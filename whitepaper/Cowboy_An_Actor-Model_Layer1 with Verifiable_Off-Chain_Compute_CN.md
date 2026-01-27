@@ -687,7 +687,7 @@ TEE 证明由专用系统 Actor（`0x97` TEE 验证器）验证，它维护：
 
 `pro_rata_payment = (work_completed / total_work_estimate) × expected_price`
 
-对于 LLM 任务，`work_completed` 以失败前生成的 token 数测量。对于 HTTP 任务，可以以完成的请求数测量。Runner 必须提供部分完成的证据（例如，部分输出、中间状态哈希）。
+对于 LLM 任务，`work_completed` 以失败前生成的 token 数测量。对于 HTTP 任务，可以以完成的请求数测量。对于 MCP 任务，以完成的工具调用数测量。Runner 必须提供部分完成的证据（例如，部分输出、中间状态哈希）。
 
 **争议解决** 任何一方都可以在挑战窗口（15 分钟）内挑战任务结果：
 

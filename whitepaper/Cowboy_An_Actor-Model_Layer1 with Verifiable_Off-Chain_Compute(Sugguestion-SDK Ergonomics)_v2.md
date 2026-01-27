@@ -29,7 +29,7 @@ Cowboy SDK 提供三种调用原语，适用于不同场景：
 |------|---------|--------|--------|----------|---------|
 | `call()` | T+0 (同交易) | ✅ 直接返回 | ✅ 共享上下文 | ✅ 级联回滚 | 原子操作、状态查询 |
 | `send()` | T+N (下一区块) | ❌ 无 | ❌ 独立交易 | ❌ 不可撤回 | 通知、触发任务 |
-| `await continuation` | T+N (链下执行后) | ✅ 恢复返回 | ❌ 独立交易 | ❌ 不可撤回 | LLM、HTTP、跨 Actor 异步 |
+| `await continuation` | T+N (链下执行后) | ✅ 恢复返回 | ❌ 独立交易 | ❌ 不可撤回 | LLM、HTTP、MCP、跨 Actor 异步 |
 
 ### 1.2 执行时序图
 
@@ -229,7 +229,7 @@ Continuation 是 Cowboy 处理跨区块异步操作的核心机制。SDK 提供�
 
 | 装饰器 | 用途 | await 目标 |
 |--------|------|-----------|
-| `@runner.continuation` | 调用链下 Runner 服务 | `runner.llm()`, `runner.http()` 等 |
+| `@runner.continuation` | 调用链下 Runner 服务 | `runner.llm()`, `runner.http()`, `runner.mcp()` 等 |
 | `@actor.continuation` | Actor 间异步请求-响应 | `ActorRef.async_*()` 方法 |
 
 **两者共享同一套编译策略和状态机机制**，区别仅在于 await 的目标不同。
@@ -813,7 +813,7 @@ flowchart TD
         Q2["原子执行多 Actor 操作"]
         Q3["发送通知（不关心结果）"]
         Q4["触发另一个 Actor 的后台任务"]
-        Q5["调用 LLM/HTTP 等链下服务"]
+        Q5["调用 LLM/HTTP/MCP 等链下服务"]
         Q6["Actor 间异步请求-响应"]
     end
 

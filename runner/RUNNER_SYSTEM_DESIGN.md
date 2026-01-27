@@ -16,7 +16,7 @@ Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市
 1. **可验证性**: 支持多种信任模型（N-of-M、TEE、ZK V2）
 2. **开放性**: 自由市场定价，Runner 自主报价
 3. **可靠性**: 健康检查、故障转移、争议解决
-4. **扩展性**: 支持多种任务类型（LLM、HTTP、自定义）
+4. **扩展性**: 支持多种任务类型（LLM、HTTP、MCP、自定义）
 5. **安全性**: 密钥管理、访问控制、防攻击机制
 
 ---
@@ -68,7 +68,7 @@ Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
 │  │  Runner 1    │  │  Runner 2    │  │  Runner 3    │         │
-│  │  (LLM/HTTP)  │  │  (LLM/HTTP)  │  │  (TEE)       │         │
+│  │  (LLM/HTTP/MCP)│ │  (LLM/HTTP/MCP)│ │  (TEE)       │         │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘         │
 │         │                 │                 │                  │
 │         └─────────────────┼─────────────────┘                  │
@@ -103,6 +103,7 @@ Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市
 | **Runner Node** | `crates/runner/` | 任务执行、结果提交、健康上报 | 🔴 待实现 |
 | **LLM Executor** | `crates/runner/llm/` | LLM 推理、模型管理 | 🔴 待实现 |
 | **HTTP Executor** | `crates/runner/http/` | HTTP 请求、数据提取 | 🔴 待实现 |
+| **MCP Executor** | `crates/runner/mcp/` | MCP 工具调用、服务器连接 | 🔴 待实现 |
 | **TEE Runtime** | `crates/runner/tee/` | TEE 环境、证明生成 | 🔴 待实现 |
 | **Consensus Client** | `crates/runner/consensus/` | N-of-M 投票、结果聚合 | 🔴 待实现 |
 
@@ -148,7 +149,8 @@ Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市
 │  │  (独立进程)   │  │  (独立进程)   │  │  (独立进程)   │ │
 │  │              │  │              │  │              │ │
 │  │  - LLM API   │  │  - HTTP      │  │  - TEE       │ │
-│  │  - 本地模型   │  │  - 数据提取   │  │  - 证明生成   │ │
+│  │  - MCP 工具  │  │  - MCP 工具  │  │  - 证明生成   │ │
+│  │  - 本地模型   │  │  - 数据提取   │  │              │ │
 │  └──────────────┘  └──────────────┘  └──────────────┘ │
 │                                                           │
 │  完全独立运行，不依赖 Node 或 PVM                          │
@@ -161,7 +163,7 @@ Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市
 |------|------|------|---------|------|
 | **PVM** | 链上，运行在 Node 内部 | 执行 Actor 的 Python 代码 | 依赖 Node 提供 HostApi、状态存储 | 确定性执行、单块原子性 |
 | **Node** | 链上 | 共识、交易执行、状态管理 | 包含 PVM 作为执行引擎 | 参与共识、维护状态 |
-| **Runner** | 链下，完全独立 | 执行 LLM、HTTP 等链下任务 | 通过消息与链上通信 | 独立进程、不参与共识、不执行 PVM 代码 |
+| **Runner** | 链下，完全独立 | 执行 LLM、HTTP、MCP 等链下任务 | 通过消息与链上通信 | 独立进程、不参与共识、不执行 PVM 代码 |
 
 #### 1.3.3 独立性体现
 
@@ -227,7 +229,7 @@ async def analyze(self, msg):
 **2. 扩展性**
 - ✅ Runner 网络可以独立扩展（增加更多 Runner）
 - ✅ 不增加链节点的负担
-- ✅ 可以支持不同类型的 Runner（LLM、HTTP、自定义）
+- ✅ 可以支持不同类型的 Runner（LLM、HTTP、MCP、自定义）
 
 **3. 安全性**
 - ✅ 链下执行不影响共识安全
@@ -505,6 +507,14 @@ pub enum JobType {
         body: Option<Vec<u8>>,
         extraction: Option<ExtractionConfig>,
         freshness: Option<FreshnessConfig>,
+    },
+    
+    /// MCP 工具调用
+    Mcp {
+        server: String,           // MCP 服务器标识符
+        tool_name: String,        // 工具名称
+        arguments: JsonValue,     // 工具参数（JSON）
+        timeout_seconds: Option<u64>, // 超时时间（秒）
     },
     
     /// 自定义任务（V2）
@@ -1091,6 +1101,162 @@ impl JobExecutor for HttpExecutor {
             source_attestation: Some(attestation),
             timestamp: SystemTime::now(),
         })
+    }
+}
+```
+
+#### 2.4.3 MCP 执行器
+
+```rust
+// crates/runner/src/mcp/executor.rs
+
+use mcp_client::{McpClient, McpTransport, ToolCallRequest};
+
+pub struct McpExecutor {
+    /// MCP 服务器连接池
+    server_connections: HashMap<String, McpClient>,
+    
+    /// 服务器配置
+    server_configs: HashMap<String, McpServerConfig>,
+    
+    /// 工具描述符缓存
+    tool_cache: RwLock<HashMap<String, ToolDescriptor>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct McpServerConfig {
+    /// 服务器名称
+    pub name: String,
+    /// 传输类型（stdio、http、websocket）
+    pub transport: McpTransportType,
+    /// 连接 URL 或命令
+    pub endpoint: String,
+    /// 认证配置（可选）
+    pub auth: Option<McpAuth>,
+    /// 超时时间（秒）
+    pub timeout_seconds: u64,
+}
+
+#[derive(Debug, Clone)]
+pub enum McpTransportType {
+    Stdio { command: String, args: Vec<String> },
+    Http { url: String },
+    WebSocket { url: String },
+}
+
+impl JobExecutor for McpExecutor {
+    async fn execute(&self, spec: &JobSpec) -> Result<JobResult, ExecutorError> {
+        let JobType::Mcp {
+            server,
+            tool_name,
+            arguments,
+            timeout_seconds,
+        } = &spec.job_type else {
+            return Err(ExecutorError::InvalidJobType);
+        };
+        
+        // 1. 获取或创建 MCP 客户端连接
+        let client = self.get_or_create_client(server).await?;
+        
+        // 2. 验证工具存在（从缓存或重新获取）
+        let tool_descriptor = self.get_tool_descriptor(server, tool_name).await?;
+        
+        // 3. 验证参数符合 schema
+        if let Some(schema) = &tool_descriptor.input_schema {
+            validate_against_schema(arguments, schema)?;
+        }
+        
+        // 4. 执行工具调用
+        let timeout = timeout_seconds.unwrap_or(30);
+        let start_time = Instant::now();
+        
+        let result = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            client.call_tool(ToolCallRequest {
+                name: tool_name.clone(),
+                arguments: arguments.clone(),
+            })
+        ).await??;
+        
+        let elapsed = start_time.elapsed();
+        
+        // 5. 构建结果
+        Ok(JobResult {
+            data: serde_json::json!({
+                "content": result.content,
+                "is_error": result.is_error,
+                "server": server,
+                "tool": tool_name,
+            }),
+            usage: ResourceUsage {
+                input_tokens: 0,
+                output_tokens: 0,
+                wall_time_seconds: elapsed.as_secs(),
+                memory_mb: 0,
+            },
+            tee_attestation: None,
+            source_attestation: None,
+            timestamp: SystemTime::now(),
+        })
+    }
+}
+
+impl McpExecutor {
+    /// 获取或创建 MCP 客户端连接
+    async fn get_or_create_client(&self, server: &str) -> Result<&McpClient, ExecutorError> {
+        if !self.server_connections.contains_key(server) {
+            let config = self.server_configs.get(server)
+                .ok_or(ExecutorError::McpServerNotFound(server.to_string()))?;
+            
+            let client = match &config.transport {
+                McpTransportType::Stdio { command, args } => {
+                    McpClient::connect_stdio(command, args).await?
+                }
+                McpTransportType::Http { url } => {
+                    McpClient::connect_http(url).await?
+                }
+                McpTransportType::WebSocket { url } => {
+                    McpClient::connect_ws(url).await?
+                }
+            };
+            
+            // 初始化连接
+            client.initialize().await?;
+            
+            self.server_connections.insert(server.to_string(), client);
+        }
+        
+        Ok(self.server_connections.get(server).unwrap())
+    }
+    
+    /// 获取工具描述符（带缓存）
+    async fn get_tool_descriptor(
+        &self, 
+        server: &str, 
+        tool_name: &str
+    ) -> Result<ToolDescriptor, ExecutorError> {
+        let cache_key = format!("{}:{}", server, tool_name);
+        
+        // 尝试从缓存获取
+        if let Some(descriptor) = self.tool_cache.read().await.get(&cache_key) {
+            return Ok(descriptor.clone());
+        }
+        
+        // 从服务器获取工具列表
+        let client = self.get_or_create_client(server).await?;
+        let tools = client.list_tools().await?;
+        
+        // 更新缓存
+        let mut cache = self.tool_cache.write().await;
+        for tool in &tools {
+            let key = format!("{}:{}", server, tool.name);
+            cache.insert(key, tool.clone());
+        }
+        
+        // 返回请求的工具
+        tools.into_iter()
+            .find(|t| t.name == tool_name)
+            .ok_or(ExecutorError::McpToolNotFound(tool_name.to_string()))
     }
 }
 ```

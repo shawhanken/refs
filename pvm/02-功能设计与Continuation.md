@@ -109,7 +109,7 @@ CBOR Map {
 ```text
 CBOR Map {
   "kind": "runner_job",
-  "job_type": "llm" | "http" | "custom",
+  "job_type": "llm" | "http" | "mcp" | "custom",
   "payload": map,
   "cid": bytes32,
   "reply_to": bytes20,

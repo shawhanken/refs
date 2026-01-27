@@ -687,7 +687,7 @@ For impossible jobs and external faults, runners receive partial payment based o
 
 `pro_rata_payment = (work_completed / total_work_estimate) × expected_price`
 
-For LLM jobs, `work_completed` is measured in tokens generated before failure. For HTTP jobs, it may be measured in requests completed. The runner must provide evidence of partial completion (e.g., partial output, intermediate state hash).
+For LLM jobs, `work_completed` is measured in tokens generated before failure. For HTTP jobs, it may be measured in requests completed. For MCP jobs, it is measured by tool calls completed. The runner must provide evidence of partial completion (e.g., partial output, intermediate state hash).
 
 **Dispute Resolution** Any party can challenge a job outcome within the challenge window (15 minutes):
 

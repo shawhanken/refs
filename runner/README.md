@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市场**。Runner 节点是完全独立运行的链下服务，通过 JSON-RPC 2.0 协议与链上 System Actors 通信，执行 LLM 推理、HTTP 请求等链下任务。
+Runner 系统是 Cowboy 链的核心创新，提供**可验证的链下计算市场**。Runner 节点是完全独立运行的链下服务，通过 JSON-RPC 2.0 协议与链上 System Actors 通信，执行 LLM 推理、HTTP 请求、MCP 工具调用等链下任务。
 
 ### 核心特性
 

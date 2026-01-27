@@ -336,7 +336,7 @@ let options = ExecutionOptions {
 // 根据白皮书定义 Runner Job 格式
 pub struct RunnerJob {
     pub kind: "runner_job",
-    pub job_type: "llm" | "http" | "custom",
+    pub job_type: "llm" | "http" | "mcp" | "custom",
     pub payload: CborValue,
     pub cid: [u8; 32],
     pub reply_to: [u8; 20],

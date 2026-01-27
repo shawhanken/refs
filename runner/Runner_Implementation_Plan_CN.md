@@ -98,7 +98,7 @@ def mode() -> str:
 ```
 
 - `mode == "fsm"`：启用 `@runner.continuation` / `@actor.continuation` 装饰器逻辑。
-- `mode == "checkpoint"`：`runner.llm/http` 返回 awaitable，触发 checkpoint。
+- `mode == "checkpoint"`：`runner.llm/http/mcp` 返回 awaitable，触发 checkpoint。
 
 #### 存储命名空间（建议）
 
@@ -356,7 +356,7 @@ def mode() -> str:
 
 ## 里程碑（建议）
 
-- M1：Host API + SDK 基础 + mock runner（仅 `runner.llm/http`，无验证）。
+- M1：Host API + SDK 基础 + mock runner（仅 `runner.llm/http/mcp`，无验证）。
 - M2：Continuation（方案 A: checkpoint 承接；方案 B: FSM 编译）+ 状态存储 + timeout/guard。
 - M3：Verify.builder + JSON schema 校验 + RunnerValidationError。
 - M4：Runner 系统 Actor 与 registry/dispatch/lanes/结算（链侧）。
@@ -433,7 +433,7 @@ async def analyze(self, msg):
 ```text
 RunnerJob {
   kind: "runner_job",
-  job_type: "llm" | "http" | "custom",
+  job_type: "llm" | "http" | "mcp" | "custom",
   payload: map,
   cid: bytes32,
   reply_to: bytes20,

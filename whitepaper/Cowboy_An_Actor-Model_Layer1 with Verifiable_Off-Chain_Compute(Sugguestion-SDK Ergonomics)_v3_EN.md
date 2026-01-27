@@ -29,7 +29,7 @@ The Cowboy SDK provides three call primitives for different scenarios:
 |-----------|-----------------|--------------|-----------|----------------------|-------------------|
 | `call()` | T+0 (same transaction) | ✅ Direct return | ✅ Shared context | ✅ Cascading rollback | Atomic operations, state queries |
 | `send()` | T+N (next block) | ❌ None | ❌ Independent transaction | ❌ Irrevocable | Notifications, triggering tasks |
-| `await continuation` | T+N (after off-chain execution) | ✅ Resume return | ❌ Independent transaction | ❌ Irrevocable | LLM, HTTP, cross-Actor async |
+| `await continuation` | T+N (after off-chain execution) | ✅ Resume return | ❌ Independent transaction | ❌ Irrevocable | LLM, HTTP, MCP, cross-Actor async |
 
 ### 1.2 Execution Sequence Diagram
 
@@ -229,7 +229,7 @@ Continuation is the core mechanism for Cowboy to handle cross-block asynchronous
 
 | Decorator | Purpose | await Target |
 |-----------|---------|--------------|
-| `@runner.continuation` | Call off-chain Runner services | `runner.llm()`, `runner.http()`, etc. |
+| `@runner.continuation` | Call off-chain Runner services | `runner.llm()`, `runner.http()`, `runner.mcp()`, etc. |
 | `@actor.continuation` | Inter-Actor async request-response | `ActorRef.async_*()` methods |
 
 **Both share the same compilation strategy and state machine mechanism**, differing only in the await target.
@@ -813,7 +813,7 @@ flowchart TD
         Q2["Atomically execute multi-Actor operation"]
         Q3["Send notification (don't care about result)"]
         Q4["Trigger another Actor's background task"]
-        Q5["Call LLM/HTTP and other off-chain services"]
+        Q5["Call LLM/HTTP/MCP and other off-chain services"]
         Q6["Inter-Actor async request-response"]
     end
 
