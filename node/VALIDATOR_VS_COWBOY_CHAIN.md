@@ -65,6 +65,7 @@ cargo build --release --bin validator
 # 或者直接使用 cargo run
 cargo run --bin validator -- --config test/config.yaml --peers test/peers.yaml
 ```
+cargo run --bin validator -- --peers=/home/ubuntu/workspace/node/test/peers.yaml --config=/home/ubuntu/workspace/node/test/c7d6c9694b7e4331a7b2538b4202e8d658193543616047b621620aa2a3ef5d74.yaml
 
 ## 为什么有两个名称？
 
