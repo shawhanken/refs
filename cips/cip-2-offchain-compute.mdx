@@ -1,0 +1,153 @@
+---
+title: "CIP-2: Verifiable Off-Chain Compute"
+description: Framework for executing verifiable, asynchronous off-chain computations
+icon: microchip
+---
+
+<Note>
+  **Status:** Draft for Internal Review  
+  **Type:** Standards Track  
+  **Category:** Core  
+  **Created:** 2025-10-02
+</Note>
+
+<Tip>
+  This specification defines the verifiable, asynchronous off‑chain compute framework (VRF‑based selection, mandatory result_schema, and deferred callbacks per CIP‑1). Content below mirrors the CIP text verbatim.
+</Tip>
+
+# CIP-2: Verifiable Asynchronous Off-chain Computation Framework
+
+---
+
+### **Abstract**
+
+This proposal introduces a framework for executing verifiable, off-chain computations within the Cowboy ecosystem. It defines a standardized, asynchronous protocol for smart contracts to request external data fetching, complex computations, or AI model inferences from a decentralized network of off-chain "Runners." The architecture is built on a deterministic, VRF-based selection mechanism, allowing for verifiable and implicit task assignment. The core design philosophy emphasizes user-centric verification, task clarity through mandatory result schemas, and on-chain stability via a deferred transaction model for callbacks.
+
+---
+
+### **Motivation**
+
+To unlock advanced use cases involving AI/ML, large datasets, or Web2 APIs, smart contracts need a secure and reliable bridge to the off-chain world. This CIP proposes a flexible and unopinionated approach, tailored for Cowboy's on-chain Python environment, that addresses the limitations of existing oracle solutions.
+
+This framework empowers developers to:
+
+1. **Integrate Complex Logic:** Run Python-based AI model inferences or heavy computations off-chain.  
+2. **Preserve On-chain Stability:** Utilize an asynchronous, deferred transaction model to prevent network congestion from off-chain interactions.  
+3. **Achieve Verifiable Decentralization:** Leverage a VRF-based system to eliminate centralized schedulers and allow anyone to verify task assignments.  
+4. **Enforce Clarity:** Mandate task and result schemas to reduce ambiguity and ensure Runners can reliably execute and be verified.  
+5. **Choose Their Trust Model:** Allow developers to select the number of Runners and the type of cryptographic proof required for their specific application's needs.
+
+---
+
+### **Specification**
+
+The framework consists of four main components:
+
+1. **The Off-chain Task Dispatcher:** A contract for developers to submit and define tasks.  
+2. **The Runner Registry:** A contract managing Runner registration, staking, and the health-based active runner list.  
+3. **The Runner Submission Contract:** A dedicated contract for Runners to submit results or skip tasks.  
+4. **Off-chain Runners:** External actors who execute tasks and interact with the on-chain contracts.
+
+#### **1. Task Definition and Result Schema**
+
+To ensure clarity and verifiability, every off-chain task submission **must** include a result_schema. This is a bytes payload that defines the explicit constraints of the task and its expected output. This allows the protocol to perform basic, objective validation and protects both developers and Runners.
+
+The schema should define parameters such as:
+
+* max_return_bytes: The maximum size of the result_data to prevent gas-bombing attacks.  
+* expected_execution_ms: A target execution time to help Runners assess feasibility.  
+* data_format: A description of the expected data structure (e.g., JSON schema, binary format).
+
+#### **2. Core Workflow (Asynchronous & Deferred)**
+
+1. **Task Submission:** A developer's Actor contract calls submit_task on the **Dispatcher**, providing the task definition and the result_schema. The state of the **active runner list** and the current **VRF seed** are fixed at this submission block for deterministic selection.  
+2. **Implicit Runner Selection:** Off-chain Runners continuously monitor for new tasks. For each new task, a Runner can locally and independently run the on-chain verification logic to determine if they have been selected.  
+3. **Task Execution or Skipping:**  
+   * A selected Runner executes the task off-chain according to the definition.  
+   * If a Runner chooses not to execute, they must call skip_task on the **Runner Submission Contract**. This passes the responsibility to the next Runner in the deterministic sequence.  
+4. **Result Submission:** The executing Runner calls submit_result on the **Runner Submission Contract**, providing the result and any requested proof. The contract verifies that:  
+   * The caller is a legitimately selected Runner for this task.  
+   * The result payload size does not exceed max_return_bytes from the schema.  
+5. **Deferred Callback:** Once the required number of results (N) has been collected, the Runner Submission Contract constructs and signs a **deferred transaction** (per CIP-1). This transaction contains the call to the developer's callback function with all submitted results.  
+6. **Callback Execution:** Network validators include and execute this deferred transaction in a future block, guaranteeing its completion without impacting the performance of the core protocol.  
+7. **Result Consumption & Payment:** Within the callback, the Actor contract processes the results and **must** call consume_result on the Dispatcher, specifying which Runner's result it used. This final step triggers the distribution of payment to the Runners.
+
+#### **3. The Off-chain Task Dispatcher**
+
+Resides at a canonical address (e.g., 0x0...cowboy.offchain).
+
+**Data Structures:**
+
+| struct OffchainTask:    task_id: uint256    caller: address    task_definition: bytes    result_schema: bytes *# MANDATORY: Defines output constraints*    callback_address: address    callback_selector: bytes4    num_runners_requested: uint8    payment_per_runner: uint256    submission_block: uint64    timeout_block: uint64    proof_type_requested: uint8    status: uint8 |
+| :---- |
+
+**Interface:**
+
+* submit_task(task_definition: bytes, result_schema: bytes, callback_address: address, callback_selector: bytes4, num_runners: uint8, timeout_blocks: uint64, proof_type_requested: uint8) -> uint256:  
+  * Called by an Actor to initiate a task. Locks funds and emits a TaskSubmitted event. Returns a task_id.  
+* consume_result(task_id: uint256, consumed_runner_address: address):  
+  * Called by the Actor from within its callback. Finalizes the task and triggers payment distribution.
+
+#### **4. The Runner Registry & Active List Management**
+
+Manages Runner identity and maintains the deterministic list of active Runners.
+
+**Data Structures:**
+
+| struct RunnerProfile:    stake_amount: uint256    tasks_completed: uint64    tasks_failed: uint64    tasks_skipped: uint64    last_heartbeat_block: uint64    health: uint8 |
+| :---- |
+
+**Active List Management:**
+
+The Registry maintains an ordered array active_runner_list.
+
+* **Heartbeat (heartbeat()):** A Runner calls this to signal liveness. If not in the list, they are appended with max health (a governable parameter, e.g., 100 blocks). If already in the list, their health is reset to max.  
+* **Health Decay:** For every block, a protocol-level process decrements the health of each Runner in the list.  
+* **Removal:** If a Runner's health reaches 0, they are removed from active_runner_list. This ensures the list is dynamic and contains only responsive participants.
+
+#### **5. The Runner Submission Contract**
+
+Resides at a dedicated address (e.g., 0x0...cowboy.runner.submit).
+
+**Interface:**
+
+* submit_result(task_id: uint256, result_data: bytes, proof: bytes, execution_time_ms: uint64):  
+  * Verifies the msg.sender is a selected Runner for the task_id using the VRF logic.  
+  * Validates result_data against the task's result_schema.  
+  * Stores the result and checks if the callback can be triggered.  
+* skip_task(task_id: uint256):  
+  * Verifies the msg.sender is a selected Runner.  
+  * Records that this Runner has waived execution for this task, allowing the next Runner in the sequence to take their place.
+
+#### **6. Verifiable Runner Selection (VRF-based)**
+
+This mechanism ensures a decentralized, predictable, and verifiable selection process.
+
+* Logic: The selection is determined by a network-wide VRF seed that is periodically updated. For a task submitted at submission_block, the starting index in the active_runner_list is calculated as:  
+  start_index=hash(vrf_seed+(submission_block−vrf_generation_block))(modlist_size)  
+* **Selection:** The N requested Runners are those at indices start_index, start_index + 1, ..., start_index + N - 1, using ring buffer logic (wrapping around the list).  
+* **Verification:** The is_runner_selected_for_task logic (as detailed in the pseudocode) is implemented on-chain within the Runner Submission Contract. This function accounts for the historical state of the active list and any skips to definitively prove if a submission is valid.
+
+---
+
+### **Rationale**
+
+* **VRF-based Selection:** This decentralizes the selection process, removing a critical point of failure and control. It makes selection transparent and mathematically verifiable by anyone.  
+* **Deferred Transactions:** By integrating with CIP-1, we offload the gas-intensive and potentially long-running callback transactions from the main execution flow, enhancing the network's overall stability and predictability.  
+* **Mandatory Result Schemas:** This simple requirement drastically improves the robustness of the system. It creates a clear contract between developers and Runners, prevents entire classes of abuse (like gas-bombing), and simplifies result verification.  
+* **Health-Based Active List:** The health mechanism provides a fluid and self-correcting list of reliable Runners, ensuring that tasks are assigned to nodes that are consistently online and responsive.
+
+---
+
+### **Backwards Compatibility**
+
+This CIP is fully backwards compatible. It introduces new canonical contracts and functionalities without altering any existing core protocol rules or transaction formats.
+
+---
+
+### **Security Considerations**
+
+* **VRF Grinding:** An attacker could try to influence the submission_block of their task to get a favorable start_index. This is mitigated by the fact that block production itself is a decentralized process, making precise timing difficult and expensive.  
+* **Active List Manipulation:** A sophisticated attacker could try to manipulate the active_runner_list by timing heartbeats or spamming new registrations. The minimum stake requirement and the cost of sending heartbeat transactions serve as economic deterrents.  
+* **Callback Griefing:** A malicious developer could write a callback that always fails, preventing Runners from being paid. The on-chain failed_callbacks counter on the developer's contract serves as a reputational penalty, and Runners may choose to blacklist actors with high failure rates.  
+* **Collusion:** Collusion among Runners remains a risk. This is primarily mitigated by the developer (by requesting proofs or a larger N) and the pseudo-randomness of the VRF selection, which makes it difficult for a cabal to be selected together consistently.
