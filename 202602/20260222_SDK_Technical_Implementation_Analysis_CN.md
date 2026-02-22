@@ -1,868 +1,992 @@
-# Cowboy SDK 技术实现路径分析
+# Cowboy SDK (`cowboy_sdk`) 技术实现路径分析
 
 **日期**: 2026-02-22
-**状态**: 分析报告
+**版本**: v2 (修订版)
+**状态**: 技术规划
 **范围**: CIP-6 SDK 规范 vs 现有代码实现对比，完整实现路径
+**原则**: 立足长远，消除隐患，不做短视妥协
 
 ---
 
-## 一、总体架构概述
+## 零、修订说明
 
-Cowboy SDK 的设计目标是在确定性 Python VM (PVM) 之上提供高级开发者抽象，隐藏底层的消息传递、Timer、Gas 计量等机制。SDK 分布在以下三层：
+本版本（v2）相对于初版做出以下根本性修正：
 
-```
-┌────────────────────────────────────────────────────┐
-│  开发者代码层 (Developer Code)                      │
-│  @actor, call(), send(), await runner.llm(), ...   │
-├────────────────────────────────────────────────────┤
-│  Python SDK 层 (pvm_sdk)                           │
-│  actor.py, runner.py, continuation.py, verify.py   │
-│  types.py, pvm_random.py, pvm_time.py, ...         │
-├────────────────────────────────────────────────────┤
-│  Host API 层 (pvm_host - Rust)                     │
-│  send_message, get/set/delete_state, context,      │
-│  randomness, runtime_config, emit_event, gas meter │
-├────────────────────────────────────────────────────┤
-│  PVM Runtime (Rust: pvm-runtime + RustPython)      │
-│  确定性执行、Continuation (FSM/Checkpoint)、         │
-│  SoftFloat、模块白名单、Gas 计量                     │
-├────────────────────────────────────────────────────┤
-│  链核心 (cowboy-chain)                              │
-│  ExecutionEngine, BlockchainStorage, Consensus      │
-└────────────────────────────────────────────────────┘
-```
+| 初版决策 | 问题 | v2 修正 |
+|---------|------|--------|
+| 包名 `pvm_sdk`→`cowboy_sdk` 推迟到 Phase 4 | 每一天的延迟都在累积迁移债务 | **Phase 0 第一步**完成重命名 |
+| 序列化"短期保持 JSON，中期迁 CBOR" | JSON 格式的存量 Continuation 状态在 CBOR 切换后不可读，造成链上数据断裂 | **从第一天起使用 CBOR**，通过 Host API 暴露 Rust 侧 CBOR 编解码 |
+| "Checkpoint 为默认，FSM 作为优化路径" | Checkpoint 捕获整个 Python 执行栈，快照体积大、含运行时内部状态、跨版本不兼容 | **FSM 为唯一的链上生产路径**；Checkpoint 仅用于本地开发调试，不进入共识 |
+| Guard 校验推迟到 Phase 1 | 没有 Guard 的 Continuation = 没有安全带的汽车；一旦有开发者基于无 Guard 的 SDK 部署合约，后续修补成为破坏性变更 | Guard 校验与 Continuation **同步交付**，不分离 |
+| 安全机制 (`reentrancy_guard`, `bounded_loop`, `capture` 类型检查) 标为 P1/P2 | 安全机制不是"优化"，是基础设施；主网前缺少这些机制会导致真实攻击面 | 全部提升为 **P0**，与对应功能同步交付 |
+| 确定性测试放在 Phase 4 | 非确定性 bug 越晚发现修复成本越高，可能导致链分叉 | **每个 Phase 自带确定性测试**，CI 强制执行 |
+| 按水平层（原语层→Continuation→类型→异步→测试）切分 | 各层耦合紧密，横切导致半成品无法独立验证 | **按垂直切片**推进，每个 Phase 交付端到端可验证的完整功能 |
+| SoftFloat 是 `str` 包装器 | `SoftFloat("0.5") > SoftFloat("0.3")` 做的是字符串比较，得到错误结果 `True`（"5" > "3" 恰好对但 "0.9" > "0.10" 就不对） | SoftFloat 必须对接 PVM 层的 softfloat 算术，或**直接使用 PVM 全局 float 替换** |
 
 ---
 
-## 二、现有代码实现状态分析
+## 一、架构全景
+
+### 1.1 四层架构
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  开发者代码层 (Developer Code)                                  │
+│  from cowboy_sdk import actor, call, send, runner, capture     │
+│  @actor class MyAgent: ...                                     │
+├────────────────────────────────────────────────────────────────┤
+│  cowboy_sdk (Python)                                           │
+│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌────────┐ ┌─────────┐ │
+│  │ call.py │ │ send.py │ │runner.py │ │actor.py│ │verify.py│ │
+│  └─────────┘ └─────────┘ └──────────┘ └────────┘ └─────────┘ │
+│  ┌──────────────┐ ┌──────────┐ ┌────────┐ ┌──────────────┐   │
+│  │continuation  │ │ guards   │ │types   │ │ models       │   │
+│  └──────────────┘ └──────────┘ └────────┘ └──────────────┘   │
+├────────────────────────────────────────────────────────────────┤
+│  pvm_host (Rust → Python 绑定)                                 │
+│  send_message │ call_actor │ get/set/delete_state │ context   │
+│  randomness │ emit_event │ cbor_encode/decode │ keccak256    │
+│  set_timer │ cancel_timer │ self_address │ transfer           │
+├────────────────────────────────────────────────────────────────┤
+│  PVM Runtime (Rust: pvm-runtime + RustPython)                  │
+│  确定性执行 │ FSM 编译器 │ SoftFloat │ 模块白名单 │ Gas 计量   │
+├────────────────────────────────────────────────────────────────┤
+│  链核心 (cowboy-chain)                                         │
+│  ExecutionEngine │ BlockchainStorage │ Simplex BFT Consensus   │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 核心设计不变量
+
+以下原则是架构级约束，贯穿所有 Phase，**任何实现决策不得违反**：
+
+| # | 不变量 | 违反后果 |
+|---|--------|---------|
+| I-1 | 所有跨信任边界数据使用 **Canonical CBOR** (RFC 8949) | 链分叉 / 状态不一致 |
+| I-2 | SDK 公共 API 名称空间统一为 **`cowboy_sdk`** | 生态碎片化 / 文档矛盾 |
+| I-3 | Continuation 的链上生产模式为 **FSM**，状态以 CBOR 显式序列化 | 跨版本不兼容 / 状态膨胀 |
+| I-4 | 所有安全机制（Guard、Reentrancy、BoundedLoop、TypeCheck）**与对应功能同步交付** | 攻击面暴露 |
+| I-5 | 每个新增功能**自带确定性测试**，CI 跨平台验证 | 非确定性 bug 延迟爆发 |
+| I-6 | 浮点运算**全局使用 SoftFloat**（PVM 层替换），SDK 不提供独立的 SoftFloat 类型包装 | 共识分歧 |
+| I-7 | SDK 版本号遵循 **语义化版本 (SemVer)**，主网前标记为 `0.x`，公共 API 变更必须显式弃用 | API 断裂 |
+
+---
+
+## 二、现有代码实现状态
 
 ### 2.1 Python SDK 层 (`node/pvm/Lib/pvm_sdk/`)
+
+> 注意：当前目录名为 `pvm_sdk`，Phase 0 将重命名为 `cowboy_sdk`。
 
 | 文件 | 功能 | 实现状态 | 完成度 |
 |------|------|---------|--------|
 | `__init__.py` | SDK 入口、模块导出 | ✅ 已实现 | 90% |
-| `continuation.py` | Capture/序列化/Continuation 状态管理 | ✅ 基本实现 | 70% |
-| `runner.py` | Runner 任务发送、Awaitable | ⚠️ 部分实现 | 40% |
-| `actor.py` | ActorRef、Actor 间异步调用 | ⚠️ 骨架实现 | 20% |
-| `verify.py` | 验证构建器 | ⚠️ 部分实现 | 30% |
-| `types.py` | PVM 安全类型 | ⚠️ 存根实现 | 10% |
-| `pvm_random.py` | 确定性随机数 | ✅ 完整实现 | 95% |
+| `continuation.py` | Capture/序列化/Continuation 状态管理 | ⚠️ 基本实现（JSON 序列化，Guard 未校验） | 50% |
+| `runner.py` | Runner 任务发送、Awaitable | ⚠️ 部分实现（仅 Checkpoint 模式） | 35% |
+| `actor.py` | ActorRef、Actor 间异步调用 | ⚠️ 骨架实现（await 直接抛异常） | 15% |
+| `verify.py` | 验证构建器 | ⚠️ 部分实现（3/17 检查器） | 25% |
+| `types.py` | PVM 安全类型 | ❌ 存根（`SoftFloat` 是 `str` 子类，无算术能力） | 5% |
+| `pvm_random.py` | 确定性随机数 (VRF) | ✅ 完整实现 | 95% |
 | `pvm_time.py` | 区块时间 | ✅ 已实现 | 90% |
 | `pvm_sys.py` | 系统元数据 | ✅ 已实现 | 90% |
 | `runtime.py` | 运行时模式检测 | ✅ 已实现 | 90% |
 
 ### 2.2 Rust Host API 层 (`node/chain/src/pvm_host.rs`)
 
-已实现的 Host API 方法：
+**已暴露给 Python 的 Host API**：
 
-| 方法 | 功能 | CIP-6 需求覆盖 |
-|------|------|---------------|
-| `send_message(target, payload)` | 发送消息到目标 Actor | send() 的底层支撑 |
-| `get_state(key)` | 读取 Actor 存储 | storage.get() |
-| `set_state(key, value)` | 写入 Actor 存储 | storage.set() |
-| `delete_state(key)` | 删除存储键 | Continuation 清理 |
-| `context()` | 获取执行上下文 | block_height, sender, tx_hash 等 |
-| `randomness(domain)` | VRF 确定性随机 | pvm_random 支撑 |
-| `runtime_config()` | 运行时配置 | continuation_mode 检测 |
-| `emit_event(topic, data)` | 发出事件 | 日志/审计 |
-| `call_actor(target, method, args, cycles)` | 同步调用 Actor | call() 的底层支撑 |
+| 方法 | 功能 | 状态 |
+|------|------|------|
+| `send_message(target, payload)` | 发送消息到目标 Actor | ✅ |
+| `get_state(key)` | 读取 Actor 存储 | ✅ |
+| `set_state(key, value)` | 写入 Actor 存储 | ✅ |
+| `delete_state(key)` | 删除存储键 | ✅ |
+| `context()` | 执行上下文 (block_height, sender, tx_hash 等) | ✅ |
+| `randomness(domain)` | VRF 确定性随机 | ✅ |
+| `runtime_config()` | 运行时配置 | ✅ |
+| `emit_event(topic, data)` | 发出事件 | ✅ |
+| `call_actor(target, method, args, cycles)` | 同步调用 Actor | ✅ (需验证 Python 绑定) |
 
-**缺失的 Host API**:
-- `set_timer()` / `cancel_timer()` — Timer 系统的 Host 调用
-- `get_balance()` — 查询余额
-- `transfer()` — 价值转移
-- `get_code_hash()` — 查询 Actor 代码哈希
+**需新增的 Host API** (按 Phase 排列)：
 
-### 2.3 PVM Runtime 层
+| Host API | 用途 | 所属 Phase | 阻塞功能 |
+|----------|------|-----------|---------|
+| `cbor_encode(value) → bytes` | Canonical CBOR 编码 | Phase 0 | 所有序列化 |
+| `cbor_decode(data) → value` | CBOR 解码 | Phase 0 | 所有反序列化 |
+| `keccak256(data) → bytes` | 哈希计算 | Phase 0 | Guard 指纹 |
+| `self_address() → bytes` | 当前 Actor 地址 | Phase 0 | ActorRef |
+| `current_block() → int` | 当前区块高度 | Phase 0 | BlockHeight |
+| `get_balance(addr) → int` | 查询余额 | Phase 1 | 状态查询 |
+| `transfer(to, amount)` | 价值转移 | Phase 1 | 原生转账 |
+| `set_timer(height, handler, data) → id` | 设置定时器 | Phase 1 | Timeout |
+| `cancel_timer(timer_id)` | 取消定时器 | Phase 1 | Timeout 清理 |
 
-| 组件 | 实现状态 | 说明 |
-|------|---------|------|
-| RustPython VM | ✅ 完整 | 基于 RustPython fork，支持确定性执行 |
-| SoftFloat | ✅ 已实现 | `vm/src/softfloat.rs`，56 个测试通过 |
-| Continuation - Checkpoint 模式 | ✅ 已实现 | 运行时保存/恢复，可跨块 |
-| Continuation - FSM 模式 | ⚠️ 骨架存在 | `codegen/src/pvm_fsm.rs` 存在，但编译器未完整 |
-| 确定性子系统 | ✅ 已实现 | 模块白名单、固定哈希种子、无 JIT |
-| Gas 计量 (Cycles) | ✅ 已实现 | 字节码级别计量 |
-| Gas 计量 (Cells) | ✅ 已实现 | I/O 边界计量 |
-| 模块白名单 | ✅ 已实现 | `determinism.rs` 管理 |
+### 2.3 PVM Runtime / Runner 系统状态
 
-### 2.4 Runner 系统
-
-| 组件 | 实现状态 | 说明 |
-|------|---------|------|
-| LLM 执行器 | ✅ 已实现 | OpenAI / Anthropic API |
-| HTTP 执行器 | ✅ 已实现 | GET/POST/PUT 等 |
-| MCP 执行器 | ✅ 已实现 | Model Context Protocol |
-| 结果验证器 | ✅ 已实现 | 6 种验证模式 |
-| Runner 注册表 | ✅ 已实现 | VRF 选择 |
-| 任务分发器 | ✅ 已实现 | 链上 System Actor |
-| TEE 验证器 | ⚠️ 框架实现 | 具体验证逻辑待完善 |
+| 组件 | 状态 | 关键发现 |
+|------|------|---------|
+| RustPython VM + 确定性子系统 | ✅ 完整 | 模块白名单、固定哈希种子、无 JIT |
+| SoftFloat (Rust) | ✅ 56 测试通过 | `vm/src/softfloat.rs`，可全局替换 Python float |
+| Continuation - Checkpoint | ✅ 可用 | `rustpython_checkpoint`，仅适合开发调试 |
+| Continuation - FSM 编译器 | ⚠️ 骨架 | `codegen/src/pvm_fsm.rs` 存在但不完整 |
+| Gas 计量 (Cycles + Cells) | ✅ 完整 | 字节码级 + I/O 边界双计量 |
+| Runner (LLM/HTTP/MCP) | ✅ 完整 | 链下执行 + 6 种验证模式 |
+| VRF (3 层) | ✅ 33 测试通过 | HKDF + EC-VRF + Threshold-BLS |
 
 ---
 
-## 三、CIP-6 规范与现有代码的详细差距分析
-
-### 3.1 调用原语 (Chapter 1)
-
-#### `call()` — 同步调用 (T+0)
-
-**CIP-6 规范要求**:
-```python
-balance = call(
-    target="0x1111...",
-    method="get_balance",
-    args={"user": user},
-    cycles_limit=5000
-)
-```
-
-**当前实现状态**: ⚠️ 底层 Host API 存在 (`call_actor`)，但 Python 层无封装
-
-**差距**:
-- Python SDK 缺少 `call()` 顶层函数
-- 缺少 `cycles_limit` 参数传递
-- 缺少调用深度检查 (最大 32 层)
-- 缺少返回值 CBOR 反序列化
-- 缺少 `ActorRef` 语法糖 (如 `oracle.get_price("ETH")` 自动编译为 `call(...)`)
-
-**实现路径**:
-1. 在 `pvm_sdk/__init__.py` 导出 `call()` 函数
-2. `call()` 内部调用 `pvm_host.call_actor(target, method, cbor_encode(args), cycles_limit)`
-3. 返回值进行 CBOR 解码
-4. `ActorRef.__getattr__` 通过 `__call__` 代理为 `call()` 调用
-
-#### `send()` — 异步消息 (T+N)
-
-**CIP-6 规范要求**:
-```python
-send(target="0x3333...", message={"action": "notify", "order_id": order_id})
-```
-
-**当前实现状态**: ⚠️ 底层 `pvm_host.send_message()` 存在，但 Python 层仅在 `runner.py` 内部使用
-
-**差距**:
-- 缺少 `send()` 顶层函数
-- 当前 `send_message()` 接受原始 bytes payload，无自动序列化
-- 缺少消息 ID 生成逻辑的 Python 封装
-- 缺少扇出限制检查 (每交易最多 1024 条)
-
-**实现路径**:
-1. 在 `pvm_sdk/__init__.py` 导出 `send()` 函数
-2. `send(target, message)` → `pvm_host.send_message(target, cbor_encode(message))`
-3. 消息 ID 由 Host 层自动生成
-
-#### `@reentrancy_guard` — 重入保护
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. 创建 `pvm_sdk/guards.py`
-2. 装饰器在方法入口时通过 `pvm_host.get_state()` 检查锁状态
-3. 锁键: `keccak256(method_name + caller_addr)`
-4. 入口加锁、出口解锁（包括异常路径）
-
-### 3.2 Continuation 机制 (Chapter 2)
-
-#### `@runner.continuation` — FSM 编译
-
-**CIP-6 规范要求**:
-```python
-@runner.continuation
-async def example(self, msg):
-    ctx = capture()
-    ctx.a = await runner.llm("step1")
-    ctx.b = await runner.llm(f"step2: {ctx.a}")
-    return ctx.b
-```
-编译为显式 FSM 状态机。
-
-**当前实现状态**:
-- Checkpoint 模式 ✅: `_RunnerAwaitable.__await__` 通过 `rustpython_checkpoint.checkpoint_bytes()` 实现暂停/恢复
-- FSM 模式 ⚠️: `runner.continuation` 装饰器是空壳 (直接返回原函数)，`pvm_fsm.rs` 有骨架但编译器不完整
-
-**差距**:
-- FSM 编译器 (`codegen/src/pvm_fsm.rs`) 需要完成 AST → 状态机转换
-- 需要实现 `example__resume()` 自动生成
-- 缺少 `await` 点计数限制 (最多 8 个)
-- 缺少嵌套函数 await 的静态检查
-
-**实现路径**（两条路线，可并行）:
-
-**路线 A — Checkpoint 模式优先（当前可用）**:
-1. 保持现有 `rustpython_checkpoint` 机制
-2. 完善 `_RunnerAwaitable`，增加 `timeout_blocks`、`verification` 参数
-3. 优点: 简单、已可用；缺点: 状态快照较大、恢复成本高
-
-**路线 B — FSM 编译器（长期目标）**:
-1. 完善 `codegen/src/pvm_fsm.rs`，实现 Python AST → FSM 代码变换
-2. 在部署阶段（`compile_actor()`）执行转换
-3. 每个 `await` 生成一个 `state_N` 分支
-4. 优点: 状态精简、确定性强；缺点: 实现复杂度高
-
-**推荐策略**: 短期以 Checkpoint 模式为生产可用基线，中期开发 FSM 编译器。
-
-#### `capture()` — 显式状态捕获
-
-**当前实现状态**: ✅ 基本实现
-
-`Capture` 类已实现属性动态存取、序列化/反序列化：
-```python
-class Capture:
-    def __getattr__(self, name): ...
-    def __setattr__(self, name, value): ...
-    def to_dict(self) -> dict: ...
-    @classmethod
-    def from_dict(cls, value) -> Capture: ...
-```
-
-**差距**:
-- 缺少 CBOR 序列化（当前使用 JSON）
-- 缺少类型安全检查（禁止闭包、函数引用、生成器）
-- 缺少大小限制 (单个 Continuation 最大 64 KiB)
-
-**实现路径**:
-1. 将 `_encode_json` / `_decode_json` 替换为 CBOR 编码（使用 `cbor2` 或 Rust 侧 CBOR）
-2. 在 `__setattr__` 中添加类型白名单检查
-3. 在 `save_cont()` 中添加大小检查
-
-#### `@bounded_loop` — 有界循环
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. 创建装饰器 `bounded_loop(max_iterations=N)`
-2. 在编译/运行时注入迭代计数器
-3. 超过上限抛出 `LoopBoundExceeded`
-4. FSM 模式下，编译器据此生成固定数量的状态
-
-#### `@actor.continuation` — Actor 间异步调用
-
-**当前实现状态**: ⚠️ 骨架存在
-
-`actor.py` 中的 `ActorRef.async_call()` 和 `_ActorAwaitable` 仅有框架，`__await__` 直接抛出 `RuntimeError`。
-
-**实现路径**:
-1. `async_call()` → 生成 correlation_id
-2. 通过 `pvm_host.send_message()` 发送请求
-3. 注册回调处理器
-4. Checkpoint 模式下暂停等待
-5. 收到响应时恢复执行
-
-### 3.3 状态安全机制 (Chapter 3)
-
-#### `guard_unchanged` — 装饰器级守卫
-
-**当前实现状态**: ⚠️ 数据结构存在但未强制执行
-
-`continuation.py` 的 `save_cont()` 接受 `guard_unchanged` 参数并序列化存储，但恢复时**未做校验**。
-
-**差距**:
-- `load_cont()` 不检查 guard 值是否变化
-- 缺少 `keccak256(cbor(storage.get(key)))` 指纹计算
-- 缺少 `StateConflictError` 异常类型
-
-**实现路径**:
-1. `save_cont()` 时，对每个 guard key 计算 `snapshot_hash = keccak256(cbor(storage.get(key)))`
-2. 存入 continuation state 的 `guard_hashes` 字段
-3. `load_cont()` / `resume` 时重新计算哈希，不一致则抛出 `StateConflictError`
-
-#### `storage.guard()` — 对象级精细守卫
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. 创建 `GuardedValue` 类
-2. `storage.guard(key)` 返回 `GuardedValue(key, snapshot_hash, value)`
-3. 访问 `.value` 属性时自动验证当前哈希与快照一致
-4. 不一致抛出 `StateConflictError`
-
-### 3.4 异步工具 (Chapter 4)
-
-#### `Retry` — 重试策略
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-```python
-class Retry:
-    def __init__(self, max_attempts, backoff="exponential"):
-        self.max_attempts = max_attempts
-        self.backoff = backoff
-```
-在 `_RunnerAwaitable` 中读取 retry_policy，失败时按退避序列重试。
-
-#### `TaskGroup` — 结构化并发
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. 创建 `TaskGroup` 上下文管理器
-2. `create_task()` 按顺序分配 nonce，发送任务到 Runner
-3. 退出 `async with` 块时，等待所有任务完成
-4. 结果按创建顺序排列（确定性保证）
-
-### 3.5 类型系统 (Chapter 5)
-
-#### `SoftFloat` — 软件浮点
-
-**当前实现状态**: ⚠️ Python SDK 中仅为 `str` 包装
-
-```python
-class SoftFloat(str):
-    def __new__(cls, value):
-        return str.__new__(cls, str(value))
-```
-
-但 Rust PVM 层已实现真正的 SoftFloat（`vm/src/softfloat.rs`，56 个测试通过）。
-
-**差距**: Python SDK 的 `SoftFloat` 没有实际算术能力，无法进行 `>`, `<`, `+`, `-` 等运算。
-
-**实现路径**:
-1. 方案 A: 在 Rust 侧通过 `pvm_host` 暴露 softfloat 运算，Python 侧调用
-2. 方案 B: PVM 全局替换 Python 的 `float` 为 softfloat（RustPython 已支持）
-3. 推荐方案 B: RustPython 的 softfloat 模块已完成，只需确保 SDK 层的 `SoftFloat` 类型与之正确对接
-
-#### `CowboyModel` — PVM 安全数据模型
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. 基于 `dataclasses` (白名单模块) 实现轻量版数据模型
-2. 字段验证: 禁止 `float`（强制 `SoftFloat`）、禁止 `set`（强制 `ordered_set`）
-3. 提供 `schema()` 方法，生成 JSON Schema 用于 Runner 验证
-4. CBOR 序列化/反序列化支持
-
-#### `ordered_set` — 有序集合
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**:
-1. PVM 层已有设计 — 将 `set` 透明替换为插入顺序集合
-2. 可在 RustPython VM 层拦截 `set()` 构造，返回 `ordered_set`
-3. 或在 SDK 层提供 `ordered_set` 类基于 `dict` 键集实现
-
-#### `BlockHeight` — 语义化区块高度
-
-**当前实现状态**: ❌ 未实现
-
-**实现路径**: 简单的 `int` 子类加类型标注，主要用于 API 文档和 IDE 提示。
-
-### 3.6 声明式验证构建器 (Chapter 6)
-
-#### `Verify` — 验证器
-
-**当前实现状态**: ⚠️ 部分实现
-
-已实现:
-- `Verify.builder()` ✅
-- `.mode()`, `.runners()`, `.threshold()`, `.check()`, `.build()` ✅
-- `Verify.json_schema_valid()` ✅
-- `Verify.structured_match()` ✅
-- `Verify.majority_vote()` ✅
-
-未实现的检查器 (14 个):
-| 检查器 | 状态 |
-|--------|------|
-| `exact_match()` | ❌ |
-| `numeric_tolerance(field, tolerance)` | ❌ |
-| `numeric_range(field, min, max)` | ❌ |
-| `set_equality(field)` | ❌ |
-| `contains_all(substrings)` | ❌ |
-| `contains_none(substrings)` | ❌ |
-| `regex_match(pattern)` | ❌ |
-| `length_bounds(min, max)` | ❌ |
-| `semantic_similarity(threshold)` | ❌ |
-| `no_prompt_leak()` | ❌ |
-| `entropy_check(min_entropy)` | ❌ |
-| `custom(actor, method)` | ❌ |
-| `supermajority_vote(field, threshold)` | ❌ |
-
-**注意**: Runner 侧（Rust）的 `result-verifier` crate 已实现 6 种验证模式，SDK 需与之对齐。
-
-**实现路径**: 每个检查器只需返回标准化的 dict 结构，由 Runner 侧实际执行检查。
-
-### 3.7 序列化层
-
-**CIP-6 要求**: 所有跨信任边界数据使用 Canonical CBOR (RFC 8949)
-
-**当前实现**: continuation.py 使用 JSON (`json.dumps(sort_keys=True, separators=(',',':'))`)
-
-**差距**: JSON 不满足 CBOR 规范要求。但 JSON 在当前阶段可用作过渡方案。
-
-**实现路径**:
-1. 短期: 保持 JSON (已有确定性 sort_keys 保证)
-2. 中期: 引入 `cbor2` 库或 Rust 侧 CBOR 编码，通过 Host API 暴露
-3. 所需 CBOR 规则:
-   - 映射键字节字典序排序
-   - 整数最短编码
-   - 无不定长度数组/映射
-   - 浮点数编码为 64 位 IEEE 754
+## 三、差距分析：隐患识别
+
+### 3.1 致命隐患（必须在主网前解决）
+
+| # | 隐患 | 严重程度 | 说明 |
+|---|------|---------|------|
+| D-1 | **Guard 校验形同虚设** | 🔴 致命 | `save_cont()` 接受 `guard_unchanged` 参数并序列化，但 `load_cont()` 恢复时**完全不做校验**。这意味着跨块期间状态被篡改不会被发现，构成过时状态攻击面 |
+| D-2 | **SoftFloat 是假的** | 🔴 致命 | `types.py` 中 `SoftFloat(str)` 没有算术能力。`SoftFloat("0.10") > SoftFloat("0.9")` 返回 `True`（字符串比较 "1" > "0"），这是共识分歧的定时炸弹 |
+| D-3 | **序列化格式 (JSON) 违反协议** | 🔴 致命 | CIP-6 和白皮书明确要求 Canonical CBOR。JSON 的浮点精度损失、编码非规范性会导致跨节点状态哈希不一致 |
+| D-4 | **Checkpoint 模式进入共识** | 🟡 高 | Checkpoint 快照包含 Python VM 内部状态（栈帧、字节码指针），跨 PVM 版本升级后无法正确恢复，造成链上冻结的 Continuation |
+| D-5 | **无 capture() 类型检查** | 🟡 高 | 可以 `ctx.fn = lambda x: x` 捕获闭包，序列化时静默失败或产生非确定性 |
+| D-6 | **包名分裂** | 🟡 高 | 代码 `pvm_sdk`，文档 `cowboy_sdk`，开发者无所适从；拖延越久迁移成本越大 |
+
+### 3.2 功能性差距
+
+| CIP-6 功能 | 现状 | 差距类型 |
+|-----------|------|---------|
+| `call()` 顶层函数 | ❌ 未暴露 | SDK 层缺失 |
+| `send()` 顶层函数 | ❌ 未暴露 | SDK 层缺失 |
+| `@actor` 装饰器 | ❌ | SDK 层缺失 |
+| `@reentrancy_guard` | ❌ | 安全机制缺失 |
+| `@bounded_loop` | ❌ | 安全机制缺失 |
+| `@actor.continuation` | ⚠️ 骨架 (`__await__` 抛异常) | 功能不可用 |
+| `storage.guard()` | ❌ | 安全机制缺失 |
+| `Retry` 类 | ❌ | 异步工具缺失 |
+| `TaskGroup` | ❌ | 异步工具缺失 |
+| `CowboyModel` | ❌ | 类型系统缺失 |
+| `ordered_set` | ❌ | 类型系统缺失 |
+| `BlockHeight` | ❌ | 类型标注缺失 |
+| Verify 检查器 | 3/17 已实现 | 14 个检查器缺失 |
+| `runner.mcp()` | ❌ (Rust 侧已实现) | SDK 未暴露 |
 
 ---
 
-## 四、Host API 缺失项分析
+## 四、CBOR 序列化策略（不变量 I-1）
 
-以下 Host API 是实现 CIP-6 完整 SDK 所必需但当前缺失的：
+### 4.1 为什么必须从第一天使用 CBOR
 
-| Host API | 用途 | CIP-6 关联 | 优先级 |
-|----------|------|-----------|--------|
-| `call_actor(target, method, args, cycles)` | 同步调用 Actor | `call()` 原语 | P0 |
-| `set_timer(height, handler, data)` | 设置定时器 | Timeout 机制 | P1 |
-| `cancel_timer(timer_id)` | 取消定时器 | Timeout 清理 | P1 |
-| `get_balance(address)` | 查询余额 | 状态查询 | P1 |
-| `transfer(to, amount)` | 价值转移 | 原生转账 | P1 |
-| `keccak256(data)` | 哈希计算 | guard 指纹 | P1 |
-| `cbor_encode(value)` / `cbor_decode(data)` | CBOR 序列化 | 跨边界数据 | P2 |
-| `current_block()` | 当前区块高度 | BlockHeight 类型 | P2 |
-| `self_address()` | 当前 Actor 地址 | ActorRef 引用 | P1 |
+| 场景 | JSON 的问题 | CBOR 的解决 |
+|------|-----------|------------|
+| 浮点数 | `json.dumps(0.1)` → `"0.1"` 但 `0.1` 在 IEEE 754 中不可精确表示，不同 JSON 库可能序列化为不同精度 | CBOR 强制 64 位 IEEE 754 编码，字节确定 |
+| 字节类型 | JSON 无原生 bytes 支持，当前用 `{"__bytes__": hex}` 包装 — 脆弱且非标准 | CBOR 原生 bytes 类型 (major type 2) |
+| 映射键排序 | `json.dumps(sort_keys=True)` 按 Unicode 排序，但 CBOR 要求按编码后字节排序 — 两者结果可能不同 | Canonical CBOR 定义明确的键排序 |
+| 整数编码 | JSON 所有数字统一文本表示 | CBOR 最短编码（共识关键） |
+| 存量数据 | 若先用 JSON 再迁 CBOR，链上已有的 JSON 格式 Continuation 状态无法被 CBOR 解码器读取 | 无此问题 |
 
-> 注意: `call_actor` 在 Rust Host 层可能已部分实现（`pvm_host.rs` 中有调用 Actor 的逻辑），但需验证 Python 侧是否已暴露。
+### 4.2 实现方案
 
----
+**方案选择**: 通过 Rust Host API 暴露 CBOR 编解码，不在 Python 侧引入第三方库。
 
-## 五、分阶段实现路线图
+**理由**:
+- Rust 侧已有 CBOR 依赖（`serde_cbor` 或类似），代码可复用
+- 避免 Python 第三方库 (`cbor2`) 引入确定性风险
+- Host API 调用走 Gas 计量，成本可控
 
-### Phase 0: 基础原语层（预计 2-3 周）
-
-**目标**: 让 CIP-6 第一章的三种调用原语可用
-
-| 任务 | 优先级 | 工作量估计 | 依赖 |
-|------|--------|-----------|------|
-| 实现 `call()` Python 封装 | P0 | 3 天 | Host API `call_actor` |
-| 实现 `send()` Python 封装 | P0 | 2 天 | 已有 `send_message` |
-| 完善 `ActorRef` 同步调用语法糖 | P0 | 2 天 | `call()` |
-| 实现 `@actor` 装饰器 | P1 | 2 天 | 无 |
-| 实现 `@reentrancy_guard` | P1 | 3 天 | `get_state`/`set_state` |
-| 导出 `self.address`、`self.storage` 等 Actor 属性 | P1 | 2 天 | Host API |
-
-**交付物**:
-- `pvm_sdk/call.py` — `call()` 函数
-- `pvm_sdk/send.py` — `send()` 函数
-- `pvm_sdk/actor.py` — 增强的 `@actor` 装饰器和 `ActorRef`
-- `pvm_sdk/guards.py` — `@reentrancy_guard`
-
-### Phase 1: Continuation 增强（预计 3-4 周）
-
-**目标**: 完善跨块异步机制
-
-| 任务 | 优先级 | 工作量估计 | 依赖 |
-|------|--------|-----------|------|
-| 增强 `runner.llm/http` 的参数支持 | P0 | 3 天 | 无 |
-| 实现 `timeout_blocks` 强制执行 | P0 | 5 天 | Timer Host API |
-| 实现 `guard_unchanged` 校验逻辑 | P0 | 3 天 | `keccak256` Host API |
-| 实现 `storage.guard()` 精细守卫 | P1 | 3 天 | guard 基础设施 |
-| 实现 `@bounded_loop` | P1 | 3 天 | 无 |
-| 实现 `capture()` 类型安全检查 | P1 | 2 天 | 无 |
-| 实现 `capture()` 大小限制 (64 KiB) | P2 | 1 天 | 无 |
-| 暴露 `runner.mcp()` | P1 | 2 天 | Runner MCP 执行器 |
-
-**交付物**:
-- `continuation.py` — 增强的 guard 校验和大小限制
-- `runner.py` — 完整参数支持、timeout、mcp
-- `guards.py` — `storage.guard()`, `GuardedValue`
-
-### Phase 2: 类型系统与验证（预计 2-3 周）
-
-**目标**: PVM 安全类型和完整验证器
-
-| 任务 | 优先级 | 工作量估计 | 依赖 |
-|------|--------|-----------|------|
-| 对接 SoftFloat (PVM 层已有) | P0 | 3 天 | RustPython softfloat |
-| 实现 `CowboyModel` | P1 | 5 天 | `dataclasses` |
-| 实现 `ordered_set` | P1 | 3 天 | 无 |
-| 补全 Verify 检查器 (14 个) | P0 | 5 天 | 无 |
-| 实现 `Retry` 类 | P1 | 2 天 | 无 |
-| 实现 `BlockHeight` 类型 | P2 | 1 天 | 无 |
-
-**交付物**:
-- `types.py` — 完整的 `SoftFloat`、`ordered_set`、`BlockHeight`
-- `models.py` — `CowboyModel` 基类
-- `verify.py` — 全部 17 个内置检查器
-- `retry.py` — `Retry` 策略类
-
-### Phase 3: 高级异步模式（预计 3-4 周）
-
-**目标**: TaskGroup、Actor 间异步调用、FSM 编译器原型
-
-| 任务 | 优先级 | 工作量估计 | 依赖 |
-|------|--------|-----------|------|
-| 实现 `TaskGroup` | P0 | 5 天 | Continuation 基础 |
-| 实现 `@actor.continuation` 完整流程 | P0 | 5 天 | `send_message` |
-| FSM 编译器原型 (`pvm_fsm.rs`) | P1 | 10 天 | RustPython codegen |
-| 序列化迁移到 CBOR | P2 | 5 天 | `cbor2` 或 Host CBOR |
-| 条件分支 await 支持 | P1 | 3 天 | FSM 编译器 |
-| 循环 await + `@bounded_loop` FSM 支持 | P1 | 5 天 | FSM 编译器 |
-
-**交付物**:
-- `taskgroup.py` — `TaskGroup` 上下文管理器
-- `actor.py` — 完整的 `@actor.continuation`
-- `pvm_fsm.rs` — FSM 编译器原型
-
-### Phase 4: 生产就绪化（预计 4-6 周）
-
-| 任务 | 优先级 | 工作量估计 |
-|------|--------|-----------|
-| 完整的端到端集成测试 | P0 | 10 天 |
-| 确定性测试套件（跨平台一致性验证） | P0 | 5 天 |
-| 文档和开发者指南 | P0 | 5 天 |
-| `cowboy_sdk` 包名统一（从 `pvm_sdk` 重命名） | P1 | 3 天 |
-| 错误消息国际化和开发者友好化 | P2 | 3 天 |
-| 性能基准测试 | P1 | 5 天 |
-
----
-
-## 六、关键技术实现细节
-
-### 6.1 `call()` 同步调用的实现方案
-
+**Host API 新增**:
 ```
-┌──────────┐     call(target, method, args)     ┌──────────┐
-│ Actor A  │ ──────────────────────────────────> │ Actor B  │
-│ (Python) │                                    │ (Python) │
-│          │ <── return result (CBOR decoded) ── │          │
-└────┬─────┘                                    └──────────┘
-     │
-     │ pvm_host.call_actor(target_bytes, method, cbor(args), cycles_limit)
-     │
-     ▼
-┌──────────────────────────────────────────────────────────┐
-│ CowboyHost (Rust - pvm_host.rs)                          │
-│ 1. 序列化参数                                             │
-│ 2. 检查调用深度 (≤32)                                     │
-│ 3. 扣除 cycles_limit                                     │
-│ 4. 切换到目标 Actor 执行上下文                              │
-│ 5. 执行 Actor B 的 method                                 │
-│ 6. 收集返回值                                             │
-│ 7. 退还未使用的 cycles                                    │
-│ 8. 返回 CBOR 编码的结果 (或传播异常)                        │
-└──────────────────────────────────────────────────────────┘
+pvm_host.cbor_encode(value: any) -> bytes    # Canonical CBOR 编码
+pvm_host.cbor_decode(data: bytes) -> any     # CBOR 解码
 ```
 
-**Python SDK 层实现**:
+**Python SDK 层**:
 ```python
-# pvm_sdk/call.py
+# cowboy_sdk/codec.py
 import pvm_host
-from .continuation import encode_payload, decode_payload
+
+def encode(value):
+    return pvm_host.cbor_encode(value)
+
+def decode(data):
+    return pvm_host.cbor_decode(data)
+```
+
+**Canonical CBOR 规则** (Rust 实现必须严格遵循):
+1. 映射键按编码后字节的字典序排序
+2. 整数使用最短编码
+3. 禁止不定长度数组或映射
+4. 浮点数统一编码为 64 位 IEEE 754（禁止 float16/float32 降级）
+5. 禁止重复映射键
+
+---
+
+## 五、SoftFloat 策略（不变量 I-6）
+
+### 5.1 问题本质
+
+CIP-6 附录 A 规则 3：**禁止 `float`，使用 `cowboy_sdk.types.SoftFloat`**。
+
+但当前 `SoftFloat(str)` 只是字符串包装，无实际算术能力。而 Rust PVM 层 (`vm/src/softfloat.rs`) 已完成真正的软件浮点实现。
+
+### 5.2 策略选择
+
+| 方案 | 描述 | 优势 | 劣势 |
+|------|------|------|------|
+| A: SDK 层包装类 | Python `SoftFloat` 类实现所有算术，底层调用 Host API | 类型系统清晰 | 每次运算一次 Host 调用，性能差 |
+| B: PVM 全局替换 | RustPython VM 层将 Python `float` 全局替换为 softfloat | 零侵入、性能最优 | 开发者不感知类型差异 |
+| **C: B + SDK 类型标注** | PVM 层全局替换 float + SDK 提供 `SoftFloat` 类型标注用于文档和 Schema | 两全其美 | 需确保 PVM 层替换完整 |
+
+**选择方案 C**。
+
+**实现**:
+1. PVM Runtime 确认 `float` 全局使用 softfloat 实现（已有 `vm/src/softfloat.rs`）
+2. SDK 的 `SoftFloat` 变为类型标注（alias），不再是独立的算术类：
+
+```python
+# cowboy_sdk/types.py
+SoftFloat = float  # PVM 中 float 已全局替换为 softfloat
+```
+
+3. `CowboyModel` 在 Schema 生成时将 `float` 字段标记为 SoftFloat 语义
+4. 确定性测试验证: `float(0.1) + float(0.2)` 在 x86 和 ARM 上产生相同结果
+
+---
+
+## 六、FSM vs Checkpoint 策略（不变量 I-3）
+
+### 6.1 两种模式对比
+
+| 维度 | FSM (有限状态机) | Checkpoint (运行时快照) |
+|------|----------------|----------------------|
+| **状态大小** | 仅 `capture()` 声明的变量，精简 | 整个 Python 执行栈 + VM 内部状态，巨大 |
+| **确定性** | 状态是显式 CBOR，完全确定 | 快照包含 VM 内部指针、栈帧，**跨 PVM 版本不兼容** |
+| **Gas 可预测性** | 恢复成本固定（反序列化 capture） | 恢复成本不可预测（重建整个 VM 状态） |
+| **审计性** | 状态可读、可检查 | 快照是不透明二进制 |
+| **升级兼容性** | ✅ 只依赖 CBOR 格式和 handler 名称 | ❌ PVM 任何内部变化都可能导致恢复失败 |
+| **实现难度** | 高（需 AST→FSM 编译器） | 低（已实现） |
+
+### 6.2 决策
+
+**FSM 是唯一进入链上共识的 Continuation 模式。** Checkpoint 仅用于以下非共识场景：
+- 本地开发网 (`cowboyd`) 的快速原型验证
+- 单元测试中的 mock 执行
+- 开发者 IDE 的调试预览
+
+**绝不允许 Checkpoint 快照写入链上存储或参与区块状态转换。**
+
+### 6.3 FSM 编译策略
+
+FSM 编译不需要完整的 Python AST 编译器。CIP-6 明确了严格的模式约束：
+- 最多 8 个顺序 await
+- 禁止嵌套函数 await
+- 禁止递归 await
+- 循环 await 必须使用 `@bounded_loop`
+
+在这些约束下，FSM 编译可简化为**装饰器级别的代码重写**：
+
+```
+原始代码:
+    @runner.continuation
+    async def f(self, msg):
+        ctx = capture()
+        ctx.a = await runner.llm("step1")
+        ctx.b = await runner.llm(f"step2: {ctx.a}")
+        return ctx.b
+
+编译输出:
+    def f(self, msg):
+        cid = new_cid(self, "f")
+        save_cont(cid, state=0, ctx={}, handler="f__resume")
+        _send_job("llm", cid, "f__resume", "step1")
+
+    def f__resume(self, msg):
+        cont = load_cont(msg.cid)
+        verify_guards(cont)
+        ctx = cont["ctx"]
+
+        if cont["state"] == 0:
+            ctx["a"] = msg.result
+            save_cont(msg.cid, state=1, ctx=ctx, handler="f__resume")
+            _send_job("llm", msg.cid, "f__resume", f"step2: {ctx['a']}")
+        elif cont["state"] == 1:
+            ctx["b"] = msg.result
+            delete_cont(msg.cid)
+            return ctx["b"]
+```
+
+**实现路径**（分两阶段）：
+
+**阶段 A — Python 层代码重写器** (Phase 1):
+- 使用 Python `ast` 模块解析 `@runner.continuation` 装饰的函数
+- 在 SDK 导入阶段 (`import cowboy_sdk`) 或 Actor 部署阶段执行转换
+- 验证约束 (await 数量 ≤ 8、无嵌套、无递归)
+- 生成等价的同步函数 + `__resume` 处理器
+- **优势**: 纯 Python 实现，无需修改 Rust 编译器
+- **预估工作量**: 10-12 天
+
+**阶段 B — Rust 层字节码优化** (Phase 3+):
+- 将 Python 层编译器迁移到 `codegen/src/pvm_fsm.rs`
+- 在字节码层面优化，减少运行时开销
+- **预估工作量**: 15-20 天
+
+---
+
+## 七、分阶段实现路线图（垂直切片）
+
+### 设计原则
+
+每个 Phase 交付**端到端可验证的完整功能切片**，而非水平层。每个 Phase 包含：
+- 功能实现
+- 对应的安全机制
+- 确定性测试
+- API 文档
+
+### Phase 0: 基础设施与重命名（2 周）
+
+**目标**: 建立 `cowboy_sdk` 基础，使整个后续开发在正确的地基上进行。
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **重命名 `pvm_sdk` → `cowboy_sdk`** | 目录重命名、所有 import 更新、测试修正、PVM 模块白名单更新 | 3 天 |
+| **新增 Host API: `cbor_encode`/`cbor_decode`** | Rust 侧实现 Canonical CBOR，暴露给 Python | 3 天 |
+| **迁移 `continuation.py` 序列化到 CBOR** | `encode_payload`/`decode_payload` 切换为 CBOR；移除 JSON fallback | 2 天 |
+| **新增 Host API: `keccak256`** | 用于 Guard 指纹计算 | 1 天 |
+| **新增 Host API: `self_address`、`current_block`** | Actor 基础元数据 | 1 天 |
+| **定义错误层次结构** | `CowboyError` 基类 + 所有异常类型 | 1 天 |
+| **建立 SDK 版本号 (`0.1.0`)** | `__version__`、SemVer 策略文档 | 0.5 天 |
+| **确定性测试基础设施** | CI 跨平台 (x86 + ARM) CBOR 编解码一致性测试 | 1.5 天 |
+
+**交付物**:
+```
+node/pvm/Lib/cowboy_sdk/
+├── __init__.py          # 版本号、顶层导出
+├── codec.py             # CBOR 编解码 (基于 Host API)
+├── errors.py            # CowboyError, StateConflictError, ...
+├── continuation.py      # 迁移至 CBOR 序列化
+├── runtime.py           # 运行时检测
+├── pvm_time.py          # 区块时间
+├── pvm_random.py        # 确定性随机
+└── pvm_sys.py           # 系统元数据
+```
+
+**错误层次结构**:
+```python
+class CowboyError(Exception): pass
+
+class DeterminismError(CowboyError): pass
+class StateConflictError(CowboyError): pass
+class ReentrancyError(CowboyError): pass
+class LoopBoundExceeded(CowboyError): pass
+class CaptureTypeError(CowboyError): pass
+class ContinuationLimitError(CowboyError): pass
+class CycleLimitExceeded(CowboyError): pass
+class RunnerTimeoutError(CowboyError): pass
+class RunnerValidationError(CowboyError): pass
+class DeterministicValidationError(CowboyError): pass
+```
+
+**Phase 0 验收标准**:
+- `from cowboy_sdk import capture` 可正常工作
+- `cowboy_sdk.codec.encode({...})` 与 Rust 侧 CBOR 输出字节相同
+- `continuation.save_cont()` → CBOR 存储 → `load_cont()` 往返一致
+- CI 跨 x86/ARM 通过
+
+---
+
+### Phase 1: 调用原语 + 安全机制 + FSM（5 周）
+
+**目标**: CIP-6 第 1-3 章完整实现，含所有安全机制。这是 SDK 的核心里程碑。
+
+#### 1A: 同步调用 `call()` + 重入保护（1.5 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **实现 `call()`** | 封装 `pvm_host.call_actor`，参数 CBOR 编码，返回值 CBOR 解码 | 2 天 |
+| **实现 `send()`** | 封装 `pvm_host.send_message`，参数 CBOR 编码 | 1 天 |
+| **实现 `@actor` 装饰器** | Actor 类注册、`self.address`/`self.storage` 属性注入 | 2 天 |
+| **实现 `ActorRef` 语法糖** | `oracle.get_price("ETH")` 自动编译为 `call(...)` | 1 天 |
+| **实现 `@reentrancy_guard`** | 基于 `keccak256(method + caller)` 的存储级锁 | 2 天 |
+| **`call()`/`send()` 确定性测试** | 跨 Actor 调用、异常传播、深度限制 (32) | 1.5 天 |
+
+**`call()` 实现**:
+```python
+# cowboy_sdk/call.py
+import pvm_host
+from . import codec
 
 def call(target, method, args=None, cycles_limit=10000):
     if isinstance(target, str):
         target = bytes.fromhex(target.replace("0x", ""))
-    payload = encode_payload(args or {})
+    payload = codec.encode(args) if args is not None else b""
     result_bytes = pvm_host.call_actor(target, method, payload, cycles_limit)
     if result_bytes is None:
         return None
-    return decode_payload(result_bytes)
+    return codec.decode(result_bytes)
 ```
 
-### 6.2 Continuation 状态机完整流程
-
-```
-Block N                          Block N+K
-┌──────────────────┐             ┌──────────────────┐
-│ hybrid_workflow() │             │ example__resume() │
-│                  │             │                  │
-│ 1. ctx.balance = │             │ 1. load_cont(cid)│
-│    call(...)     │             │ 2. verify guards │
-│ 2. save guard    │             │ 3. ctx = restore │
-│    snapshot_hash │             │ 4. ctx.analysis  │
-│ 3. save_cont(cid,│             │    = msg.result  │
-│    state=0, ctx) │             │ 5. if recommend: │
-│ 4. send(RUNNER,  │             │    call(trade)   │
-│    job_spec)     │             │ 6. send(notify)  │
-│ 5. return (挂起) │             │ 7. delete_cont() │
-└──────────────────┘             └──────────────────┘
-        │                                ▲
-        │    Runner 链下执行               │
-        ▼                                │
-┌──────────────────┐             ┌──────────────────┐
-│  Runner System   │────────────>│ 延迟交易回调       │
-│  LLM/HTTP/MCP    │   result    │ handle_resume()  │
-└──────────────────┘             └──────────────────┘
-```
-
-### 6.3 Guard 校验的实现方案
-
+**`@reentrancy_guard` 实现**:
 ```python
-# continuation.py 增强
+# cowboy_sdk/guards.py
+import pvm_host
+from .errors import ReentrancyError
 
-def save_cont(cid, state, ctx, handler, timeout_blocks=0, guard_unchanged=None):
-    # ... 现有逻辑 ...
-    
-    # 新增: 计算 guard 快照哈希
+def reentrancy_guard(func):
+    lock_key = b"__reentrancy:" + func.__name__.encode("utf-8")
+    def wrapper(self, *args, **kwargs):
+        if pvm_host.get_state(lock_key) is not None:
+            raise ReentrancyError(f"Reentrant call to {func.__name__}")
+        pvm_host.set_state(lock_key, b"\x01")
+        try:
+            return func(self, *args, **kwargs)
+        finally:
+            pvm_host.delete_state(lock_key)
+    wrapper.__name__ = func.__name__
+    return wrapper
+```
+
+#### 1B: FSM Continuation + Guard 校验（2 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **Python AST FSM 编译器** | `@runner.continuation` 装饰器在导入时解析 async 函数 AST，重写为 FSM | 7 天 |
+| **Guard 校验强制执行** | `save_cont()` 捕获 guard 哈希，`load_cont()` 验证一致性 | 2 天 |
+| **`capture()` 类型白名单** | `__setattr__` 检查值类型，禁止闭包/生成器/函数引用 | 1 天 |
+| **`capture()` 大小限制** | 单个 Continuation ≤ 64 KiB | 0.5 天 |
+| **Continuation 数量限制** | 每 Actor ≤ 100 个活跃 Continuation | 0.5 天 |
+
+**FSM 编译器核心逻辑** (Python `ast` 模块):
+```python
+# cowboy_sdk/_compiler.py
+import ast
+
+class FSMCompiler(ast.NodeVisitor):
+    def __init__(self, func_source, func_name):
+        self.states = []
+        self.current_state = 0
+        self.await_count = 0
+        self.func_name = func_name
+
+    def visit_Await(self, node):
+        self.await_count += 1
+        if self.await_count > 8:
+            raise ContinuationLimitError(
+                f"{self.func_name}: max 8 sequential awaits (found {self.await_count})"
+            )
+        self.states.append(node)
+        self.current_state += 1
+
+    def validate(self, tree):
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.AsyncFunctionDef,)) and node.name != self.func_name:
+                raise ContinuationLimitError("await in nested functions is prohibited")
+            if isinstance(node, ast.Yield):
+                raise DeterminismError("yield is prohibited in continuation functions")
+```
+
+**Guard 校验**:
+```python
+# cowboy_sdk/continuation.py 中增强
+
+def save_cont(cid, state, ctx, handler, timeout_blocks=0, guard_keys=None):
+    # ... 序列化 ctx ...
     guard_hashes = {}
-    if guard_unchanged:
-        for key in guard_unchanged:
-            value = pvm_host.get_state(key.encode("utf-8"))
-            if value is not None:
-                guard_hashes[key] = hashlib.sha256(value).hexdigest()
-            else:
-                guard_hashes[key] = None
-    
-    payload["guard_hashes"] = guard_hashes
-    pvm_host.set_state(_cont_key(cid), _encode_json(payload))
+    if guard_keys:
+        for key in guard_keys:
+            raw = pvm_host.get_state(key.encode("utf-8") if isinstance(key, str) else key)
+            guard_hashes[key] = pvm_host.keccak256(raw) if raw is not None else None
+    payload = {
+        "state": state,
+        "ctx": ctx_serialized,
+        "handler": handler,
+        "timeout_block": pvm_host.current_block() + timeout_blocks if timeout_blocks else 0,
+        "guard_hashes": guard_hashes,
+        "checksum": None,  # 后续填充
+    }
+    encoded = codec.encode(payload)
+    payload["checksum"] = pvm_host.keccak256(encoded)
+    pvm_host.set_state(_cont_key(cid), codec.encode(payload))
 
 
-def verify_guards(cont_data):
-    """恢复时验证 guard 状态未变"""
-    guard_hashes = cont_data.get("guard_hashes", {})
-    for key, expected_hash in guard_hashes.items():
-        current_value = pvm_host.get_state(key.encode("utf-8"))
-        if current_value is not None:
-            current_hash = hashlib.sha256(current_value).hexdigest()
-        else:
-            current_hash = None
-        if current_hash != expected_hash:
+def load_cont(cid):
+    raw = pvm_host.get_state(_cont_key(cid))
+    if raw is None:
+        raise CowboyError("continuation state missing")
+    data = codec.decode(raw)
+    _verify_guards(data)
+    _verify_timeout(data)
+    return data
+
+
+def _verify_guards(cont_data):
+    for key, expected_hash in cont_data.get("guard_hashes", {}).items():
+        raw = pvm_host.get_state(key.encode("utf-8") if isinstance(key, str) else key)
+        actual_hash = pvm_host.keccak256(raw) if raw is not None else None
+        if actual_hash != expected_hash:
             raise StateConflictError(
-                f"Guard violation: storage key '{key}' changed during continuation"
+                f"Guard violation: storage key '{key}' was modified during continuation"
+            )
+
+
+def _verify_timeout(cont_data):
+    timeout_block = cont_data.get("timeout_block", 0)
+    if timeout_block and pvm_host.current_block() > timeout_block:
+        raise RunnerTimeoutError(f"Continuation timed out at block {timeout_block}")
+```
+
+**`capture()` 类型白名单**:
+```python
+_ALLOWED_CAPTURE_TYPES = (bool, int, str, bytes, bytearray, float, type(None), list, dict, tuple)
+
+class Capture:
+    def __setattr__(self, name, value):
+        _check_capture_type(value, name)
+        data = object.__getattribute__(self, "_data")
+        data[name] = value
+
+def _check_capture_type(value, path=""):
+    if isinstance(value, _ALLOWED_CAPTURE_TYPES):
+        if isinstance(value, (list, tuple)):
+            for i, item in enumerate(value):
+                _check_capture_type(item, f"{path}[{i}]")
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                if not isinstance(k, (str, int)):
+                    raise CaptureTypeError(f"dict key at {path} must be str or int, got {type(k)}")
+                _check_capture_type(v, f"{path}.{k}")
+        return
+    raise CaptureTypeError(
+        f"Cannot capture {type(value).__name__} at '{path}'. "
+        f"Only {', '.join(t.__name__ for t in _ALLOWED_CAPTURE_TYPES)} are allowed."
+    )
+```
+
+#### 1C: `storage.guard()` + `@bounded_loop`（1 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **`storage.guard(key)`** | `GuardedValue` 类，访问 `.value` 时自动验证 | 2 天 |
+| **`@bounded_loop`** | 迭代计数注入，超限抛 `LoopBoundExceeded` | 2 天 |
+| **集成测试** | Guard 冲突检测、循环中断、嵌套场景 | 1 天 |
+
+#### 1D: Phase 1 确定性测试（0.5 周）
+
+| 测试场景 | 验证内容 |
+|---------|---------|
+| 跨 Actor `call()` 链 (A→B→C) | 深度计数、异常传播、原子回滚 |
+| Continuation FSM 完整流程 | save→resume→verify_guard→delete |
+| Guard 冲突检测 | 挂起期间修改 guarded key，恢复时抛出 StateConflictError |
+| Reentrancy 保护 | 循环调用触发 ReentrancyError |
+| Capture 类型拒绝 | lambda、generator、file handle 等被拒绝 |
+| 跨 x86/ARM | 所有以上测试在两种架构上结果一致 |
+
+**Phase 1 验收标准**:
+- CIP-6 第 1-3 章的所有代码示例可直接运行
+- Guard 校验在所有恢复路径上强制执行
+- FSM 编译器正确处理顺序、条件分支两种 await 模式
+- 所有安全机制 (`reentrancy_guard`, `bounded_loop`, `capture` 类型检查) 可用
+
+---
+
+### Phase 2: 类型系统 + 验证器 + Timeout（3 周）
+
+**目标**: CIP-6 第 4-6 章功能完整。
+
+#### 2A: 类型系统（1 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **确认 PVM SoftFloat 全局替换** | 验证 RustPython 中 `float` 已全局使用 softfloat | 1 天 |
+| **`SoftFloat` 类型标注** | SDK 中 `SoftFloat = float`，CowboyModel 使用 | 0.5 天 |
+| **`ordered_set`** | RustPython VM 层 `set` → 插入顺序集合；SDK 暴露类型 | 2 天 |
+| **`BlockHeight`** | `int` 语义子类，`__repr__` 显示 "block#N" | 0.5 天 |
+| **`CowboyModel`** | 基于 `dataclasses`，`schema()` 生成 JSON Schema，CBOR 序列化 | 3 天 |
+| **类型系统确定性测试** | SoftFloat 算术一致性 (x86 vs ARM)、ordered_set 迭代顺序 | 1 天 |
+
+**`CowboyModel` 设计**:
+```python
+# cowboy_sdk/models.py
+import dataclasses
+from . import codec
+
+class CowboyModel:
+    def __init_subclass__(cls, **kwargs):
+        dataclasses.dataclass(cls)
+        _validate_fields(cls)
+
+    def to_cbor(self):
+        return codec.encode(dataclasses.asdict(self))
+
+    @classmethod
+    def from_cbor(cls, data):
+        d = codec.decode(data)
+        return cls(**d)
+
+    @classmethod
+    def schema(cls):
+        fields = dataclasses.fields(cls)
+        properties = {}
+        for f in fields:
+            properties[f.name] = _type_to_json_schema(f.type)
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": [f.name for f in fields if f.default is dataclasses.MISSING],
+        }
+
+def _validate_fields(cls):
+    for f in dataclasses.fields(cls):
+        if f.type is set or f.type is frozenset:
+            raise DeterminismError(
+                f"Field '{f.name}' uses set type. Use ordered_set instead."
             )
 ```
 
-### 6.4 TaskGroup 实现方案
+#### 2B: 验证构建器补全（1 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **补全 14 个 Verify 检查器** | 每个返回标准化 dict，由 Runner 侧执行 | 3 天 |
+| **与 Rust `result-verifier` 对齐验证** | 确保 SDK 生成的 check spec 与 Rust 验证器兼容 | 1 天 |
+| **验证器集成测试** | 提交 job → Runner 验证 → 结果回调 | 1 天 |
+
+完整检查器列表（17 个）:
 
 ```python
-# pvm_sdk/taskgroup.py
+class Verify:
+    @staticmethod
+    def builder(): return VerifyBuilder()
 
+    @staticmethod
+    def exact_match():
+        return {"kind": "exact_match"}
+
+    @staticmethod
+    def json_schema_valid(schema):
+        return {"kind": "json_schema_valid", "schema": schema}
+
+    @staticmethod
+    def structured_match(fields):
+        return {"kind": "structured_match", "fields": list(fields)}
+
+    @staticmethod
+    def majority_vote(field):
+        return {"kind": "majority_vote", "field": field}
+
+    @staticmethod
+    def supermajority_vote(field, threshold):
+        return {"kind": "supermajority_vote", "field": field, "threshold": threshold}
+
+    @staticmethod
+    def numeric_tolerance(field, tolerance):
+        return {"kind": "numeric_tolerance", "field": field, "tolerance": tolerance}
+
+    @staticmethod
+    def numeric_range(field, min_val, max_val):
+        return {"kind": "numeric_range", "field": field, "min": min_val, "max": max_val}
+
+    @staticmethod
+    def set_equality(field):
+        return {"kind": "set_equality", "field": field}
+
+    @staticmethod
+    def contains_all(substrings):
+        return {"kind": "contains_all", "substrings": list(substrings)}
+
+    @staticmethod
+    def contains_none(substrings):
+        return {"kind": "contains_none", "substrings": list(substrings)}
+
+    @staticmethod
+    def regex_match(pattern):
+        return {"kind": "regex_match", "pattern": pattern}
+
+    @staticmethod
+    def length_bounds(min_len, max_len):
+        return {"kind": "length_bounds", "min": min_len, "max": max_len}
+
+    @staticmethod
+    def semantic_similarity(threshold):
+        return {"kind": "semantic_similarity", "threshold": threshold}
+
+    @staticmethod
+    def no_prompt_leak():
+        return {"kind": "no_prompt_leak"}
+
+    @staticmethod
+    def entropy_check(min_entropy):
+        return {"kind": "entropy_check", "min_entropy": min_entropy}
+
+    @staticmethod
+    def custom(actor, method):
+        return {"kind": "custom", "actor": actor, "method": method}
+```
+
+#### 2C: Timeout + Retry + Timer 集成（1 周）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **新增 Host API: `set_timer`/`cancel_timer`** | Rust 侧实现 | 2 天 |
+| **`timeout_blocks` 强制执行** | Continuation 保存时注册超时 Timer，恢复时检查 | 2 天 |
+| **`Retry` 类** | 退避策略，延迟序列为固定 [1, 2, 4, 8] 个区块 | 1 天 |
+
+**Phase 2 验收标准**:
+- CIP-6 第 4-6 章所有代码示例可运行
+- `SoftFloat` 算术在 x86/ARM 上结果一致
+- 全部 17 个 Verify 检查器与 Rust 侧验证器格式兼容
+- Timeout 到期触发 `RunnerTimeoutError`
+
+---
+
+### Phase 3: 高级异步模式 + Actor Continuation（3 周）
+
+**目标**: CIP-6 第 7 章混合模式完整可用。
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **`runner.mcp()` 暴露** | SDK 层添加 MCP awaitable，与 HTTP/LLM 同等地位 | 2 天 |
+| **`TaskGroup` 结构化并发** | 确定性 nonce 分配、按创建顺序返回结果 | 5 天 |
+| **`@actor.continuation`** | Actor 间异步请求-响应完整流程 | 5 天 |
+| **FSM 编译器: 循环 await** | `@bounded_loop` 装饰的循环中 await 的 FSM 状态生成 | 3 天 |
+| **FSM 编译器: try/except await** | 异常状态的序列化和恢复 | 2 天|
+| **综合集成测试** | CIP-6 §7.1 完整示例端到端运行 | 3 天 |
+
+**`TaskGroup` 确定性设计**:
+
+```python
 class TaskGroup:
     def __init__(self):
         self._tasks = []
-        self._nonce_base = None
-    
+
     async def __aenter__(self):
-        ctx = pvm_host.context()
-        self._nonce_base = ctx.get("nonce", 0)
         return self
-    
-    async def __aexit__(self, *args):
-        # 等待所有任务完成（通过 checkpoint 暂停）
-        for task in self._tasks:
-            if task.result is None:
-                await task
-    
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass  # FSM 编译器会将 TaskGroup 展开为多个并行 send + 聚合 resume
+
     def create_task(self, awaitable):
         task = _TaskHandle(awaitable, len(self._tasks))
         self._tasks.append(task)
         return task
-
-
-class _TaskHandle:
-    def __init__(self, awaitable, index):
-        self._awaitable = awaitable
-        self._index = index
-        self.result = None
-    
-    def __await__(self):
-        self.result = yield from self._awaitable.__await__()
-        return self.result
 ```
 
-### 6.5 Verify 检查器完整实现
+**关键约束**: `TaskGroup` 内任务创建顺序决定 nonce，因此必须严格确定性。FSM 编译器将 `async with TaskGroup()` 展开为：
+1. 为每个 `create_task()` 生成独立的 `send_job()`，nonce 按创建顺序分配
+2. 生成聚合状态: 等待所有任务结果到达
+3. 结果按任务创建顺序排列
 
-```python
-# verify.py 补全
-
-class Verify:
-    # ... 已有方法 ...
-    
-    @staticmethod
-    def exact_match():
-        return {"kind": "exact_match"}
-    
-    @staticmethod
-    def numeric_tolerance(field, tolerance):
-        return {"kind": "numeric_tolerance", "field": field, "tolerance": str(tolerance)}
-    
-    @staticmethod
-    def numeric_range(field, min_val, max_val):
-        return {"kind": "numeric_range", "field": field, "min": min_val, "max": max_val}
-    
-    @staticmethod
-    def set_equality(field):
-        return {"kind": "set_equality", "field": field}
-    
-    @staticmethod
-    def contains_all(substrings):
-        return {"kind": "contains_all", "substrings": list(substrings)}
-    
-    @staticmethod
-    def contains_none(substrings):
-        return {"kind": "contains_none", "substrings": list(substrings)}
-    
-    @staticmethod
-    def regex_match(pattern):
-        return {"kind": "regex_match", "pattern": pattern}
-    
-    @staticmethod
-    def length_bounds(min_len, max_len):
-        return {"kind": "length_bounds", "min": min_len, "max": max_len}
-    
-    @staticmethod
-    def semantic_similarity(threshold):
-        return {"kind": "semantic_similarity", "threshold": str(threshold)}
-    
-    @staticmethod
-    def no_prompt_leak():
-        return {"kind": "no_prompt_leak"}
-    
-    @staticmethod
-    def entropy_check(min_entropy):
-        return {"kind": "entropy_check", "min_entropy": str(min_entropy)}
-    
-    @staticmethod
-    def custom(actor, method):
-        return {"kind": "custom", "actor": actor, "method": method}
-    
-    @staticmethod
-    def supermajority_vote(field, threshold):
-        return {"kind": "supermajority_vote", "field": field, "threshold": threshold}
-```
+**Phase 3 验收标准**:
+- CIP-6 §7.1 `TradingAgent.hybrid_workflow` 完整运行
+- `TaskGroup` 并行任务结果顺序确定
+- `@actor.continuation` 跨 Actor 异步调用完整流程
 
 ---
 
-## 七、白皮书与 SDK 规范一致性矩阵
+### Phase 4: 生产加固（4 周）
 
-| 白皮书章节 | CIP-6 对应 | 代码实现 | 一致性 |
-|-----------|-----------|---------|--------|
-| Actor 模型 (私有状态/邮箱) | Ch1 调用原语 | types/execution.rs: Actor 结构体 | ✅ 一致 |
-| 消息传递 (恰好一次) | Ch1.4 send() | storage: enqueue_message + 去重 | ✅ 一致 |
-| 重入 (深度限制 32) | Ch1.5 reentrancy | execution.rs: 深度计数 | ✅ 一致 |
-| Continuation (FSM) | Ch2 编译策略 | pvm_fsm.rs (骨架) | ⚠️ 未完成 |
-| Continuation (Checkpoint) | Ch2 (隐含) | rustpython_checkpoint | ✅ 已实现 |
-| capture() | Ch2.2 状态捕获 | continuation.py: Capture | ✅ 基本一致 |
-| guard | Ch3 状态安全 | save_cont() 参数存在 | ⚠️ 未强制执行 |
-| Timeout (区块高度) | Ch4.1 | Timer Host API | ⚠️ 框架存在 |
-| 确定性 Python VM | PVM 章节 | pvm-runtime + RustPython | ✅ 一致 |
-| SoftFloat | PVM 数值确定性 | vm/softfloat.rs | ✅ Rust 层完成 |
-| 固定哈希种子 | PVM 哈希排序 | determinism.rs | ✅ 一致 |
-| CBOR 序列化 | 序列化章节 | 当前使用 JSON | ⚠️ 需迁移 |
-| 模块白名单 | PVM 模块管理 | determinism.rs | ✅ 一致 |
-| Runner 任务框架 | 链下计算 | runner 系统完整 | ✅ 一致 |
-| 验证模式 (6 种) | Ch6 验证构建器 | result-verifier crate | ✅ Rust 层完成 |
-| Runner VRF 选择 | Runner 选择 | ecvrf.rs, registry.rs | ✅ 一致 |
-| 双 Gas (Cycles/Cells) | 费用章节 | execution.rs 双计量 | ✅ 一致 |
-| Timer 系统 | 定时器章节 | storage: Timer + 索引 | ✅ 一致 |
-| 专用通道 | 共识网络 | — | ❌ 未实现 |
-| MEV 防护 (VRF 排序) | 共识 MEV | — | ❌ 未实现 |
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| **全量确定性测试套件** | 所有 SDK 功能的跨平台 (x86/ARM) 一致性 | 5 天 |
+| **压力测试** | 100 个并发 Continuation、深度 32 call 链、1024 条 send 扇出 | 5 天 |
+| **安全审计检查表** | PVM 兼容性铁律 (CIP-6 附录 A) 逐项验证 | 3 天 |
+| **FSM 编译器迁移到 Rust** | `pvm_fsm.rs` 完整实现，替代 Python `ast` 编译器 | 10 天 |
+| **开发者文档** | API 参考、教程、最佳实践、反模式指南 | 5 天 |
+| **性能基准** | Gas 消耗报告 (call/send/continuation/guard 各操作的 cycles/cells 成本) | 2 天 |
 
 ---
 
-## 八、风险和注意事项
-
-### 8.1 包名统一
-- **现状**: 代码中使用 `pvm_sdk`，CIP-6 文档使用 `cowboy_sdk`，白皮书 v2 使用 `cowboy_sdk`
-- **建议**: 在 Phase 4 统一重命名为 `cowboy_sdk`，需更新所有 import 路径
-
-### 8.2 序列化格式迁移
-- **风险**: 从 JSON 迁移到 CBOR 是一个破坏性变更
-- **缓解**: 在 CBOR 迁移时实现双模式（检测格式自动切换），设定弃用时间表
-
-### 8.3 FSM vs Checkpoint 模式的选择
-- **FSM 优势**: 状态更小、确定性更强、Gas 更可预测
-- **Checkpoint 优势**: 实现简单、灵活性高、已可用
-- **风险**: 两种模式并存增加维护复杂度
-- **建议**: 短期 Checkpoint 为默认，FSM 作为优化路径，最终标准化为 FSM
-
-### 8.4 向后兼容性
-- 每个 Phase 的 API 变更需保持向后兼容
-- 弃用的 API 至少保留一个版本周期
-- 使用 `__version__` 标记 SDK 版本
-
-### 8.5 安全考量
-- `call()` 的 `cycles_limit` 必须由开发者显式指定，防止无限递归
-- `capture()` 必须验证值类型，禁止序列化不安全对象（闭包、生成器）
-- `guard_unchanged` 必须在所有恢复路径上强制执行，包括超时和错误路径
-
----
-
-## 九、优先级矩阵总结
-
-| 优先级 | 功能 | Phase | 工作量 |
-|--------|------|-------|--------|
-| **P0** | `call()` / `send()` 原语 | 0 | 5 天 |
-| **P0** | `timeout_blocks` 强制执行 | 1 | 5 天 |
-| **P0** | `guard_unchanged` 校验 | 1 | 3 天 |
-| **P0** | Verify 检查器补全 | 2 | 5 天 |
-| **P0** | `SoftFloat` 对接 | 2 | 3 天 |
-| **P0** | `TaskGroup` | 3 | 5 天 |
-| **P0** | `@actor.continuation` | 3 | 5 天 |
-| **P0** | 端到端测试 | 4 | 10 天 |
-| **P1** | `@actor` 装饰器 | 0 | 2 天 |
-| **P1** | `@reentrancy_guard` | 0 | 3 天 |
-| **P1** | `storage.guard()` | 1 | 3 天 |
-| **P1** | `@bounded_loop` | 1 | 3 天 |
-| **P1** | `CowboyModel` | 2 | 5 天 |
-| **P1** | `ordered_set` | 2 | 3 天 |
-| **P1** | `Retry` 类 | 2 | 2 天 |
-| **P1** | FSM 编译器原型 | 3 | 10 天 |
-| **P1** | 包名统一 (`cowboy_sdk`) | 4 | 3 天 |
-| **P2** | CBOR 序列化迁移 | 3 | 5 天 |
-| **P2** | `BlockHeight` 类型 | 2 | 1 天 |
-| **P2** | `capture()` 大小限制 | 1 | 1 天 |
-
-**总预估工作量**: 约 12-16 周（1 人全职）
-
----
-
-## 十、模块文件结构设计（最终形态）
+## 八、模块文件结构（最终形态）
 
 ```
-node/pvm/Lib/cowboy_sdk/          # 重命名后的 SDK
-├── __init__.py                    # 顶层导出: call, send, actor, runner, capture, ...
-├── call.py                        # call() 同步调用原语
-├── send.py                        # send() 异步消息原语
-├── actor.py                       # @actor 装饰器, ActorRef, @actor.continuation
-├── runner.py                      # @runner.continuation, runner.llm/http/mcp
-├── continuation.py                # Capture, save/load/delete_cont, CID 生成
-├── guards.py                      # @reentrancy_guard, GuardedValue, storage.guard()
-├── verify.py                      # Verify builder, 17 个内置检查器
-├── retry.py                       # Retry 策略
-├── taskgroup.py                   # TaskGroup 结构化并发
-├── models.py                      # CowboyModel 数据模型基类
-├── types.py                       # SoftFloat, ordered_set, BlockHeight
-├── errors.py                      # StateConflictError, LoopBoundExceeded, ...
-├── bounded_loop.py                # @bounded_loop 装饰器
-├── runtime.py                     # 运行时模式检测
-├── pvm_time.py                    # 确定性时间 (区块高度)
-├── pvm_random.py                  # 确定性随机数 (VRF)
-└── pvm_sys.py                     # 系统元数据
+node/pvm/Lib/cowboy_sdk/
+├── __init__.py            # 版本号 (0.x.y)、顶层导出
+│                          # call, send, actor, runner, capture,
+│                          # ActorRef, Verify, Retry, CowboyModel
+│
+├── codec.py               # CBOR 编解码 (委托 pvm_host)
+├── errors.py              # 完整错误层次结构
+│
+├── call.py                # call() 同步调用原语
+├── send.py                # send() 异步消息原语
+│
+├── actor.py               # @actor 装饰器
+│                          # ActorRef (同步语法糖 + async_* 方法)
+│                          # @actor.continuation
+│
+├── runner.py              # @runner.continuation
+│                          # runner.llm() / runner.http() / runner.mcp()
+│
+├── continuation.py        # Capture 类、save/load/delete_cont
+│                          # CID 生成、Guard 校验、Timeout 校验
+│                          # 类型白名单、大小限制
+│
+├── guards.py              # @reentrancy_guard
+│                          # GuardedValue, storage.guard()
+│
+├── bounded_loop.py        # @bounded_loop(max_iterations=N)
+│
+├── verify.py              # Verify.builder() + 17 个内置检查器
+├── retry.py               # Retry(max_attempts, backoff)
+├── taskgroup.py           # TaskGroup 结构化并发
+│
+├── models.py              # CowboyModel 基类 (schema/CBOR 支持)
+├── types.py               # SoftFloat (= float), ordered_set, BlockHeight
+│
+├── _compiler.py           # FSM 编译器 (Python AST → 同步状态机)
+│                          # 内部模块，不暴露给开发者
+│
+├── runtime.py             # 运行时模式检测
+├── pvm_time.py            # 确定性时间 (区块高度)
+├── pvm_random.py          # 确定性随机数 (VRF)
+└── pvm_sys.py             # 系统元数据 (chain_id, pvm_version)
 ```
 
 ---
 
-## 附录 A: 现有代码关键文件索引
+## 九、白皮书与 SDK 规范一致性矩阵
 
-| 文件路径 | 功能 | 行数 |
-|----------|------|------|
-| `node/pvm/Lib/pvm_sdk/__init__.py` | SDK 入口 | 24 |
-| `node/pvm/Lib/pvm_sdk/continuation.py` | Continuation 状态管理 | 158 |
-| `node/pvm/Lib/pvm_sdk/runner.py` | Runner 任务封装 | 82 |
-| `node/pvm/Lib/pvm_sdk/actor.py` | Actor 引用和异步调用 | 28 |
-| `node/pvm/Lib/pvm_sdk/verify.py` | 验证构建器 | 45 |
-| `node/pvm/Lib/pvm_sdk/types.py` | PVM 类型 | 3 |
-| `node/pvm/Lib/pvm_sdk/pvm_random.py` | 确定性随机 | 196 |
-| `node/pvm/Lib/pvm_sdk/pvm_time.py` | 区块时间 | 9 |
-| `node/pvm/Lib/pvm_sdk/pvm_sys.py` | 系统信息 | 6 |
-| `node/pvm/Lib/pvm_sdk/runtime.py` | 运行时检测 | 6 |
-| `node/chain/src/pvm_host.rs` | Host API 实现 | ~800 |
-| `node/chain/src/pvm_executor.rs` | PVM 执行器 | ~300 |
-| `node/chain/src/execution.rs` | 交易执行引擎 | ~1500 |
-| `node/pvm/crates/pvm-runtime/src/` | PVM 核心运行时 | ~2000 |
-| `node/pvm/crates/pvm-host/src/lib.rs` | Host API Trait | ~100 |
-| `runner/crates/result-verifier/src/verifier.rs` | 结果验证器 | ~500 |
-| `runner/crates/runner-common/src/types.rs` | Runner 公共类型 | ~400 |
-
-## 附录 B: CIP-6 章节映射
-
-| CIP-6 章节 | 本文对应章节 | 实现状态 |
-|------------|------------|---------|
-| Ch1: 调用原语 | §3.1 | ⚠️ 底层存在，SDK 层缺失 |
-| Ch2: Continuation | §3.2 | ⚠️ Checkpoint 可用，FSM 未完成 |
-| Ch3: 状态安全 | §3.3 | ⚠️ 数据结构存在，校验逻辑缺失 |
-| Ch4: 异步工具 | §3.4 | ❌ Retry/TaskGroup 未实现 |
-| Ch5: 类型系统 | §3.5 | ⚠️ SoftFloat Rust 层完成，SDK 层存根 |
-| Ch6: 验证构建器 | §3.6 | ⚠️ 3/17 检查器已实现 |
-| Ch7: 混合模式 | §6.1-6.5 | ❌ 需要所有组件就绪 |
-| App A: PVM 兼容性 | §7 白皮书矩阵 | ✅ 大部分规则已在 PVM 层执行 |
+| 白皮书章节 | CIP-6 对应 | 代码实现 | 一致性 | 所属 Phase |
+|-----------|-----------|---------|--------|-----------|
+| Actor 模型 (私有状态/邮箱) | Ch1 调用原语 | types/execution.rs | ✅ | — |
+| 消息传递 (恰好一次) | Ch1.4 send() | storage: enqueue + 去重 | ✅ | — |
+| 重入 (深度限制 32) | Ch1.5 reentrancy | execution.rs | ✅ | — |
+| call() 原语 | Ch1.3 | SDK 缺失 | ⚠️ → Phase 1 | 1A |
+| send() 原语 | Ch1.4 | SDK 缺失 | ⚠️ → Phase 1 | 1A |
+| @reentrancy_guard | Ch1.5 | 未实现 | ❌ → Phase 1 | 1A |
+| Continuation (FSM) | Ch2 编译策略 | 骨架存在 | ⚠️ → Phase 1 | 1B |
+| capture() | Ch2.2 | 已实现 (需加固) | ⚠️ → Phase 1 | 1B |
+| Guard 校验 | Ch3 | 未强制执行 | 🔴 → Phase 1 | 1B |
+| storage.guard() | Ch3.2 | 未实现 | ❌ → Phase 1 | 1C |
+| @bounded_loop | Ch2.5 | 未实现 | ❌ → Phase 1 | 1C |
+| SoftFloat | PVM 数值确定性 | Rust 层完成 | ✅ (SDK 需对接) | 2A |
+| ordered_set | PVM 哈希排序 | 未实现 | ❌ → Phase 2 | 2A |
+| CowboyModel | Ch5 | 未实现 | ❌ → Phase 2 | 2A |
+| CBOR 序列化 | 序列化章节 | 使用 JSON | 🔴 → Phase 0 | 0 |
+| 验证模式 (6 种) | Ch6 | Rust 层完成 | ✅ (SDK 需补全) | 2B |
+| Verify 检查器 | Ch6.3 | 3/17 | ⚠️ → Phase 2 | 2B |
+| Timeout (区块高度) | Ch4.1 | 框架存在 | ⚠️ → Phase 2 | 2C |
+| Retry | Ch4.1 | 未实现 | ❌ → Phase 2 | 2C |
+| TaskGroup | Ch4.2 | 未实现 | ❌ → Phase 3 | 3 |
+| @actor.continuation | Ch2.7 | 骨架 (抛异常) | ⚠️ → Phase 3 | 3 |
+| runner.mcp() | 链下计算 | Rust 已实现 | ⚠️ → Phase 3 | 3 |
+| 混合模式示例 | Ch7 | 不可用 | ❌ → Phase 3 | 3 |
+| 模块白名单 | PVM 模块管理 | determinism.rs | ✅ | — |
+| 固定哈希种子 | PVM 哈希排序 | determinism.rs | ✅ | — |
+| 双 Gas (Cycles/Cells) | 费用章节 | execution.rs | ✅ | — |
+| Timer 系统 | 定时器章节 | storage: Timer | ✅ | — |
+| Runner VRF 选择 | Runner 选择 | ecvrf.rs | ✅ | — |
 
 ---
 
-*本文档基于 2026-02-22 的代码库状态生成。随着开发进展，各项状态可能更新。*
+## 十、版本策略与 API 稳定性
+
+### 10.1 SemVer 策略
+
+```
+主网前: 0.x.y
+  0.1.0 — Phase 0 完成 (基础设施 + CBOR)
+  0.2.0 — Phase 1 完成 (调用原语 + FSM + Guard)
+  0.3.0 — Phase 2 完成 (类型 + 验证 + Timeout)
+  0.4.0 — Phase 3 完成 (TaskGroup + Actor Continuation)
+  0.9.0 — Phase 4 完成 (生产加固)
+
+主网: 1.0.0
+  公共 API 冻结，后续只允许向后兼容变更
+```
+
+### 10.2 API 弃用策略
+
+- `0.x` 阶段: 允许 minor 版本间破坏性变更，但必须在 CHANGELOG 中明确标注
+- `1.0` 后: 弃用 API 至少保留**两个 minor 版本**后移除
+- 弃用 API 通过 `warnings.warn("...", DeprecationWarning)` 提示
+- PVM 模块白名单确保旧 `pvm_sdk` 名称在过渡期内仍可导入 (Phase 0 中设置别名)
+
+### 10.3 `pvm_sdk` → `cowboy_sdk` 过渡
+
+Phase 0 执行时：
+1. 目录 `node/pvm/Lib/pvm_sdk/` → `node/pvm/Lib/cowboy_sdk/`
+2. 在 `node/pvm/Lib/pvm_sdk/__init__.py` 保留兼容层:
+   ```python
+   import warnings
+   warnings.warn("pvm_sdk is deprecated, use cowboy_sdk", DeprecationWarning, stacklevel=2)
+   from cowboy_sdk import *
+   ```
+3. PVM 模块白名单同时允许 `pvm_sdk` 和 `cowboy_sdk`
+4. 在 `0.3.0` 之后移除 `pvm_sdk` 兼容层
+
+---
+
+## 十一、Host API 缺失项汇总
+
+### 按 Phase 排列
+
+| Phase | Host API | Rust 层工作 | Python 绑定 | 阻塞的 SDK 功能 |
+|-------|----------|-----------|------------|----------------|
+| **0** | `cbor_encode(value)` | 实现 Canonical CBOR 编码器 | 暴露为 `pvm_host.cbor_encode` | 所有序列化 |
+| **0** | `cbor_decode(data)` | 实现 CBOR 解码器 | 暴露为 `pvm_host.cbor_decode` | 所有反序列化 |
+| **0** | `keccak256(data)` | 调用已有 hashlib | 暴露为 `pvm_host.keccak256` | Guard 指纹 |
+| **0** | `self_address()` | 返回当前 Actor 地址 | 暴露为 `pvm_host.self_address` | ActorRef |
+| **0** | `current_block()` | 返回区块高度 | 暴露为 `pvm_host.current_block` | BlockHeight |
+| **1** | `call_actor(target, method, args, cycles)` | 验证已有实现，确认 Python 绑定 | 确认可用 | `call()` |
+| **2** | `get_balance(addr)` | 读取账户余额 | 暴露 | 状态查询 |
+| **2** | `transfer(to, amount)` | 扣减/增加余额 | 暴露 | 原生转账 |
+| **2** | `set_timer(height, handler, data)` | 注册到 Timer 队列 | 暴露 | Timeout |
+| **2** | `cancel_timer(timer_id)` | 从 Timer 队列移除 | 暴露 | Timeout 清理 |
+
+---
+
+## 十二、时间线总结
+
+```
+Phase 0 (2 周)     Phase 1 (5 周)         Phase 2 (3 周)      Phase 3 (3 周)    Phase 4 (4 周)
+┌──────────┐  ┌──────────────────────┐  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│ 基础设施  │  │ 调用原语 + FSM +     │  │ 类型 + 验证 + │  │ TaskGroup +   │  │ Rust FSM +    │
+│ 重命名    │→│ Guard + 安全机制     │→│ Timeout       │→│ Actor Cont.  │→│ 安全审计 +    │
+│ CBOR      │  │ + 确定性测试         │  │ + 确定性测试   │  │ + 确定性测试   │  │ 文档 + 基准   │
+└──────────┘  └──────────────────────┘  └───────────────┘  └───────────────┘  └───────────────┘
+   v0.1.0          v0.2.0                   v0.3.0              v0.4.0             v0.9.0
+```
+
+**总计: 17 周 (1 人全职)**
+
+| Phase | 周数 | 交付的 CIP-6 章节 | 版本 |
+|-------|------|------------------|------|
+| 0 | 2 | 基础设施 (无对应章节) | 0.1.0 |
+| 1 | 5 | Ch1 调用原语 + Ch2 Continuation + Ch3 状态安全 | 0.2.0 |
+| 2 | 3 | Ch4 异步工具 + Ch5 类型系统 + Ch6 验证构建器 | 0.3.0 |
+| 3 | 3 | Ch7 混合模式 + Actor Continuation | 0.4.0 |
+| 4 | 4 | 生产加固、Rust FSM、文档 | 0.9.0 |
+
+---
+
+## 附录 A: PVM 兼容性铁律验证检查表
+
+| # | 规则 | SDK 层实施方案 | 验证方法 |
+|---|------|-------------|---------|
+| 1 | 禁止 `import time` | PVM 模块白名单拦截；SDK 提供 `pvm_time` | 白名单测试 |
+| 2 | 禁止 `import random` | PVM 模块白名单拦截；SDK 提供 `pvm_random` | 白名单测试 |
+| 3 | 禁止 `float`（硬件 FPU） | PVM 全局 softfloat 替换；SDK `SoftFloat = float` | 跨平台算术测试 |
+| 4 | 禁止 `set()` | PVM VM 层 set → ordered_set；SDK 暴露 `ordered_set` | 迭代顺序测试 |
+| 5 | 禁止 `pickle` | PVM 模块白名单拦截；SDK 使用 CBOR | 白名单测试 |
+| 6 | `call()` 深度 ≤ 32 | Host API `call_actor` 内部计数 | 深度越界测试 |
+| 7 | await 点 ≤ 8 | FSM 编译器静态检查 | 编译器拒绝测试 |
+| 8 | 循环 await 需 `@bounded_loop` | FSM 编译器静态检查 | 编译器拒绝测试 |
+| 9 | `capture()` 显式声明 | FSM 编译器强制要求 | 编译器拒绝测试 |
+| 10 | `send()` 不可撤回 | SDK 文档 + Linter 警告 | 反模式检测测试 |
+
+## 附录 B: 现有代码关键文件索引
+
+| 文件路径 | 功能 | 行数 | Phase 中的角色 |
+|----------|------|------|--------------|
+| `node/pvm/Lib/pvm_sdk/__init__.py` | SDK 入口 | 24 | Phase 0: 重命名 |
+| `node/pvm/Lib/pvm_sdk/continuation.py` | Continuation 状态 | 158 | Phase 0: CBOR 迁移; Phase 1: Guard 加固 |
+| `node/pvm/Lib/pvm_sdk/runner.py` | Runner 封装 | 82 | Phase 1: FSM 重写 |
+| `node/pvm/Lib/pvm_sdk/actor.py` | Actor 引用 | 28 | Phase 1: 完整实现; Phase 3: Continuation |
+| `node/pvm/Lib/pvm_sdk/verify.py` | 验证构建器 | 45 | Phase 2: 补全 14 个检查器 |
+| `node/pvm/Lib/pvm_sdk/types.py` | 类型定义 | 3 | Phase 2: SoftFloat + ordered_set |
+| `node/pvm/Lib/pvm_sdk/pvm_random.py` | 确定性随机 | 196 | 稳定，无需变更 |
+| `node/chain/src/pvm_host.rs` | Host API | ~800 | Phase 0-2: 新增 7+ 个 API |
+| `node/chain/src/execution.rs` | 执行引擎 | ~1500 | 稳定，无需变更 |
+| `node/pvm/crates/vm/src/softfloat.rs` | 软浮点 | ~500 | Phase 2: 验证全局替换 |
+| `node/pvm/crates/codegen/src/pvm_fsm.rs` | FSM 骨架 | ~100 | Phase 4: Rust FSM 编译器 |
+| `runner/crates/result-verifier/src/verifier.rs` | 结果验证 | ~500 | Phase 2: SDK Verify 对齐 |
+
+---
+
+*本文档基于 2026-02-22 的代码库状态生成。SDK 标准名称为 `cowboy_sdk`。*
