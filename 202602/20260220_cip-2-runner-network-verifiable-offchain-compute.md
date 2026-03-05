@@ -1,4 +1,16 @@
-# CIP-2: Runner Network — Verifiable Off-Chain Compute Marketplace
+> [!WARNING]
+> **已弃用 (Superseded)**  
+> 本文件为 2026-02-20 修订版草稿，已被 **2026-03-05 修订版**取代。  
+> 权威版本：[`refs/cips/cip-2-offchain-compute.mdx`](../cips/cip-2-offchain-compute.mdx)  
+>  
+> **主要变更（旧→新）：**
+> - VRF 选择：环形索引 → **Fisher-Yates VRF + 质押加权**（修复相关性攻击漏洞）
+> - VRF seed：Dispatcher 私钥 → **HMAC(block_hash, job_id)**（去中心化）
+> - `skip_task` 接口 → **超时自动重选**（激励对齐）
+> - 结果提交：全员上链 → **commit-reveal + 委托聚合器**（降低 Gas，防结果抄袭）
+> - 新增：`required_runner_pool` 字段（Entitlement Pool 准入控制）
+
+# CIP-2: Runner Network — Verifiable Off-Chain Compute Marketplace (Draft, Superseded)
 
 ---
 

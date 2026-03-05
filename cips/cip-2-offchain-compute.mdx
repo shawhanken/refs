@@ -8,11 +8,12 @@ icon: microchip
   **Status:** Draft for Internal Review  
   **Type:** Standards Track  
   **Category:** Core  
-  **Created:** 2025-10-02
+  **Created:** 2025-10-02  
+  **Revised:** 2026-03-05
 </Note>
 
 <Tip>
-  This specification defines the verifiable, asynchronous off‑chain compute framework (VRF‑based selection, mandatory result_schema, and deferred callbacks per CIP‑1). Content below mirrors the CIP text verbatim.
+  This specification defines the verifiable, asynchronous off‑chain compute framework. Revision 2026-03-05 replaces the ring-buffer VRF selection with Fisher-Yates VRF + stake-weighted sortition, removes the `skip_task` mechanism in favor of timeout-based re-selection, and introduces the commit-reveal aggregator model for result verification.
 </Tip>
 
 # CIP-2: Verifiable Asynchronous Off-chain Computation Framework
@@ -21,7 +22,7 @@ icon: microchip
 
 ### **Abstract**
 
-This proposal introduces a framework for executing verifiable, off-chain computations within the Cowboy ecosystem. It defines a standardized, asynchronous protocol for smart contracts to request external data fetching, complex computations, or AI model inferences from a decentralized network of off-chain "Runners." The architecture is built on a deterministic, VRF-based selection mechanism, allowing for verifiable and implicit task assignment. The core design philosophy emphasizes user-centric verification, task clarity through mandatory result schemas, and on-chain stability via a deferred transaction model for callbacks.
+This proposal introduces a framework for executing verifiable, off-chain computations within the Cowboy ecosystem. It defines a standardized, asynchronous protocol for smart contracts to request external data fetching, complex computations, or AI model inferences from a decentralized network of off-chain "Runners." The architecture is built on a deterministic, stake-weighted VRF selection mechanism using Fisher-Yates shuffle, ensuring verifiable task assignment that is resistant to correlation attacks and Sybil manipulation. The core design philosophy emphasizes user-centric verification, task clarity through mandatory result schemas, and on-chain stability via a deferred transaction model for callbacks (per CIP-1).
 
 ---
 
@@ -33,121 +34,275 @@ This framework empowers developers to:
 
 1. **Integrate Complex Logic:** Run Python-based AI model inferences or heavy computations off-chain.  
 2. **Preserve On-chain Stability:** Utilize an asynchronous, deferred transaction model to prevent network congestion from off-chain interactions.  
-3. **Achieve Verifiable Decentralization:** Leverage a VRF-based system to eliminate centralized schedulers and allow anyone to verify task assignments.  
+3. **Achieve Verifiable Decentralization:** Leverage a stake-weighted VRF-based system to eliminate centralized schedulers and allow anyone to verify task assignments.  
 4. **Enforce Clarity:** Mandate task and result schemas to reduce ambiguity and ensure Runners can reliably execute and be verified.  
-5. **Choose Their Trust Model:** Allow developers to select the number of Runners and the type of cryptographic proof required for their specific application's needs.
+5. **Choose Their Trust Model:** Allow developers to select the number of Runners, the verification mode, and optional Runner pool constraints for their specific application's security needs.
 
 ---
 
 ### **Specification**
 
-The framework consists of four main components:
+The framework consists of five main on-chain components and the off-chain Runner network:
 
-1. **The Off-chain Task Dispatcher:** A contract for developers to submit and define tasks.  
-2. **The Runner Registry:** A contract managing Runner registration, staking, and the health-based active runner list.  
-3. **The Runner Submission Contract:** A dedicated contract for Runners to submit results or skip tasks.  
-4. **Off-chain Runners:** External actors who execute tasks and interact with the on-chain contracts.
+1. **The Job Dispatcher** (`0x0000...0002`): Receives job submissions, runs VRF selection, and manages job lifecycle.  
+2. **The Runner Registry** (`0x0000...0001`): Manages Runner registration, staking, capabilities, health, and reputation.  
+3. **The Result Verifier** (`0x0000...0003`): Aggregates runner results and delivers verified outcomes via deferred callback.  
+4. **The Entitlement Registry** (`0x0000...0007`): Optional Runner pool access control (see §7).  
+5. **Off-chain Runners:** External nodes that execute tasks and submit results.
 
 #### **1. Task Definition and Result Schema**
 
-To ensure clarity and verifiability, every off-chain task submission **must** include a result_schema. This is a bytes payload that defines the explicit constraints of the task and its expected output. This allows the protocol to perform basic, objective validation and protects both developers and Runners.
+Every off-chain task submission **must** include a `result_schema`. This mandatory payload defines the explicit output constraints of the task, enabling objective validation by the protocol.
 
-The schema should define parameters such as:
+The schema defines at minimum:
 
-* max_return_bytes: The maximum size of the result_data to prevent gas-bombing attacks.  
-* expected_execution_ms: A target execution time to help Runners assess feasibility.  
-* data_format: A description of the expected data structure (e.g., JSON schema, binary format).
+* `max_return_bytes`: Maximum result size to prevent gas-bombing attacks.  
+* `expected_execution_ms`: Target execution time to help Runners assess feasibility.  
+* `data_format`: Expected data structure (e.g., JSON schema, binary format).
 
-#### **2. Core Workflow (Asynchronous & Deferred)**
+#### **2. Job Specification**
 
-1. **Task Submission:** A developer's Actor contract calls submit_task on the **Dispatcher**, providing the task definition and the result_schema. The state of the **active runner list** and the current **VRF seed** are fixed at this submission block for deterministic selection.  
-2. **Implicit Runner Selection:** Off-chain Runners continuously monitor for new tasks. For each new task, a Runner can locally and independently run the on-chain verification logic to determine if they have been selected.  
-3. **Task Execution or Skipping:**  
-   * A selected Runner executes the task off-chain according to the definition.  
-   * If a Runner chooses not to execute, they must call skip_task on the **Runner Submission Contract**. This passes the responsibility to the next Runner in the deterministic sequence.  
-4. **Result Submission:** The executing Runner calls submit_result on the **Runner Submission Contract**, providing the result and any requested proof. The contract verifies that:  
-   * The caller is a legitimately selected Runner for this task.  
-   * The result payload size does not exceed max_return_bytes from the schema.  
-5. **Deferred Callback:** Once the required number of results (N) has been collected, the Runner Submission Contract constructs and signs a **deferred transaction** (per CIP-1). This transaction contains the call to the developer's callback function with all submitted results.  
-6. **Callback Execution:** Network validators include and execute this deferred transaction in a future block, guaranteeing its completion without impacting the performance of the core protocol.  
-7. **Result Consumption & Payment:** Within the callback, the Actor contract processes the results and **must** call consume_result on the Dispatcher, specifying which Runner's result it used. This final step triggers the distribution of payment to the Runners.
+Every job submitted to the Dispatcher carries a `JobSpec`:
 
-#### **3. The Off-chain Task Dispatcher**
+| Field | Type | Description |
+|-------|------|-------------|
+| `job_id` | H256 | Unique job identifier |
+| `job_type` | JobType | `Llm`, `Http`, `Mcp`, or `Custom` |
+| `bounds` | ResourceBounds | Resource limits for execution |
+| `verification` | VerificationConfig | Verification mode and parameters |
+| `max_price` | U256 | Maximum price (CBY wei) |
+| `tip` | U256 | Priority tip |
+| `timeout_blocks` | u64 | Timeout in blocks |
+| `callback` | CallbackInfo | Callback Actor and handler |
+| `submitter` | Address | Submitting Actor's address |
+| `submitted_at` | u64 | Submission block height |
+| `required_runner_pool` | Option\<PoolId\> | Optional: only Runners holding this Entitlement pool may be selected (§7) |
 
-Resides at a canonical address (e.g., 0x0...cowboy.offchain).
+#### **3. Core Workflow (Asynchronous & Deferred)**
 
-**Data Structures:**
+```
+Actor calls submit_job(job_spec)
+    │  → Job Dispatcher (0x0000...0002)
+    │
+    ▼
+1. Validate JobSpec (bounds ≠ 0, max_price > 0, timeout > 0)
+2. Record submission_block → fixes the candidate snapshot
+3. Generate VRF seed: seed = HMAC-SHA256(key=block_hash, "runner-select-v2:" || job_id || submitted_at)
+4. Build candidate list (see §4)
+5. Run Fisher-Yates VRF selection (see §5) → assign M runners
+6. Store job → JobStatus::Assigned
 
-| struct OffchainTask:    task_id: uint256    caller: address    task_definition: bytes    result_schema: bytes *# MANDATORY: Defines output constraints*    callback_address: address    callback_selector: bytes4    num_runners_requested: uint8    payment_per_runner: uint256    submission_block: uint64    timeout_block: uint64    proof_type_requested: uint8    status: uint8 |
-| :---- |
+Runner polls get_assigned_jobs(runner_addr)
+    │
+    ├── Execute → submit commitment → Aggregator collects → submit_result
+    └── Do not execute → job times out → automatic re-selection (see §6)
 
-**Interface:**
+Result Verifier (0x0000...0003)
+    └── Verify commitments → produce VerifiedResult → deferred callback to Actor
+```
 
-* submit_task(task_definition: bytes, result_schema: bytes, callback_address: address, callback_selector: bytes4, num_runners: uint8, timeout_blocks: uint64, proof_type_requested: uint8) -> uint256:  
-  * Called by an Actor to initiate a task. Locks funds and emits a TaskSubmitted event. Returns a task_id.  
-* consume_result(task_id: uint256, consumed_runner_address: address):  
-  * Called by the Actor from within its callback. Finalizes the task and triggers payment distribution.
+#### **4. Runner Registry & Candidate List Construction**
 
-#### **4. The Runner Registry & Active List Management**
+**System Actor:** `0x0000...0001`
 
-Manages Runner identity and maintains the deterministic list of active Runners.
+The Registry maintains runners with full registration data including stake, capabilities, rate card, health, and reputation.
 
-**Data Structures:**
+**Candidate list construction** (at `submission_block`):
 
-| struct RunnerProfile:    stake_amount: uint256    tasks_completed: uint64    tasks_failed: uint64    tasks_skipped: uint64    last_heartbeat_block: uint64    health: uint8 |
-| :---- |
+1. **Health filter:** `HealthStatus::Healthy` (heartbeat received within `heartbeat_timeout_blocks`)  
+2. **Reputation filter:** `reputation ≥ 50`  
+3. **Capability filter:** Runner supports the required `JobType`  
+4. **TEE filter:** If `tee_required`, runner must declare TEE support  
+5. **Price filter:** Estimated cost ≤ `job_spec.max_price`  
+6. **Concurrency filter:** `active_jobs < max_concurrent_jobs`  
+7. **Entitlement filter** *(optional)*: If `required_runner_pool` is set, runner must hold the specified Entitlement (§7)
 
-**Active List Management:**
+**Candidate list ordering:** After filtering, candidates are **sorted ascending by address bytes** to produce a globally consistent, deterministic ordered list. This sort is mandatory — different nodes must arrive at the identical ordered list.
 
-The Registry maintains an ordered array active_runner_list.
+**Candidate list snapshot:** The filtered and sorted list is fixed at `submission_block`. Runners who join or leave after submission do not affect the selection for this job.
 
-* **Heartbeat (heartbeat()):** A Runner calls this to signal liveness. If not in the list, they are appended with max health (a governable parameter, e.g., 100 blocks). If already in the list, their health is reset to max.  
-* **Health Decay:** For every block, a protocol-level process decrements the health of each Runner in the list.  
-* **Removal:** If a Runner's health reaches 0, they are removed from active_runner_list. This ensures the list is dynamic and contains only responsive participants.
+#### **5. Verifiable Runner Selection (Fisher-Yates VRF)**
 
-#### **5. The Runner Submission Contract**
+<Warning>
+  The ring-buffer selection from the original CIP-2 draft (start_index + consecutive indices) is **superseded** by this specification. Ring-buffer selection is vulnerable to correlation attacks: an adversary controlling M adjacent positions in the list can guarantee selection for any M-runner job.
+</Warning>
 
-Resides at a dedicated address (e.g., 0x0...cowboy.runner.submit).
+**VRF Seed (deterministic, no private key required):**
 
-**Interface:**
+```
+seed = Keccak256(
+    block_hash              // consensus-fixed, globally consistent
+    || "cowboy-runner-select-v2:"  // domain separator (prevents cross-context collisions)
+    || job_id               // unique per job
+    || submitted_at_le8     // 8-byte LE block height
+)
+```
 
-* submit_result(task_id: uint256, result_data: bytes, proof: bytes, execution_time_ms: uint64):  
-  * Verifies the msg.sender is a selected Runner for the task_id using the VRF logic.  
-  * Validates result_data against the task's result_schema.  
-  * Stores the result and checks if the callback can be triggered.  
-* skip_task(task_id: uint256):  
-  * Verifies the msg.sender is a selected Runner.  
-  * Records that this Runner has waived execution for this task, allowing the next Runner in the sequence to take their place.
+`block_hash` is the hash of the `submission_block`, already fixed by consensus. No private key is required. `block_hash` is a public value — all nodes agree on it — so HMAC's key-hiding property is unnecessary here. A domain separator achieves the same cross-context isolation.
 
-#### **6. Verifiable Runner Selection (VRF-based)**
+> **Implementation note:** Use `cowboy_types::keccak256`, which is the project-standard hash primitive (consistent with job ID generation, timer ID generation, token ID generation, etc.). The `pvm_host::randomness()` API uses HKDF-SHA256 specifically because it is a security-critical PRF exposed to Actor code; the runner selection seed has no such requirement.
 
-This mechanism ensures a decentralized, predictable, and verifiable selection process.
 
-* Logic: The selection is determined by a network-wide VRF seed that is periodically updated. For a task submitted at submission_block, the starting index in the active_runner_list is calculated as:  
-  start_index=hash(vrf_seed+(submission_block−vrf_generation_block))(modlist_size)  
-* **Selection:** The N requested Runners are those at indices start_index, start_index + 1, ..., start_index + N - 1, using ring buffer logic (wrapping around the list).  
-* **Verification:** The is_runner_selected_for_task logic (as detailed in the pseudocode) is implemented on-chain within the Runner Submission Contract. This function accounts for the historical state of the active list and any skips to definitively prove if a submission is valid.
+**Stake-Weighted Fisher-Yates Shuffle (select M from N):**
+
+```
+candidates ← sorted filtered list (length N)
+weights[i] ← stake_to_weight(candidates[i].stake)
+   where stake_to_weight(s) = floor(log2(s / MIN_STAKE + 1)) + 1
+   (logarithmic compression: 1024× stake → 11× weight, preventing whale monopoly)
+
+current_seed ← seed
+for i in 0..M:
+    total_remaining ← sum(weights[i..N])
+    hash ← Keccak256(current_seed || i_le8)
+    r ← u64_from_le(hash[0..8]) mod total_remaining
+    j ← weighted_pick(weights[i..N], r)   // cumulative weight lookup → O(N)
+    swap(candidates[i], candidates[i+j])
+    swap(weights[i], weights[i+j])
+    current_seed ← hash
+
+selected ← candidates[0..M].addresses
+```
+
+**Properties:**
+- Selected runners are **pairwise independent**: no two selections are correlated
+- Higher stake → higher probability of selection (Sybil resistance)
+- Same `seed` + same `candidates` always produces the same result (determinism)
+- Any node can independently verify the selection (verifiability)
+
+**On-chain verification** (in Result Verifier and Job Dispatcher):  
+Given `(candidates_snapshot, seed, M)`, re-run the above algorithm to verify that `msg.sender` is among the selected set. The `candidates_snapshot` Merkle root is stored at submission time.
+
+#### **6. Timeout-Based Re-selection (replaces skip_task)**
+
+<Note>
+  The `skip_task` interface is **removed** from this revision. Explicit skipping creates adverse incentives (runners cherry-picking jobs) and unnecessary on-chain transactions. Timeout-based re-selection achieves the same liveness guarantee with better economic alignment.
+</Note>
+
+**Timeout re-selection protocol:**
+
+1. Selected runners have `timeout_blocks` to submit their result commitment.  
+2. If no commitment is received within `timeout_blocks`:  
+   - All timed-out runners receive `reputation -= TIMEOUT_PENALTY` (default: 5)  
+   - Dispatcher triggers re-selection:  
+     `retry_seed = Keccak256(original_seed || "retry:" || retry_count_le4)`  
+   - Timed-out runners are excluded from the retry candidate list  
+   - A new set of M runners is selected from the remaining candidates  
+3. After `MAX_RETRIES` (default: 3) consecutive failures, the job transitions to `Failed` and `reputation -= SLASH_THRESHOLD` for persistent non-responders  
+4. After `SLASH_THRESHOLD` consecutive slashes, a stake slash is triggered
+
+**Economic alignment:** Not executing = passive timeout = reputation loss. Runners are incentivized to either execute or proactively avoid accepting jobs they cannot execute (by not heartbeating for job types they lack).
+
+#### **7. Entitlement Pool Integration (Optional)**
+
+Jobs may specify `required_runner_pool: Some(pool_id)` to restrict selection to runners holding a specific Entitlement from the Entitlement Registry (`0x0000...0007`).
+
+This enables:
+- **Open** (default): `required_runner_pool = None` — any qualified runner may be selected
+- **Whitelist**: `required_runner_pool = Some(TrustedPoolId)` — only runners granted pool membership
+- **Compliance-gated**: Only runners in EU-resident or TEE-certified pools
+- **Governance-curated**: DAO grants Entitlement pool membership via on-chain governance
+
+Entitlement is checked during candidate list construction (§4, step 7) and does not affect the VRF algorithm itself.
+
+#### **8. Result Submission: Commit-Reveal + Designated Aggregator**
+
+<Note>
+  This revision replaces the original model (all runners independently submit full results to chain) with a commit-reveal + aggregator model that reduces on-chain Gas by ~(N-1)/N and prevents runners from copying each other's results after seeing them.
+</Note>
+
+**Participants:**
+- **Runners:** All M selected runners execute the job independently
+- **Aggregator:** The selected runner with the highest reputation (deterministic, ties broken by address order). Acts as the coordinator.
+
+**Submission flow:**
+
+```
+Step 1 – Commit (all M runners, on-chain, low cost):
+    commit(runner_addr, job_id, hash(result_bytes || runner_sig))
+    Deadline: submitted_at + commit_deadline_blocks
+
+Step 2 – Collect (Aggregator, off-chain):
+    Aggregator receives result_bytes from other runners via direct HTTP push
+    Aggregator runs verification logic (majority vote, structured match, etc.)
+
+Step 3 – Reveal (Aggregator, on-chain):
+    submit_verified_result(job_id, VerifiedResult, reveals[])
+    reveals[i] = { runner, result_bytes, runner_sig }
+    Aggregator receives a small bonus reward for honest aggregation
+
+Step 4 – On-chain verification (Result Verifier):
+    For each reveal[i]:
+        assert hash(result_bytes || runner_sig) == stored_commitment[i]
+        assert runner_sig is valid Ed25519 over result_bytes
+    Run verification mode checks (MajorityVote, StructuredMatch, etc.)
+    Produce VerifiedResult → trigger deferred callback (CIP-1)
+```
+
+**Safety properties:**
+- Runners cannot copy others' results after seeing them (commitment pre-locks the result)
+- Aggregator cannot forge other runners' results (commitment-bound)
+- Aggregator failure: other runners may submit individual reveals after `aggregator_timeout_blocks`; Result Verifier falls back to self-aggregation
+
+#### **9. Verification Modes**
+
+| Mode | Runners | Description |
+|------|---------|-------------|
+| **None** | 1 | No verification. Dev/test only. |
+| **EconomicBond** | 1 | Single runner with economic stake bond. |
+| **MajorityVote** | N ≥ 3 | Extract `vote_field`, majority wins with threshold. |
+| **StructuredMatch** | N ≥ 2 | Pipeline of checks: JsonSchema, field matching, numeric tolerance, numeric range, per-field majority. |
+| **Deterministic** | N ≥ 2 | Byte-identical match across all results. Requires `tee_required = true` for meaningful guarantees (LLM inference is inherently non-deterministic without TEE + fixed model hash). |
+| **SemanticSimilarity** | N ≥ 3 | Cosine similarity clustering; largest cluster meeting threshold wins. |
+
+#### **10. Randomness Evolution Path**
+
+The VRF seed source evolves across three phases without changing the selection algorithm or Actor-facing APIs:
+
+| Phase | Seed IKM | Security Assumption |
+|-------|----------|---------------------|
+| **L1 (current)** | `block_hash` of `submission_block` | Honest supermajority of block proposers |
+| **L2 (near-term)** | `block_vrf_output` = EC-VRF output by block proposer (in block header) | Honest block proposer per round |
+| **L3 (long-term)** | `block_vrf_output` = Threshold-BLS t-of-n beacon | t-of-n validators honest |
+
+The `pvm_host.rs` randomness API is designed for zero-Actor-code-change migration: only the IKM source switches internally.
 
 ---
 
 ### **Rationale**
 
-* **VRF-based Selection:** This decentralizes the selection process, removing a critical point of failure and control. It makes selection transparent and mathematically verifiable by anyone.  
-* **Deferred Transactions:** By integrating with CIP-1, we offload the gas-intensive and potentially long-running callback transactions from the main execution flow, enhancing the network's overall stability and predictability.  
-* **Mandatory Result Schemas:** This simple requirement drastically improves the robustness of the system. It creates a clear contract between developers and Runners, prevents entire classes of abuse (like gas-bombing), and simplifies result verification.  
-* **Health-Based Active List:** The health mechanism provides a fluid and self-correcting list of reliable Runners, ensuring that tasks are assigned to nodes that are consistently online and responsive.
+* **Fisher-Yates VRF over ring-buffer:** The original ring-buffer selection (selecting N consecutive indices) is vulnerable to correlation attacks — an adversary controlling adjacent positions in the active list is always selected together for any N-runner job. Fisher-Yates with independent weighted draws eliminates this correlation entirely.
+
+* **Stake-weighting:** Equal-probability selection ignores stake, making Sybil attacks cheap (register 100 minimal-stake accounts = 100× chance). Logarithmic stake weighting provides proportional incentives without enabling whale monopoly.
+
+* **No private key for VRF seed:** Using `HMAC(block_hash, job_id)` instead of a dispatcher private key eliminates both the hardcoded-key security hole and the single-node selection bias. `block_hash` is consensus-fixed and globally consistent.
+
+* **Timeout re-selection over skip_task:** `skip_task` creates adverse incentives (runners selectively skip low-value jobs) and adds unnecessary on-chain transactions. Passive timeout with reputation penalty provides the same liveness guarantee with better economic alignment.
+
+* **Commit-reveal aggregator:** All-runners-submit to chain costs Gas × N and allows result copying. Commit-reveal prevents copying; designating the highest-reputation runner as aggregator is deterministic and Gas-efficient.
+
+* **Deferred Transactions (CIP-1):** Callbacks are delivered as deferred transactions, decoupling off-chain execution latency from the main chain execution path.
+
+* **Mandatory Result Schemas:** Creates a clear contract between developers and Runners, prevents gas-bombing, and simplifies result verification.
 
 ---
 
 ### **Backwards Compatibility**
 
-This CIP is fully backwards compatible. It introduces new canonical contracts and functionalities without altering any existing core protocol rules or transaction formats.
+This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged. The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
 
 ---
 
 ### **Security Considerations**
 
-* **VRF Grinding:** An attacker could try to influence the submission_block of their task to get a favorable start_index. This is mitigated by the fact that block production itself is a decentralized process, making precise timing difficult and expensive.  
-* **Active List Manipulation:** A sophisticated attacker could try to manipulate the active_runner_list by timing heartbeats or spamming new registrations. The minimum stake requirement and the cost of sending heartbeat transactions serve as economic deterrents.  
-* **Callback Griefing:** A malicious developer could write a callback that always fails, preventing Runners from being paid. The on-chain failed_callbacks counter on the developer's contract serves as a reputational penalty, and Runners may choose to blacklist actors with high failure rates.  
-* **Collusion:** Collusion among Runners remains a risk. This is primarily mitigated by the developer (by requesting proofs or a larger N) and the pseudo-randomness of the VRF selection, which makes it difficult for a cabal to be selected together consistently.
+* **VRF Grinding:** A submitter could attempt to choose `submitted_at` to influence the seed. Since `seed = HMAC(block_hash, job_id || submitted_at)` and `block_hash` is consensus-fixed before the submitter can observe it, this attack requires pre-computing the block hash — equivalent to breaking the consensus security assumption.
+
+* **Stake Concentration:** The logarithmic weight compression `log2(stake/MIN_STAKE + 1) + 1` limits the selection advantage of high-stake runners. A runner with 1024× the minimum stake gets only 11× the selection weight, not 1024×.
+
+* **Aggregator Collusion:** The Aggregator sees all results before submitting to chain. Mitigations: (1) other runners' commitments are locked before Aggregator submits; (2) other runners can independently reveal if Aggregator is unresponsive; (3) Aggregator's extra reward is forfeit if the submitted VerifiedResult is later challenged.
+
+* **Active List Manipulation:** Minimum stake (`MIN_STAKE`) and reputation threshold (`min_reputation = 50`) provide economic deterrence. The Entitlement pool mechanism (§7) allows job submitters to further restrict runner eligibility.
+
+* **Callback Griefing:** A malicious developer could write a callback that always fails, preventing runners from being paid. The `failed_callbacks` counter accrues as a reputational penalty, and runners may blacklist actors with high failure rates.
+
+* **Historical Snapshot Integrity:** The candidate list is fixed at `submission_block`. The Merkle root of the candidate list must be stored on-chain at submission time to enable re-selection verification. Runners who join or leave post-submission do not affect the snapshot.
