@@ -9,11 +9,11 @@ icon: microchip
   **Type:** Standards Track  
   **Category:** Core  
   **Created:** 2025-10-02  
-  **Revised:** 2026-03-05
+  **Revised:** 2026-03-09
 </Note>
 
 <Tip>
-  This specification defines the verifiable, asynchronous off‑chain compute framework. Revision 2026-03-05 replaces the ring-buffer VRF selection with Fisher-Yates VRF + stake-weighted sortition, removes the `skip_task` mechanism in favor of timeout-based re-selection, and introduces the commit-reveal aggregator model for result verification.
+  This specification defines the verifiable, asynchronous off‑chain compute framework. Revision 2026-03-05 replaces the ring-buffer VRF selection with Fisher-Yates VRF + stake-weighted sortition, removes the `skip_task` mechanism in favor of timeout-based re-selection, and introduces the commit-reveal aggregator model for result verification. Revision 2026-03-09 expands §7 to reflect the implemented Entitlement type system (Scope / Action / Constraints / Role), updates the system actor table to include Secrets Manager (`0x04`) and TEE Verifier (`0x05`), and clarifies the Pool membership grant flow.
 </Tip>
 
 # CIP-2: Verifiable Asynchronous Off-chain Computation Framework
@@ -42,13 +42,19 @@ This framework empowers developers to:
 
 ### **Specification**
 
-The framework consists of five main on-chain components and the off-chain Runner network:
+The framework consists of seven on-chain System Actor components and the off-chain Runner network:
 
-1. **The Job Dispatcher** (`0x0000...0002`): Receives job submissions, runs VRF selection, and manages job lifecycle.  
-2. **The Runner Registry** (`0x0000...0001`): Manages Runner registration, staking, capabilities, health, and reputation.  
-3. **The Result Verifier** (`0x0000...0003`): Aggregates runner results and delivers verified outcomes via deferred callback.  
-4. **The Entitlement Registry** (`0x0000...0007`): Optional Runner pool access control (see §7).  
-5. **Off-chain Runners:** External nodes that execute tasks and submit results.
+| Address | System Actor | Role |
+|---------|-------------|------|
+| `0x0000…0001` | **Runner Registry** | Runner registration, staking, capabilities, health, reputation |
+| `0x0000…0002` | **Job Dispatcher** | Job submission, VRF selection, job lifecycle management |
+| `0x0000…0003` | **Result Verifier** | Commit-reveal aggregation, result verification, callback dispatch |
+| `0x0000…0004` | **Secrets Manager** | Encrypted secret storage and TEE-gated secret release |
+| `0x0000…0005` | **TEE Verifier** | Remote attestation verification for TEE-based runners |
+| `0x0000…0007` | **Entitlement Registry** | Permission management: Runner Pool access control and general RBAC (see §7) |
+| — | **Off-chain Runners** | External nodes that execute tasks and submit results |
+
+> **Address gap note:** `0x0006` is reserved for future use.
 
 #### **1. Task Definition and Result Schema**
 
@@ -76,7 +82,7 @@ Every job submitted to the Dispatcher carries a `JobSpec`:
 | `callback` | CallbackInfo | Callback Actor and handler |
 | `submitter` | Address | Submitting Actor's address |
 | `submitted_at` | u64 | Submission block height |
-| `required_runner_pool` | Option\<PoolId\> | Optional: only Runners holding this Entitlement pool may be selected (§7) |
+| `required_runner_pool` | `Option<Vec<u8>>` | Optional: Pool ID bytes; only Runners holding a `RunnerJoinPool(pool_id)` Entitlement may be selected (§7) |
 
 #### **3. Core Workflow (Asynchronous & Deferred)**
 
@@ -87,7 +93,7 @@ Actor calls submit_job(job_spec)
     ▼
 1. Validate JobSpec (bounds ≠ 0, max_price > 0, timeout > 0)
 2. Record submission_block → fixes the candidate snapshot
-3. Generate VRF seed: seed = HMAC-SHA256(key=block_hash, "runner-select-v2:" || job_id || submitted_at)
+3. Generate VRF seed: seed = Keccak256(block_hash || "cowboy-runner-select-v2:" || job_id || submitted_at_le8)
 4. Build candidate list (see §4)
 5. Run Fisher-Yates VRF selection (see §5) → assign M runners
 6. Store job → JobStatus::Assigned
@@ -112,10 +118,10 @@ The Registry maintains runners with full registration data including stake, capa
 1. **Health filter:** `HealthStatus::Healthy` (heartbeat received within `heartbeat_timeout_blocks`)  
 2. **Reputation filter:** `reputation ≥ 50`  
 3. **Capability filter:** Runner supports the required `JobType`  
-4. **TEE filter:** If `tee_required`, runner must declare TEE support  
+4. **TEE filter:** If `tee_required`, runner must declare TEE support (attestation verified by TEE Verifier `0x05`)  
 5. **Price filter:** Estimated cost ≤ `job_spec.max_price`  
 6. **Concurrency filter:** `active_jobs < max_concurrent_jobs`  
-7. **Entitlement filter** *(optional)*: If `required_runner_pool` is set, runner must hold the specified Entitlement (§7)
+7. **Entitlement filter** *(optional)*: If `required_runner_pool = Some(pool_id)`, the Entitlement Registry (`0x07`) must confirm that the runner holds an Entitlement with `Scope::RunnerPool(pool_id)` and `Action::RunnerJoinPool(pool_id)` that has not expired and has not exceeded its `max_uses` (see §7.3)
 
 **Candidate list ordering:** After filtering, candidates are **sorted ascending by address bytes** to produce a globally consistent, deterministic ordered list. This sort is mandatory — different nodes must arrive at the identical ordered list.
 
@@ -193,17 +199,193 @@ Given `(candidates_snapshot, seed, M)`, re-run the above algorithm to verify tha
 
 **Economic alignment:** Not executing = passive timeout = reputation loss. Runners are incentivized to either execute or proactively avoid accepting jobs they cannot execute (by not heartbeating for job types they lack).
 
-#### **7. Entitlement Pool Integration (Optional)**
+#### **7. Entitlement Registry (`0x0000…0007`)**
 
-Jobs may specify `required_runner_pool: Some(pool_id)` to restrict selection to runners holding a specific Entitlement from the Entitlement Registry (`0x0000...0007`).
+The Entitlement Registry is a system Actor that provides a unified, on-chain permission management layer. For this CIP, its primary role is **Runner Pool access control** (gating job assignments to a curated set of runners). It also provides general RBAC infrastructure consumed by other subsystems (Token admin delegation, Actor access control, etc.).
 
-This enables:
-- **Open** (default): `required_runner_pool = None` — any qualified runner may be selected
-- **Whitelist**: `required_runner_pool = Some(TrustedPoolId)` — only runners granted pool membership
-- **Compliance-gated**: Only runners in EU-resident or TEE-certified pools
-- **Governance-curated**: DAO grants Entitlement pool membership via on-chain governance
+##### **7.1 Core Type System**
 
-Entitlement is checked during candidate list construction (§4, step 7) and does not affect the VRF algorithm itself.
+The Entitlement type system is defined in `cowboy_types::entitlement`:
+
+```rust
+/// Scope — defines the resource boundary a permission applies to
+pub enum Scope {
+    Global,                   // chain-wide
+    Actor(Address),           // specific Actor
+    Token([u8; 32]),          // specific Token (token_id)
+    Runner(Address),          // specific Runner
+    RunnerPool(Vec<u8>),      // Runner Pool membership (pool_id bytes)
+    Namespace(Vec<u8>),       // custom named namespace
+}
+
+/// Action — defines the permitted operation (single action per Entitlement record)
+pub enum Action {
+    All,                                       // wildcard
+    // Token actions
+    TokenTransfer, TokenMint, TokenBurn,
+    TokenFreeze, TokenSetHook, TokenTransferOwnership,
+    // Actor actions
+    ActorDeploy, ActorSendMessage,
+    ActorExecuteHandler(Vec<u8>),              // handler name
+    // Runner actions
+    RunnerRegister { min_stake_override: Option<u128> },
+    RunnerSubmitJob, RunnerSubmitResult,
+    RunnerJoinPool(Vec<u8>),                   // pool_id — grants pool membership
+    // System actions
+    SystemTransfer, SystemCreateAccount, SystemUpgrade,
+    // Custom
+    Custom(Vec<u8>),
+}
+
+/// Constraints — use conditions attached to an Entitlement
+pub struct Constraints {
+    pub valid_from:          Option<u64>,   // block height activation
+    pub valid_until:         Option<u64>,   // block height expiry
+    pub max_uses:            u64,           // 0 = unlimited
+    pub used_count:          u64,
+    pub max_amount_per_use:  Option<u64>,
+    pub max_total_amount:    Option<u64>,
+    pub total_amount_used:   u64,
+    pub rate_limit:          Option<RateLimit>,
+    pub delegatable:         bool,
+    pub delegation_depth_max: u8,           // max delegation chain depth (0 = non-delegatable)
+    pub revocable:           bool,
+}
+
+/// A single Entitlement record (one scope + one action per record)
+pub struct Entitlement {
+    pub grantee:    Address,
+    pub scope:      Scope,
+    pub action:     Action,
+    pub constraints: Constraints,
+    pub parent_id:  Option<EntitlementId>,  // set when derived via delegation
+}
+
+pub type EntitlementId = [u8; 32];  // keccak256(grantee || scope || action || parent_id?)
+
+/// Named permission set (RBAC role)
+pub struct Role {
+    pub name:        Vec<u8>,
+    pub scopes:      Vec<Scope>,
+    pub actions:     Vec<Action>,
+    pub constraints: Constraints,
+}
+```
+
+> **Design note:** Each `Entitlement` record covers **one** `(Scope, Action)` pair. Granting multiple actions requires multiple `Grant` calls (or an `AssignRole` that references a `Role` collecting them). This keeps revocation granular: revoking one action does not affect others.
+
+##### **7.2 System Instructions (instruction numbers 30–39)**
+
+```rust
+pub enum SystemInstruction {
+    // ... existing instructions 0–29 ...
+
+    // Entitlement instructions (30–39)
+    EntitlementGrant {
+        grantee:     Address,
+        scope:       Vec<u8>,       // codec-encoded Scope
+        action:      Vec<u8>,       // codec-encoded Action
+        constraints: Vec<u8>,       // codec-encoded Constraints
+    },                                              // 30
+    EntitlementRevoke {
+        entitlement_id: [u8; 32],
+    },                                              // 31
+    EntitlementDelegate {
+        entitlement_id: [u8; 32],
+        delegatee:      Address,
+        constraints:    Vec<u8>,    // must be a strict subset of parent constraints
+    },                                              // 32
+    EntitlementCreateRole {
+        name:          Vec<u8>,
+        scopes:        Vec<u8>,     // codec-encoded Vec<Scope>
+        actions:       Vec<u8>,     // codec-encoded Vec<Action>
+        constraints:   Vec<u8>,
+    },                                              // 33
+    EntitlementAssignRole {
+        role_id:  [u8; 32],
+        assignee: Address,
+    },                                              // 34
+    EntitlementRevokeRole {
+        role_id:  [u8; 32],
+        assignee: Address,
+    },                                              // 35
+}
+```
+
+##### **7.3 Runner Pool Membership Model**
+
+A **Runner Pool** is an on-chain access-control list identified by an arbitrary `pool_id: Vec<u8>`. Membership is represented as an Entitlement:
+
+```
+Scope::RunnerPool(pool_id) + Action::RunnerJoinPool(pool_id)
+```
+
+**Grant flow:**
+
+```
+Pool Owner / Governance
+    │
+    └── EntitlementGrant {
+            grantee:  <runner_address>,
+            scope:    Scope::RunnerPool(pool_id),
+            action:   Action::RunnerJoinPool(pool_id),
+            constraints: Constraints {
+                valid_until: Some(expiry_block),  // optional time-bound
+                max_uses: 0,                      // unlimited while valid
+                delegatable: false,               // pool membership is non-delegatable
+                revocable: true,
+                ..Default::default()
+            },
+        }
+```
+
+**Candidate filter check** (step 7 of §4, at `submission_block`):
+
+```
+EntitlementRegistry.check(
+    grantee = runner_address,
+    scope   = Scope::RunnerPool(required_runner_pool),
+    action  = Action::RunnerJoinPool(required_runner_pool),
+    at_block = submission_block,
+) → bool
+```
+
+The check passes if at least one non-expired, non-exhausted Entitlement matching `(grantee, scope, action)` exists. `used_count` is **not** incremented by the membership check — only by explicit `max_uses`-bounded grants (e.g. one-time trial membership).
+
+**Access modes enabled:**
+
+| Mode | `required_runner_pool` | Effect |
+|------|----------------------|--------|
+| **Open** (default) | `None` | Any qualified runner may be selected |
+| **Whitelist** | `Some(trusted_pool_id)` | Only runners with pool Entitlement |
+| **Compliance-gated** | `Some(eu_tee_pool_id)` | Only runners with regional or TEE-certified Entitlement |
+| **Governance-curated** | `Some(dao_pool_id)` | DAO grants pool membership via on-chain governance |
+
+##### **7.4 Gas Costs**
+
+| Operation | Cycles | Cells |
+|-----------|--------|-------|
+| `EntitlementGrant` | 5,000 | 500 |
+| `EntitlementRevoke` | 2,000 | 100 |
+| `EntitlementDelegate` | 3,000 | 300 |
+| `EntitlementCreateRole` | 5,000 | 500 |
+| `EntitlementAssignRole` / `RevokeRole` | 2,000 | 100 |
+| Entitlement check (per candidate, §4 filter) | 500 | 0 |
+
+##### **7.5 Safety Limits**
+
+| Limit | Value | Rationale |
+|-------|-------|-----------|
+| Max Entitlements per address | 256 | Prevent storage inflation |
+| Max delegation chain depth | 5 (`delegation_depth_max`) | Prevent unbounded chains |
+| Max Roles per address | 64 | Bound role-expansion attacks |
+| Lazy expiry cleanup | On-access | Expired Entitlements deleted on first check post-expiry |
+
+##### **7.6 Backwards Compatibility**
+
+1. **Default pass-through:** If the Entitlement Registry Actor does not exist, all checks return `false` (no runner is admitted via pool filter). Jobs with `required_runner_pool = None` are unaffected.  
+2. **Existing subsystems:** Token `owner == caller` checks remain the first-priority gate; Entitlement provides an additional delegation path, not a replacement.  
+3. **Instruction numbering isolation:** Instructions 30–39 do not conflict with existing instructions 0–29.
 
 #### **8. Result Submission: Commit-Reveal + Designated Aggregator**
 
@@ -252,7 +434,7 @@ Step 4 – On-chain verification (Result Verifier):
 | **EconomicBond** | 1 | Single runner with economic stake bond. |
 | **MajorityVote** | N ≥ 3 | Extract `vote_field`, majority wins with threshold. |
 | **StructuredMatch** | N ≥ 2 | Pipeline of checks: JsonSchema, field matching, numeric tolerance, numeric range, per-field majority. |
-| **Deterministic** | N ≥ 2 | Byte-identical match across all results. Requires `tee_required = true` for meaningful guarantees (LLM inference is inherently non-deterministic without TEE + fixed model hash). |
+| **Deterministic** | N ≥ 2 | Byte-identical match across all results. Requires `tee_required = true` for meaningful guarantees (LLM inference is inherently non-deterministic without TEE + fixed model hash). TEE attestation verified by TEE Verifier (`0x05`). |
 | **SemanticSimilarity** | N ≥ 3 | Cosine similarity clustering; largest cluster meeting threshold wins. |
 
 #### **10. Randomness Evolution Path**
@@ -275,7 +457,7 @@ The `pvm_host.rs` randomness API is designed for zero-Actor-code-change migratio
 
 * **Stake-weighting:** Equal-probability selection ignores stake, making Sybil attacks cheap (register 100 minimal-stake accounts = 100× chance). Logarithmic stake weighting provides proportional incentives without enabling whale monopoly.
 
-* **No private key for VRF seed:** Using `HMAC(block_hash, job_id)` instead of a dispatcher private key eliminates both the hardcoded-key security hole and the single-node selection bias. `block_hash` is consensus-fixed and globally consistent.
+* **No private key for VRF seed:** Using `Keccak256(block_hash || domain || job_id)` instead of a dispatcher private key eliminates both the hardcoded-key security hole and the single-node selection bias. `block_hash` is consensus-fixed and globally consistent.
 
 * **Timeout re-selection over skip_task:** `skip_task` creates adverse incentives (runners selectively skip low-value jobs) and adds unnecessary on-chain transactions. Passive timeout with reputation penalty provides the same liveness guarantee with better economic alignment.
 
@@ -285,17 +467,21 @@ The `pvm_host.rs` randomness API is designed for zero-Actor-code-change migratio
 
 * **Mandatory Result Schemas:** Creates a clear contract between developers and Runners, prevents gas-bombing, and simplifies result verification.
 
+* **Entitlement as membership proof (not just a flag):** Pool membership is represented as an on-chain Entitlement record (with expiry, rate-limit, delegatability) rather than a simple boolean flag. This allows time-bounded trial access, revocable membership, and delegation to sub-pools without protocol changes.
+
+* **Single action per Entitlement record:** Each record carries one `(Scope, Action)` pair. This enables fine-grained revocation without affecting co-granted actions, and keeps the membership check path O(1) per action.
+
 ---
 
 ### **Backwards Compatibility**
 
-This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged. The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
+This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged (`0x01`–`0x05`, `0x07`; `0x06` is reserved). The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
 
 ---
 
 ### **Security Considerations**
 
-* **VRF Grinding:** A submitter could attempt to choose `submitted_at` to influence the seed. Since `seed = HMAC(block_hash, job_id || submitted_at)` and `block_hash` is consensus-fixed before the submitter can observe it, this attack requires pre-computing the block hash — equivalent to breaking the consensus security assumption.
+* **VRF Grinding:** A submitter could attempt to choose `submitted_at` to influence the seed. Since `seed = Keccak256(block_hash || domain || job_id || submitted_at)` and `block_hash` is consensus-fixed before the submitter can observe it, this attack requires pre-computing the block hash — equivalent to breaking the consensus security assumption.
 
 * **Stake Concentration:** The logarithmic weight compression `log2(stake/MIN_STAKE + 1) + 1` limits the selection advantage of high-stake runners. A runner with 1024× the minimum stake gets only 11× the selection weight, not 1024×.
 
@@ -306,3 +492,9 @@ This CIP is fully backwards compatible with the core protocol. System Actor addr
 * **Callback Griefing:** A malicious developer could write a callback that always fails, preventing runners from being paid. The `failed_callbacks` counter accrues as a reputational penalty, and runners may blacklist actors with high failure rates.
 
 * **Historical Snapshot Integrity:** The candidate list is fixed at `submission_block`. The Merkle root of the candidate list must be stored on-chain at submission time to enable re-selection verification. Runners who join or leave post-submission do not affect the snapshot.
+
+* **Entitlement Inflation:** Each address is limited to 256 active Entitlements and 64 assigned Roles. `EntitlementGrant` consumes 500 Cells to deter spam. Expired Entitlements are lazily cleaned on first post-expiry check.
+
+* **Delegation Chain Depth:** `delegation_depth_max` (max 5) and the requirement that delegated constraints be a strict subset of parent constraints prevent privilege escalation through chained delegation.
+
+* **Pool Membership Expiry:** Pool Entitlements with `valid_until` set are automatically ineligible after the specified block. Node operators running compliance-sensitive pools should set time-bounded grants and renew via governance.
