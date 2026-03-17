@@ -149,7 +149,7 @@ Statically pricing high-level bytecode instructions is insufficient. To ensure f
 12. **Object Serialization Determinism:**  
     * **Problem:** Passing data between Actors via messages and persisting state to storage require serialization of Python objects. If serialization is non-deterministic, the same object may produce different byte streams on different nodes.  
     * **Specification:**  
-      * The protocol must use a **deterministic, canonical serialization format** (e.g., MessagePack or protocol-specific binary format).  
+      * The protocol must use Canonical CBOR (RFC 8949, §4.2 deterministic encoding) — map keys sorted, shortest integer encoding, no indefinite-length containers. CIP-6 establishes Canonical CBOR as the authoritative protocol serialization standard.  
       * Dictionary keys must be **sorted lexicographically** before serialization.  
       * Floats must be serialized using the exact bit representation according to the IEEE 754 standard.  
       * Serialization cost: 20 + total_bytes cycles (20 is the base serialization overhead).

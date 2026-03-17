@@ -385,7 +385,7 @@ When an actor cannot pay rent (balance, reserve, and prepaid epochs exhausted):
 
 - **Grace period (7 rent‑epochs):** Actor remains fully functional; flagged as "rent overdue"; catch‑up fee accumulates (10% of missed rent).
 - **Warning period (3 rent‑epochs):** Actor flagged as "eviction imminent"; events emitted to alert dependent actors.
-- **Eviction (rent‑epoch N+11):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are preserved. The actor enters a "dormant" state.
+- **Eviction (rent‑epoch N+10):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are preserved. The actor enters a "dormant" state.
 
 Evicted storage can be restored by anyone who provides the original data (verified against the recorded root hash) and pays back‑rent plus catch‑up fees.
 
@@ -681,14 +681,19 @@ Genesis supply is split into a **Company Reserve** and a **Network Distribution*
 The runner fee burn is the primary deflationary mechanism beyond basefee burns. As network usage grows, the burn rate increases proportionally, creating a reflexive supply‑reduction loop that offsets inflation (see §8.2). Governance MAY adjust the runner fee burn percentage via standard proposal + timelock.
 
 ## 9\. System Actors & Precompiles
-- **0x01 Messaging:** Enqueue and fanout messages.
-- **0x02 Timers:** Schedule/cancel timers.
-- **0x03 Oracle/Runner:** Manage off-chain jobs.
-- **0x04 Blob store:** Commit/retrieve blob multihashes.
-- **0x05 Signer utils:** secp/BLS/VRF helpers.
-- **0x06 EventListener:** Ethereum event subscriptions (see §16).
-- **0x07 TEE Verifier:** Verify TEE attestations against trusted measurements.
-- **0x08 Secrets Manager:** Secure credential storage and access control for TEE runners.
+
+| Address | Name | Function |
+|---------|------|----------|
+| **0x01** | Runner Registry | Runner registration, staking, capabilities, health (CIP-2) |
+| **0x02** | Job Dispatcher | Job submission, VRF selection, lifecycle management (CIP-2) |
+| **0x03** | Result Verifier | Commit-reveal aggregation, verification, callback dispatch (CIP-2) |
+| **0x04** | Secrets Manager | Encrypted credential storage, TEE-gated access (CIP-2) |
+| **0x05** | TEE Verifier | Remote attestation and trusted measurement verification (CIP-2) |
+| **0x06** | DualBasefee | Protocol dual-metered basefee state storage (CIP-3) |
+| **0x07** | Entitlement Registry | Runner Pool access control, RBAC (CIP-2) |
+| **0x08** | EventListener | Ethereum event subscriptions and cross-chain triggers |
+
+> **Note**: Addresses 0x01–0x08 are allocated to the runner subsystem and core protocol mechanisms. General protocol infrastructure actors (Messaging, Timers, Blob Store, Signer) are implemented as protocol-level mechanisms without dedicated system actor addresses in the current version; they will be assigned addresses from 0x0A onward as those subsystems are formalized.
 
 ## 10\. Developer Experience (DX)
 - **SDKs:** A primary Python SDK (`cowboy-py`) is provided.
@@ -802,7 +807,7 @@ Cowboy relies on third‑party bridge infrastructure for asset transfers and cro
 
 ### 16.3. Event Subscription (Ethereum to Cowboy)
 - Cowboy actors MAY subscribe to event logs emitted by specific contracts on the Ethereum blockchain.
-- A system actor on Cowboy, `0x06 EventListener`, SHALL manage these subscriptions. This actor relies on the bridge validator set to act as a decentralized oracle, monitoring the Ethereum chain for specified events.
+- A system actor on Cowboy, `0x08 EventListener`, SHALL manage these subscriptions. This actor relies on the bridge validator set to act as a decentralized oracle, monitoring the Ethereum chain for specified events.
 - When a subscribed event is confirmed (i.e., finalized on Ethereum), the `EventListener` actor MUST enqueue a message to the subscribing Cowboy actor, delivering the event's topic and data as the message payload.
 - The cost of this subscription service SHALL be paid by the actor in CBY, covering the gas fees incurred by the oracle validators on Ethereum.
 
@@ -848,15 +853,17 @@ Python opcode costs are implementation-defined and not protocol-specified. The r
 
 #### Actor API Costs
 
-| Operation | Base Cost | Variable Cost |
-|-----------|-----------|---------------|
-| `send_message()` | 1,000 cycles | — |
-| `storage_read()` | 500 cycles | +1 cycle/byte read |
-| `storage_write()` | 5,000 cycles | +10 cycles/byte written |
-| `hash()` | 100 cycles | +1 cycle/byte hashed |
-| `verify_signature()` | 3,000 cycles | — |
-| `get_block_info()` | 100 cycles | — |
-| `emit_event()` | 500 cycles | +5 cycles/byte |
+> **Note**: The authoritative gas cost values for all host operations are defined in CIP-3. The values shown here must match CIP-3; in case of conflict, CIP-3 is normative.
+
+| Operation | Base Cost | Variable Cost | Reference |
+|-----------|-----------|---------------|-----------|
+| `send_message()` | 80 cycles | — | (See CIP-3 §2) |
+| `storage_read()` | 10 cycles | — | (See CIP-3 §2) |
+| `storage_write()` | 50 cycles | — | (See CIP-3 §2) |
+| `hash()` | 100 cycles | +1 cycle/byte hashed | |
+| `verify_signature()` | 3,000 cycles | — | |
+| `get_block_info()` | 100 cycles | — | |
+| `emit_event()` | 500 cycles | +5 cycles/byte | |
 
 #### Platform Token Costs (CIP-20)
 
@@ -921,7 +928,7 @@ LLM inference is **not gas-metered**. Runners operate in a competitive marketpla
 | Pricing | Runners post quotes (CBY per token, per model) |
 | Selection | Users specify `max_price` in LlmRequest; matching via auction or direct selection |
 | Settlement | On verified delivery: 89% to runner, 10% burned, 1% to Treasury |
-| Collateral | `runner_stake >= 10 × average_job_value` |
+| Collateral | `runner_stake >= max(10,000 CBY, 1.5 × declared_max_job_value)` |
 | Verification | Attestation + random re-execution challenges |
 
 The protocol does NOT specify LLM pricing—this is determined by market dynamics between users and runners.
@@ -930,8 +937,16 @@ The protocol does NOT specify LLM pricing—this is determined by market dynamic
 Both Cycles and Cells use independent basefee adjustment:
 
 ```
-next_basefee = basefee × (1 + δ × (usage - target) / target)
+basefee_{x,i+1} = max(MIN_BASEFEE, basefee_{x,i} × (1 + clamp((U_x - T_x) / (T_x × α), -δ, +δ)))
 ```
+
+Where:
+- `α = 8` (BASEFEE_ALPHA — smoothing factor)
+- `δ = 0.125` (12.5% maximum change per block)
+- `MIN_BASEFEE = 1` (floor to prevent zero basefee)
+- `clamp(v, -δ, +δ)` caps the adjustment to ±12.5%
+
+This formula is consistent with §4.2 and the reference implementation.
 
 **Cycle parameters:**
 | Parameter | Value |

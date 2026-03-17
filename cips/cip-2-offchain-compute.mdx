@@ -54,7 +54,7 @@ The framework consists of seven on-chain System Actor components and the off-cha
 | `0x0000…0007` | **Entitlement Registry** | Permission management: Runner Pool access control and general RBAC (see §7) |
 | — | **Off-chain Runners** | External nodes that execute tasks and submit results |
 
-> **Address gap note:** `0x0006` is reserved for future use.
+> **Address gap note:** `0x0006` — DualBasefee — Protocol dual-metered basefee state storage (used by the fee mechanism; do not use for off-chain runner operations)
 
 #### **1. Task Definition and Result Schema**
 
@@ -437,7 +437,18 @@ Step 4 – On-chain verification (Result Verifier):
 | **Deterministic** | N ≥ 2 | Byte-identical match across all results. Requires `tee_required = true` for meaningful guarantees (LLM inference is inherently non-deterministic without TEE + fixed model hash). TEE attestation verified by TEE Verifier (`0x05`). |
 | **SemanticSimilarity** | N ≥ 3 | Cosine similarity clustering; largest cluster meeting threshold wins. |
 
-#### **10. Randomness Evolution Path**
+#### **10. Challenge Window and Bond Parameters**
+
+After a `VerifiedResult` is committed on-chain, any party may challenge the result within the challenge window by submitting a challenge bond:
+
+**Challenge Window Parameters:**
+- Challenge window: 15 minutes (900 blocks at ~1s/block)
+- Challenge bond: 100 CBY (burned if challenge fails, returned + reward if challenge succeeds)
+- Challenge scope: Any objectively verifiable failure within the 15-minute window
+
+A successful challenge reverts the callback, slashes the offending runner(s), and refunds the challenger's bond plus a reward drawn from the slashed stake. A failed challenge burns the bond to deter spam challenges.
+
+#### **11. Randomness Evolution Path**
 
 The VRF seed source evolves across three phases without changing the selection algorithm or Actor-facing APIs:
 
@@ -475,7 +486,7 @@ The `pvm_host.rs` randomness API is designed for zero-Actor-code-change migratio
 
 ### **Backwards Compatibility**
 
-This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged (`0x01`–`0x05`, `0x07`; `0x06` is reserved). The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
+This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged (`0x01`–`0x05`, `0x07`; `0x06` is assigned to DualBasefee and must not be used for off-chain runner operations). The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
 
 ---
 

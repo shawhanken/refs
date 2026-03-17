@@ -73,21 +73,24 @@ Let σ be the global state, B a block with transactions T_i, basefees (bf_c, bf_
 
 1. **Header/Proposer:** Determined by HotStuff and the previous QC.  
 2. **Epoch Maintenance (if applicable):** Redistribute timers from higher-tier queues into the Block Ring Buffer.  
-3. **Deliver Timers & Build Priority Queue** :  
-   a. Access the timer bucket for height(B).  
-   b. For each due timer message, the block producer performs a read-only call to the owner actor's designated Gas Bidding Agent (GBA), invoking getGasBid(context). The context object is supplied by the protocol (see §4.2).  
-   c. The GBA returns a bid (max_fee_per_cycle, tip_per_cycle, etc.).  
-   d. The producer populates a temporary priority queue with all due timers, ordered by their effective tip.  
-4. **Execute Prioritized Timers**:  
-   a. The producer executes timer-triggered messages from the front of the priority queue.  
-   b. Execution continues until either the queue is empty or the cumulative cycles used exceed the TIMER_PROCESSING_BUDGET_CYCLES for the block.  
-5. **Priority Weight for the next epoch:**  
-   a. For each actor with due timers, compute a normalized priority score S from: effective tip (post-GBA), execution outcome (success/defer), deadline lateness, and per-block budget consumption ratio.  
-   b. Update per-actor weight using exponential decay: weight' = (1 − λ) · weight + λ · S, where λ is governance-tunable (e.g., 0.2).  
-   c. Enforce bounds and fairness: clamp to [weight_min, weight_max]; apply a starvation floor for actors whose timers were repeatedly deferred; decay weights on inactivity.  
-   d. Application in next epoch: (1) break ties among equal effective tips; (2) apportion TIMER_PROCESSING_BUDGET_CYCLES slices per actor to smooth congestion while preserving price signals.  
-   e. Persistence & timing: persist weights in σ; recompute on epoch rollover; governance MAY reset or rescale weights when parameters change.  
-6. **Execute Transactions :** Process the ordered transaction set T_i. Actor calls to set_timeout now MUST include the address of the GBA that will manage the timer's future execution.  
+3. **Execute Transactions:** Process the ordered transaction set T_i. Actor calls to set_timeout now MUST include the address of the GBA that will manage the timer's future execution.
+4. **Deliver Timers & Build Priority Queue** :
+   a. Access the timer bucket for height(B).
+   b. For each due timer message, the block producer performs a read-only call to the owner actor's designated Gas Bidding Agent (GBA), invoking getGasBid(context). The context object is supplied by the protocol (see §4.2).
+   c. The GBA returns a bid (max_fee_per_cycle, tip_per_cycle, etc.).
+   d. The producer populates a temporary priority queue with all due timers, ordered by their effective tip.
+
+   > **Ordering rationale:** Timers execute after user transactions to ensure that timer callbacks cannot front-run transactions in the same block. This ordering is consistent with the whitepaper state transition function.
+
+5. **Execute Prioritized Timers**:
+   a. The producer executes timer-triggered messages from the front of the priority queue.
+   b. Execution continues until either the queue is empty or the cumulative cycles used exceed the TIMER_PROCESSING_BUDGET_CYCLES for the block.
+6. **Priority Weight for the next epoch:**
+   a. For each actor with due timers, compute a normalized priority score S from: effective tip (post-GBA), execution outcome (success/defer), deadline lateness, and per-block budget consumption ratio.
+   b. Update per-actor weight using exponential decay: weight' = (1 − λ) · weight + λ · S, where λ is governance-tunable (e.g., 0.2).
+   c. Enforce bounds and fairness: clamp to [weight_min, weight_max]; apply a starvation floor for actors whose timers were repeatedly deferred; decay weights on inactivity.
+   d. Application in next epoch: (1) break ties among equal effective tips; (2) apportion TIMER_PROCESSING_BUDGET_CYCLES slices per actor to smooth congestion while preserving price signals.
+   e. Persistence & timing: persist weights in σ; recompute on epoch rollover; governance MAY reset or rescale weights when parameters change.
 7. **Resolve Jobs, Adjust Basefees, Mint Rewards:** These steps proceed as previously defined.
 
 ---

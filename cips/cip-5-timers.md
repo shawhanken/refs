@@ -5,10 +5,14 @@ icon: clock
 ---
 
 <Note>
-  **Status:** Draft
+  **Status:** Superseded
   **Type:** Standards Track
   **Category:** Core
 </Note>
+
+> **Status: Superseded by CIP-1**
+>
+> This proposal has been superseded by CIP-1 (Actor Scheduler), which implements the Gas Bidding Agent (GBA) timer model consistent with the whitepaper specification. The Globalbox delivery mechanism and aging weight scoring described here may be incorporated as enhancements to CIP-1 in a future revision. New implementations should use CIP-1.
 
 ## 1. Abstract
 
