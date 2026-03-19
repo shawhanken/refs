@@ -52,9 +52,11 @@ The framework consists of seven on-chain System Actor components and the off-cha
 | `0x0000…0004` | **Secrets Manager** | Encrypted secret storage and TEE-gated secret release |
 | `0x0000…0005` | **TEE Verifier** | Remote attestation verification for TEE-based runners |
 | `0x0000…0007` | **Entitlement Registry** | Permission management: Runner Pool access control and general RBAC (see §7) |
+| `0x0000…0009` | **Volume Registry** | Storage volume lifecycle, CapToken issuance, manifest-root anchoring (CIP-9) |
+| `0x0000…000A` | **Container Image Registry** | On-chain allowlist of authorized OCI image hashes; execution policy management (CIP-10) |
 | — | **Off-chain Runners** | External nodes that execute tasks and submit results |
 
-> **Address gap note:** `0x0006` — DualBasefee — Protocol dual-metered basefee state storage (used by the fee mechanism; do not use for off-chain runner operations)
+> **Address gap note:** `0x0006` — DualBasefee — Protocol dual-metered basefee state storage (used by the fee mechanism; do not use for off-chain runner operations). `0x0008` — EventListener — reserved. `0x0009` — Volume Registry (CIP-9). `0x000A` — Container Image Registry (CIP-10).
 
 #### **1. Task Definition and Result Schema**
 
@@ -73,7 +75,7 @@ Every job submitted to the Dispatcher carries a `JobSpec`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `job_id` | H256 | Unique job identifier |
-| `job_type` | JobType | `Llm`, `Http`, `Mcp`, or `Custom` |
+| `job_type` | JobType | `Llm`, `Http`, `Mcp`, `Custom`, or `Container` (CIP-10) |
 | `bounds` | ResourceBounds | Resource limits for execution |
 | `verification` | VerificationConfig | Verification mode and parameters |
 | `max_price` | U256 | Maximum price (CBY wei) |
@@ -83,6 +85,7 @@ Every job submitted to the Dispatcher carries a `JobSpec`:
 | `submitter` | Address | Submitting Actor's address |
 | `submitted_at` | u64 | Submission block height |
 | `required_runner_pool` | `Option<Vec<u8>>` | Optional: Pool ID bytes; only Runners holding a `RunnerJoinPool(pool_id)` Entitlement may be selected (§7) |
+| `volume_mounts` | `Vec<VolumeMount>` | CIP-9 volumes to attach before execution. Default empty; backward-compatible. Each entry carries a `CapToken` authorizing the selected Runner to mount the specified volume. See CIP-9 §2.5. |
 
 #### **3. Core Workflow (Asynchronous & Deferred)**
 
@@ -100,7 +103,11 @@ Actor calls submit_job(job_spec)
 
 Runner polls get_assigned_jobs(runner_addr)
     │
+    ├── (if volume_mounts non-empty) Mount CIP-9 volumes via steamtrain-client (CIP-9 §5)
     ├── Execute → submit commitment → Aggregator collects → submit_result
+    ├── (if volumes were mounted) Unmount volumes → obtain manifest_root per volume
+    ├── submit_result (JobResultSubmit)
+    ├── (if any volume was written) VolumeAnchorManifest per written volume — same tx recommended (CIP-9 §4)
     └── Do not execute → job times out → automatic re-selection (see §6)
 
 Result Verifier (0x0000...0003)
@@ -113,6 +120,18 @@ Result Verifier (0x0000...0003)
 
 The Registry maintains runners with full registration data including stake, capabilities, rate card, health, and reputation.
 
+**RateCard capability fields relevant to job dispatch:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `supported_job_types` | `Vec<String>` | Job type names this runner accepts (e.g. `["Llm","Http","Container"]`) |
+| `steamtrain_capable` | `bool` | Runner has Steamtrain client configured; can handle jobs with `volume_mounts` (CIP-9) |
+| `supports_containers` | `bool` | Runner supports CIP-10 container execution (OCI runtime + cgroup v2 present) |
+| `container_limits` | `Option<ContainerCapacity>` | Maximum `ContainerLimits` values this runner will accept (CIP-10) |
+| `allowed_image_registries` | `Vec<String>` | OCI image registries this runner will pull from; empty = any (CIP-10) |
+
+Runners that do not declare `steamtrain_capable = true` are excluded from candidate selection for jobs with non-empty `volume_mounts` (filter 8). Runners that do not declare `supports_containers = true` are excluded from selection for `Container` jobs (filter 9).
+
 **Candidate list construction** (at `submission_block`):
 
 1. **Health filter:** `HealthStatus::Healthy` (heartbeat received within `heartbeat_timeout_blocks`)  
@@ -122,6 +141,15 @@ The Registry maintains runners with full registration data including stake, capa
 5. **Price filter:** Estimated cost ≤ `job_spec.max_price`  
 6. **Concurrency filter:** `active_jobs < max_concurrent_jobs`  
 7. **Entitlement filter** *(optional)*: If `required_runner_pool = Some(pool_id)`, the Entitlement Registry (`0x07`) must confirm that the runner holds an Entitlement with `Scope::RunnerPool(pool_id)` and `Action::RunnerJoinPool(pool_id)` that has not expired and has not exceeded its `max_uses` (see §7.3)
+8. **Volume mount filter** *(when `job_spec.volume_mounts` is non-empty)*: For each `VolumeMount`:
+   - `cap_token.grantee` MUST equal the candidate runner's address
+   - `cap_token.expires_at_block` MUST be `> submitted_at_block + timeout_blocks` (token must not expire before the job could complete)
+   - The referenced volume MUST exist in the Volume Registry (`0x0009`) with `deleted = false`
+   - Candidates failing any cap-token check are excluded from selection for this job
+9. **Container capability filter** *(when `job_type = Container`)*:
+   - Runner's `RateCard.supports_containers` MUST be `true`
+   - `spec.limits` fields MUST NOT exceed `RateCard.container_limits` corresponding caps
+   - `spec.image_hash` MUST be present in the Container Image Registry (`0x000A`) as an active entry, OR `spec.allow_unregistered = true` AND the runner has passed the TEE filter (rule 4)
 
 **Candidate list ordering:** After filtering, candidates are **sorted ascending by address bytes** to produce a globally consistent, deterministic ordered list. This sort is mandatory — different nodes must arrive at the identical ordered list.
 
@@ -216,6 +244,7 @@ pub enum Scope {
     Runner(Address),          // specific Runner
     RunnerPool(Vec<u8>),      // Runner Pool membership (pool_id bytes)
     Namespace(Vec<u8>),       // custom named namespace
+    Volume([u8; 32]),         // specific storage volume (volume_id) — CIP-9
 }
 
 /// Action — defines the permitted operation (single action per Entitlement record)
@@ -233,6 +262,14 @@ pub enum Action {
     RunnerJoinPool(Vec<u8>),                   // pool_id — grants pool membership
     // System actions
     SystemTransfer, SystemCreateAccount, SystemUpgrade,
+    // Volume actions (CIP-9) — used with Scope::Volume(volume_id)
+    VolumeRead([u8; 32]),                      // read-only access to a volume
+    VolumeWrite([u8; 32]),                     // write-only access to a volume
+    VolumeReadWrite([u8; 32]),                 // full read-write access to a volume
+    // Container actions (CIP-10) — used with Scope::Actor(actor_address)
+    ContainerNetworkEgress {
+        allowed_hosts: Vec<String>,            // allowlist of internet hostnames the container may reach
+    },
     // Custom
     Custom(Vec<u8>),
 }
@@ -273,6 +310,10 @@ pub struct Role {
 ```
 
 > **Design note:** Each `Entitlement` record covers **one** `(Scope, Action)` pair. Granting multiple actions requires multiple `Grant` calls (or an `AssignRole` that references a `Role` collecting them). This keeps revocation granular: revoking one action does not affect others.
+
+> **CIP-9 Volume actions:** `VolumeRead/Write/ReadWrite` are granted by the volume owner to a Runner address via `EntitlementGrant` as a governance-level standing policy, complementing the per-job `CapToken` mechanism (CIP-9 §8). The Job Dispatcher MAY additionally verify volume Entitlements when `required_runner_pool` is set. The `volume_id` in the Action variant is the 32-byte `VolumeId` defined in CIP-9 §2.1.
+
+> **CIP-10 ContainerNetworkEgress:** Grants a container job submitted by a specific Actor (`Scope::Actor(actor_address)`) the right to reach external internet hosts. The runner enforces the `allowed_hosts` allowlist via iptables egress filtering inside the container's network namespace (CIP-10 §8). Without this Entitlement, container jobs execute with no internet access.
 
 ##### **7.2 System Instructions (instruction numbers 30–39)**
 
@@ -436,6 +477,21 @@ Step 4 – On-chain verification (Result Verifier):
 | **StructuredMatch** | N ≥ 2 | Pipeline of checks: JsonSchema, field matching, numeric tolerance, numeric range, per-field majority. |
 | **Deterministic** | N ≥ 2 | Byte-identical match across all results. Requires `tee_required = true` for meaningful guarantees (LLM inference is inherently non-deterministic without TEE + fixed model hash). TEE attestation verified by TEE Verifier (`0x05`). |
 | **SemanticSimilarity** | N ≥ 3 | Cosine similarity clustering; largest cluster meeting threshold wins. |
+
+**Container job verification guidance** (`job_type = Container`, CIP-10):
+
+The canonical output field for `Container` jobs is `ContainerOutput.stdout`. The applicable verification modes depend on whether the container accesses external network resources:
+
+| Scenario | Recommended Mode | Rationale |
+|----------|-----------------|-----------|
+| Deterministic container (fixed `image_hash` + fixed CIP-9 volume input state) | `Deterministic` | Same image + same input → byte-identical stdout across runners |
+| Deterministic container with TEE | `Deterministic` with `tee_required = true` | Attestation proves runtime integrity |
+| Container with `ContainerNetworkEgress` | `StructuredMatch` on `exit_code` + selected stdout fields | Network responses may differ across runners/time; only objective fields should be matched |
+| Single-runner container (dev/test) | `None` or `EconomicBond` | No multi-runner comparison |
+
+`MajorityVote` and `SemanticSimilarity` are **not recommended** for Container jobs — container stdout is typically structured data or binary, not natural language suitable for semantic comparison.
+
+> **Manifest root consistency:** When multiple runners execute the same Container job with identical `volume_mounts` and `Deterministic` mode, their `VolumeAnchorManifest` submissions should produce the same `manifest_root`. A mismatch indicates divergent execution and is treated as a verification failure.
 
 #### **10. Challenge Window and Bond Parameters**
 
