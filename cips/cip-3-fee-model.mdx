@@ -71,9 +71,9 @@ Cycles are metered by instrumenting the core bytecode execution loop of the Pyth
 | Dictionary Get/Set | 3 |
 | List Append/Access | 2 |
 | String Operation (per character) | 1 |
-| Mailbox Send (per message, payload extra) | 500 |
-| Set Timer (+ cells) | 1,000 |
-| Cancel Timer | 500 |
+| Mailbox Send (per message, payload extra) | 80 |
+| Set Timer (+ cells) | 200 |
+| Cancel Timer | 200 |
 | Commit Blob (per KiB) | 40 |
 | Storage KV Read (per call) | 10 |
 | Storage KV Write (per call, + cells) | 200 |
@@ -191,7 +191,7 @@ It is critical to distinguish on-chain gas from off-chain job fees. The protocol
 
 To smooth short-term fee volatility and make them predictable in the long term, Cowboy implements an independent EIP-1559-style basefee adjustment mechanism for both the Cycles and Cells tracks. At its core is a negative feedback loop designed to keep the resource usage of each block stable around a preset target.
 
-* **Core Principle:** The protocol sets an ideal "target usage" (T_c and T_b) for Cycles and Cells at 50% of block capacity. **Cycle target: 10,000,000 cycles/block. Cell target: 500,000 cells/block.**
+* **Core Principle:** The protocol sets an ideal "target usage" (T_c and T_b) for Cycles and Cells at 50% of block capacity. **Block cycle capacity: 20,000,000 cycles/block. Block cell capacity: 1,000,000 cells/block. Cycle target (T_c): 10,000,000 cycles/block (50% of capacity). Cell target (T_b): 500,000 cells/block (50% of capacity).**
   * If the previous block's actual usage U was **higher** than the target T, the current block's basefee will be adjusted **upwards** to curb demand.  
   * If the previous block's actual usage U was **lower** than the target T, the current block's basefee will be adjusted **downwards** to stimulate demand.  
 * **Update Rule Explained:** Each block calculates the new basefee based on the parent block's usage via the following formula:  

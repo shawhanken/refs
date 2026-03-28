@@ -45,7 +45,7 @@ This section is descriptive and non‑binding. Normative requirements are in §�
 - **Cycle:** Unit of metered on‑chain compute.
 - **Cell:** Unit of metered bytes (1 cell = 1 byte).
 - **Runner:** Off‑chain worker that executes a job and returns an attested result.
-- **Steamtrain / attachable volume (CIP-9):** Distributed encrypted object storage: Runners read and write **volumes** via a client library (FUSE + QUIC); storage nodes see ciphertext only. **CapTokens** bind mount rights to a Runner address; **manifest roots** MAY be anchored on-chain via the Volume Registry (**0x09**).
+- **Steamtrain / attachable volume (CIP-9):** Distributed encrypted object storage: Runners read and write **volumes** via a client library (FUSE + QUIC); storage nodes see ciphertext only. **CapTokens** bind mount rights to a Runner address; **manifest roots** MAY be anchored on-chain via a dedicated registry (address TBD; **0x09** is now reserved for on-chain Governance).
 - **Entitlement:** A permission governing an actor's or runner's capabilities.
 - **GBA:** Gas Bidding Agent — an actor that dynamically bids for timer execution on behalf of another actor.
 
@@ -219,7 +219,7 @@ The protocol does **not** meter off‑chain Runner execution. Runners set their 
 
 Actors can outsource computation — LLM inference, HTTP fetches, MCP tool invocation, heavy transforms, and **one-shot container jobs** (**CIP-10**) — to a decentralized network of **Runners** who stake CBY. The marketplace is verifiable: the chain accepts results under trust models chosen by the developer, and dishonest runners risk slashing.
 
-**Attachable storage (CIP-9).** Jobs MAY declare `volume_mounts`: Runners that declare storage capability mount encrypted volumes through **Steamtrain** (client-side encryption; manifest roots anchorable on-chain via **0x09**). This supports secrets, large artifacts, and multi-step tool chains without putting raw payloads in calldata.
+**Attachable storage (CIP-9).** Jobs MAY declare `volume_mounts`: Runners that declare storage capability mount encrypted volumes through **Steamtrain** (client-side encryption; manifest roots anchorable on-chain per **CIP-9**, deferred). This supports secrets, large artifacts, and multi-step tool chains without putting raw payloads in calldata.
 
 **Job Lifecycle:**
 
@@ -540,7 +540,7 @@ where `x ∈ {cycle, cell}`, **alpha = 8**, **delta = 0.125**. Nodes MUST **burn
 
 Runners MUST stake `max(10,000 CBY, 1.5 × declared_max_job_value)` in the Runner Registry.
 
-Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts) and MAY specify **CIP-10** **Container** execution; the on-chain **Volume Registry** and **Container Image Registry** live at **0x09** and **0x0A** (§9). Field-level requirements (e.g. `volume_mounts`, image allowlists) are normative in **CIP-2**, **CIP-9**, and **CIP-10**.
+Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts, _deferred_) and MAY specify **CIP-10** **Container** execution; the **Container Image Registry** lives at **0x0A** (§9); address **0x09** is assigned to the **Governance** actor. Field-level requirements (e.g. `volume_mounts`, image allowlists) are normative in **CIP-2**, **CIP-9**, and **CIP-10**.
 
 5.3 **Job lifecycle.**
 
@@ -699,11 +699,11 @@ The runner fee burn is the primary deflationary mechanism beyond basefee burns. 
 | **0x05** | TEE Verifier | Remote attestation and trusted measurement verification (CIP-2) |
 | **0x06** | DualBasefee | Protocol dual-metered basefee state storage (CIP-3); **not** used for off-chain runner operations |
 | **0x07** | Entitlement Registry | Runner Pool access control, general RBAC (CIP-2 §7) |
-| **0x08** | EventListener | Ethereum event subscriptions and cross-chain triggers (reserved; §16.3) |
-| **0x09** | Volume Registry | Storage volume lifecycle, CapToken issuance, manifest-root anchoring (CIP-9; CIP-2) |
+| **0x08** | Treasury | Protocol fee collection and distribution; receives the 1% runner settlement fee and other protocol-directed payments |
+| **0x09** | Governance | On-chain protocol parameter governance; stores `SettlementConfig` (runner/burn/treasury split ratios) and future governable parameters |
 | **0x0A** | Container Image Registry | On-chain allowlist of authorized OCI image hashes; execution policy (CIP-10; CIP-2) |
 
-> **Note (normative):** Runner / off-chain compute subsystem addresses **0x01–0x05**, **0x07**, **0x09**, and **0x0A** follow **CIP-2** together with **CIP-9** and **CIP-10**. **0x06** is fee-mechanism state only. **0x08** is reserved for EventListener (§16.3). Additional system actors for general protocol infrastructure (e.g. Messaging, Timers, Blob Store, Signer) **MAY** be assigned from **0x0B** upward as formalized. **If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**
+> **Note (normative):** Runner / off-chain compute subsystem addresses **0x01–0x05** and **0x07** follow **CIP-2** together with **CIP-10**. **0x06** is fee-mechanism state only (CIP-3). **0x08** is the protocol Treasury. **0x09** is the on-chain Governance actor for settable protocol parameters. **0x0A** is the Container Image Registry (CIP-10). Additional system actors for general protocol infrastructure **MAY** be assigned from **0x0B** upward as formalized. **If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**
 
 ## 10\. Developer Experience (DX)
 - **SDKs:** A primary Python SDK (`cowboy-py`) is provided.
@@ -724,7 +724,7 @@ The runner fee burn is the primary deflationary mechanism beyond basefee burns. 
 
 12.2 **Runner safety.**
 
-Slashing for proven dishonesty (fabricated results, wrong model). Operational failures result in reputation penalties only. Committees mitigate single‑runner faults. **CIP-9** manifest anchoring and **CIP-10** image allowlists reduce supply-chain and cross-runner integrity risk; default container network isolation preserves verifiability for N-of-M modes (**CIP-10**).
+Slashing for proven dishonesty (fabricated results, wrong model). Operational failures result in reputation penalties only. Committees mitigate single‑runner faults. **CIP-9** manifest anchoring (deferred) and **CIP-10** image allowlists reduce supply-chain and cross-runner integrity risk; default container network isolation preserves verifiability for N-of-M modes (**CIP-10**).
 
 12.3 **Reentrancy.**
 
@@ -757,7 +757,7 @@ Prevents state bloat; eviction windows protect liveness.
 
 **Off‑chain:**
 
-`committee M` = 5; `threshold N` = 3; `challenge_window` = 15 min; `challenge_bond` = 100 CBY; `runner_stake_floor` = 10,000 CBY.
+`committee M` = 5; `threshold N` = 3; `challenge_window` = 15 min; `challenge_bond` = 100 CBY; `runner_stake_floor` = 10,000 CBY; `dispute_window_blocks` = 75.
 
 **State Rent:**
 
@@ -771,7 +771,7 @@ Prevents state bloat; eviction windows protect liveness.
 - **Execution:** Python actors vs. EVM contracts.
 - **Fees:** Dual meters (cycles/cells) vs. single gas scalar.
 - **Timers:** Native timers vs. external keepers.
-- **Off‑chain compute:** Native verifiable Runner market (optional **CIP-9** encrypted volumes, **CIP-10** container jobs) vs. external oracles only.
+- **Off‑chain compute:** Native verifiable Runner market (**CIP-9** encrypted volumes (deferred), **CIP-10** container jobs) vs. external oracles only.
 - **State:** Rent with eviction vs. indefinite storage.
 
 ## 15\. Entitlements
@@ -817,7 +817,7 @@ Cowboy relies on third‑party bridge infrastructure for asset transfers and cro
 
 ### 16.3. Event Subscription (Ethereum to Cowboy)
 - Cowboy actors MAY subscribe to event logs emitted by specific contracts on the Ethereum blockchain.
-- A system actor on Cowboy, `0x08 EventListener`, SHALL manage these subscriptions. This actor relies on the bridge validator set to act as a decentralized oracle, monitoring the Ethereum chain for specified events.
+- A system actor on Cowboy, `EventListener` (CIP-7, deferred; address TBD — **0x08** is currently assigned to Treasury), SHALL manage these subscriptions when implemented. This actor relies on the bridge validator set to act as a decentralized oracle, monitoring the Ethereum chain for specified events.
 - When a subscribed event is confirmed (i.e., finalized on Ethereum), the `EventListener` actor MUST enqueue a message to the subscribing Cowboy actor, delivering the event's topic and data as the message payload.
 - The cost of this subscription service SHALL be paid by the actor in CBY, covering the gas fees incurred by the oracle validators on Ethereum.
 
