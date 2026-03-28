@@ -26,7 +26,7 @@ Actor
 | 操作 | 付款方 | 金额 | 收款方 |
 |------|--------|------|--------|
 | `VolumeCreate`（CIP-9 指令 40） | Actor | 5,000C + 500 Cells gas | 销毁 |
-| 预付存储 escrow | Actor | CBY × 字节 × 周期 | 锁入 Volume Registry (0x09) |
+| 预付存储 escrow | Actor | CBY × 字节 × 周期 | 锁入 Volume Registry（地址 TBD；**0x09** 已分配给 **Governance**，CIP-9 延期实施） |
 | `ContainerImageRegister`（CIP-10 指令 50） | 镜像注册人 | 10,000C + 200 Cells gas | 销毁 |
 
 > 存储 escrow 不是一次性的，它是"余额驱动续存"：Steamtrain 节点定期从 escrow 中结算，余额耗尽则停止服务。

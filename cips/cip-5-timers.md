@@ -149,8 +149,8 @@ Timers created within the current block's transactions MUST NOT fire in the same
 
 | Operation | Cycle Cost |
 | :-------- | :--------- |
-| `schedule_timer` | `1,000` cycles + payload cells |
-| `cancel_timer` | `500` cycles (flat) |
+| `schedule_timer` | `200` cycles + payload cells |
+| `cancel_timer` | `200` cycles (flat) |
 
 Cell costs for index metadata writes are charged separately by the storage layer per CIP-3.
 
