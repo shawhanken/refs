@@ -12,6 +12,14 @@ icon: coins
   **Updated:** 2026-01-18
 </Note>
 
+<Warning>
+  **Type Update (2026-03-27):** Token amounts use `u128` in the implementation (not `u256` as originally specified). u128 supports up to ~3.4 × 10³⁸, sufficient for any reasonable token economy with 18 decimal places. u128 executes in two native CPU instructions vs. software emulation for u256.
+</Warning>
+
+<Tip>
+  **CBY Relationship:** CBY is the protocol-layer native currency and is NOT a CIP-20 token. CIP-20 manages user-created fungible tokens.
+</Tip>
+
 ## Abstract
 
 CIP-20 defines Cowboy's native fungible token standard. Tokens are first-class runtime primitives—not actor contracts—enabling maximum efficiency while supporting institutional requirements like pause, blacklist, and compliance controls through optional **validation hooks**.
@@ -161,7 +169,7 @@ class ITransferHook:
 
 - **Cannot modify amounts**: Hooks validate, they don't transform
 - **Cannot add transfers**: No fee-on-transfer via hooks
-- **Gas limit**: Hook calls capped at 50,000 Cycles; exceeded = transfer fails
+- **Gas limit**: Hook calls capped at 50,000 Cycles and 50,000 Cells; exceeded = transfer fails
 - **Failure = revert**: If `can_transfer` returns False, transfer reverts
 - **No recursion**: Hooks cannot trigger transfers of the same token
 
@@ -559,7 +567,7 @@ The `approve` function has a known race condition (inherited from ERC-20). If Al
 
 ### Hook Security
 
-- **Gas limits**: Hooks are capped at 50,000 Cycles to prevent DoS
+- **Gas limits**: Hooks are capped at 50,000 Cycles and 50,000 Cells to prevent DoS
 - **No reentrancy**: Hooks cannot trigger transfers of the same token
 - **Determinism**: Hooks MUST be deterministic; non-deterministic hooks break consensus
 - **Upgrades**: Changing the hook address affects all future transfers; use timelocks for critical tokens

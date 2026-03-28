@@ -1,481 +1,261 @@
 ---
 title: "CIP-4: State Storage & Persistence"
-description: Merkle-Patricia Trie architecture for dual-VM state management
+description: QMDB flat key-value architecture for state management and Merkle proofs
 icon: database
 ---
 
 <Note>
-  **Status:** Draft
+  **Status:** Draft (Revised 2026-03-27 — rewritten for QMDB architecture)
   **Type:** Standards Track
   **Category:** Core
 </Note>
 
 ## 1. Abstract
-This proposal defines Cowboy's storage and state persistence mechanism, adopting a **Merkle-Patricia Trie (MPT)/triedb** architecture for a dual-engine execution environment supporting **PyVM and EVM**. The system employs:
+This proposal defines Cowboy's storage and state persistence mechanism, adopting a **QMDB** (flat key-value store with Blake3 hashing) architecture. The system employs:
 - **Sequential ledger** for persisting consensus blocks;
-- **Triedb (single-file/segmented KV)** as the **canonical state repository**, with **Hexary MPT** as the state commitment tree;
-- **RLP** as the default encoding (with extension fields where necessary);
-- **Namespaced key space** to distinguish PyVM and EVM states;
-- **Cross-VM call wrapper (C-ABI)** for interface-layer adaptation, keeping the storage layer neutral;
-- **Rebuildable auxiliary indexes** to support queries and browsing.
+- **QMDB** as the **canonical state repository**, with fixed 54-byte keys and Blake3-based Merkle commitments;
+- **StateValue codec** (CBOR/binary) as the encoding format;
+- **Namespaced key space** with byte-prefix routing for accounts, storage, timers, mailbox, and system state;
+- **Rebuildable auxiliary indexes** to support queries and browsing;
+- **Merkle proof layer** for light client state verification (C15 State Proofs).
 
 ## 2. Background and Motivation
-MPT/triedb has been extensively validated in the EVM ecosystem at scale, with mature node layouts, RLP encoding, and proof toolchains. Benefits of Cowboy adopting MPT:
-- Reuse of EVM/Ethereum ecosystem indexers, auditing, and light client components;
-- Simple and consistent model, reducing engineering complexity;
-- Decoupling VM semantics through **namespace + C-ABI**, maintaining storage layer neutrality.
+The original CIP-4 design specified Merkle-Patricia Trie (MPT). Production implementation chose QMDB for:
+- **Performance**: Flat KV with Blake3 hashing provides 10-100x throughput vs. hexary MPT for state reads/writes;
+- **Simplicity**: Fixed 54-byte keys (1-byte prefix + 21-byte address/hash + 32-byte zero-pad) avoid tree rebalancing;
+- **Proof capability**: QMDB native Merkle proofs + Binary Merkle Tree (BMT) for TX/receipt roots provide equivalent light client verification;
+- **Production-proven**: Running on devnet with full E2E proof verification.
 
 ## 3. Overall Design
 Data is organized into three layers:
 1) **Ledger**: Append-only block segment files;
-2) **Triedb (canonical state)**: Single-file (or segmented) KV with **MPT** as commitment root;
-3) **Aux (rebuildable indexes)**: Read-optimized tables (TxHash→location, BlockHash→height, log topic→location), not included in state root.
-
+2) **QMDB (canonical state)**: Three flat KV databases (`state_db`, `tx_index`, `tx_receipts`) with Blake3 Merkle commitments;
+3) **Aux (rebuildable indexes)**: Read-optimized tables (TxHash→location, BlockHash→height, event indexes), not included in state root.
 
 ### 3.1 Three-Layer Relationships and Data Flow
 These three layers are not parallel repositories but a **top-down rebuildable, verifiable pipeline**:
 
-**Ledger (sequential source of truth) → Execution → Triedb (canonical state root, MPT) → Derivation → Aux (read-optimized indexes)**.
+**Ledger (sequential source of truth) → Execution → QMDB (canonical state roots) → Derivation → Aux (read-optimized indexes)**.
 
 - **Write and Commit Path** (when a block is accepted):
-  1) **Consensus produces block → Write to Ledger**: Append block header, transactions/messages, commit info; block header contains `state_root` (backfilled/verified by execution).
-  2) **Execution layer replays the block → Produce Triedb batch**: Update ACCOUNT/STORAGE/CODE/RECEIPT/BLOCKMETA keys; write to triedb in batches sorted by key, recompute MPT root.
-  3) **Block-level atomic commit**: After commit, locally computed `state_root` must equal block header `state_root`, otherwise reject block/rollback.
-  4) **Derive/refresh Aux (can be async)**: Export from **Ledger + Triedb** to `txhash→(block,txi,offset)`, `blockhash→height`, `topic→locations`, etc. Aux errors can be rebuilt.
+  1) **Consensus produces block → Write to Ledger**: Append block header, transactions/messages; block header contains `state_root`, `tx_root`, `receipt_root`.
+  2) **Speculative execution replays the block → Produce write batch**: Update account/actor/storage/timer/mailbox/deferred-tx keys; compute three Merkle roots.
+  3) **Root verification**: Locally computed roots must match block header roots; otherwise reject block.
+  4) **Batch commit**: Cache the write batch; on finalization, apply atomically to QMDB.
+  5) **Derive/refresh Aux (can be async)**: Export from Ledger + QMDB to auxiliary indexes.
 
 - **Read Path** (how they cooperate during queries):
-  - By **transaction hash**: First query **Aux.txhash** to get `(block, txi, offset)`;
-    - For original transaction/block body → Use offset to read **Ledger**;
-    - For authoritative receipt/logs/state → Read **Triedb** directly (`RECEIPT`/`ACCOUNT`/`STORAGE`), can return **MPT proof**.
-  - By **address/slot**: Read **Triedb** directly;
-  - By **event topic**: First query **Aux.topic** for candidates, then verify with **Triedb.RECEIPT** or **Ledger**.
+  - By **transaction hash**: Query `tx_index` DB for location → read Ledger for raw tx, read `tx_receipts` for receipt.
+  - By **address/slot**: Read `state_db` directly; can return **QMDB Merkle proof**.
+  - By **event topic**: Query Aux indexes for candidates, then verify with receipts.
 
-- **Foreign key/pointer conventions**:
-  - `Triedb.BLOCKMETA(block).state_root == Ledger.block[block].state_root`;
-  - `Triedb.RECEIPT(block,txi)` aligns with `(block, txi)` in Ledger body;
-  - `Aux.txhash[H] → (block,txi,offset)` points to Ledger segment file location; `Aux.topic`'s `(block,txi,log_i)` can be verified in Triedb/Receipts.
+- **Consistency invariants**:
+  1) `state_db.root_at(N) == Ledger.block[N].state_root`;
+  2) `tx_root` computed via BMT over block transactions matches header;
+  3) `receipt_root` computed via BMT over block receipts matches header;
+  4) After deleting Aux, can rebuild from Ledger+QMDB within bounded time.
 
-**Diagram A: Commit Path (Write/Commit)**
 ```mermaid
 flowchart LR
   L["Ledger\nappend blocks"] -->|execute block| X[Executor]
-  X -->|"batch writes + rehash"| T["Triedb (MPT)"]
+  X -->|"batch writes + hash"| T["QMDB (state_db)"]
   T -->|derive| A["Aux Indexes"]
   H[["Header.state_root"]] -. verify .- T
   classDef store fill:#eef,stroke:#66c;
   class L,T,A store;
 ```
 
-**Diagram B: Read Path (Read/Query)**
-```mermaid
-flowchart TB
-  U[User Query] --> Q{By TxHash?}
-  Q -->|Yes| AT[Aux.txhash]
-  AT --> O[(Ledger offset)]
-  O --> LT[Read raw tx/block from Ledger]
-  AT --> TR["Triedb.RECEIPT(block, txi)"]
-  TR --> P[Return receipt/logs + MPT proof]
-  Q -->|"No (Addr/Slot)"| TS[Triedb.ACCOUNT / STORAGE]
-  TS --> P2[Return value + MPT proof]
-  Q -->|Topic| TOP[Aux.topic]
-  TOP --> C1[Verify with Triedb.RECEIPT]
-```
-
-### 3.2 Rollback and Rebuild (Reorg/Recovery)
-- **Fork Reorganization (Reorg)**:
-  1) Use **Ledger** final branch as reference, locate common ancestor height `H`;
-  2) **Triedb** rolls back to snapshot `H` (or recover via rollback log);
-  3) Replay from `H+1` along new branch **to latest**, verifying `state_root` per block;
-  4) **Aux** incrementally or fully rebuilds for range `[H..tip]`.
-
-- **Aux-only corruption**:
-  - Directly discard and rebuild from **Ledger + Triedb.RECEIPT**; does not affect on-chain correctness.
-
-- **Triedb node loss/corruption**:
-  - Replay **Ledger** from trusted snapshot `H` or genesis to generate same root; Aux can be rebuilt in parallel.
-
-- **Consistency invariants (implementations should verify)**:
-  1) `Triedb.root_at(N) == Ledger.block[N].state_root`;
-  2) `Triedb.RECEIPT(block,txi)` ordering matches Ledger body;
-  3) `Aux.txhash[h]`'s pointed `(block,txi)` can be verified in Triedb/Receipts and Ledger;
-  4) After deleting Aux, can rebuild same content from **Ledger+Triedb** within bounded time;
-  5) Given same Ledger segment, replaying on empty Triedb should yield same `state_root`.
+### 3.2 Rollback and Rebuild
+- **Speculative rollback**: After speculative execution, the write batch is cached but not applied. On finalization, the cached batch is applied atomically.
+- **Fork reorganization**: Replay from last finalized height using Ledger as source of truth.
+- **Aux-only corruption**: Rebuild from Ledger + QMDB receipts; does not affect consensus correctness.
+- **QMDB corruption**: Replay Ledger from genesis or trusted snapshot to regenerate state.
 
 ## 4. Key Space and Namespaces
-### 4.1 Top-Level Prefixes (Logical Tables)
-- `0x0` **ACCOUNT**: Account/Actor metadata.
-- `0x1` **STORAGE**: Contract/Actor storage slot key-values (interpreted per VM namespace).
-- `0x2` **CODE**: Code bytes (PyVM bundle or EVM bytecode).
-- `0x3` **RECEIPT**: Receipts (by block sequence number).
-- `0x4` **BLOCKMETA**: Block metadata (metering/fee rate snapshots, etc.).
-- `0x5` **MAILBOX**: Mailbox segments/metadata.
 
-All above are included in **MPT canonical root**; below AUX tables are **non-canonical**.
+### 4.1 State Key Format
+All state keys are **54 bytes** (fixed length):
 
-### 4.2 VM Namespaces (vm_ns)
-- `vm_ns = 0x00`: **PyVM**
-- `vm_ns = 0x01`: **EVM** 
+```
+[1-byte prefix] [21-byte routing key (address or hash)] [32-byte suffix (zeros or hash)]
+```
 
-Unified storage slot key: `STORAGE : 0x1 || keccak(address) || vm_ns || slot_key32`.
+### 4.2 State Prefixes
 
-### 4.3 Key Formats (RLP values)
-- **ACCOUNT**  
-  `key = 0x0 || keccak(address)` → `value = rlp([nonce, balance, code_hash, vm_kind, metadata])`  
-  - `vm_kind ∈ {0=EOA, 1=PyVM, 2=EVM}`, `metadata`: version/permissions/capabilities.
+| Prefix | Name | Routing Key | Description |
+|--------|------|------------|-------------|
+| `0x00` | Account | `address` | Account metadata (nonce, balance) |
+| `0x01` | ActorMeta | `address` | Actor metadata (code hash, storage root) |
+| `0x02` | ActorCode | `address` | Actor code bytes |
+| `0x03` | ActorStorage | `address` | Actor storage slots (suffix = keccak of key) |
+| `0x04` | Mailbox | `address` | Actor mailbox messages |
+| `0x05` | Timer | `keccak(timer_id)` | Timer data |
+| `0x06` | TimerIndex | `height (8 bytes)` | Timer list per block height |
+| `0x07` | PendingDeferredTx | `keccak(tx_hash)` | Pending deferred transaction data |
+| `0x08` | SystemState | `keccak(key)` | System state (basefee, etc.) |
+| `0x09` | ActorEvents | `address` | Actor event log list |
+| `0x0A` | SeenMessageIds | `address` | Message deduplication set |
+| `0x0B` | ActorTimerCount | `address` | Per-actor timer count |
+| `0x0C` | DeferredActorCount | `address` | Per-actor pending deferred TX count |
+| `0x0D` | DeferredTxBlock | `keccak(tx_hash)` | Creation block height for deferred TXs |
 
-- **STORAGE**  
-  `key = 0x1 || keccak(address) || vm_ns || slot_key32` → `value = rlp(zeroless(value_bytes))`  
-  - **PyVM**: `slot_key32 = keccak(utf8(path) || optional_index)` (stable mapping of dict/attr paths).
-  - **EVM**: `slot_key32 = keccak(slot_index_or_key)` (32B position). 
+### 4.3 Value Encoding
+- **StateValue** variants: `Account(Account)`, `Actor(Actor)`, `ActorCode(Vec<u8>)`, `StorageSlot(Vec<u8>)`, `Mailbox(VecDeque<Message>)`, `Timer(Timer)`, `TimerList(TimerList)`, `DeferredTx(Transaction)`, `DeferredTxList(DeferredTxList)`, `SystemBytes(Vec<u8>)`, `ActorEventList(ActorEventList)`.
+- Encoding: CBOR for transactions, binary codec for internal types.
+- Decode bounds enforced: `DeferredTxList` max 16,384 entries; `ActorEventList` max 1,000 entries.
 
-- **CODE**  
-  `key = 0x2 || code_hash` → `value = raw_code_bytes`  
-  - **PyVM**: `mpy`/Py bytecode bundle (containing `manifest.rlp`: entry/dependencies/permissions/storage mode).
-  - **EVM**: Deployed bytecode;  
+## 5. QMDB State Commitments
 
-- **RECEIPT**  
-  `key = 0x3 || u64(block) || u32(tx_index)` →  
-  `value = rlp([status, vm_kind, gas_used, logs_bloom, logs_root, fee_breakdown, proof_ref?])`
+### 5.1 State Root
+QMDB computes a Merkle root over all key-value pairs in `state_db` using Blake3 hashing. This root is included in every block header as `state_root`.
 
-- **BLOCKMETA**  
-  `key = 0x4 || u64(block)` →  
-  `value = rlp([state_root, fee_schedule_hash, meters_compute{pyvm,evm}, meters_data, extra])`
+### 5.2 Transaction Root
+Computed via **Binary Merkle Tree (BMT)** over `keccak256` hashes of all transactions in the block:
+```
+tx_root = BMT(keccak256(tx_0), keccak256(tx_1), ..., keccak256(tx_n))
+```
 
-- **MAILBOX**  
-  `key = 0x5 || keccak(address) || u32(segment_idx)` →  
-  `value = rlp([range_start, range_end, segment_root, sealed_flag])`
+### 5.3 Receipt Root
+Computed via **BMT** over RLP-encoded receipts:
+```
+receipt_root = BMT(keccak256(rlp(receipt_0)), ..., keccak256(rlp(receipt_n)))
+```
 
-## 5. MPT Details
+### 5.4 Proof System
+QMDB provides native Merkle inclusion proofs for any state key:
 
-This section specifies the **storage contents**, **node structure**, **key paths (secure-trie)**, and **proof and multi-key proof** specifications for the **Hexary Merkle-Patricia Trie (MPT)** adopted by Cowboy.
+**RPC Endpoints:**
+- `GET /proof/account/{address}` — account state proof
+- `GET /proof/actor/{address}` — actor metadata proof
+- `GET /proof/storage/{address}/{key}` — actor storage slot proof
+- `GET /proof/tx/{tx_hash}` — transaction inclusion proof (BMT)
+- `GET /proof/receipt/{tx_hash}` — receipt inclusion proof (BMT)
+- `POST /proof/multi` — batch state proof (up to 256 keys per request)
 
-### 5.1 What's Stored in the Trie? (Logical Table Review)
-
-All key-value pairs included in the **canonical root** enter the same MPT, with keys formed by concatenating "logical prefix + routing key" (see §4). Main logical tables:
-
-- **ACCOUNT (0x0)**: Account/Actor metadata (unified account model).
-- **STORAGE (0x1)**: Contract/Actor storage slots; distinguished by **VM namespace `vm_ns`** for PyVM/EVM semantics.
-- **CODE (0x2)**: Code bytes (PyVM mpy/bytecode bundle + manifest | EVM bytecode).
-- **RECEIPT (0x3)**: Receipts (indexed by block number and transaction sequence).
-- **BLOCKMETA (0x4)**: Block metadata (state_root, fee rate snapshots, metering aggregates, etc.).
-- **MAILBOX (0x5)**: Mailbox segment records (segment range, segment root, seal flag).
-
-> These key-value pairs are **collectively** committed to a single `state_root`; RPC layer can produce MPT proofs for any key.
-
-### 5.2 Node Types and Encoding
-
-Cowboy adopts Ethereum-style **hexadecimal Patricia**, with nodes uniformly encoded using **RLP**:
-
-- **Branch**: 17 slots (16 child pointers + 1 value slot). `[c0..c15, value]`
-- **Extension**: Path prefix compression + single child pointer. `[HP(prefix, EXT), child_ptr]`
-- **Leaf**: Terminates path and carries value. `[HP(suffix, LEAF), value]`
-- **HP (Hex-Prefix) encoding**: Compresses nibble path into bytes and encodes LEAF/EXT, odd/even length flags.
-- **Hash**: Take **Keccak-256** of node's **RLP**; parent nodes reference children either by hash or inline RLP when node is small.
-
-### 5.3 Path and Keys (Secure-trie)
-
-To obtain stable paths and resist malicious distribution, triedb's **Trie path** follows secure-trie rules:
-
-1. First assemble **database key byte string** `DB_key_bytes` (the concatenation of logical prefix and routing key from §4, e.g. `0x0||keccak(address)` / `0x1||keccak(address)||vm_ns||slot_key32`, etc.).
-2. Calculate `DB_key_hash = Keccak256(DB_key_bytes)` (**single Keccak over entire DB key**).
-3. Split `DB_key_hash`'s 32 bytes into 64 **nibbles** as the Trie path.
-
-> Note: This is **not** a separate double-hash on `keccak(address)`, but a single Keccak over the **complete DB key** to obtain the path (avoiding ambiguity). EVM `eth_getProof` compatibility is provided via "EVM view" derivation described in §10.
-
-### 5.4 Value Encoding
-
-- Structured objects like accounts, receipts, block metadata use **RLP lists** (see §4.3 and Appendix A).
-- Storage slot values use **RLP(zeroless_bytes)** (empty value = delete, avoiding ambiguity).
-- Code `CODE` values are **raw bytes** (PyVM bundle or EVM bytecode).
-
-### 5.5 Proof
-
-**Inclusion proof**: Server returns "all node RLPs needed for the path from root to target key"; client verifies hashes hop-by-hop from `state_root` to reach target leaf/value.
-
-**Non-inclusion proof**: Path diverges at some node (extension prefix mismatch, branch missing child pointer, leaf suffix unequal), thereby proving target key doesn't exist.
-
-**Interface**:
-
-- `getProof(keys[]) -> ProofBundle`:
-  - `ProofBundle` is a set of **deduplicated node RLPs**, covering multiple key paths simultaneously (see next section).
-- `verifyProof(root, key, bundle)`: Client verifies single key (or iterates multiple keys).
-
-### 5.6 Multi-key Proof (Batch Proof)
-
-When client needs **a batch of keys** (e.g. multiple storage slots, multiple accounts), server will:
-
-- Find path for each key independently;
-- **Deduplicate** node RLPs involved in these paths, forming a **minimal covering set**;
-- Return this set (plus key ordering/location info), allowing client to verify each key independently.
-
-**Advantages**:
-
-- Compared to multiple single-key proofs, batch package is typically smaller;
-- Suitable for **batch state sync, light clients, cross-node consistency verification**.
-
-### 5.7 Failure Semantics and Robustness
-
-- **Empty value = delete**: If leaf value is empty byte string, treat as "key doesn't exist"; if needing to represent "logical empty", should encode `0x00` or similar placeholder at protocol layer.
-- **Inline nodes**: When child node RLP < 32B, parent node may **inline** that RLP; verification should hash **parent node as whole** to ensure integrity.
-- **Strict hash**: Hash function is Keccak-256 (not SHA3-256).
+**Independent Verifier:**
+The `cowboy-proof-verifier` crate provides standalone verification (Rust + WASM), requiring only the proof data and state root — no full node needed.
 
 ## 6. Execution and Consistency
 
-This section details the process from block acceptance by consensus to disk commit, atomicity guarantees, error handling, and implementation requirements.
+### 6.1 Block Lifecycle
+1. **Fetch block**: Read block header and body from Ledger.
+2. **Pre-check**: Validate signatures, nonces, gas limits.
+3. **Speculative execution**: Execute all transactions in batch mode:
+   - `begin_batch()` → execute transactions → `commit_batch()`
+   - Produces `state_pending`, `tx_index_pending`, `tx_receipts_pending` write sets
+   - Processes timers, deferred TXs (with per-actor limits and expiration)
+4. **Compute roots**: Calculate `state_root`, `tx_root`, `receipt_root` from the write set.
+5. **Root verification**: Roots must match block header; reject if mismatch.
+6. **Cache**: Store write batch for later finalization.
+7. **On finalization**: Apply cached batch to QMDB databases.
 
-### 6.1 Block Lifecycle (Execution Perspective)
+### 6.2 Atomic Commit
+Three QMDB databases are committed sequentially: `state_db` → `tx_index` → `tx_receipts`. Each individual DB commit is atomic. A crash between commits is recoverable: consensus layer replays finalized blocks on restart (see §3.2).
 
-1. **Fetch block**: Read block header and body (transactions/messages) from Ledger.
-2. **Pre-check**: Static rule validation (signatures, nonces, basic fields, gas limit, size, etc.).
-3. **Sequential execution**: Execute transactions in block order, producing:
-   - `ACCOUNT/STORAGE/CODE` write-set
-   - `RECEIPT` (containing `status, vm_kind, gas_used, logs_*`)
-   - `BLOCKMETA` (this block's `meters_*` aggregates and `fee_schedule_hash`)
-   - `MAILBOX` segment writes (if this block has enqueues) and possible seals
-4. **Batch write to triedb**: Sort write-set by key and batch write, recompute MPT;
-5. **Root verification**: Locally computed `state_root'` must exactly match block header `state_root`;
-6. **Commit**: Atomic per block, commit to disk (WAL→SST);
-7. **Derive Aux**: Asynchronously/delayed update of `aux.txhash / aux.blockhash / aux.topic`, etc.
-
-### 6.2 Atomic Commit Algorithm (Recommended)
-
-- **Single batch transaction**:
-  - Collect all block changes as `batch`, use single `WriteBatch` to write to column families `ACCOUNT/STORAGE/CODE/RECEIPT/BLOCKMETA/MAILBOX`;
-  - Rebuild/update MPT nodes in memory until obtaining `state_root'`;
-  - If `state_root' == header.state_root`, write `batch` atomically; otherwise **reject block** and log error.
-- **Failure recovery**:
-  - If crash occurs before `batch` commit, replay this block after restart;
-  - If occurs during Aux derivation, Aux can be discarded and rebuilt without affecting consistency.
-
-### 6.3 EVM and PyVM Consistency Hooks
-
-- All VM execution engines must:
-  1. Only write via unified `putState(key,value)`/`delState(key)` interface;
-  2. Not directly modify historical segments (sealed MAILBOX segments are read-only);
-  3. Guarantee determinism within same scheduling frame (no wall clock, no external randomness).
+### 6.3 Determinism Requirements
+- All execution engines must write via unified `StateKey`/`StateValue` interface;
+- No wall clock, no external randomness during execution;
+- Identical block + identical state must produce identical roots.
 
 ### 6.4 Errors and Block Rejection
+- **Root mismatch**: Block rejected.
+- **Storage errors**: Logged with opaque messages to clients; detailed errors server-side only.
+- **Resource exhaustion**: Degrade gracefully (pause Aux derivation), never break QMDB atomicity.
 
-- **Root mismatch**: Reject directly;
-- **Illegal writes** (out-of-bounds/violating read-only keys) and **illegal gas accounting** (less than actual) are executor bugs, node should halt block production and alert;
-- **Resource exhaustion** (memory/disk capacity thresholds): Enter degraded mode (pause Aux derivation, defer compaction), but must not break triedb atomicity.
-
-### 6.5 Invariants (Implementations Must Self-Check)
-
-1. `Triedb.root_at(N) == Ledger.block[N].state_root`;
-2. `RECEIPT(block,txi)` ordering matches Ledger body;
-3. Sealed segments must not change once sealed;
-4. `meters_*` aggregates match per-receipt sums exactly (zero tolerance).
-
-## 7. Auxiliary Indexes (Aux, Rebuildable)
-
-Aux is used to accelerate RPC and browsing queries, not included in state root, any corruption can be rebuilt from Ledger+Triedb. This section defines its **schema, construction, sync, and verification**.
+## 7. Auxiliary Indexes (Rebuildable)
 
 ### 7.1 Index Schemas
+- **`tx_index`**: `tx_hash → TransactionLocation { block_hash, tx_index }`
+- **`tx_receipts`**: `tx_hash → TransactionReceipt { ... }`
+- **Event indexes**: Per-actor event lists (in `state_db` as `ActorEventList`)
 
-- **`aux.txhash`**: `tx_hash → {block, tx_index, ledger_offset}`
-- **`aux.blockhash`**: `block_hash → height`
-- **`aux.topic`**: `topic_hash || time_bucket → list< {block, tx_index, log_index} >`
-- **(Optional) aux.code**: `code_hash → {vm_kind, size, first_seen_block}`
+### 7.2 Construction
+After block commit, scan transactions and receipts to update auxiliary indexes. Updates can lag behind finalization without affecting consensus.
 
-### 7.2 Construction and Updates
-
-- After block commit, scan this block's `RECEIPT` and Ledger body:
-  - Write `aux.txhash` for each transaction (can batch append);
-  - Write `aux.blockhash` for block header;
-  - Update `aux.topic` for each log by `topic[]`, using bucketing strategy like `BY_BLOCK_RANGE=4096`.
-- Updates can lag; nodes can configure "derivation delay window" (e.g. 2-10 blocks) to smooth IO.
-
-### 7.3 Rebuild Process
-
-- **Full rebuild**: Traverse Ledger segment files and Triedb.RECEIPT, generate all Aux tables sequentially;
-- **Incremental rebuild**: Advance forward from latest `aux.watermark` (last consistent height);
-- **Consistency check**:
-  - For random sampled `tx_hash`, verify its `(block,txi)` matches `RECEIPT`/Ledger;
-  - For random sampled `topic` entries, query back `RECEIPT(block,txi)`'s `log_index`-th log to verify existence.
-
-### 7.4 API Recommendations
-
-- `getTxLocation(tx_hash) -> {block, txi, ledger_offset}`
-- `getLogs(topic, from_block, to_block, limit) -> Events[]`
-- `getCodeMeta(code_hash) -> {vm_kind, size, first_seen}`
+### 7.3 Rebuild
+Full rebuild by replaying Ledger from genesis. Incremental rebuild from last consistent height.
 
 ## 8. Snapshots and Sync
 
-This section specifies state distribution between nodes, light client verification, and bootstrap strategies.
+### 8.1 Sync Modes
+- **Full node sync**: Replay Ledger from genesis or trusted snapshot.
+- **Fast sync**: Download QMDB state at height `H`, verify root matches block header, replay from `H`.
+- **Light client**: Maintain block header chain; verify state via Merkle proofs (`/proof/*` endpoints).
 
-### 8.1 Snapshot Format
+### 8.2 Proof Packaging
+- Batch proofs (`POST /proof/multi`) deduplicate shared proof nodes across multiple keys.
+- Max 256 keys per batch request.
+- Responses include proof version, chunk location, MMR leaves, and operation digests.
 
-- **Node forest**: A set of MPT nodes (RLP) and root `state_root(H)` at certain height `H`;
-- **Manifest**: Contains:
-  - Height/block hash;
-  - Chunk boundaries and hashes of node list (for resumable transfer);
-  - Hot key prefixes (PyVM: application namespaces, EVM: common contracts);
-  - Version info (RLP/hash function/encoding version).
+## 9. Performance
 
-### 8.2 Sync Modes
+### 9.1 QMDB Advantages
+- **O(1) reads/writes**: Flat KV with fixed-size keys avoids tree traversal;
+- **Efficient hashing**: Blake3 is 3-5x faster than Keccak-256;
+- **Batch operations**: Block-level batch commit with deferred merkleization;
+- **Bounded cache**: Speculative cache limited to 8 entries (evicts oldest on overflow).
 
-- **Full node sync**: Start from genesis or latest trusted snapshot `H`, replay Ledger sequentially to latest; snapshots can serve as "starting state".
-- **Fast sync**: Download snapshot at height `H` (node forest), verify root matches block header, then only replay Ledger for `H..tip` range.
-- **Light client**: Only maintain block header chain and minimal state; obtain **multi-key MPT proof packages** via `getProof(keys[])` to verify reads.
+### 9.2 Metrics
+Key metrics: `block_apply_ms`, `proof_generation_ms`, `batch_commit_ms`, `speculative_cache_size`.
 
-### 8.3 Multi-key Proof Packaging Strategy
+## 10. Security
+- **Canonical source**: Only QMDB `state_db` as authoritative state;
+- **Proof integrity**: Merkle proofs verified against `state_root` in finalized block header;
+- **DoS mitigation**: Decode bounds on all list types; per-actor limits on timers (1,024) and deferred TXs (64); deferred TX expiration (1,000 blocks);
+- **Error opacity**: Storage errors return opaque messages to API callers; detailed errors logged server-side only.
 
-- **Minimal coverage**: Deduplicate nodes involved in paths for multiple keys;
-- **Grouping**: Group keys by high-order prefix to improve sharing rate;
-- **Limit control**: Cap max node count/byte size, split into multiple packages if exceeded;
-- **Verification interface**: Client verifies key-by-key, node RLP results can be cached and reused.
-
-### 8.4 Consistency and Security
-
-- Snapshot root must match `state_root` in block header specified by `(height, block_hash)`;
-- Proof packages must fully include all referenced child nodes (including inline cases);
-- Adversarial inputs (giant values/deep paths) require resource limits and timeouts;
-- Network layer can enable rate limiting and root-hash-based deduplication cache for snapshot/proof downloads.
-
-## 9. Performance Strategies
-
-To ensure stable block production and queries under high load, the following implementation strategies and parameters are recommended.
-
-### 9.1 Write Path Optimization
-
-- **Key clustering**: Sort write-set by nibble prefix after execution, reducing node splits and redundant hashing;
-- **Batch writes**: Block-level single batch commit (LSM/column families), reducing WAL/compaction pressure;
-- **Parallel hashing**: Multi-threaded RLP→Keccak on independent subtrees;
-- **In-segment accumulation**: Build small Merkle for MAILBOX tail segment in memory, then attach to main tree, reducing fine-grained scattered writes.
-
-### 9.2 Read Path Optimization
-
-- **Node caching**: Pin hot branch/extension nodes (recommend 1-4 GiB);
-- **Proof result caching**: Repeated `getProof` within short time can hit cache directly;
-- **Aux preheating**: Build preloaded indexes for commonly used topics/code hashes.
-
-### 9.3 Storage Engine Parameters (LSM Example)
-
-- `block_cache_size >= 1 GiB`, `write_buffer_size >= 256 MiB`;
-- `max_background_jobs` commensurate with CPU cores;
-- Column families: Separate nodes, accounts/storage, receipts, mailboxes to reduce mutual pollution;
-- Compaction strategy: Prioritize compacting levels containing hot key prefixes to avoid read amplification.
-
-### 9.4 Metrics and Backpressure
-
-- Key metrics: `block_apply_ms`, `rehash_ops/s`, `proof_hit_rate`, `aux_lag_blocks`, `compaction_pending_bytes`;
-- Backpressure: When `aux_lag_blocks` or `compaction_pending_bytes` exceed thresholds, reduce RPC concurrency or pause non-critical index derivation;
-- Observability: Provide Prometheus metrics and pprof/flamegraph interfaces to locate hotspots.
-
-## 10. Compatibility
-- **PyVM friendly**: Supports Pythonic structures via `vm_ns=0x00` and path hashing;
-- **EVM compatible**: Account/storage/code consistent with Ethereum format (with added `vm_kind/vm_ns`);
-- **Encoding**: Default RLP, with optional fields appended for specific structures when necessary.
-
-## 11. Security
-- **Canonical source**: Only triedb (MPT) as authoritative;
-- **Proof integrity**: External proof packages verified per MPT rules;
-- **DoS mitigation**: Key prefix quotas, mailbox segment size limits, Aux index throttling.
-
-## 12. Parameters
-- `VM_NS: {0x00=PyVM, 0x01=EVM}`  
-- `SEGMENT_SIZE = 256` (mailbox segments)  
-- `SNAPSHOT_INTERVAL = 1024`  
-- `NODE_CACHE = 2 GiB`
+## 11. Parameters
+- `STATE_KEY_LEN = 54` (fixed key size)
+- `MAX_SPECULATIVE_CACHE_ENTRIES = 8`
+- `MAX_DEFERRED_TX_LIST_SIZE = 16,384`
+- `MAX_ACTOR_EVENTS = 1,000`
+- `MAX_TIMERS_PER_ACTOR = 1,024`
+- `MAX_PENDING_DEFERRED_PER_ACTOR = 64`
+- `DEFERRED_TX_MAX_AGE_BLOCKS = 1,000`
+- `SNAPSHOT_INTERVAL = 1024` (recommended)
 
 ---
 
-## Appendix A: RLP Structure Recommendations
-- **Account**: `[nonce, balance, code_hash, vm_kind, metadata]`  
-- **Receipt**: `[status, vm_kind, gas_used, logs_bloom, logs_root, fee_breakdown, proof_ref?]`  
-- **BlockMeta**: `[state_root, fee_schedule_hash, meters_compute{pyvm,evm}, meters_data, extra]`
-
-## Appendix B: C-ABI (Cross-VM Call Wrapper)
+## Appendix A: StateValue Variants
 ```
-struct CAbiCall {
-  u8  target_vm_kind;   // 1=PyVM, 2=EVM
-  u32 selector;         // keccak(signature)[0..4]
-  list<bytes> args;     // Can use RLP(list<bytes>)
+Account { nonce: u64, balance: u128 }
+Actor { address, code_hash, code: Vec<u8>, balance: u128, nonce: u64, storage: BTreeMap, mailbox: VecDeque<Message> }
+Timer { actor_address, height: u64, payload: Vec<u8>, timer_id: Vec<u8>, handler: String }
+TimerList { timer_ids: Vec<Vec<u8>> }
+DeferredTxList { hashes: Vec<Sha256Digest> }
+TransactionReceipt { transaction, cycles_used, cells_used, block_height, block_hash, tx_index, status, events, ... }
+ActorEventList { events: Vec<ActorEvent> }
+SystemBytes(Vec<u8>)  // for basefee state, per-actor counters, etc.
+```
+
+## Appendix B: Key Prefix Quick Reference
+| Prefix | Name | Example Key |
+|--------|------|-------------|
+| `0x00` | Account | `0x00 \|\| address \|\| zeros` |
+| `0x01` | ActorMeta | `0x01 \|\| address \|\| zeros` |
+| `0x02` | ActorCode | `0x02 \|\| address \|\| zeros` |
+| `0x03` | ActorStorage | `0x03 \|\| address \|\| keccak(slot_key)` |
+| `0x04` | Mailbox | `0x04 \|\| address \|\| zeros` |
+| `0x05` | Timer | `0x05 \|\| keccak(timer_id)[0:21] \|\| zeros` |
+| `0x06` | TimerIndex | `0x06 \|\| height_bytes \|\| zeros` |
+| `0x07` | PendingDeferredTx | `0x07 \|\| keccak(tx_hash)[0:21] \|\| zeros` |
+| `0x08` | SystemState | `0x08 \|\| keccak(key_name)[0:21] \|\| zeros` |
+| `0x09` | ActorEvents | `0x09 \|\| address \|\| zeros` |
+| `0x0A` | SeenMessageIds | `0x0A \|\| address \|\| zeros` |
+| `0x0B` | ActorTimerCount | `0x0B \|\| address \|\| zeros` |
+| `0x0C` | DeferredActorCount | `0x0C \|\| address \|\| zeros` |
+| `0x0D` | DeferredTxBlock | `0x0D \|\| keccak(tx_hash)[0:21] \|\| zeros` |
+
+## Appendix C: Proof Response Format
+```json
+{
+  "proof_version": 1,
+  "loc": <u64>,
+  "chunk": "<hex>",
+  "mmr_leaves": <u64>,
+  "digests": ["<hex>", ...],
+  "partial_chunk_digest": "<hex>",
+  "ops_root": "<hex>"
 }
-struct CAbiRet { bytes data; }
 ```
-- **PyVM adaptation**: `dispatch[selector](*decode(args)) -> bytes`;
-- **EVM adaptation**: `selector||abi.encode(args)` as calldata;
-- Receipt records `vm_kind` and call frames.
-
-## Appendix C: Key Prefix Quick Reference
-- `0x0` ACCOUNT: `keccak(address)`  
-- `0x1` STORAGE: `keccak(address)||vm_ns||slot_key32`  
-- `0x2` CODE: `code_hash`  
-- `0x3` RECEIPT: `u64(block)||u32(txi)`  
-- `0x4` BLOCKMETA: `u64(block)`  
-- `0x5` MAILBOX: `keccak(address)||u32(seg)`
-
-## Appendix D: Worked Examples (PyVM and EVM Storage)
-
-The following examples demonstrate how "accounts, code, and several storage slots" map to triedb keys/values; hashes and bytes are for illustration of paths only, not requiring byte-for-byte reproduction.
-
-### D.1 PyVM Contract `P` Storage
-
-Assume:
-
-- Address `addrP = 0xAA..AA`; `vm_kind=PyVM (1)`; `vm_ns=0x00`.
-- Code package `code_hash = keccak(PyBundle)`; contains `manifest.rlp` (entry/dependencies/permissions/storage contract).
-- Contract has Pythonic storage:
-  - `cfg.version = 3` → path `"cfg.version"`
-  - `users[0xdeadbeef] = 42` → path `"users" || 0xdeadbeef`
-
-**Account**
-
-- `key = 0x0 || keccak(addrP)`
-- `value = rlp([nonce, balance, code_hash, vm_kind=2, metadata])`
-
-**Code**
-
-- `key = 0x2 || code_hash` → `value = PyBundleBytes`
-
-**Storage (path hashed to slot_key32)**
-
-- `slot_key32(version) = keccak("cfg.version")`
-- `slot_key32(user_deadbeef) = keccak("users" || 0xdeadbeef)`
-- Unified key: `k = 0x1 || keccak(addrP) || 0x00 || slot_key32`
-  - `v(version) = rlp(0x03)`
-  - `v(user_deadbeef) = rlp(0x2a)`
-
-**Mailbox (if enabled)**
-
-- Tail segment `segment_idx=7`:
-  - `k = 0x5 || keccak(addrP) || 0x00000007`
-  - `v = rlp([range_start, range_end, segment_root, sealed_flag])`
-
-### D.2 EVM Contract `E` (e.g. ERC-20) Storage
-
-Assume:
-
-- Address `addrE = 0xBB..BB`; `vm_kind=EVM (2)`; `vm_ns=0x01`.
-- Deployed bytecode's `code_hash` follows EVM rules.
-- EVM storage has two typical slots:
-  - Simple variable `totalSupply` (`slot = 0x00`);
-  - Mapping `balances[address]` (Solidity rule: `slot_key = keccak(pad(addr) || pad(slot_index))`).
-
-**Account**
-
-- `key = 0x0 || keccak(addrE)`
-- `value = rlp([nonce, balance, code_hash, vm_kind=1, metadata])`
-
-  > For maximum compatibility, can also provide `storageRoot/codeHash` fields in EVM view to align with Ethereum tooling account encoding (see §10 Compatibility).
-
-**Code**
-
-- `key = 0x2 || code_hash` → `value = evm_bytecode`
-
-**Storage**
-
-- `slot_key32(totalSupply) = keccak(0x00)` (or directly 32B zero-padded, depending on implementation's chosen "secure-trie pre-key")
-- `slot_key32(balances[user]) = keccak( pad(user) || pad( mapping_slot_index ) )`
-- Unified key: `k = 0x1 || keccak(addrE) || 0x01 || slot_key32`
-  - `v(totalSupply) = rlp( totalSupply_bytes )`
-  - `v(balance[user]) = rlp( balance_bytes )`
-
-**Consistency with CREATE/CREATE2**
-
-- Create address `address = keccak(rlp([sender, nonce]))[12:]`;
-- CREATE2 address `keccak(0xff || sender || salt || keccak(init_code))[12:]`;
-- Both consistent with Ethereum, **independent of triedb internal key design**.
-
+Verification: reconstruct the Merkle path from `loc` through `digests` to `ops_root`, then verify `ops_root` matches the `state_root` from the block header.

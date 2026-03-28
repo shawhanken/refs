@@ -929,7 +929,7 @@ The actor model provides natural reentrancy protection—actors process one mess
 
 ### Hook Security
 
-- Hooks are capped at 50,000 Cycles (same as CIP-20 token hooks)
+- Hooks are capped at 50,000 Cycles and 50,000 Cells (same as CIP-20 token hooks)
 - Malicious hooks can block all swaps—pool deployers must be trusted
 - Consider timelock for hook updates on major pools
 

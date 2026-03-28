@@ -638,6 +638,8 @@ class GeoRestrictedHook(Actor):
 
 ### Timer Integration
 
+> **Same-Block Constraint (CIP-5):** Timers created in the current block cannot fire in the same block. An auction with `interval=1` will have its first clearing delayed by one block.
+
 Cowboy's native timers enable automatic per-block clearing:
 
 ```python
@@ -776,7 +778,7 @@ TokensClaimed(auction: address, bidder: address, bid_id: u256, tokens: u256, cur
 
 ### Hook Security
 
-- **Hooks capped at 50,000 cycles** (same as CIP-20/CIP-21)
+- **Hooks capped at 50,000 Cycles and 50,000 Cells** (same as CIP-20/CIP-21)
 - **can_claim must return true** for funds to be claimable (hooks should not trap funds)
 - **Timelock recommended** for hook updates
 
