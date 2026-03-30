@@ -1,6 +1,12 @@
+> [!WARNING]
+> **API 细节可能过时 (API Details May Be Outdated)**
+> 本文档最后更新于 2026-01-24（v0.4.0）。此后 Host API 经历了多次更改，包括：
+> gas 常量调整（MAILBOX_SEND_BASE_CYCLES 500→80 等）、`storage_get` Cycles 计费逻辑变更、
+> 新增 `max_cycles` 限制参数等。请以 `node/execution/src/pvm_host.rs` 和 `node/execution/src/gas.rs` 为准。
+
 # PVM API 参考与使用指南
 
-**最后更新**: 2026-01-24  
+**最后更新**: 2026-01-24
 **版本**: 0.4.0
 
 ---

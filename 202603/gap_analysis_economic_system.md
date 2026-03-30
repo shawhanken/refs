@@ -1,3 +1,15 @@
+> [!WARNING]
+> **部分内容已过时 (Partially Outdated)**
+> 本报告基于 2026-03 初的代码状态，以下条目已于后续开发中实现，**不再是 gap**：
+>
+> - **CIP-3 EIP-1559 Basefee Engine**（§1 所称"completely missing"）：已于 H-2/M-C 阶段完整实现。
+>   相关文件：`node/execution/src/basefee.rs`、`node/execution/src/execution/engine.rs`、
+>   `node/storage/src/process_block.rs`。实现包括双轨 basefee 持久化、区块 burn/tip 拆分、
+>   `BLOCK_CYCLES_TARGET=10_000_000`、`BLOCK_CELLS_TARGET=500_000`。
+>
+> §2（CIP-7 Retention Contracts）、§4（CIP-21 DEX）、§5（CIP-22 CCA）、§6（Runner Metering）
+> 描述的 gap 截至 2026-03-30 仍未实现，内容依然有效。
+
 # Cowboy Docs vs Code: Economic System Gap Analysis
 
 This report outlines the discrepancies between the authorized technical designs (Whitepaper, CIPs) and the actual implementation in the `node` and `runner` repositories. The focus is specifically on the Cowboy Economic System and related primitives.

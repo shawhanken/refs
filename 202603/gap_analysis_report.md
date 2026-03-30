@@ -1,3 +1,13 @@
+> [!WARNING]
+> **主要 Gap 已修复 (Primary Gap Resolved)**
+> 本报告撰写于 2026-03-03，其核心发现已不再成立：
+>
+> - **§2.1 Synchronous Call Primitive**（被标为 "CRITICAL GAP"）：`call_actor` 已在
+>   `node/execution/src/pvm_host.rs` 中完整实现，包含 `sync_called_actors` 跨 Actor 状态追踪、
+>   `ActorCallSnapshot` 回滚机制、同步调用深度计数器，完全支持 T+0 原子嵌套调用。
+>
+> 其余内容（如具体测试建议）仅供参考，以实际代码为准。
+
 # Cowboy Node & Runner Implementation Gap Analysis Report
 
 **Date:** 2026-03-03

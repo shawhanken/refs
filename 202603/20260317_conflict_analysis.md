@@ -26,7 +26,7 @@
 | 2 | Gas 成本表（WP §17.3 "权威" vs CIP-3 vs 代码） | P0 | — | ✓ |
 | 3 | Timer 执行时机（CIP-1 先于 TX vs WP/CIP-5/代码 后于 TX） | P0 | — | ✓ |
 | 4 | 两套 Timer 机制并存（CIP-1 GBA vs CIP-5 Globalbox） | P0 | — | ✓ |
-| 5 | Basefee 目标值（WP 10M cycles vs 代码 5M） | P1 | ✓ | — |
+| 5 | Basefee 目标值（WP 10M cycles vs 代码 5M） | P1 | ✅ 已修复 | — |
 | 6 | Basefee 计算公式（WP §4.2 含 alpha/clamp vs §17.8 简化版） | P1 | — | ✓ |
 | 7 | Runner 质押公式（WP §5.2: 1.5× vs §17.7: 10× vs 代码: 仅地板价） | P1 | — | ✓ |
 | 8 | Runner 结果提交协议（WP 15min 挑战窗口 vs CIP-2 Aggregator 模型） | P1 | — | ✓ |
@@ -34,6 +34,7 @@
 | 10 | 存储驱逐时机（WP §17.5 10 rent-epoch vs 正文 N+11 off-by-one） | P2 | — | ✓ |
 
 **代码改动总计：仅 2 处**（冲突 #1 地址重分配，冲突 #5 常量修正）
+> **更新 2026-03-30**：冲突 #5 的代码改动已完成，`BLOCK_CYCLES_TARGET` 现为 `10_000_000`（`node/types/src/constants.rs:24`）。
 **文档改动：9 处**（需明确哪份文档为权威）
 
 ---
@@ -203,9 +204,12 @@ Status: Superseded by CIP-1
 
 ---
 
-## 冲突 #5 — Basefee 目标值（P1）
+## 冲突 #5 — Basefee 目标值（P1）✅ 已修复
 
-### 问题描述
+> **2026-03-30 更新**：此冲突已解决。`BLOCK_CYCLES_TARGET` 已改为 `10_000_000`，
+> 与白皮书 §4.3/§13/§17.9 完全一致。见 `node/types/src/constants.rs:24`。
+
+### 问题描述（历史）
 
 白皮书与代码实现对 Cycles 目标值有 **2 倍**差异：
 
@@ -459,7 +463,7 @@ CIP-3 提到了与 WP 不一致的序列化格式：
 | WP §9 | 冲突 #1（系统 Actor 地址） |
 | WP §3.5 vs §17.3 | 冲突 #2（Gas 成本），附录 A |
 | WP §4.2 vs §17.8 | 冲突 #6（Basefee 公式），附录 A |
-| WP §4.3 / §13 / §17.9 | 冲突 #5（Cycles 目标） |
+| WP §4.3 / §13 / §17.9 | 冲突 #5（Cycles 目标，✅ 已修复） |
 | WP §4.4 / §17.5 vs 正文 | 冲突 #10（驱逐时机），附录 A |
 | WP §5.2 vs §17.7 | 冲突 #7（质押公式），附录 A |
 | WP §5.3 | 冲突 #8（Runner 结果协议） |
@@ -468,7 +472,7 @@ CIP-3 提到了与 WP 不一致的序列化格式：
 | CIP-3 | 冲突 #2（Gas 数值），冲突 #9（序列化） |
 | CIP-5 | 冲突 #4（双 Timer 机制） |
 | 代码 process_block.rs | 冲突 #1（BASEFEE 0x06），冲突 #3（Timer 顺序 ✓） |
-| 代码 basefee.rs | 冲突 #5（5M vs 10M），冲突 #6（公式 ✓） |
+| 代码 basefee.rs | 冲突 #5（✅ 已修复：10M），冲突 #6（公式 ✓） |
 | 代码 gas.rs | 冲突 #2（CIP-3 aligned ✓） |
 
 ---

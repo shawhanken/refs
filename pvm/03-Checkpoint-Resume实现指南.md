@@ -1,3 +1,8 @@
+> [!WARNING]
+> **历史快照 (Historical Snapshot — 2026-01-24)**
+> 本文档为 Checkpoint/Resume 功能的早期实现指南。相关功能截至 2026-03-30 处于部分实现状态，
+> 文档描述的部分接口细节可能与当前 `pvm-runtime` 代码不符，请以代码为准。
+
 # PVM Checkpoint/Resume 实现指南
 
 **最后更新**: 2026-01-24

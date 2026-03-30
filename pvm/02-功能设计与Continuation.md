@@ -1,3 +1,8 @@
+> [!WARNING]
+> **历史快照 (Historical Snapshot — 2026-01-24)**
+> 本文档描述的是 Continuation 机制的早期设计草案。Continuation 功能截至 2026-03-30
+> 尚未完全实装（属于已知未实现项）。文档的设计思路仍有参考价值，但不代表当前代码行为。
+
 # PVM 功能设计与 Continuation 机制
 
 **最后更新**: 2026-01-24
