@@ -1,8 +1,17 @@
 # Cowboy 项目参考文档索引
 
-本目录包含 Cowboy 项目的所有参考文档，按**主题**分类整理。跨主题的综合分析、报告、会议纪要集中在 `analysis/`。
+本目录包含 Cowboy 项目的所有参考文档，按**主题**分类整理。跨主题的综合分析、报告、会议纪要集中在 `analysis/`，由 LLM 维护的综合 wiki 位于 `wiki/`。
 
 **最后更新**: 2026-04-15
+
+---
+
+## 🧭 从哪里开始
+
+- **快速定位概念 / 参数 / 冲突** → **[`wiki/`](wiki/index.md)**（LLM 综合层，权威参数与跨文档综合）
+- **读规范原文** → `cips/`、`whitepaper/`
+- **读历史上下文** → `node/`、`pvm/`、`runner/`、`chain/`、`economics/` 等主题目录
+- **追漂移 / 修正案** → [`analysis/2026-04-15_documentation_amendments.md`](analysis/2026-04-15_documentation_amendments.md) 或 [`wiki/drift.md`](wiki/drift.md)
 
 ---
 
@@ -10,6 +19,7 @@
 
 ```
 refs/
+├── wiki/         🆕 LLM 维护的综合知识库（概念/实体/参数/漂移）
 ├── whitepaper/   核心技术白皮书（受保护，不改动）
 ├── cips/         CIP 规范（living specs，以 cip-N 命名）
 ├── chain/        跨系统集成与整体架构
@@ -18,10 +28,11 @@ refs/
 ├── runner/       链下执行系统
 ├── economics/    费用模型 / Basefee / Gas / Tokenomics
 ├── devex/        开发者体验与客户反馈
-├── analysis/     跨主题分析、会议纪要、问题修复计划
+├── analysis/     跨主题分析、会议纪要、问题修复计划、修正案
 ├── common/       通用基础设施（nginx、CI/CD、git 子模块）
 ├── dev_support/  开发工具（MCP server、模板）
-└── _archive_/    被替代或过时的历史文档
+├── _archive_/    被替代或过时的历史文档
+└── LLM_Wiki.md   LLM Wiki 模式说明（wiki/ 的设计蓝本）
 ```
 
 ---
@@ -32,6 +43,25 @@ refs/
 - **`0X-`** 排序前缀（如 `01-`, `02-`）：综合文档的阅读顺序
 - **`cip-N-xxx`**：CIP 规范，以编号为身份
 - 无前缀：`README.md`、`CLAUDE.md` 等固定名称文件
+
+---
+
+## 🧠 wiki/ — LLM 维护的综合知识库
+
+**设计**: 参照 [`LLM_Wiki.md`](LLM_Wiki.md) 的模式，由 LLM 从 raw sources 综合、交叉引用、持续维护。
+
+**入口**:
+- [`wiki/index.md`](wiki/index.md) — 内容索引
+- [`wiki/AGENTS.md`](wiki/AGENTS.md) — 操作规约（Ingest/Query/Lint 工作流）
+- [`wiki/parameters.md`](wiki/parameters.md) — 参数常量权威表（代码为准）
+- [`wiki/drift.md`](wiki/drift.md) — 文档-代码漂移看板
+- [`wiki/log.md`](wiki/log.md) — 变更时序日志
+
+**页面分类**:
+- `concepts/` — 跨文档综合的抽象主题（9 页：actor-model、continuation、basefee、timer 等）
+- `entities/` — 具体系统实体（4 页：system-actors、runner-lifecycle、pvm、node）
+
+**权威层级**: 代码 > 修正案 > CIP > 白皮书 > 其它 raw。
 
 ---
 
