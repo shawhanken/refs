@@ -13,6 +13,8 @@ icon: clock
 
 <Tip>
   This document describes the timer mechanism **as currently implemented** in the Cowboy node. CIP-1 remains the authoritative specification for the broader Actor Message Scheduler (GBA bidding, tiered calendar queue). This CIP covers the concrete timer storage, scheduling, and end-of-block delivery that the node executes today.
+
+> **修正案（2026-04-15）**: 代码实现以 CIP-1 风格 GBA 调度为准（`schedule_timer` host API + block-tail deferred tx）；Globalbox EOB timers 未实现。块 timer 预算 `8,888,890 cycles`、单 timer 上限 `550,000 cycles`。详见 [`analysis/2026-04-15_documentation_amendments.md §五`](../analysis/2026-04-15_documentation_amendments.md)。
 </Tip>
 
 ## 1. Abstract

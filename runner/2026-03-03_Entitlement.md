@@ -1,3 +1,7 @@
+> **修正案（2026-04-15）**: 本文引用的 `MIN_STAKE = 50,000 CBY` 是 Runner 接受工作的**经济门槛**，并非链上注册 floor（后者为 `10,000 CBY`）。两层门槛并存，不冲突。详见 [`analysis/2026-04-15_documentation_amendments.md §六·补²`](../analysis/2026-04-15_documentation_amendments.md)。
+
+---
+
 这是一个很好的架构设计问题。我先让入理深有代解现与码中限、权户、Gas账 相关的机制，然后给出一个完整的 Entitlement 机制设计方案。
 
           

@@ -19,6 +19,10 @@ icon: calendar-clock
   **Implementation Status: Phase 2 / Not Yet Implemented.** The tiered Calendar Queue and GBA-based priority model described here are a future protocol design. Current timer behavior (FIFO queue, single gas tier) is implemented as specified in **CIP-5**. This document is retained for roadmap reference.
 </Warning>
 
+<Warning>
+  **修正案（2026-04-15）**: 本 CIP 描述的 "Timer-then-Transactions" 顺序与当前代码实现相反；代码实际为 **Transactions-then-Timers**（`node/storage/src/speculative.rs:152-475`）。块 timer 预算 `8,888,890` cycles，单 timer 上限 `550,000` cycles。详见 [`analysis/2026-04-15_documentation_amendments.md §五`](../analysis/2026-04-15_documentation_amendments.md)。
+</Warning>
+
 ### **Cowboy Improvement Proposal (CIP-1): The Autonomous Actor Scheduler**
 
 **Status:** Draft for internal review

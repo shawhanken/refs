@@ -16,6 +16,15 @@ icon: microchip
   This specification defines the verifiable, asynchronous off‑chain compute framework. Revision 2026-03-05 replaces the ring-buffer VRF selection with Fisher-Yates VRF + stake-weighted sortition, removes the `skip_task` mechanism in favor of timeout-based re-selection, and introduces the commit-reveal aggregator model for result verification. Revision 2026-03-09 expands §7 to reflect the implemented Entitlement type system (Scope / Action / Constraints / Role), updates the system actor table to include Secrets Manager (`0x04`) and TEE Verifier (`0x05`), and clarifies the Pool membership grant flow.
 </Tip>
 
+<Warning>
+  **修正案（2026-04-15）**: 以下条目以代码为准，本 CIP 文中相应表述以修正案为准。
+  - **System Actor 地址表**：`0x01-0x0B` 共 11 个槽位（包含 ENTITLEMENT_REGISTRY `0x07`、TREASURY `0x08`、GOVERNANCE `0x09`、STORAGE_MANAGER `0x0A`、RELAY_REGISTRY `0x0B`）
+  - **Runner 质押公式**：`stake >= max(10,000 CBY, 1.5 × declared_max_job_value)`（非 10× average_job_value）
+  - **VerificationMode**：6 variants — None / EconomicBond / MajorityVote / StructuredMatch / Deterministic / SemanticSimilarity（ZK-Proof 未实现）
+
+  详见 [`analysis/2026-04-15_documentation_amendments.md`](../analysis/2026-04-15_documentation_amendments.md) 条目 B / C / D。
+</Warning>
+
 # CIP-2: Verifiable Asynchronous Off-chain Computation Framework
 
 ---

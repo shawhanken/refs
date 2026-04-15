@@ -15,6 +15,16 @@ icon: gauge-high
   This specification defines Cowboy’s dual-metered gas (Cycles/Cells) and independent EIP‑1559 fee markets. Content below mirrors the CIP text verbatim.
 </Tip>
 
+<Warning>
+  **修正案（2026-04-15）**: 以下参数以代码为准：
+  - `BLOCK_CYCLES_TARGET = 20,000,000`（CIP 原文 10,000,000）
+  - `BLOCK_CELLS_TARGET = 4,000,000`（CIP 原文 500,000）
+  - **Basefee 更新公式**: 几何更新 `Δ = basefee × |used−target| / target / ALPHA`，clamp 到 `basefee / DENOM`；`ALPHA = 96`（非 8）、`DENOM = 96`、`MIN_BASEFEE = 10,000`（非 1）、`MAX_BASEFEE = 10²⁴`
+  - **Transfer 成本**: `5,000 cycles / 500 cells`（CIP 原文 21,000 cycles / 0 cells）
+
+  详见 [`analysis/2026-04-15_documentation_amendments.md §一`](../analysis/2026-04-15_documentation_amendments.md)。
+</Warning>
+
 ### **Cowboy Improvement Proposal (CIP-3): Dual-Metered Gas Calculation and Dynamic Fee Market**
 
 **Status:** Draft for internal review

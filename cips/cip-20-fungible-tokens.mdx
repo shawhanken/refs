@@ -16,6 +16,10 @@ icon: coins
   **Type Update (2026-03-27):** Token amounts use `u128` in the implementation (not `u256` as originally specified). u128 supports up to ~3.4 × 10³⁸, sufficient for any reasonable token economy with 18 decimal places. u128 executes in two native CPU instructions vs. software emulation for u256.
 </Warning>
 
+<Warning>
+  **修正案（2026-04-15）**: `token_hook_max_cycles = 50,000` 为**阶段 1** 声明，当前代码 **尚未真正扣费与中断**（"declared but not enforced"），阶段 2 才接入。详见 [`analysis/2026-04-15_documentation_amendments.md §六·补`](../analysis/2026-04-15_documentation_amendments.md)。
+</Warning>
+
 <Tip>
   **CBY Relationship:** CBY is the protocol-layer native currency and is NOT a CIP-20 token. CIP-20 manages user-created fungible tokens.
 </Tip>

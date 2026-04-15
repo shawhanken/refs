@@ -1,7 +1,15 @@
 # Ethereum-Style 地址迁移实施方案
 
-> **状态**: 提案 (Proposal)
-> **日期**: 2026-02-23
+> **状态**: ✅ **已采纳并实施**（2026-04-15 更新）
+> **原始提案日期**: 2026-02-23
+>
+> **修正案（2026-04-15）**: 本提案已落地。代码当前：
+> - `Address = [u8; 20]`（`node/types/src/address.rs:8-12`）
+> - 签名 secp256k1 ECDSA 65 字节（`node/types/src/signature.rs:9-18`）
+> - 派生 `keccak256(secp256k1_pubkey_uncompressed[1..])[12..]`
+>
+> 详见 [`analysis/2026-04-15_documentation_amendments.md §六`](../analysis/2026-04-15_documentation_amendments.md)。
+>
 > **背景**: 白皮书定义了 Ethereum 风格地址，但代码实现使用了 Ed25519 (Solana 风格)。本文档分析现状，提出迁移方案及详细实施步骤。
 
 ---
