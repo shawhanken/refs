@@ -1,277 +1,211 @@
 # Cowboy 项目参考文档索引
 
-本目录包含 Cowboy 项目的所有参考文档，按主题分类整理。
+本目录包含 Cowboy 项目的所有参考文档，按**主题**分类整理。跨主题的综合分析、报告、会议纪要集中在 `analysis/`。
 
-## 📋 文档分类原则
+**最后更新**: 2026-04-15
 
-文档按以下类别进行分类，请确保文档放置在正确的目录中：
-
-1. **chain/** - Cowboy 各系统整体集成相关文档
-   - 系统间集成方案
-   - 整体架构设计
-   - 跨系统协作文档
-
-2. **pvm/** - 虚拟机相关文档
-   - PVM 核心功能
-   - Python 解释器实现
-   - PVM 内部机制
-
-3. **runner/** - 链下执行系统相关文档
-   - Runner 系统设计
-   - 链下计算市场
-   - Runner 实现计划
-
-4. **common/** - 通用文档
-   - 工具使用指南
-   - 通用配置文档
-   - 开发环境设置
-
-5. **whitepaper/** - 白皮书（特殊且重要，不要有任何改动）
-   - 核心技术白皮书
-   - 架构设计文档
-
-6. **node/** - 主链节点相关文档
-   - 节点实现细节
-   - 节点升级文档
-   - 节点 API 文档
-
-7. **task-plans/** - 工作计划
-   - 任务清单
-   - 项目路线图
-   - 开发计划
+---
 
 ## 📁 目录结构
 
 ```
 refs/
-├── whitepaper/          # 核心技术白皮书（特殊，不要改动）
-├── pvm/                 # PVM (Python Virtual Machine) 相关文档（所有文件扁平化）
-├── chain/              # Cowboy 各系统整体集成相关文档（所有文件扁平化）
-├── node/               # 主链节点相关文档（所有文件扁平化）
-├── runner/             # 链下执行系统相关文档
-├── task-plans/         # 任务计划和路线图
-└── common/             # 通用工具和指南
+├── whitepaper/   核心技术白皮书（受保护，不改动）
+├── cips/         CIP 规范（living specs，以 cip-N 命名）
+├── chain/        跨系统集成与整体架构
+├── node/         主链节点实现
+├── pvm/          Python 虚拟机
+├── runner/       链下执行系统
+├── economics/    费用模型 / Basefee / Gas / Tokenomics
+├── devex/        开发者体验与客户反馈
+├── analysis/     跨主题分析、会议纪要、问题修复计划
+├── common/       通用基础设施（nginx、CI/CD、git 子模块）
+├── dev_support/  开发工具（MCP server、模板）
+└── _archive_/    被替代或过时的历史文档
 ```
 
-**注意**：所有分类目录中的文件都已扁平化到一级，不再使用子目录，便于人类阅读。
+---
+
+## 📝 文件命名约定
+
+- **`YYYY-MM-DD_`** 日期前缀：文档的首次提交/撰写日期（稳定不变）
+- **`0X-`** 排序前缀（如 `01-`, `02-`）：综合文档的阅读顺序
+- **`cip-N-xxx`**：CIP 规范，以编号为身份
+- 无前缀：`README.md`、`CLAUDE.md` 等固定名称文件
 
 ---
 
-## 📘 核心技术白皮书（whitepaper/）
+## 📘 whitepaper/ — 核心技术白皮书
 
-### 主要白皮书
-- **`Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute_CN.md`** ⭐⭐⭐  
-  **核心技术白皮书（中文版）** - 所有技术决策的最高依据
-- `Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute_EN.md`  
-  核心技术白皮书（英文版）
+所有技术决策的最高依据，**请勿改动**。
 
-### SDK 人体工程学建议
-- `Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute(Sugguestion-SDK Ergonomics)_v2.md`  
-  SDK 人体工程学建议 v2（中文）
-- `Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute(Sugguestion-SDK Ergonomics)_v3_EN.md`  
-  SDK 人体工程学建议 v3（英文）
-
-**说明**：核心技术白皮书定义了 Cowboy 的架构、Actor 模型、Continuation 机制、确定性执行要求、Dual Gas 模型等核心概念。任何技术决策如有冲突，以此文档为准。
+- `Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute_CN.md` ⭐⭐⭐ 最新中文版
+- `Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute_EN.md` 最新英文版
+- `2026-03-21_cowboy-technical-whitepaper-revised.md` 3 月修订版
+- `*(Suggestion-SDK Ergonomics)*_v2/v3_EN.md` SDK 人体工程学建议
 
 ---
 
-## 🐍 PVM 相关文档（pvm/）
+## 📋 cips/ — Cowboy Improvement Proposals
 
-**文档数量**: 5 篇综合文档（已整合 23 个旧文档）
-
-### 综合文档
-
-1. **01-API参考与使用指南.md** ⭐⭐⭐⭐⭐
-   - Host API 和 Runtime API 完整参考
-   - 基本使用示例
-   - Continuation 使用示例
-   - Python Actor 示例
-
-2. **02-功能设计与Continuation.md** ⭐⭐⭐⭐
-   - Continuation 设计草案（Actor↔Actor, Actor↔Runner）
-   - SDK API 说明
-   - 编译期约束
-   - FSM 编译形态
-   - CBOR Schema
-   - Guard 机制
-
-3. **03-Checkpoint-Resume实现指南.md** ⭐⭐⭐⭐
-   - 函数级 Checkpoint 支持
-   - Block Stack 支持
-   - Checkpoint File/Bytes API
-   - 实现挑战和解决方案
-
-4. **04-编码规范与最佳实践.md** ⭐⭐⭐⭐⭐
-   - 支持的 Python 特性
-   - 限制和禁止的操作
-   - Checkpoint 使用规范
-   - 确定性执行要求
-   - 常见错误和陷阱
-   - 最佳实践
-
-5. **05-测试评估与升级.md** ⭐⭐⭐
-   - 测试覆盖率报告（124 个测试）
-   - 真实完成度评估（35-40%）
-   - 升级安全防护方案
-   - 可行性分析与路线图
-
-**说明**：所有文档已整合为 5 篇综合文档，便于阅读和维护。旧文档已归档到 `_archive_/` 目录。
+见 CLAUDE.md 表格：CIP-1 到 CIP-22（Actor 调度、链下计算、费用模型、Tokens、存储、Timer、SDK、Runner 容器等）。
 
 ---
 
-## ⛓️ Chain 相关文档（chain/）
+## ⛓️ chain/ — 整体架构与集成
 
-### 集成方案
-- `PVM_CHAIN_INTEGRATION_CN.md` - PVM 与主链低耦合对接方案
-
-### 升级和工作计划
-- **`WORK_PLAN_AFTER_WHITEPAPER_REVIEW.md`** ⭐ - 基于核心白皮书的后续工作方案（当前工作重点）
-
-**说明**：chain 目录包含 Cowboy 各系统整体集成相关的文档，包括集成方案和工作计划。
+- `2026-01-24_PVM_CHAIN_INTEGRATION_CN.md` — PVM 与主链低耦合对接方案
+- `2026-01-24_WORK_PLAN_AFTER_WHITEPAPER_REVIEW.md` ⭐ 白皮书评审后的工作方案
+- `2026-02-19_Cowboy_Project_Architecture_Overview.md` / `_EN.md` — 技术架构全景图
+- `2026-04-02_简单交易全链路性能与可观测性方案.md` — 全链路性能与观测设计
+- `2026-04-10_cowboy-tempo-ecosystem-blueprint.md` — 生态蓝图
 
 ---
 
-## 🏃 Runner 相关文档（runner/）
+## 🖥️ node/ — 主链节点
 
-- `RUNNER_SYSTEM_DESIGN.md` - Runner 系统设计文档
-- `Runner_Implementation_Plan_CN.md` - Runner 实现计划
+**综合文档**（优先阅读）：
+- `01-项目概览与路线图.md` ⭐⭐⭐
+- `02-实施与技术实现.md`
+- `03-测试与验证.md`
+- `04-当前状态与行动项.md` ⭐⭐⭐
 
-**说明**：Runner 系统是链下执行系统，提供可验证的链下计算市场。
+**历史/专题**：
+- `2026-02-05_VALIDATOR_VS_COWBOY_CHAIN.md`
+- `2026-02-21_SoftFloat_VRF_Implementation_Report_CN/EN.md` — SoftFloat/VRF 实现报告
+- `2026-02-22_Validator日志中常见WARN说明.md`
+- `2026-02-22_如何获得actor列表.md`
+- `2026-02-24_ADDRESS_MIGRATION_ETH_STYLE.md` — 地址迁移方案
+- `2026-02-25_Account_CLI_Dev_Task_Brief.md`
+- `2026-02-25_Cowboy_Node_Build_Install_Guide.md`
+- `2026-02-25_Cowboy_Node_Installation_Report.md`
+- `2026-04-11_Validator_Stall_Root_Cause_Analysis.md`
 
----
-
-## 📋 任务计划（task-plans/）
-
-- `Cowboy_PVM_Task_Plan.md` - Cowboy SDK 开发任务清单（英文）
-- `Cowboy_PVM_Task_Plan_CN.md` - Cowboy SDK 开发任务清单（中文）
-
-**说明**：包含模块划分、时间表、风险评估等项目管理文档。
-
----
-
-## 🖥️ Node 相关文档（node/）
-
-**文档数量**: 5 篇综合文档（已整合 15 个旧文档）
-
-### 综合文档
-
-1. **01-项目概览与路线图.md** ⭐⭐⭐⭐⭐
-   - 项目整体规划和评估
-   - 2026 年路线图
-   - 真实完成度分析（8% vs 15%）
-   - 技术挑战评估
-   - 里程碑时间表
-
-2. **02-实施与技术实现.md** ⭐⭐⭐⭐
-   - 详细实施总结（阶段1-4）
-   - 技术问题解决方案（借用检查器、Stack Overflow）
-   - API 实现（CowboyHost、PvmExecutionContext）
-   - 架构图
-   - 技术债务说明
-
-3. **03-测试与验证.md** ⭐⭐⭐⭐
-   - 测试执行总结（14 个新测试）
-   - 新增测试详情
-   - PVM 子模块集成验证
-   - Stack Overflow 修复验证
-   - Checkpoint 模式演示
-   - 测试覆盖率
-
-4. **04-当前状态与行动项.md** ⭐⭐⭐⭐⭐
-   - 当前项目状态
-   - 立即行动项（今天）
-   - 本周计划
-   - 本月目标
-   - Phase 2 目标清单
-   - 下一步计划
-   - 已知问题
-   - 项目指标
-
-**说明**：所有文档已整合为 5 篇综合文档，便于阅读和维护。旧文档已归档到 `_archive_/` 目录。
+`_archive_/` — 已整合到综合文档的旧文档。
 
 ---
 
-## 🛠️ 通用工具和指南（common/）
+## 🐍 pvm/ — Python 虚拟机
 
-- `git-submodule-integration-guide.md` - Git 子模块集成指南
-- `nginx-installation.md` - Nginx 安装指南
-- `nginx-reverse-proxy-config.md` - Nginx 反向代理配置
+**综合文档**（优先阅读）：
+- `01-API参考与使用指南.md` ⭐⭐⭐⭐⭐
+- `02-功能设计与Continuation.md`
+- `03-Checkpoint-Resume实现指南.md`
+- `04-编码规范与最佳实践.md` ⭐⭐⭐⭐⭐
+- `05-测试评估与升级.md`
 
----
+**历史/专题**：
+- `2026-01-24_PVM_IMPLEMENTATION_PLAN.md`
+- `2026-01-24_PVM_REAL_COMPLETENESS_ASSESSMENT.md`
+- `2026-01-27_SOFTFLOAT_PERFORMANCE.md` / `_TESTING.md`
+- `2026-02-27_PVM_Runtime_Alias_Design_CN.md` — SDK alias 设计
+- `2026-03-04_pvm-call-actor-session-upgrade-summary.md` — 跨 Actor 调用链路改造
 
-## 📖 文档阅读建议
-
-### 新手入门路径
-1. **核心技术白皮书** (`whitepaper/Cowboy_An_Actor-Model_Layer1 with Verifiable_Off-Chain_Compute_CN.md`) - 理解 Cowboy 的核心理念
-2. **PVM API 参考** (`pvm/01-API参考与使用指南.md`) - 了解 PVM API 和使用方法
-3. **PVM 编码规范** (`pvm/04-编码规范与最佳实践.md`) - 了解如何编写 PVM Python 代码
-4. **PVM 链集成方案** (`chain/PVM_CHAIN_INTEGRATION_CN.md`) - 了解整体架构
-
-### 开发者路径
-1. **项目概览** (`node/01-项目概览与路线图.md`) - 整体规划和评估
-2. **当前行动项** (`node/04-当前状态与行动项.md`) - 当前工作重点和下一步计划
-3. **实施与技术实现** (`node/02-实施与技术实现.md`) - 详细实施总结和技术细节
-4. **Continuation 设计** (`pvm/02-功能设计与Continuation.md`) - Continuation 机制详解
-
-### 功能实现路径
-1. **Checkpoint 实现指南** (`pvm/03-Checkpoint-Resume实现指南.md`) - Checkpoint/Resume 完整实现指南
-2. **功能设计** (`pvm/02-功能设计与Continuation.md`) - Continuation 和功能设计
-3. **测试与验证** (`node/03-测试与验证.md`) - 测试报告和验证结果
-
-### 项目管理路径
-1. **任务计划** (`task-plans/Cowboy_PVM_Task_Plan_CN.md`) - 完整的任务清单和时间表
-2. **工作方案** (`chain/WORK_PLAN_AFTER_WHITEPAPER_REVIEW.md`) - 基于白皮书的后续工作方案
-3. **项目概览** (`node/01-项目概览与路线图.md`) - 项目整体规划和路线图
-4. **测试评估** (`pvm/05-测试评估与升级.md`) - 测试覆盖率和完成度评估
+`_archive_/` — 旧文档；`pvm_bytecode_design/` — 字节码设计专题。
 
 ---
 
-## 🏷️ 文档标签说明
+## 🏃 runner/ — 链下执行系统
 
-- ⭐⭐⭐ - 最高优先级，所有决策的依据
-- ⭐ - 当前工作重点
-- 🇨🇳 - 中文文档
-- 🇬🇧 - 英文文档
-- 📝 - 设计文档
-- 🔧 - 实现指南
-- 📊 - 规划文档
-
----
-
-## 📝 文档命名约定
-
-- `*_CN.md` - 中文文档
-- `*_EN.md` - 英文文档
-- `*_v2.md`, `*_v3.md` - 版本化文档
-- `README.md` - 各子目录的索引文件
+- `2026-01-24_Runner_Implementation_Plan_CN.md`
+- `2026-01-27_NODE_ACTOR_RUNNER_FLOW.md`
+- `2026-01-27_README_CN.md` / `2026-01-27_TESTS_README_CN.md`
+- `2026-01-29_MCP_INTEGRATION.md` / `MCP_USAGE.md`
+- `2026-02-05_DOCUMENTATION.md` — Runner 详细文档
+- `2026-02-05_QUICK_START_MCP.md` / `QUICK_SUBMIT.md` / `SUBMIT_JOB_GUIDE.md`
+- `2026-02-26_Runner_Graceful_Shutdown_Plan_CN/EN.md`
+- `2026-03-03_Entitlement.md` — 权限机制
+- `2026-03-05_deterministic_runner_selection.md` / `_en.md` — 确定性选择算法
 
 ---
 
-## 🔄 文档更新与维护
+## 💰 economics/ — 费用模型与经济学
 
-### 文档整合说明
+- `2026-02-22_actor_economics_faq.md` — Actor 经济学 FAQ
+- `2026-02-22_timer_basefee_analysis.md` — Timer Basefee 分析
+- `2026-02-23_cowboy_economics_comprehensive.md` — 经济学综合指南
+- `2026-04-12_Basefee_Throttle_Analysis/` — Basefee 节流分析（中/英/原文）
+- `2026-04-12_Devnet_Basefee_Economics/` — Devnet Basefee 经济学（中/英）
+- `2026-04-13_fee-audit-report.md` ⭐ 费用审计报告（进行中）
 
-为了便于阅读和维护，已将以下目录的文档整合为综合文档：
+相关规范：`cips/cip-3-fee-model.mdx`。
 
-- **node/** - 15 个文档整合为 5 篇综合文档
-- **pvm/** - 23 个文档整合为 5 篇综合文档
+---
 
-所有旧文档已归档到各目录的 `_archive_/` 子目录，仅供参考。
+## 🧑‍💻 devex/ — 开发者体验与客户反馈
 
-### 文档更新原则
+- `2026-02-18_Developer_Experience_Situational_Awareness.md` — DevEx 态势
+- `2026-02-18_devex_review_comments.md`
+- `2026-02-19_Cowboy_DevEx_Feedback_CN/EN.md`
+- `2026-02-19_client_alignment_analysis.md` / `_CN.md`
+- `2026-02-19_client_followup_strategy.md`
+- `2026-02-19_slack_client_feedback.md`
+- `2026-02-21_DevEx_Communication_Draft_CN/EN.md`
+- `2026-02-22_Customer_Requirements_Fulfillment_Summary.md`
+- `2026-02-22_SDK_Technical_Implementation_Analysis_CN.md`
 
-1. **保持综合文档最新**：定期更新综合文档，确保信息准确
-2. **归档旧版本**：重要变更时，将旧版本归档
-3. **统一命名**：使用 `01-`, `02-` 等前缀便于排序
-4. **扁平化结构**：所有文件扁平化到一级，不使用子目录
+---
 
-### 提交更新
+## 🔍 analysis/ — 跨主题分析与规划
 
-如有文档缺失或分类错误，请提交 issue 或 PR。
+- `2026-02-16_whitepaper_vs_code_comparison.md` / `_en.md` — 白皮书对标代码
+- `2026-02-21_Internal_Meeting_Minutes.md` — 内部会议纪要
+- `2026-03-03_gap_analysis_report.md` — 综合 gap 分析
+- `2026-03-16_gap_analysis_economic_system.md` — 经济系统 gap（CIP-3/7/20/21/22）
+- `2026-03-17_conflict_analysis.md` — 白皮书/CIP-2/代码冲突识别
+- `2026-03-21_cowboy_issues_fix_plan.md` — 95 issues 修复计划
+- `2026-03-31_bench_analysis_report.md` — Devnet 性能基准分析
 
-**最后更新**: 2026-01-24  
-**文档整合完成**: 
-- ✅ 所有分类目录中的文件已扁平化到一级，不再使用子目录
-- ✅ node 目录：15 个文档整合为 5 篇综合文档
-- ✅ pvm 目录：23 个文档整合为 5 篇综合文档
-- ✅ 旧文档已归档到各目录的 `_archive_/` 子目录
+---
+
+## 🛠️ common/ — 基础设施
+
+- `2026-01-24_git-submodule-integration-guide.md`
+- `2026-01-24_nginx-installation.md`
+- `2026-01-24_nginx-reverse-proxy-config.md`
+- `2026-02-18_cicd_deployment_plan_cn.md` / `_en.md`
+
+---
+
+## 🗄️ _archive_/ — 归档
+
+已被新版文档替代或内容完全过时的历史文档。仅供追溯参考。
+
+- `_archive_/202602/` — 2 月白皮书草稿及被替代的清单
+- 根 `_archive_/*.md` — 早期升级评估、集成测试状态等
+
+---
+
+## 📖 阅读路径建议
+
+**新人入门**
+1. `whitepaper/*_CN.md` — 核心理念
+2. `pvm/01-API参考与使用指南.md` — PVM API
+3. `pvm/04-编码规范与最佳实践.md` — Python Actor 规范
+4. `chain/2026-01-24_PVM_CHAIN_INTEGRATION_CN.md` — 整体架构
+
+**开发者**
+1. `node/01-项目概览与路线图.md`
+2. `node/04-当前状态与行动项.md`
+3. `node/02-实施与技术实现.md`
+4. `pvm/02-功能设计与Continuation.md`
+
+**经济/费用相关**
+1. `cips/cip-3-fee-model.mdx`
+2. `economics/2026-04-13_fee-audit-report.md`
+3. `economics/2026-02-23_cowboy_economics_comprehensive.md`
+
+**项目管理**
+1. `chain/2026-01-24_WORK_PLAN_AFTER_WHITEPAPER_REVIEW.md`
+2. `analysis/2026-03-21_cowboy_issues_fix_plan.md`
+3. `node/01-项目概览与路线图.md`
+
+---
+
+## 🔄 维护原则
+
+1. **主题归位**：新文档按主题（node/pvm/runner/chain/economics/devex/common）放入对应目录
+2. **跨主题放 analysis/**：涉及多个子系统的综合分析、gap 报告、会议纪要进 `analysis/`
+3. **日期前缀**：新文档以 `YYYY-MM-DD_` 为前缀，日期为首次提交日（出生日，不随修订变更）
+4. **替代则归档**：文档被新版本完全替代时，移入 `_archive_/` 并在 PR 中标注替代者
+5. **whitepaper/ 受保护**：不改动
