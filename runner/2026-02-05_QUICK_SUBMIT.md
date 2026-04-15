@@ -34,11 +34,12 @@ cd runner/scripts
   "reward": 100,
   "deadline": 1000,
   "verification": {
-    "runners": 1,
-    "mode": "HappyCase"
+    "mode": "none"
   }
 }
 ```
+
+> **修正案（2026-04-15 H-2/H-3）**：`HappyCase` 非法。合法：`none`/`economicbond`/`majorityvote`/`structuredmatch`/`deterministic`/`semanticsimilarity`。详见 [`refs/analysis/2026-04-15_documentation_amendments.md §六·补³`](../analysis/2026-04-15_documentation_amendments.md)。
 
 ### 3. 创建私钥文件
 

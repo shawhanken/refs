@@ -99,8 +99,8 @@ cargo run --bin cowboy runner --rpc-url http://localhost:4000 register \
 
 | 参数 | 说明 |
 |------|------|
-| `--private-key` | 私钥文件：支持 `runner_key.json` 或 32 字节 hex 文件 |
-| `--stake` | 质押 CBY 数量，链上最小约 50,000 CBY |
+| `--private-key` | 私钥文件：支持 `runner_key.json` 或 32 字节 hex 文件（内容为 secp256k1 标量，非 Ed25519 seed，见修正案 H-1）|
+| `--stake` | 质押 CBY 数量。链上**注册 floor** = 10,000 CBY；**工作经济门槛** ≈ 50,000 CBY（两层门槛，见修正案 G-2）|
 | `--rpc-url` | 链 RPC，默认 `http://localhost:4000` |
 | `--nonce` | 0 表示自动查询当前 nonce |
 
@@ -143,7 +143,9 @@ cowboy runner --rpc-url http://localhost:4000 list
 | `/runner/{address}/heartbeat` | POST | 心跳（一般由节点自动发） |
 | `/runners/active` | GET | 所有活跃 Runner |
 
-地址为 **32 字节 Ed25519 公钥**，十六进制 64 字符，可带或不带 `0x`。
+地址为 **20 字节 Ethereum 风格地址**（secp256k1 公钥经 keccak256 派生，末 20 字节），十六进制 40 字符，可带或不带 `0x`。
+
+> **修正案（2026-04-15 H-1）**：原文写 "32 字节 Ed25519" 已过时。详见 [`refs/analysis/2026-04-15_documentation_amendments.md §六·补³`](../analysis/2026-04-15_documentation_amendments.md)。
 
 ### 4.3 常见错误
 
@@ -204,7 +206,7 @@ python3 get_job_id.py http://localhost:4000 <tx_hash>
   1. 确认链版本与代码已包含 Runner 系统 Actor 的 genesis 初始化（如 `create_runner_system_actors` / `initialize_genesis_accounts` 中初始化 Actor）。
   2. 新链或可接受清空数据时：停链 → 清空链数据目录 → 用当前代码重新启动，让 genesis 重新执行。
   3. 检查脚本：`runner/scripts/check_system_actors.sh <rpc_url>`。
-- **注意**：查询系统 Actor 时，地址为 **32 字节 Ed25519 公钥**（如由 `node/runner` 的 `print_system_actors` 输出），不是 20 字节地址。
+- **注意**：查询系统 Actor 时，地址为 **20 字节 Ethereum 风格地址**（如由 `node/runner` 的 `print_system_actors` 输出）。见修正案 H-1。
 
 ### 6.3 修改链或 Runner 代码后不生效
 
@@ -213,7 +215,7 @@ python3 get_job_id.py http://localhost:4000 <tx_hash>
 
 ### 6.4 账户余额 / 质押不足
 
-- 注册会锁定质押；若报余额或质押相关错误，请确保账户余额 ≥ 质押 + gas，且质押满足链上最小要求（如 50,000 CBY）。
+- 注册会锁定质押；若报余额或质押相关错误，请确保账户余额 ≥ 质押 + gas，且质押满足链上最小要求（**注册 floor 10,000 CBY；工作经济门槛 ≈ 50,000 CBY**，见修正案 G-2）。
 
 ---
 
@@ -226,8 +228,8 @@ python3 get_job_id.py http://localhost:4000 <tx_hash>
 | **Stake 反序列化** | 链上已支持 stake 为数字或字符串；若仍报错，检查 CLI 发送的 JSON。 |
 | **health 枚举** | 必须为小写：`healthy` / `unhealthy` / `paused` / `deregistered`。 |
 | **--rpc-url 位置** | 必须写在 `cowboy runner` 与 `register`（或 `get`/`list`）之间。 |
-| **Runner Address** | 使用 Ed25519 公钥（32 字节），由 KeyManager 持久化在 `data/runner_key.json`。 |
-| **系统 Actor 地址** | 查询 `/actor/{address}` 时使用 32 字节公钥；可用 `node/runner` 的 `print_system_actors` 查看正确地址。 |
+| **Runner Address** | 使用 **Ethereum 风格 20 字节地址**（secp256k1 公钥经 keccak256 派生），KeyManager 持久化在 `data/runner_key.json`。（修正案 H-1：原文 Ed25519 32 字节已过时）|
+| **系统 Actor 地址** | 查询 `/actor/{address}` 时使用 20 字节 ETH 地址；可用 `node/runner` 的 `print_system_actors` 查看当前地址表。 |
 | **Job Dispatcher 存在但报未初始化** | 多为存储/读写视图不一致；确保 genesis 正确初始化并重启链。 |
 
 ---

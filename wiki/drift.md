@@ -17,9 +17,9 @@ status: authoritative
 
 ---
 
-## 当前活跃漂移（13 项，按严重性排序）
+## 当前活跃漂移（21 项，按严重性排序）
 
-### 高严重性（6）
+### 高严重性（9）
 
 | ID | 主题 | 现状 |
 |---|---|---|
@@ -29,8 +29,11 @@ status: authoritative
 | B | System Actor 地址表 0x01-0x0B | ✅ CIP-2 顶部 banner；workspace CLAUDE.md 待更新 |
 | C | Runner stake 公式（1.5× vs 10×）| ✅ CIP-2 顶部 banner |
 | E-1 | Timer 执行顺序（CIP-1 与代码相反）| ✅ CIP-1 顶部 banner |
+| H-1 | Runner 地址 20 字节 ETH（非 Ed25519 32 字节）| ✅ runner/DOCUMENTATION.md 4 处已修 |
+| H-2 | VerificationMode `HappyCase` 非法 | ✅ 4 份 runner 文档 JSON 示例已修 |
+| H-3 | MCP/Job 示例缺 mode 字段（runners/threshold/checks）| ✅ 修正案 §六·补³ 给出完整 schema |
 
-### 中严重性（7）
+### 中严重性（9）
 
 | ID | 主题 | 现状 |
 |---|---|---|
@@ -39,8 +42,18 @@ status: authoritative
 | E-2 | CIP-5 Globalbox EOB 未实现 | ✅ CIP-5 顶部 banner |
 | F | Address ETH-style 已落地 | ✅ ADDRESS_MIGRATION 提案标 ✅已实施 |
 | G-1 | Token hook 50K 为阶段 1 声明未扣费 | ✅ CIP-20 顶部 banner |
-| G-2 | Runner stake 两层门槛（10K/50K）| ✅ Entitlement 顶部 banner |
+| G-2 | Runner stake 两层门槛（10K/50K）| ✅ Entitlement 顶部 banner；DOCUMENTATION.md 3 处已修 |
+| M-1 | VerificationMode 字段级 schema 缺失 | ✅ 修正案 §六·补³ 补齐；建议回填到 DOCUMENTATION.md |
+| M-4 | CallbackInfo.actor 地址格式未声明 | ✅ 修正案说明；建议补 DOCUMENTATION.md |
 | — | workspace `/home/ubuntu/workspace/CLAUDE.md` 常量 | ⚠️ 待更新（BLOCK_* 与 System Actor 地址）|
+
+### 低严重性（3）
+
+| ID | 主题 | 现状 |
+|---|---|---|
+| L-1 | Timer 预算未在 runner 文档说明 | 修正案记录，文档中未补 |
+| L-2 | 默认端口表缺失（RPC 4000 / indexer 8080）| 修正案记录 |
+| L-3 | pvm/01 过时警告缺权威源链接 | 修正案记录 |
 
 ---
 

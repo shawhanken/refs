@@ -50,11 +50,12 @@ cargo build --release
   "reward": 100,
   "deadline": 1000,
   "verification": {
-    "runners": 1,
-    "mode": "HappyCase"
+    "mode": "none"
   }
 }
 ```
+
+> **修正案（2026-04-15 H-2/H-3）**：原文 `"mode": "HappyCase"` 在当前代码中不存在。合法值：`none` / `economicbond` / `majorityvote` / `structuredmatch` / `deterministic` / `semanticsimilarity`。多 Runner 验证模式还需 `runners` + `threshold` 字段。详见 [`refs/analysis/2026-04-15_documentation_amendments.md §六·补³`](../analysis/2026-04-15_documentation_amendments.md)。
 
 ### 获取市场分析
 
@@ -122,11 +123,12 @@ cd runner && RUST_LOG=info cargo run
   "reward": 100,
   "deadline": 1000,
   "verification": {
-    "runners": 1,
-    "mode": "HappyCase"
+    "mode": "none"
   }
 }
 ```
+
+> **修正案（2026-04-15 H-2）**：原文 `HappyCase` 已更正；见上方第一处说明。
 
 ### 3. 创建 Transaction 并提交
 

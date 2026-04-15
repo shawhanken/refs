@@ -30,10 +30,10 @@ JOB_JSON='{
   "reward": 100,
   "deadline": 1000,
   "verification": {
-    "runners": 1,
-    "mode": "HappyCase"
+    "mode": "none"
   }
 }'
+# 修正案 H-2/H-3：HappyCase 非法，见 refs/analysis/2026-04-15_documentation_amendments.md
 
 # 提交任务（需要通过 Transaction，这里只是示例格式）
 # 实际提交需要使用 CLI 工具或创建 Transaction
@@ -144,8 +144,7 @@ def submit_job(symbol, tool_name="get-crypto-price", **kwargs):
         "reward": 100,
         "deadline": 1000,
         "verification": {
-            "runners": 1,
-            "mode": "HappyCase"
+            "mode": "none"
         }
     }
     
