@@ -311,6 +311,50 @@ loop {
 
 性能开销从"每条指令一次 host 调用"降到"每千 cycles 一次 host 调用"，精度损失可控（最多超用 ~1000 cycles 才检测到 out of gas）。
 
+#### 实施进展（Phase 1 + 2a 已落地，observe-only）
+
+实施分阶段推进：
+- **Phase 1**：opcode 成本表 + Frame 循环 hook，门控 `enable_gas` 默认关 → 现网零行为变化。 8 单元测试 + 4 集成测试通过。
+- **Phase 2a**：`vm.cumulative_gas_used` 跨 frame 累加；`pvm-runtime` 暴露 `last_tx_pvm_gas()`；`pvm_executor.StateSnapshot` 新增 `pvm_per_instr_gas` 字段（仅观察，**不进 receipt、不影响共识**）；`debug!` 日志在每次 PVM 执行后自动输出 cycles vs per-instr 比值。571/571 cowboy-execution 测试通过。
+- **故意未做**：调用 `host.charge_gas` 把 per-instr 费实际扣给 `cycles_used` —— 因为 `pvm_executor.rs:215` 早就有 `enable_gas: true` 的 dead intent，一旦真正接入立刻打挂 11 个 token-hook/timer/deferred 测试，完全印证 §4.7 的预言。激活需 hard fork + 参数重标定。
+
+#### 实测数据（Phase 2a 测量工具 `measure_pvm_gas` 跑 17 个 example handler）
+
+| Handler | warm per-instr | host cycles | 比值 |
+|---|---:|---:|---:|
+| `hello.increment` | 414 | 1,000 | 0.41× |
+| `hello.get_count` | 350 | 200 | 1.75× |
+| `feed-subscriber.init` | 831 | 1,000 | 0.83× |
+| `multi_call.actor4.init` | 5,715 | 200 | 28.6× |
+| `multi_call.actor5.init` | 5,715 | 200 | 28.6× |
+| `multi_call.actor2.init` | 7,853 | 500 | 15.7× |
+| `multi_call.actor1.get_result` | 7,465 | 100 | 74.6× |
+| `multi_call.actor1.ping` | 7,890 | 500 | 15.8× |
+| `multi_call.actor3.init` | 8,822 | 500 | 17.6× |
+| `multi_call.actor1.init` | 9,156 | 500 | 18.3× |
+| `multisig-safe.get_owners` | 9,222 | 0 | — |
+| `entitlements.init` | 8,727 | 0 | — |
+
+**冷启动开销**：preamble + stdlib import 约 **1.3M cycles**，与 actor 业务无关。这意味着 CIP-3 §2.2.3 设计的"首次导入费 100 cycles"严重低估。
+
+**关键结论用于 Phase 3 重标定**：
+
+1. **比值跨度 0.41× ~ 75×+** —— 全局乘数式 recalibration 不可行，必须 per-lane / per-actor-class 测量。
+2. **真实 cowboy_sdk 类 actor 稳态 5k-10k cycles**。当前 `token_hook_max_cycles = 50,000` 留出 5x 余量 → **激活后 token hook 大概率不会被打挂**。
+3. **`TIMER_CYCLES_LIMIT = 550,000` 留出 ~50x 余量** → 激活完全安全。
+4. **`DEFERRED_CYCLES_LIMIT = 100,000` 留出 ~10x 余量** → 安全。
+5. **`hello.get_count` 比值 1.75×** —— 即使是无状态读，per-instr 也已超过 host 计费。这类 actor 激活后单笔 tx cycles_used 会翻倍。
+6. **`multi_call.actor1.get_result` 比值 75×** —— 重 dict/list 操作的 actor 激活后会增长两个数量级。BLOCK_CYCLES_TARGET 必须按 per-instr 等效值同步上调，否则用户 lane 频繁拥塞。
+
+**测量工具调用方式**：
+
+```bash
+cd pvm && cargo run --quiet --example measure_pvm_gas -p pvm-runtime -- \
+  /path/to/actor.py [handler=main] [hex_input=]
+```
+
+输出冷/暖两次 pass 各自的 cycles_used / pvm_per_instr_gas / 比值。
+
 ### 3.2 Token 只读查询费 (CIP-20)
 
 #### 当前现状
