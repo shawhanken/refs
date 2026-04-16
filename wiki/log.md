@@ -26,6 +26,28 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 
 ---
 
+## [2026-04-16] ingest | CIP-12 治理 & CIP-13 Runner Stake 委托（Draft）
+
+入库来源：
+- `refs/cips/cip-12-governance.md` — 双院治理 + Security Council + 系统 Actor 升级（Draft, 2026-04-09）
+- `refs/cips/cip-13-runner-delegation.md` — Runner Stake 委托（Draft, 2026-04-12，`Requires: CIP-12`）
+
+**新建 wiki 页**:
+- `wiki/concepts/governance.md`（status: draft）
+- `wiki/concepts/runner-delegation.md`（status: draft）
+
+**更新 wiki 页**:
+- `wiki/entities/system-actors.md` — `0x09` 扩至完整治理职能；`0x01` 增注委托扩展；`0x03` 增注分账/级联
+- `wiki/entities/runner-lifecycle.md` — 新增 Phase 1b（接受委托）；Phase 6 / Phase 7 加入委托分账与 slash 级联
+- `wiki/concepts/settlement-slashing.md` — 新增委托扩展小节；相关页链接到 runner-delegation / governance
+- `wiki/parameters.md` — 新增 CIP-12 治理参数段、CIP-13 委托参数段，均标明 Draft 未实装
+- `wiki/drift.md` — 追加高严 **I-1**（CIP-13 opcode 40–44 与现有 SystemInstruction 40–43 冲突）、低严 **L-4**（CIP-12 `SystemActorUpgrade` 负载与现 opcode 43 `UpgradeActor` 关系未明）
+- `wiki/index.md` — 列入 2 个新概念页
+
+**权威层级标注**：两份 CIP 均为 Draft，协议尚未实装；wiki 新页 `status: draft`，参数段显式标"尚未实装"；代码侧 `0x09` 当前仅承载 `SettlementConfig`。
+
+---
+
 ## [2026-04-15] lint | 全文档-代码漂移审计（第 2 轮）
 
 范围：`refs/runner/`、`refs/pvm/`、`refs/chain/`、`refs/node/` 等 raw 文档对照 workspace `node/` 与 `runner/` 代码。

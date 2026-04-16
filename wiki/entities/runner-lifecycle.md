@@ -1,14 +1,15 @@
 ---
 type: entity
-tags: [runner, lifecycle, cip-2]
+tags: [runner, lifecycle, cip-2, cip-13]
 sources:
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-13-runner-delegation.md
   - refs/runner/2026-01-27_NODE_ACTOR_RUNNER_FLOW.md
   - refs/runner/2026-01-27_README_CN.md
   - refs/runner/2026-02-05_DOCUMENTATION.md
   - refs/runner/2026-03-03_Entitlement.md
   - refs/runner/2026-03-05_deterministic_runner_selection.md
-last_updated: 2026-04-15
+last_updated: 2026-04-16
 status: authoritative
 ---
 
@@ -30,6 +31,15 @@ runner register --stake <N CBY> --verification-modes [None|MajorityVote|...]
 - Runner 在 `RateCard` 声明支持的执行类型（LLM / HTTP / MCP）、单位成本
 
 **所在地**: System Actor `0x01`（RUNNER_REGISTRY），见 [[system-actors]]
+
+### 阶段 1b（可选，CIP-13 Draft）：接受委托
+
+Runner 可通过 `RunnerUpdateDelegationConfig` 打开 `DelegationConfig { accept_delegation, commission_bps, max_delegated_stake, min_delegation }`。打开后：
+
+- **有效质押** = 自质押 + 委托 Active 总额；VRF 权重与最大 Job 价值均基于此
+- **自质押下限** = `max(10,000 CBY, effective_stake × MIN_SELF_BOND_BPS / 10000)`（默认 10%）
+- Commission 改动下一 epoch 生效；其他字段立即生效
+- 详见 [[../concepts/runner-delegation]]
 
 ---
 
@@ -82,8 +92,9 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - `SettlementConfig` 由 `0x09`（GOVERNANCE）存 `{runner_percent, burn_percent, treasury_percent}`
 - 分成：runner 得报酬、burn 销毁、treasury 入国库
 - 默认值由 `UpdateSettlementConfig`（opcode 40）变更，仅 `0x09` 有权
+- **若接受委托（CIP-13 Draft）**：`per_runner_share` 按 `delegator_pool = share × total_active / effective_stake` 拆分，扣 `commission_bps` 后按 Tranche `amount` 比例发给各 Delegator；发事件 `JobSettled` + `DelegatorPayout`（≥20 delegator 时批发）
 
-详见 [[../concepts/settlement-slashing]]。
+详见 [[../concepts/settlement-slashing]] 与 [[../concepts/runner-delegation]]。
 
 ---
 
@@ -99,6 +110,7 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - 50% 入 TREASURY（0x08），50% burn
 - 若 stake 降至 `MIN_STAKE` 以下 → 设 `reputation = 0`（冻结接单）
 - `slash_runner()` in `node/execution/src/runner/verifier.rs`
+- **若接受委托（CIP-13 Draft）**：Slash 按 `self_stake + Σ slashable_tranches` 比例分摊；自质押不受封顶，Delegator 侧受 `MAX_DELEGATION_SLASH_PER_EPOCH_BPS`（默认 500 bps）per-epoch 限制；**Unbonding 中但 `now < claimable_at` 的 Tranche 仍可 slash**（防 slash-and-run）
 
 ---
 
@@ -107,10 +119,12 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - [[../concepts/vrf-runner-selection]]
 - [[../concepts/runner-verification]]
 - [[../concepts/settlement-slashing]]
+- [[../concepts/runner-delegation]] — CIP-13 Stake 委托（Draft）
 - [[../parameters]] — 所有具体常量
 
 ## Sources
 - `refs/cips/cip-2-offchain-compute.mdx` — 框架规范（2026-03-09 修订版）
+- `refs/cips/cip-13-runner-delegation.md` — Stake 委托规范（Draft, 2026-04-12）
 - `refs/runner/2026-01-27_NODE_ACTOR_RUNNER_FLOW.md` — 流程图
 - `refs/runner/2026-02-05_DOCUMENTATION.md` — 实现详述
 - `refs/runner/2026-03-05_deterministic_runner_selection.md` — 选择算法

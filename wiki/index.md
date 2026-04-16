@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-04-15
+**最后更新**: 2026-04-16
 
 ---
 
@@ -40,6 +40,8 @@
 | [runner-verification.md](concepts/runner-verification.md) | 6 种 VerificationMode、结算与仲裁窗口 |
 | [settlement-slashing.md](concepts/settlement-slashing.md) | SettlementConfig 分成、Slashing 50/50 规则 |
 | [vrf-runner-selection.md](concepts/vrf-runner-selection.md) | Fisher-Yates VRF + stake-weighted sortition 算法 |
+| [governance.md](concepts/governance.md) 🆕 | CIP-12 双院治理、Tier 0-4 提案、Security Council、系统 Actor 升级（Draft）|
+| [runner-delegation.md](concepts/runner-delegation.md) 🆕 | CIP-13 Runner Stake 委托：Tranche、分账、slash 级联、懒惰解绑（Draft）|
 
 ---
 
@@ -61,7 +63,7 @@
 按主题指向 raw 目录（`refs/wiki/` 外的原始文档）：
 
 - [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）
-- [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-22）
+- [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-22，含 CIP-12 / CIP-13 Draft）
 - [`refs/analysis/`](../analysis/) — 分析、会议、**修正案**（`2026-04-15_documentation_amendments.md` 为权威）
 - [`refs/economics/`](../economics/) — 费用模型、Basefee、Tokenomics
 - [`refs/node/`](../node/) — 节点专题

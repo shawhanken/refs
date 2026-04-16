@@ -3,7 +3,8 @@ type: comparison
 tags: [drift, consistency, audit]
 sources:
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-04-15
+  - refs/cips/cip-13-runner-delegation.md
+last_updated: 2026-04-16
 status: authoritative
 ---
 
@@ -19,7 +20,7 @@ status: authoritative
 
 ## 当前活跃漂移（21 项，按严重性排序）
 
-### 高严重性（9）
+### 高严重性（10）
 
 | ID | 主题 | 现状 |
 |---|---|---|
@@ -32,6 +33,7 @@ status: authoritative
 | H-1 | Runner 地址 20 字节 ETH（非 Ed25519 32 字节）| ✅ runner/DOCUMENTATION.md 4 处已修 |
 | H-2 | VerificationMode `HappyCase` 非法 | ✅ 4 份 runner 文档 JSON 示例已修 |
 | H-3 | MCP/Job 示例缺 mode 字段（runners/threshold/checks）| ✅ 修正案 §六·补³ 给出完整 schema |
+| **I-1** | **CIP-13 opcode 40–44 与现有 40 `UpdateSettlementConfig` / 41 `FundActor` / 42 `KeyDelivery` / 43 `UpgradeActor` 冲突** | ⚠️ **CIP-13 Draft 内含 TODO**；实现前必须重排（建议 44–48 或下一空段）。源：`node/types/src/execution.rs:1281-1294` |
 
 ### 中严重性（9）
 
@@ -47,13 +49,14 @@ status: authoritative
 | M-4 | CallbackInfo.actor 地址格式未声明 | ✅ 修正案说明；建议补 DOCUMENTATION.md |
 | — | workspace `/home/ubuntu/workspace/CLAUDE.md` 常量 | ⚠️ 待更新（BLOCK_* 与 System Actor 地址）|
 
-### 低严重性（3）
+### 低严重性（4）
 
 | ID | 主题 | 现状 |
 |---|---|---|
 | L-1 | Timer 预算未在 runner 文档说明 | 修正案记录，文档中未补 |
 | L-2 | 默认端口表缺失（RPC 4000 / indexer 8080）| 修正案记录 |
 | L-3 | pvm/01 过时警告缺权威源链接 | 修正案记录 |
+| **L-4** | **CIP-12 `SystemActorUpgrade` Payload（Tier 3）与现有 opcode 43 `UpgradeActor` 的关系未明确**：前者是治理负载，后者是已有 SystemInstruction，CIP-12 未说明合并/废弃。 | ⚠️ 实现阶段裁决 |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 type: parameter
-tags: [constants, authoritative, cip-3]
+tags: [constants, authoritative, cip-3, cip-12, cip-13]
 sources:
   - node/types/src/constants.rs
   - node/execution/src/basefee.rs
@@ -8,7 +8,9 @@ sources:
   - refs/analysis/2026-04-15_documentation_amendments.md
   - refs/cips/cip-3-fee-model.mdx
   - refs/cips/cip-2-offchain-compute.mdx
-last_updated: 2026-04-15
+  - refs/cips/cip-12-governance.md
+  - refs/cips/cip-13-runner-delegation.md
+last_updated: 2026-04-16
 status: authoritative
 ---
 
@@ -128,5 +130,52 @@ status: authoritative
 
 ---
 
+## 治理（CIP-12 Draft，尚未实装）
+
+均为初始默认值，全部可由 Tier 4 调整。
+
+| 参数 | 默认 |
+|---|---|
+| Tier 0 押金 / Temp / Voting / Quorum / Approval / Val / Timelock | 1K CBY / 3d / 5d / 5% / >50% / >50% / 3d |
+| Tier 1 | 5K / 3d / 5d / 10% / >50% / >50% / 5d |
+| Tier 2 | 5K / 5d / 7d / 15% / >55% / >50% / 7d |
+| Tier 3（系统 Actor 升级）| 25K / 7d / 7d / 15% / >60% / >50% / 7d + Fast-track |
+| Tier 4（宪法）| 100K / 14d / 14d / 20% / >66% / >66% / 14d |
+| Temp check 最小参与 / 通过率 | 1% of active stake / 33% |
+| Voting 最小参与（extend 触发）| Validator 60% / Stake 为 quorum × 60% |
+| `voting_extension_blocks` / `max_voting_extensions` | 1 天 / 3 |
+| `max_system_actor_bytecode_size` | 512 KiB |
+| Rollback window 下限 | 7 天 |
+| Circuit-Break 初始期限 / Tier 3 续期 | 7 天 / 30 天 × cap 3 次（≈90d）→ 后续须 Tier 4 |
+| Cancellation 审查窗口 / 阈值 | 90 天 / 3 次 |
+| `execution_retry_blocks` | 1 天 |
+
+**源**: `refs/cips/cip-12-governance.md` §5.2 / §6.5 / §7。
+
+---
+
+## Runner Stake 委托（CIP-13 Draft，尚未实装）
+
+均为 CIP-12 Tier 0 可调。
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `UNBONDING_BLOCKS` | 7,200（≈24h）| 解绑冷却 |
+| `DELEGATION_COOLDOWN_BLOCKS` | 600（≈2h）| `RunnerUpdateDelegationConfig` 节流 |
+| `MIN_SELF_BOND_BPS` | 1,000（10%）| Runner 自质押占 effective_stake 下限 |
+| `MAX_DELEGATORS_PER_RUNNER` | 200 | Runner 扇入上限 |
+| `MAX_ACTIVE_TRANCHES_PER_DELEGATOR` | 8 | 单 delegator 对单 runner 的 Active Tranche 上限 |
+| `MIN_DELEGATION_AMOUNT` | 1,000 CBY | 协议 floor |
+| `CLAIM_MAX_TRANCHES` | 32 | 单次 claim Tranche 数上限 |
+| `MAX_DELEGATION_SLASH_PER_EPOCH_BPS` | 500（5%）| Delegator 侧 slash 封顶 |
+| `MIN_COMMISSION_BPS` / `MAX_COMMISSION_BPS` | 500 / 10000 | Commission 上下限 |
+| `DELEGATION_EVENT_BATCH_THRESHOLD` | 20 | `DelegatorPayout` 批发阈值 |
+| 草案 opcode | 40–44 | ⚠️ **与现有 40–43 冲突**；见 [[drift]] |
+
+**源**: `refs/cips/cip-13-runner-delegation.md` §4 / §3.3。
+
+---
+
 ## 变更记录
+- **2026-04-16** 纳入 CIP-12 / CIP-13（Draft）参数段，标明尚未实装；opcode 冲突标注至 drift。
 - **2026-04-15** 建立本表，以代码/修正案为权威基线。

@@ -1,11 +1,12 @@
 ---
 type: concept
-tags: [settlement, slashing, governance, economics]
+tags: [settlement, slashing, governance, economics, cip-13]
 sources:
   - node/execution/src/runner/verifier.rs
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-13-runner-delegation.md
   - refs/economics/2026-04-13_fee-audit-report.md
-last_updated: 2026-04-15
+last_updated: 2026-04-16
 status: authoritative
 ---
 
@@ -69,9 +70,21 @@ SettlementConfig {
 
 ---
 
+## 委托扩展（CIP-13 Draft）
+
+若 Runner 打开 `DelegationConfig` 接受委托，结算与 slash 多一层分账：
+
+- **Settlement**：每 Runner 的份额先按 `delegator_pool = share × total_active / (self + total_active)` 切出，扣 `commission_bps` 后按 Active Tranche `amount` 比例分给 delegator。舍入余数归 Runner（runner/delegator 界）与最小 `tranche_id`（tranche 界）。
+- **Slashing**：基底 = `self_stake + Σ slashable_tranches`，其中 slashable 包含 Active 与 `now < claimable_at` 的 Unbonding Tranche。自质押不受封顶；Delegator 侧受 `MAX_DELEGATION_SLASH_PER_EPOCH_BPS`（默认 500 bps）per-epoch 限制；超出差额不跨 epoch 延迟（emit `DelegationSlashCapped`）。50/50 treasury/burn 路由不变。
+- 详见 [[runner-delegation]]。
+
+---
+
 ## 相关
 - [[../entities/system-actors]] — 0x03 / 0x08 / 0x09
 - [[../entities/runner-lifecycle]] — Phase 6-7
 - [[runner-verification]] — 触发 slashing 的场景
+- [[runner-delegation]] — 委托分账与 slash 级联（Draft）
+- [[governance]] — `SettlementConfig` 与 `0x09` 的完整规范（Draft）
 - [[dual-gas-model]] — Tip 源于双 gas 计费
 - [[../parameters]] — DISPUTE_WINDOW_BLOCKS

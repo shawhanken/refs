@@ -4,8 +4,9 @@ tags: [system-actors, addresses, authoritative]
 sources:
   - node/runner/src/system_actors.rs
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-12-governance.md
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-04-15
+last_updated: 2026-04-16
 status: authoritative
 ---
 
@@ -41,6 +42,7 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 - 接受 `runner register` 交易，检查 `stake >= 10,000 CBY`（注册 floor）
 - 维护 `VerificationMode` 声明、`RateCard`（计费）
 - 心跳与下线标记
+- **规范扩展（CIP-13, Draft）**：承载 Stake 委托（`DelegationConfig` / `DelegationTranche` / `DelegationTotals` 等存储键族）。详见 [[../concepts/runner-delegation]]。
 
 ### Job Dispatcher（0x02）
 - 客户 `submit_job` → 托管 bond → VRF + stake-weighted sortition（Fisher-Yates）选 Runner
@@ -52,6 +54,7 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 - 按 Job 声明的 VerificationMode 验证（[[../concepts/runner-verification]]）
 - 结算分成（runner / burn / treasury，见 [[../concepts/settlement-slashing]]）
 - Dispute 窗口后才执行 slashing
+- **规范扩展（CIP-13, Draft）**：若 Runner 接受委托，`per_runner_share` 再按 `delegator_pool / runner_commission` 拆分到 Active Tranche；`slash_runner()` 级联到 Tranche（per-epoch cap）。见 [[../concepts/runner-delegation]]。
 
 ### Dual Basefee（0x06）
 - 持久化 `basefee_cycles`、`basefee_cells` 随每块更新
@@ -64,8 +67,8 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 - 见 `refs/runner/2026-03-03_Entitlement.md`
 
 ### Governance（0x09）
-- 存储 `SettlementConfig { runner_percent, burn_percent, treasury_percent }` 于 key `system:settlement_config`
-- 唯一有权 emit `UpdateSettlementConfig`（opcode 40）
+- **当前实装**：存储 `SettlementConfig { runner_percent, burn_percent, treasury_percent }` 于 key `system:settlement_config`；唯一有权 emit `UpdateSettlementConfig`（opcode 40）
+- **规范（CIP-12, Draft）**：完整治理 Actor，承载双院投票、Tier 0–4 提案、Temp check、Security Council Cancel/Fast-Track/Circuit-Break、系统 Actor 字节码升级。自身升级必须走 Tier 4 `MetaGovernance { UpgradeGovernance }`；**不可 pause**（会死锁治理）。详见 [[../concepts/governance]]。
 
 ---
 
@@ -84,4 +87,6 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 - `refs/cips/cip-2-offchain-compute.mdx` — Runner 系统规范
 - `refs/cips/cip-3-fee-model.mdx` — Basefee actor
 - `refs/cips/cip-9-runner-storage.md` — Storage manager
+- `refs/cips/cip-12-governance.md` — `0x09` 完整治理规范（Draft）
+- `refs/cips/cip-13-runner-delegation.md` — `0x01` 委托扩展（Draft）
 - `refs/runner/2026-03-03_Entitlement.md` — Entitlement 设计
