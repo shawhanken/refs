@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "wiki/parameters.md",
+                "file": "wiki/concepts/runner-delegation.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "parameters"
+              "title": "runner-delegation"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "wiki/parameters.md",
+                "file": "wiki/concepts/runner-delegation.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "parameters 的反向链接列表"
+              "title": "runner-delegation 的反向链接列表"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "wiki/parameters.md",
+                "file": "wiki/concepts/runner-delegation.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "parameters 的出链列表"
+              "title": "runner-delegation 的出链列表"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "wiki/parameters.md",
+                "file": "wiki/concepts/runner-delegation.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "parameters 的大纲"
+              "title": "runner-delegation 的大纲"
             }
           }
         ]
@@ -185,11 +185,21 @@
   },
   "active": "0d7064b5bfd3dee3",
   "lastOpenFiles": [
-    "plans/runner-economics-and-delegation(CIP13).md",
+    "wiki/parameters.md",
+    "wiki/concepts/governance.md",
+    "wiki/concepts/runner-delegation.md",
+    "wiki/concepts/runner-verification.md",
+    "wiki/concepts/continuation.md",
+    "wiki/concepts/basefee.md",
     "wiki/concepts/actor-model.md",
+    "wiki/concepts/vrf-runner-selection.md",
+    "wiki/concepts/timer-mechanism.md",
+    "wiki/concepts/speculative-execution.md",
+    "wiki/concepts/settlement-slashing.md",
+    "plans/runner-economics-and-delegation-cip13.md",
+    "plans/runner-economics-and-delegation(CIP13).md",
     "plans/governance-7phase-roadmap.md",
     "plans/basefee-constants-lower.md",
-    "wiki/concepts/settlement-slashing.md",
     "wiki/entities/plans-inventory.md",
     "plans/transfer-lifecycle-profiling.md",
     "plans/wallet-ui-dark-theme.md",
@@ -201,16 +211,6 @@
     "plans/receipt-pruning-periodic.md",
     "plans/pvm-structured-errors.md",
     "plans/pvm-bytecode-gas-feasibility.md",
-    "plans/node-readme-update-plan.md",
-    "plans/github-issues-batch-plan.md",
-    "plans/economics-remaining-gaps.md",
-    "plans/economics-completion-assessment.md",
-    "plans/economics-alignment-plan.md",
-    "plans/block-time-change-scope.md",
-    "plans/block-time-500ms-to-1000ms.md",
-    "plans/bench-flood-errors-diagnostics.md",
-    "plans/bench-basefee-tracking.md",
-    "plans/basefee-eip1559-systematic-fix.md",
     "plans"
   ]
 }
