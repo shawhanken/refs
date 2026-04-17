@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "wiki/concepts/runner-delegation.md",
+                "file": "wiki/concepts/actor-model.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "runner-delegation"
+              "title": "actor-model"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "wiki/concepts/runner-delegation.md",
+                "file": "wiki/concepts/actor-model.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "runner-delegation 的反向链接列表"
+              "title": "actor-model 的反向链接列表"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "wiki/concepts/runner-delegation.md",
+                "file": "wiki/concepts/actor-model.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "runner-delegation 的出链列表"
+              "title": "actor-model 的出链列表"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "wiki/concepts/runner-delegation.md",
+                "file": "wiki/concepts/actor-model.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "runner-delegation 的大纲"
+              "title": "actor-model 的大纲"
             }
           }
         ]
@@ -185,9 +185,9 @@
   },
   "active": "0d7064b5bfd3dee3",
   "lastOpenFiles": [
+    "wiki/concepts/runner-delegation.md",
     "wiki/parameters.md",
     "wiki/concepts/governance.md",
-    "wiki/concepts/runner-delegation.md",
     "wiki/concepts/runner-verification.md",
     "wiki/concepts/continuation.md",
     "wiki/concepts/basefee.md",
