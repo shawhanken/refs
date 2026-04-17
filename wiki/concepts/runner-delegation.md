@@ -4,10 +4,11 @@ tags: [runner, delegation, staking, cip-13, draft]
 sources:
   - refs/cips/cip-13-runner-delegation.md
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/plans/runner-economics-and-delegation-cip13.md
   - node/runner/src/system_actors.rs
   - node/execution/src/runner/dispatcher.rs
   - node/execution/src/runner/verifier.rs
-last_updated: 2026-04-16
+last_updated: 2026-04-17
 status: draft
 ---
 
@@ -16,6 +17,8 @@ status: draft
 CBY 持有人可将代币**锁定委托**给某 Runner，提升其有效质押（VRF 权重与最大 Job 价值），换取 Runner 配置的 89% 结算分成的一部分。协议只实现**最小 hook**（注册、分账、slash 级联、解绑）；流动性质押池、收益代币、舰队管理金库等由三方 Actor 在此之上构建。
 
 **状态**：CIP-13 为 Draft（2026-04-12 创建），`Requires: CIP-12`；本页随之为 draft；协议尚未实现。opcode 40–44 与现有 SystemInstruction 40–43 **冲突**（CIP-13 中有 TODO）。
+
+**配套设计指南**：`refs/plans/runner-economics-and-delegation-cip13.md` 提供了超出 CIP-13 文本的**框架性解读**（见 §"核心框架：Compute as a Segmented Yield Primitive"）。
 
 ---
 
@@ -28,6 +31,40 @@ CBY 持有人可将代币**锁定委托**给某 Runner，提升其有效质押�
 | Ethereum | Validator 委托 / beacon rewards | Lido、Rocket Pool、Pendle、EigenLayer |
 | Solana | Validator 委托 / stake accounts | Jito、Marinade、Sanctum |
 | Cowboy（CIP-13）| Runner 委托 / 分账 | 液态质押池、stCBY、收益产品 |
+
+---
+
+## 核心框架：Compute as a Segmented Yield Primitive
+
+来源：`refs/plans/runner-economics-and-delegation-cip13.md` §"核心亮点"。
+
+Cowboy 的 Runner 委托**不是**"选个同质化验证者分红"的 PoS 式设计：
+
+- **Runner 异构**：不同硬件（GPU 型号）、能力（TEE / MCP）、支持模型（Llama-405B vs GPT-4o），均由 **Entitlement** 声明
+- **委托 = 下注计算细分市场需求曲线**：Runner A（TEE + H100 + Llama-405B）与 Runner B（CPU-only 通用计算）的收益率由完全不同的需求端驱动；委托者的选择不是"谁佣金低"，而是"哪个计算细分市场有持续需求"
+- **上层可按 entitlement class 构建分池液态质押、compute index、forward、ETF**—— 协议不实现，仅提供**结构化事件底座**（`JobSettled` + `DelegatorPayout`）作为 indexer 输入
+
+### 两种 Tip 辨析（容易混淆）
+
+| Tip 类型 | 出处 | 流向 |
+|---|---|---|
+| **链上交易 tip** | `Transaction.max_priority_fee_per_*` → `compute_tx_fees` | Block proposer / validator |
+| **Job tip** | `JobSpec.tip` → `verifier.rs:349` `total_settlement` | 共识 runner（按 89/10/1 分账）|
+
+提交一笔 job 的链上交易，submitter 既付 basefee（burn）+ priority fee（→ proposer），又在 JobSpec 里设 `max_price + tip`（→ runners）。两条独立支付通路。
+
+### 双重通缩特性
+
+一次 Job 提交对 CBY 产生两次通缩压力：
+
+- 链上交易付的 basefee → 100% burn（EIP-1559 标准）
+- Job settlement 的 **10% → burn**（按 89/10/1 分账规则）
+
+高频 compute 经济天然 deflationary —— 与 PoS 链通胀模型的本质差异。
+
+### Liveness 是隐式工作量
+
+Runner 闲置持有成本为正（质押锁定 + 硬件折旧）；协议不发出块奖励（无通胀奖励），机会成本自然驱动资本流向真实需求。心跳 / 信誉机制具体见 [[../entities/runner-lifecycle]]。
 
 ---
 
@@ -233,6 +270,7 @@ CIP-12 §6.2 定义 Stake 院权重为**质押给 Validator 的 CBY**。Runner �
 
 - `refs/cips/cip-13-runner-delegation.md` — 全文规范（Draft, 2026-04-12）
 - `refs/cips/cip-2-offchain-compute.mdx` — 当前 Runner 框架与自质押基线
+- `refs/plans/runner-economics-and-delegation-cip13.md` — 配套设计指南（"Compute as Segmented Yield Primitive"、两种 tip 辨析、双重通缩、架构总览图）
 - `node/runner/src/system_actors.rs:13-21` — `0x01`–`0x05` 地址
 - `node/execution/src/runner/{registry,dispatcher,verifier}.rs` — 实装位置（需改动）
 - `node/types/src/execution.rs:1281-1294` — opcode 40–43 现有占用

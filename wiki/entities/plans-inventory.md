@@ -19,13 +19,14 @@ status: authoritative
 
 ---
 
-## 经济 / 费用 / Basefee（6）
+## 经济 / 费用 / Basefee（7）
 
 | 文件 | 标题 | 摘要 |
 |---|---|---|
 | [economics-alignment-plan](../../plans/economics-alignment-plan.md) | 经济系统对齐评估与修复计划 | 以 WP §17 + CIP-3 为最高权威，对代码做分级偏差评估 |
 | [economics-completion-assessment](../../plans/economics-completion-assessment.md) | 经济系统真实完成度评估报告（2026-03-28） | CIP-3 / 双 gas / basefee / Lane 分区 / token / slashing 子系统完成度打分 |
 | [economics-remaining-gaps](../../plans/economics-remaining-gaps.md) | 经济系统剩余缺口修复（econ-gaps） | `dispute_window_blocks` 常量化、Runner 质押 slash、1.5× stake 动态检查 |
+| [runner-economics-and-delegation-cip13](../../plans/runner-economics-and-delegation-cip13.md) 🆕 | Runner Economics & Delegation — Design Guide | CIP-13 配套设计指南：Compute as Segmented Yield、89/10/1 分账、双类型 tip 辨析、双重通缩、tranche 模型、slash 级联 |
 | [basefee-eip1559-systematic-fix](../../plans/basefee-eip1559-systematic-fix.md) | EIP-1559 Basefee 系统化修复方案 | 2026-04-11 bench 暴露 basefee 失效，四根因整合修复（目标 2000 TPS）|
 | [basefee-constants-lower](../../plans/basefee-constants-lower.md) | 降低 basefee 常量修复高额 transfer 费用 | `MIN_BASEFEE` / `INITIAL_*_BASEFEE` 对齐 9 位小数精度，降 100× |
 | [pvm-bytecode-gas-feasibility](../../plans/pvm-bytecode-gas-feasibility.md) | 评估实施 CIP-3 §2.2.1 逐字节码 gas 的可行性 | 细粒度 PVM 字节码计费的波及面与独立性评估（非实施计划）|
@@ -88,6 +89,7 @@ status: authoritative
 - **kebab-case.md**，全英文
 - **前缀即主题域**：`economics-*` / `basefee-*` / `tps-*` / `block-time-*` / `bench-*` / `wallet-*` / `pvm-*` / `runner-*` / `node-*` / `validator-*` / `governance-*` / `receipt-*` / `transfer-*` / `github-*`
 - **名称表意**，方便在 grep / CLI / 引用中一眼识别
+- **CIP 关联**：若计划紧跟某 CIP，用 `-cipNN` 后缀（如 `runner-economics-and-delegation-cip13.md`）
 
 ## 使用指引
 
@@ -103,4 +105,4 @@ status: authoritative
 
 ## Sources
 
-- `refs/plans/` 目录下 22 份 markdown 文件（2026-04-17 盘点 + 重命名）
+- `refs/plans/` 目录下 23 份 markdown 文件（2026-04-17 盘点 + 统一 kebab-case 重命名；新增 `runner-economics-and-delegation-cip13.md` 设计指南）

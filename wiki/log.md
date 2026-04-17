@@ -131,3 +131,28 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 - `plans/` 目录仍未进 git（首次加入时将直接以新名入库，旧名不留痕）
 
 ---
+
+## [2026-04-17] ingest | `refs/plans/runner-economics-and-delegation-cip13.md`（CIP-13 设计指南）
+
+新增单份设计指南，内容上是 CIP-13 的**框架性解读 + 超越规范文本的经济学框架**。明确自标"设计文档，非完整实现方案"。
+
+**超越 CIP-13 的新内容**：
+- "Compute as a Segmented Yield Primitive" —— 委托不是同质化节点分红，而是下注 entitlement class 划分的计算细分市场需求曲线
+- `JobSettled` + `DelegatorPayout` 结构化事件作为上层 compute index / forward / ETF 的 indexer 输入底座
+- 两种 tip 辨析（`Transaction.max_priority_fee_*` → proposer vs `JobSpec.tip` → runners）
+- 双重通缩：basefee burn + settlement 10% burn
+- 架构总览（全链路 ASCII 图）
+- 与 Optimistic Rollup / zkVM 的范式对比
+
+**更新 wiki 页**:
+- `wiki/concepts/runner-delegation.md` —— 新增 §"核心框架：Compute as a Segmented Yield Primitive" 章节；frontmatter 追加 plan 作为 source；Sources 段补充；`last_updated → 2026-04-17`
+- `wiki/entities/plans-inventory.md` —— 经济分组从 6 项增至 7 项，列入此 plan；Sources 段更新为 23 份；命名约定段追加 ⚠️ 例外（括号不符 kebab-case，建议改为 `runner-economics-and-delegation-cip13.md`）
+
+**未触发**:
+- 未改 `drift.md`（此 plan 本身不带新漂移；既有 I-1 / L-4 仍为准）
+- 未改 `parameters.md`（plan 列的默认值均与 CIP-13 §4 一致，已在参数表中）
+- 未改 `settlement-slashing.md` / `runner-lifecycle.md`（plan 的分账与 slash 叙述是重述 CIP-13，已在 runner-delegation 概念页承接）
+
+**命名修正**：原始上传文件名 `runner-economics-and-delegation(CIP13).md` 含括号，已同日改为 `runner-economics-and-delegation-cip13.md` 以对齐 kebab-case 约定；`plans-inventory.md` 命名约定段补充 `-cipNN` 后缀惯例。
+
+---
