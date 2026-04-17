@@ -72,3 +72,62 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 - Job Type（LLM/HTTP/MCP/Custom）枚举
 
 ---
+
+## [2026-04-17] ingest | `refs/plans/` 工程实施计划目录（22 份）
+
+新增 raw 数据源目录 `refs/plans/`，含 22 份工程计划 / 评估 / 路径图文件（cute-name slug 命名，如 `ancient-enchanting-marble.md`）。内容主题覆盖经济/basefee、TPS/出块、receipt pruning、validator 10100 停滞、PVM 错误、钱包 UI + Passkey、社区治理、bench 观测、文档/测试/Issue 批量治理。
+
+**性质判定**：计划文件属"其它 raw"，**非规范性**；权威顺序仍是 代码 > 修正案 > CIP > 白皮书 > 其它。
+
+**新建 wiki 页**:
+- `wiki/entities/plans-inventory.md`（status: authoritative）—— slug → 标题/主题/摘要映射；按 8 个主题分组：经济(6) / 性能(6) / 可靠性(1) / Bench(2) / PVM(1) / 钱包(2) / 治理(1) / 文档-测试-待办(3)
+
+**更新 wiki 页**:
+- `wiki/AGENTS.md` —— "三层架构 §1 Raw sources" 列入 `refs/plans/`；权威顺序段补注"引用计划须标明状态"
+- `wiki/index.md` —— `entities/` 段加入 `plans-inventory.md`；"Raw Sources 快速链接"段加入 `refs/plans/`；顶部 `最后更新` → 2026-04-17
+
+**未触发**:
+- 未新增 drift 条目（计划本身不等于漂移；计划已记录的代码-文档不一致若未在 `drift.md`，需人类后续触发定向审计）
+- 未修改 `parameters.md`（计划中出现的数值均为提案态，未进入权威参数表）
+- 未修改现有 concept 页（计划中引用的概念均已有页；不重复综合）
+
+---
+
+## [2026-04-17] maintenance | `refs/plans/` 文件重命名（cute-slug → 语义 kebab-case）
+
+22 个计划文件从 cute-name slug（如 `ancient-enchanting-marble.md`、`moonlit-gathering-locket.md`）统一改为语义化 kebab-case。
+
+**命名前缀**（按主题域）: `economics-*` / `basefee-*` / `tps-*` / `block-time-*` / `bench-*` / `wallet-*` / `pvm-*` / `runner-*` / `node-*` / `validator-*` / `governance-*` / `receipt-*` / `transfer-*` / `github-*`。
+
+**对照表**（便于历史追溯）:
+
+| 旧 slug | 新命名 |
+|---|---|
+| ancient-enchanting-marble | runner-test-coverage-plan |
+| distributed-floating-simon | node-readme-update-plan |
+| encapsulated-leaping-cloud | receipt-pruning-periodic |
+| enchanted-sparking-dolphin | wallet-ui-dark-theme |
+| flickering-wishing-riddle | tps-improvement-roadmap |
+| glimmering-hugging-rossum | economics-alignment-plan |
+| glimmering-swinging-lark | validator-10100-stall-fix |
+| graceful-hugging-aho | pvm-structured-errors |
+| graceful-tickling-stonebraker | wallet-passkey-protection |
+| hazy-inventing-locket | bench-basefee-tracking |
+| inherited-jingling-emerson | economics-remaining-gaps |
+| keen-cuddling-twilight | pvm-bytecode-gas-feasibility |
+| linear-fluttering-moonbeam | bench-flood-errors-diagnostics |
+| misty-sleeping-music | basefee-constants-lower |
+| moonlit-gathering-locket | governance-7phase-roadmap |
+| purring-splashing-globe | economics-completion-assessment |
+| rustling-mapping-sundae | basefee-eip1559-systematic-fix |
+| serene-nibbling-toucan | block-time-500ms-to-1000ms |
+| sharded-toasting-aurora | tps-avg-throughput-improvement |
+| synchronous-orbiting-backus | block-time-change-scope |
+| ticklish-dancing-lecun | transfer-lifecycle-profiling |
+| twinkling-strolling-token | github-issues-batch-plan |
+
+**连带更新**:
+- `wiki/entities/plans-inventory.md` —— 全部链接与命名约定段更新
+- `plans/` 目录仍未进 git（首次加入时将直接以新名入库，旧名不留痕）
+
+---

@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-04-16
+**最后更新**: 2026-04-17
 
 ---
 
@@ -55,6 +55,7 @@
 | [runner-lifecycle.md](entities/runner-lifecycle.md) | Runner 从 register → 接单 → 结算 → 可能 slash 的全流程 |
 | [pvm.md](entities/pvm.md) | Python VM：API、确定性约束、Checkpoint、黑名单 |
 | [node.md](entities/node.md) | 主链节点：chain/execution/storage/types/rpc 架构 |
+| [plans-inventory.md](entities/plans-inventory.md) 🆕 | `refs/plans/` 22 份工程实施计划清单（按主题分组、slug → 标题映射）|
 
 ---
 
@@ -65,6 +66,7 @@
 - [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）
 - [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-22，含 CIP-12 / CIP-13 Draft）
 - [`refs/analysis/`](../analysis/) — 分析、会议、**修正案**（`2026-04-15_documentation_amendments.md` 为权威）
+- [`refs/plans/`](../plans/) — 工程实施计划 / 评估（22 份，详见 [entities/plans-inventory.md](entities/plans-inventory.md)）
 - [`refs/economics/`](../economics/) — 费用模型、Basefee、Tokenomics
 - [`refs/node/`](../node/) — 节点专题
 - [`refs/pvm/`](../pvm/) — PVM 专题

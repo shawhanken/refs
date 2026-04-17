@@ -12,6 +12,7 @@
    - `refs/node/`、`refs/pvm/`、`refs/runner/`、`refs/chain/` — 各子系统历史与综合文档
    - `refs/economics/`、`refs/devex/`、`refs/common/` — 专题文档
    - `refs/analysis/` — 跨主题分析、修正案、会议纪要
+   - `refs/plans/` — 工程实施计划 / 评估 / 路径图（随机 slug 命名；见 `wiki/entities/plans-inventory.md`）
    - `refs/_archive_/` — 归档（只读、不参与一致性检查）
    - 代码（真正权威）位于 workspace `node/`、`runner/`、`steamtrain/` workspace
 
@@ -61,6 +62,7 @@ status: authoritative | draft | stale
 - 代码引用使用 `path/to/file.rs:LINE` 格式
 - wiki 内交叉引用写相对路径（`../concepts/xxx.md`）或 `[[wiki-link]]` 风格（视工具）
 - 权威顺序：**代码 > 修正案 (analysis/*amendments*) > CIP > 白皮书 > 其它 raw**
+- `refs/plans/` 属"其它 raw"，非规范性；wiki 中引用计划必须说明其状态（提议 / 进行中 / 已落地）
 
 ---
 
