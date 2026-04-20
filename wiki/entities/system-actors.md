@@ -5,14 +5,16 @@ sources:
   - node/runner/src/system_actors.rs
   - refs/cips/cip-2-offchain-compute.mdx
   - refs/cips/cip-12-governance.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-04-16
+last_updated: 2026-04-20
 status: authoritative
 ---
 
 # System Actors
 
-Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议级功能。它们与用户 Actor 同构（消息驱动），但由 Genesis 块初始化、拥有特权操作。
+Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与用户 Actor 同构（消息驱动），但由 Genesis 块初始化、拥有特权操作。原始段 `0x01-0x0B` 已实装；CIP-14 起扩展到双字节段 `0x00NN`。
 
 ---
 
@@ -24,13 +26,15 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 | `0x02` | JOB_DISPATCHER | 任务分发、VRF 选择、托管 | CIP-2 §3-4 |
 | `0x03` | RESULT_VERIFIER | 结果验证、结算、slashing | CIP-2 §5 |
 | `0x04` | SECRETS_MANAGER | 加密秘密分发（TEE 配合）| CIP-2 §8 |
-| `0x05` | TEE_VERIFIER | TEE attestation 校验 | CIP-2 §8 |
+| `0x05` | TEE_VERIFIER | TEE attestation 校验 | CIP-2 §8；**CIP-23 全面接线** |
 | `0x06` | DUAL_BASEFEE | Cycles/Cells basefee 状态持久化 | CIP-3 |
 | `0x07` | ENTITLEMENT_REGISTRY | Scope/Action/Constraints/Role 授权 | CIP-2 §7 |
 | `0x08` | TREASURY | 协议国库（slashing / burn 目的地）| — |
 | `0x09` | GOVERNANCE | 治理参数（SettlementConfig 等）| CIP-2 §5 结算 |
 | `0x0A` | STORAGE_MANAGER | 链下存储协议元数据（CIP-9）| CIP-9 |
 | `0x0B` | RELAY_REGISTRY | 中继节点注册（未来）| — |
+| `0x0011` 🆕 | ROUTE_REGISTRY | FQDN → actor 映射；注册/续费/外部域绑定 | CIP-14 §7, CIP-16 §7 |
+| `0x0012` 🆕 | GATEWAY_REGISTRY | Gateway 节点注册 + 心跳 + command-path 系统中介 `dispatch()` | CIP-14 §9 |
 
 **源**: `node/runner/src/system_actors.rs:13-33`
 
@@ -69,6 +73,21 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 ### Governance（0x09）
 - **当前实装**：存储 `SettlementConfig { runner_percent, burn_percent, treasury_percent }` 于 key `system:settlement_config`；唯一有权 emit `UpdateSettlementConfig`（opcode 40）
 - **规范（CIP-12, Draft）**：完整治理 Actor，承载双院投票、Tier 0–4 提案、Temp check、Security Council Cancel/Fast-Track/Circuit-Break、系统 Actor 字节码升级。自身升级必须走 Tier 4 `MetaGovernance { UpgradeGovernance }`；**不可 pause**（会死锁治理）。详见 [[../concepts/governance]]。
+- **TEE 根证书治理（CIP-23, Draft）**：通过 `0x05::UpdateCpuRoot` / `UpdateNrasRoot` 指令更新 Intel / AMD / AWS / NVIDIA 根证书；`effective_at` 强制 ≥ 1 week 延迟。
+
+### TEE Verifier（0x05）
+- **当前实装**：占位桩，`verify()` 无条件返回 `Ok(())`（见 `runner/crates/tee-verifier/src/verifier.rs`）。
+- **规范（CIP-23, Draft）**：承载 CAE（Composite Attestation Envelope）真实验证流水线 —— 证书链 / measurement 白名单 / `REPORTDATA` 绑定 / 服务签名 / NRAS token。**opcodes 50–53**: `VerifyCae`, `UpdateCpuRoot`, `UpdateNrasRoot`, `GcNonces`。measurement 白名单存在 Runner Registry (`0x01.measurement_binding`)，不重复。详见 [[../concepts/tee-attestation]]。
+
+### Route Registry（0x0011，CIP-14 新地址段）
+- `name → actor_address` 正向解析 + `actor → names` 反向；`resolve` / `register` / `renew` / `set_actor` 等。
+- CIP-16 扩展到三类命名空间：`cowboy.network` / 首party TLD (`.cow`, `.cowboy`) / 外部 FQDN（TXT 挑战 + ACME 委派）。
+- 详见 [[route-registry]] / [[../concepts/dns-addressable-actors]] / [[../concepts/custom-domains]]。
+
+### Gateway Registry（0x0012，CIP-14 新地址段）
+- Gateway 节点注册 + 心跳（`MAX_GATEWAY_HEALTH = 3600 blocks`）+ stake 锁定（`MIN_GATEWAY_STAKE` 治理设）。
+- **Command 路径系统中介**: Gateway 把 HTTP 请求封装为 `dispatch(target, envelope)`，由 `0x0012` 验证"来源是 active Gateway" 后再转发到目标 Actor —— Actor 看到的 `ctx.sender == 0x0012`，天然防伪造。
+- 详见 [[gateway]] / [[../concepts/dns-addressable-actors]]。
 
 ---
 
@@ -76,7 +95,9 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 
 **历史冲突**：白皮书 §9 曾把 `0x01=Messaging`、`0x03=Oracle`，与代码完全冲突。CIP-2 2026-03-09 修订已部分对齐到 `0x04/0x05`，但代码实际扩展到 `0x07-0x0B`。
 
-**workspace CLAUDE.md** 仍列出 `0x91-0x95` 的老地址，应废弃（见 [[../drift]] 条目 B）。
+**workspace CLAUDE.md** 仍列出 `0x91-0x95` 的老地址，应废弃（见 [[../drift]] 条目 B）。CIP-23 §3.2 明确"supersedes conflicting listings in `CLAUDE.md` and `node/types/README.md`"。
+
+**新地址段 `0x0011` / `0x0012`**：CIP-14 首次跳出 `0x01-0x0B` 单字节保留段；实现时需在 `node/runner/src/system_actors.rs` 追加常量并同步 workspace CLAUDE.md。
 
 详见 [`refs/analysis/2026-04-15_documentation_amendments.md §二`](../../analysis/2026-04-15_documentation_amendments.md)。
 
@@ -89,4 +110,7 @@ Cowboy 在保留地址（`0x01` - `0x0B`）上注册系统 Actor，实现协议�
 - `refs/cips/cip-9-runner-storage.md` — Storage manager
 - `refs/cips/cip-12-governance.md` — `0x09` 完整治理规范（Draft）
 - `refs/cips/cip-13-runner-delegation.md` — `0x01` 委托扩展（Draft）
+- `refs/cips/cip-14-dns-addressable-actors.md` — `0x0011` / `0x0012` 新地址段（Draft）
+- `refs/cips/cip-16-custom-domains.md` — `0x0011` 扩展（TLD / external FQDN, Draft）
+- `refs/cips/cip-23-tee-execution.md` — `0x05` 真实 attestation 流水线（Draft）
 - `refs/runner/2026-03-03_Entitlement.md` — Entitlement 设计

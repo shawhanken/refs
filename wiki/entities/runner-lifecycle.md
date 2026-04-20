@@ -1,15 +1,16 @@
 ---
 type: entity
-tags: [runner, lifecycle, cip-2, cip-13]
+tags: [runner, lifecycle, cip-2, cip-13, cip-23]
 sources:
   - refs/cips/cip-2-offchain-compute.mdx
   - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/runner/2026-01-27_NODE_ACTOR_RUNNER_FLOW.md
   - refs/runner/2026-01-27_README_CN.md
   - refs/runner/2026-02-05_DOCUMENTATION.md
   - refs/runner/2026-03-03_Entitlement.md
   - refs/runner/2026-03-05_deterministic_runner_selection.md
-last_updated: 2026-04-16
+last_updated: 2026-04-20
 status: authoritative
 ---
 
@@ -31,6 +32,17 @@ runner register --stake <N CBY> --verification-modes [None|MajorityVote|...]
 - Runner 在 `RateCard` 声明支持的执行类型（LLM / HTTP / MCP）、单位成本
 
 **所在地**: System Actor `0x01`（RUNNER_REGISTRY），见 [[system-actors]]
+
+### 阶段 1a（TEE Runner 专用，CIP-23 Draft）：attestation-first 注册
+
+希望承接 `VerificationMode::Deterministic + tee_required` 的 Runner 必须在注册时附上 `initial_cae`（CPU + 可选 GPU）。Registry 跨 actor 调 `0x05::VerifyCae`（`user_data = keccak(runner_addr ‖ registration_block_hash)`），通过后写入 `MeasurementBinding { cpu_tee_type, allowed_cpu_measurements, allowed_gpu_measurements, service_pubkey, bound_at, expires_at, status }`。
+
+- 失败 → 拒绝注册，stake 未动
+- `status ∈ {Active, Deprecated, Revoked}`；`BINDING_RENEWAL_PERIOD ≈ 7d` 后须续约
+- Dispatcher 从此**不再**依赖 `runner.capabilities.tee_support` 布尔（弃用）
+- SGX = legacy，只能接 `EconomicBond`
+
+详见 [[../concepts/tee-attestation]]。
 
 ### 阶段 1b（可选，CIP-13 Draft）：接受委托
 
@@ -74,7 +86,7 @@ Runner 守护进程（workspace `runner/`）：
 Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - 按 Job 声明的 `VerificationMode` 分支验证（[[../concepts/runner-verification]]）
 - 若 `MajorityVote` / `StructuredMatch`：等待 N-of-M 结果 commit-reveal 后聚合
-- 若 `Deterministic`：TEE attestation + 字节级相同
+- 若 `Deterministic`：TEE attestation + 字节级相同（**CIP-23 Draft**：强制调 `0x05::VerifyCae` 逐条验 CAE；任一失败整 Job 失败）
 
 ---
 
@@ -103,7 +115,7 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 触发条件：
 - `Deterministic` 模式下字节不匹配
 - `MajorityVote` 中的少数派
-- TEE attestation 失败
+- TEE attestation 失败（CIP-23 Draft：`AttestFail` / `RegistryMismatch` / `NonceBindingFail` 等 9 类错误码之一）
 - Dispute 被判定有效
 
 规则：
@@ -120,6 +132,7 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - [[../concepts/runner-verification]]
 - [[../concepts/settlement-slashing]]
 - [[../concepts/runner-delegation]] — CIP-13 Stake 委托（Draft）
+- [[../concepts/tee-attestation]] — CIP-23 CAE + attestation-first（Draft）
 - [[../parameters]] — 所有具体常量
 
 ## Sources

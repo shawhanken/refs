@@ -1,11 +1,12 @@
 ---
 type: concept
-tags: [runner, verification, cip-2]
+tags: [runner, verification, cip-2, cip-23]
 sources:
   - node/runner/src/types.rs
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-23-tee-execution.md
   - refs/runner/2026-02-05_DOCUMENTATION.md
-last_updated: 2026-04-15
+last_updated: 2026-04-20
 status: authoritative
 ---
 
@@ -25,7 +26,7 @@ status: authoritative
 | 1 | `EconomicBond` | 单 Runner 可信，stake 大小为经济担保 |
 | 2 | `MajorityVote` | N-of-M Runner 投票，少数派 slash |
 | 3 | `StructuredMatch` | 比较指定 JSON 字段（fallback 全 JSON 比较）|
-| 4 | `Deterministic` | TEE + 字节级完全一致，不一致者 slash |
+| 4 | `Deterministic` | TEE + 字节级完全一致，不一致者 slash；**CIP-23 Draft：`tee_required = true` 强制，结果必须附 CAE 并通过 `0x05::VerifyCae`** |
 | 5 | `SemanticSimilarity` | 语义相似度匹配（LLM 场景）|
 
 ---
@@ -60,13 +61,28 @@ MajorityVote / StructuredMatch 使用 **commit-reveal**：
 
 ---
 
+## CIP-23 扩展：Deterministic 模式的密码学强制（Draft）
+
+当前代码对 `Deterministic + tee_required` 只做"字段存在性检查"，Runner 可自声明 `tee_support = Some(Sgx)` 而不交任何证明。CIP-23（Draft）的修订：
+
+- **Dispatcher 过滤**：`tee_required` 改查 Registry 的 `measurement_binding.status == Active && expires_at > now`；废弃 `runner.capabilities.tee_support` 布尔。
+- **Result Verifier**：每条结果必须附 `CompositeAttestation` (CAE)，逐条调 `0x05::VerifyCae`；任一失败整 Job 失败。
+- **SGX legacy**：IAS/EPID 2025-04-02 EOL；SGX 从此仅可用于 `EconomicBond`，**不再** 进 Deterministic 候选池。
+- **其他模式下的 CAE**：可选携带；携带则必须验证通过。
+
+详见 [[tee-attestation]]。
+
+---
+
 ## 源文档冲突 / 漂移
 
 白皮书 §5 只列 4 种模式（TEE Attestation / MajorityVote / ZK-Proof / EconomicBond）：
 - 代码扩增 StructuredMatch、SemanticSimilarity
 - ZK-Proof 未实现
 
-见 [[../drift]] 条目 D。
+CIP-2 §5.4 / §9 现文未并入 CIP-23 的 attestation-first 语言；实现时以 CIP-23 为准。
+
+见 [[../drift]] 条目 D / TEE-1。
 
 ---
 
@@ -74,3 +90,4 @@ MajorityVote / StructuredMatch 使用 **commit-reveal**：
 - [[../entities/runner-lifecycle]] — Phase 4 验证步骤
 - [[vrf-runner-selection]] — 上游 Runner 选择
 - [[settlement-slashing]] — 验证失败的经济惩罚
+- [[tee-attestation]] — CIP-23 Draft：Deterministic 模式的密码学强制

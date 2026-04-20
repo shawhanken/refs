@@ -156,3 +156,47 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 **命名修正**：原始上传文件名 `runner-economics-and-delegation(CIP13).md` 含括号，已同日改为 `runner-economics-and-delegation-cip13.md` 以对齐 kebab-case 约定；`plans-inventory.md` 命名约定段补充 `-cipNN` 后缀惯例。
 
 ---
+
+## [2026-04-20] ingest | CIP-14 / CIP-15 / CIP-16（HTTP Ingress 三件套）+ CIP-23（TEE Execution, Draft）
+
+入库来源（6 份新文档）：
+
+- `refs/cips/cip-14-dns-addressable-actors.md` — DNS-Addressable Actors（Draft, 2026-03-07, Requires: CIP-2/CIP-3）
+- `refs/cips/cip-15-public-asset-hosting.md` — Public Asset Hosting（Draft, 2026-03-07, Requires: CIP-9/CIP-14）
+- `refs/cips/cip-16-custom-domains.md` — Custom Domains & First-Party TLDs（Draft, 2026-03-08, Requires: CIP-14/CIP-2/CIP-3/CIP-5）
+- `refs/cips/cip-23-tee-execution.md` — TEE Execution & Composite Attestation（Draft, 2026-04-20, Requires: CIP-2/CIP-3/CIP-10）
+- `refs/cips/cip-23-tee-execution-zh.md` — CIP-23 中文镜像（同日）
+- `refs/plans/cowboy-tee-execution-design.md` — CIP-23 实施设计（Draft, 2026-04-20；§12 代码改造清单 + §13 4-phase 路线图）
+
+**新建 wiki 页（6 个）**:
+
+- `wiki/concepts/dns-addressable-actors.md`（status: draft）—— CIP-14 综合：`ingress.http` / Route Registry / Gateway 角色 / Query vs Command 双路径 / 系统中介 dispatch
+- `wiki/concepts/public-asset-hosting.md`（status: draft）—— CIP-15 综合：路由清单、`ingress.http` 扩展 params、Gateway↔Relay fetch 协议、CORS 默认
+- `wiki/concepts/custom-domains.md`（status: draft）—— CIP-16 综合：三类命名空间、`DomainBinding` 超集、TXT 挑战 + ACME 委派、周期重验证状态机
+- `wiki/concepts/tee-attestation.md`（status: draft）—— CIP-23 综合：CAE v1 结构、7 步验证流水线、attestation-first 注册、Deterministic 密码学强制、SGX 降级为 legacy
+- `wiki/entities/gateway.md`（status: draft）—— Gateway 节点角色（第 4 个协议 role）：职责 / 生命周期 / `dispatch()` 系统中介 / 激励 / 缓存架构
+- `wiki/entities/route-registry.md`（status: draft）—— 系统 Actor `0x0011`：Binding 结构演进、三命名空间方法表、长度递减年费 + Dutch 拍卖释放
+
+**更新 wiki 页（5 个）**:
+
+- `wiki/entities/system-actors.md` —— 表格新增 `0x0011 ROUTE_REGISTRY` / `0x0012 GATEWAY_REGISTRY`；`0x05 TEE_VERIFIER` 补规范描述（CIP-23 Draft：CAE 验证流水线、opcodes 50–53）；`0x09 GOVERNANCE` 增注 TEE 根证书治理
+- `wiki/concepts/runner-verification.md` —— Deterministic 模式行补 CIP-23 强制说明；新增 "CIP-23 扩展" 章节概述 Dispatcher 过滤改写、Result Verifier 逐条 CAE 校验、SGX legacy
+- `wiki/entities/runner-lifecycle.md` —— 阶段 1a 新增（TEE Runner attestation-first 注册）；阶段 4 / 阶段 7 补 CIP-23 CAE 验证与 9 类错误码
+- `wiki/parameters.md` —— 追加 4 个新参数段：CIP-14 Route Registry / CIP-15 Public Asset Hosting / CIP-16 Custom Domains / CIP-23 TEE Execution；全部标 "Draft, 尚未实装"
+- `wiki/drift.md` —— 活跃漂移从 21 项升至 25 项，追加：
+  - **N-1** 高严：CIP-15 要求 CIP-9 新增 `GET_MANIFEST` Relay Node RPC
+  - **N-2** 高严：CIP-15 §8.5 规范化 manifest serialization / `manifest_root` Merkle，CIP-9 无 normative 描述
+  - **TEE-1** 高严：CIP-23 amend CIP-2 §5.4/§9 但 CIP-2 源文未并入
+  - **L-5** 低严：块时间假设不一致（CIP-14 的 1s vs CIP-23 的 500ms）
+  - **L-6** 低严：CIP-14 `RouteRegistration` vs CIP-16 `DomainBinding` schema 差异
+
+**一致性审查要点（未成为独立 drift 条目，但已在新 wiki 页标注）**:
+
+- CIP-14 §8.3 引用 "Milestone 2 §5.2 `queryActor`" —— 非 CIP 命名规范，Gateway 必须跟踪其签名演进
+- CIP-14 §6.1 引用 "Entitlements Specification §10" 禁止未注册 entitlement —— `ingress.http` adoption 需要对应 spec 同步修订（文档中 inline 提醒）
+- CIP-23 §3.2 明确 supersede `CLAUDE.md` / `node/types/README.md` 中 `0x91-0x95` 老地址列表 —— 已与 drift B 合并叙述，不重复记录
+- CIP-23 新 opcodes 50–53 与 CIP-13 Draft 40–44 无冲突（CIP-13 冲突是既有 I-1 项）
+
+**权威层级标注**: 全部 6 份文档为 Draft，协议未实装；wiki 新页 `status: draft`；参数段显式标"尚未实装"；代码侧 `0x05` 仍是占位桩，`0x0011` / `0x0012` 尚无常量。
+
+---

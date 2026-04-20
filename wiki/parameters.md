@@ -1,6 +1,6 @@
 ---
 type: parameter
-tags: [constants, authoritative, cip-3, cip-12, cip-13]
+tags: [constants, authoritative, cip-3, cip-12, cip-13, cip-14, cip-15, cip-16, cip-23]
 sources:
   - node/types/src/constants.rs
   - node/execution/src/basefee.rs
@@ -10,7 +10,11 @@ sources:
   - refs/cips/cip-2-offchain-compute.mdx
   - refs/cips/cip-12-governance.md
   - refs/cips/cip-13-runner-delegation.md
-last_updated: 2026-04-16
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
+  - refs/cips/cip-16-custom-domains.md
+  - refs/cips/cip-23-tee-execution.md
+last_updated: 2026-04-20
 status: authoritative
 ---
 
@@ -176,6 +180,90 @@ status: authoritative
 
 ---
 
+## DNS-Addressable Actors（CIP-14 Draft，尚未实装）
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `ROUTE_REGISTRY_ADDRESS` | `0x0011` | 新 System Actor 地址段（见 [[entities/system-actors]]） |
+| `GATEWAY_REGISTRY_ADDRESS` | `0x0012` | 同上 |
+| `MIN_NAME_LENGTH` / `MAX_NAME_LENGTH` | 3 / 64 | 名称长度约束 |
+| `NAME_GRACE_PERIOD` | 2,592,000 blocks（≈30d @ 1 block/sec）| 过期后宽限期 |
+| `NAME_AUCTION_DURATION` | 604,800 blocks（≈7d）| Dutch 拍卖释放窗口 |
+| `BLOCKS_PER_YEAR` | 31,536,000 | ⚠️ 假设 1 block/sec；CIP-23 用 500ms 假设，见 [[drift]] |
+| `REGISTRY_PROTOCOL_FEE_BPS` | 1,000（10%）| 注册费入国库比例 |
+| `GATEWAY_POOL_BPS` | 2,000（20%）| 注册费入 Gateway serving pool 比例（余下 70% burn）|
+| `MIN_GATEWAY_STAKE` | governance-set | Gateway 注册最低 stake |
+| `MAX_GATEWAY_HEALTH` | 3,600 blocks（≈1h）| Heartbeat 重置值；每块 -1 |
+| `GATEWAY_UNSTAKE_DELAY` | 604,800 blocks（≈7d）| 解绑延迟 |
+| `MAX_REQUESTS_PER_SECOND` | 100 | Per actor per gateway |
+| `MAX_CONCURRENT_CONNECTIONS` | 1,000 | Per actor per gateway |
+| `RESULT_TTL_BLOCKS` | 3,600（≈1h）| Command-path 结果在 Actor 存储中的默认 TTL |
+| `PROTOCOL_MAX_REQUEST_BYTES` | 10,485,760（10 MiB）| 协议 ceiling；Actor 可在 `ingress.http` params 中降低 |
+| `PROTOCOL_MAX_RESPONSE_BYTES` | 10,485,760 | 同上 |
+| `PROTOCOL_MAX_QUERY_CYCLES` | 100,000,000 | Query-path PVM cycles ceiling |
+
+**`ingress.http` 默认 params**: `allowlist_methods=["GET","HEAD","POST"]`, `max_request_bytes=1 MiB`, `max_response_bytes=1 MiB`, `max_query_cycles=10_000_000`。
+
+**源**: `refs/cips/cip-14-dns-addressable-actors.md` §10。
+
+---
+
+## Public Asset Hosting（CIP-15 Draft，尚未实装）
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `MAX_STATIC_ROUTES` / `MAX_DYNAMIC_ROUTES` | 100 / 100 | `_meta/routes.json` 条目上限 |
+| `MAX_ROUTE_MANIFEST_SIZE` | 65,536 B | 路由清单 size cap |
+| `MANIFEST_POLL_INTERVAL` | 6 blocks（≈6s）| 失效轮询周期 |
+| `METADATA_CACHE_TTL` | 60 s | `_meta/*` 缓存 TTL |
+| `MAX_GATEWAY_CACHE_BYTES` | 10 GiB | 单 Gateway 对象 cache 总上限 |
+| `DEFAULT_MAX_CACHE_PER_VOLUME` | 100 MiB | Entitlement 未声明时默认 |
+| `DEFAULT_MAX_STATIC_RESPONSE_BYTES` | 10 MiB | 单资产响应默认上限 |
+| `PROTOCOL_MAX_STATIC_RESPONSE_BYTES` | 100 MiB | Hard ceiling |
+| `HEDGE_THRESHOLD_MS` | 100 ms | 投机并发 shard 请求阈值 |
+| `MAX_CONCURRENT_SHARD_FETCHES` | 8 | 单对象重建最大并发 |
+| `DEFAULT_CORS_MAX_AGE` | 86,400 s（24h）| `Access-Control-Max-Age` |
+| `MAX_CORS_RULES` | 50 | `_meta/cors.json` 条目上限 |
+
+**ingress.http 新增 params**: `static_volumes: [{volume_name, max_cache_bytes}]`（默认 `[]`）, `max_static_response_bytes`（默认 10 MiB）。
+
+**源**: `refs/cips/cip-15-public-asset-hosting.md` §10。
+
+---
+
+## Custom Domains & First-Party TLDs（CIP-16 Draft，尚未实装）
+
+| 常量 | 值 |
+|---|---|
+| `NAMESPACE_COWBOY_NETWORK / FIRST_PARTY_TLD / EXTERNAL` | 0 / 1 / 2 |
+| `TLD_COW / TLD_COWBOY` | 1 / 2 |
+| `CHALLENGE_EXPIRY_BLOCKS` | 43,200（≈12h @ 1s）|
+| `EXTERNAL_REVERIFY_INTERVAL` | 2,592,000（≈30d）|
+| `CANONICAL_EDGE_HOSTNAME` | `edge.cowboy.network` |
+| `ACME_DELEGATION_ZONE` | `acme.cowboy.network` |
+
+**源**: `refs/cips/cip-16-custom-domains.md` §12。
+
+---
+
+## TEE Execution（CIP-23 Draft，尚未实装）
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `MAX_QUOTE_AGE` | 150 blocks（≈75s @ 500ms；≈150s @ 1s）| Quote 新鲜度窗口 |
+| `BINDING_RENEWAL_PERIOD` | 12,096 blocks（≈7d @ 500ms）| Measurement binding 续约 |
+| `ROOT_UPDATE_DELAY` | 1 week | `UpdateCpuRoot` / `UpdateNrasRoot` 延迟生效 |
+| `SEEN_NONCE_GC_WINDOW` | = `DISPUTE_WINDOW_BLOCKS` (75) | Nonce 回收与争议窗口对齐 |
+| `MAX_CAE_ON_CHAIN_BYTES` | 64（仅 digest）| 完整 CAE 走 CIP-9 存 CID |
+| 新 opcodes | 50–53 | `VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces`；与 CIP-13 Draft 40–44 不冲突 |
+
+**Gas 预算**: `VerifyCae` (TDX + NCC) ≈ 200k cycles + 64 cells，每块 `BLOCK_CYCLES_TARGET = 20M` 下可验 ~100 个 CAE。
+
+**源**: `refs/cips/cip-23-tee-execution.md` §3.13、§3.6.5。
+
+---
+
 ## 变更记录
+- **2026-04-20** 纳入 CIP-14 / CIP-15 / CIP-16 / CIP-23（全部 Draft）参数段；标注块时间假设不一致（1s vs 500ms）。
 - **2026-04-16** 纳入 CIP-12 / CIP-13（Draft）参数段，标明尚未实装；opcode 冲突标注至 drift。
 - **2026-04-15** 建立本表，以代码/修正案为权威基线。
