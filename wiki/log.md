@@ -200,3 +200,62 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 **权威层级标注**: 全部 6 份文档为 Draft，协议未实装；wiki 新页 `status: draft`；参数段显式标"尚未实装"；代码侧 `0x05` 仍是占位桩，`0x0011` / `0x0012` 尚无常量。
 
 ---
+
+## [2026-04-21] alignment | v2 系列全面对齐（round 6）
+
+跨多轮迭代完成 v1 → v2 alignment：CIP-1 / CIP-2 / CIP-9 / CIP-10 / CIP-13 / CIP-14 / CIP-15 / CIP-16 / CIP-23 各发布 v2 alignment 文件 + WP v2；多轮审计揭示并解决以下根本冲突。
+
+**核心改动概览**：
+
+1. **System actor 地址段重排**（CIP-14 v2 / CIP-10 v2）：v1 草案的 `0x0011` / `0x0012` → v2 收回到紧跟代码序列的 `0x0C` (ROUTE_REGISTRY) / `0x0D` (GATEWAY_REGISTRY) / `0x0E` (RECEIPT_REGISTRY) / `0x0F` (CONTAINER_REGISTRY)。WP §9 line 704 错配 `0x0A = Container Image Registry` 由 WP-v2 Delta 6 修正（0x0A 实际归 STORAGE_MANAGER per CIP-9）。
+
+2. **SystemInstruction opcode 全面重排**：审计发现代码 `node/types/src/execution.rs:482-541` 已分配 0–51（含 CIP-5 revision 引入的 SYS_CANCEL_TIMER=48 / SYS_UPDATE_TIMER_CONFIG=49 / SYS_EXTEND_TIMER=50 / SYS_DEPLOY_CODE=51）。v1 / 早期 v2 草案的 opcode 分配（CIP-13 40-44 → 44-48；CIP-23 50-53；CIP-1 v2 草案 70-72）全部冲突。**CIP-13 v2 §1 落地为全 v2 系列的 canonical master allocation table**，重排为：CIP-13 = 52-56；CIP-23 = 57-60；CIP-10 = 61-64；CIP-14 = 65 (`IngressDispatch`) / 66 (`CompleteReceipt`)；CIP-16 = 67 (`ExternalDomainCallback`)。CIP-1 v2 §6 撤销 70-72 推荐（这些 timer ops 已在代码 48-50）。
+
+3. **CIP-5 revision 集成**（2026-04-20 重大改动）：timer 不再免费 —— per-fire `fee_payer` 预扣 + 退还（§6.3）；三路退出生命周期（natural fire / TTL expiry / insufficient-funds self-destruct，§5.4）；`LANE_TIMER_CYCLES` 与 `TIMER_GC_CYCLES` 双预算分离（§6.5）；`TimerConfig` 治理可调（§6.4）；Tx-then-Timer 块内顺序 native 化（§5.1，结束 v1 amendment caveat）。CIP-9 v2 §12 / CIP-16 v2 §5.10 各自指定 `fee_payer` 与余额不足兜底事件订阅。
+
+4. **Selector reservation 提案撤销**：CIP-14 v2 §6.2 早期草案提议 PVM 路由层把 `"http.request"` 设为系统保留 selector，**撤销**因阻断 router actor 转发模式；改回 SDK-default `ctx.sender == GATEWAY_REGISTRY=0x0D` 检查（`ctx.sender` 由协议消息路由器从 tx 签名者填入，handler 内部检查即足够）。
+
+5. **DNS 验证模式修正**（CIP-2 v2 + CIP-16 v2）：CIP-16 v1 §9.6 错用 `VerificationMode::Deterministic`（要求 byte-identical + TEE，不适合非确定性 DNS）；v2 改用 `MajorityVote` + 两个新 `VerifierCheck` 变体（`DnsTxtRecordMatch` / `DnsCnameMatch` per CIP-2 v2 §2 AMEND 2-A/B），N-of-M runner 各查 ≥3 独立 DNS resolver 多数决。CIP-16 v2 §5.6 `ExternalDomainCallback` (opcode 67) 由 `RESULT_VERIFIER (0x03)` 系统中介强制，非 SDK 约定。
+
+6. **CIP-9 amendment 修正**（CIP-9 v2）：v2 早期草稿误把 `StorageCommitment` / `commit_manifest` / `volume_id = keccak256(...)` 列为 amendment（实为 CIP-9 §11.1/§12.2 已有），CIP-9 v2 §9 errata 修正。真实需要的 amendment 仅 4 项：`GET_MANIFEST` Relay RPC（AMEND 9-G）+ `ManifestCommitted` 链上事件（AMEND 9-H）+ canonical Merkle pin to CBFS RFC-6962-style（§3）+ status → HTTP 行为映射表（§5）。CIP-15 v2 据此重写。
+
+7. **DomainBinding 迁移规则**（CIP-16 v2 §3.1）：v1 `RouteRegistration` 升级为 `DomainBinding` 时按显式默认值（`namespace_kind=COWBOY_NETWORK, status=ACTIVE` 等）一次性 schema upgrade，结束 L-6 漂移。
+
+8. **SettlementConfig target_pool 6-enum 表**（CIP-14 v2 Part III §6 canonical）：CIP-3 既有的 `UpdateSettlementConfig` (opcode 40) 加 `target_pool` discriminant；MAIN / REGISTRY / GATEWAY_POOL / CONTAINER / REGISTRY_TLD_COW / REGISTRY_TLD_COWBOY 六个变体集中在该表，handler MUST exhaustive switch。
+
+9. **CIP-23 v2 三层 chain 与 BillingAttestation 数据源**：`sec.tee_required` entitlement / `VerificationConfig.tee_required` 字段 / `MeasurementBinding` 三层独立校验，分布在 deploy / submit / register/renew 三个生命周期时刻。`tee_signature: Option<CompositeAttestation>` **每次 billing event 临时生成**（v2 §5.1），不缓存 measurement_binding 时的 quote。`nitro` 待加入 `CANONICAL_TEE_TYPES`（precondition）。
+
+10. **CIP-13 v2 ↔ CIP-23 v2 正交**：TEE 资格是 categorical capability check（`MeasurementBinding.status`），与 stake 来源无关。委托质押增加 VRF 权重但不授予 / 取消 TEE 资格。
+
+**入库 / 修订的 v2 文档（10 份）**：
+- `refs/cips/cip-1-actor-scheduler-v2.md`
+- `refs/cips/cip-2-offchain-compute-v2.md`
+- `refs/cips/cip-9-runner-storage-v2.md`
+- `refs/cips/cip-10-runner-containers-v2.md`
+- `refs/cips/cip-13-runner-delegation-v2.md`
+- `refs/cips/cip-14-dns-addressable-actors-v2.md`
+- `refs/cips/cip-15-public-asset-hosting-v2.md`
+- `refs/cips/cip-16-custom-domains-v2.md`
+- `refs/cips/cip-23-tee-execution-v2.md`
+- `refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md`（含 6 个 deltas + alignment brief）
+
+**更新 wiki 页（19 份）**：
+- entities: system-actors / route-registry / gateway / runner-lifecycle / pvm
+- concepts: dns-addressable-actors / public-asset-hosting / custom-domains / runner-delegation / tee-attestation / timer-mechanism / runner-verification / governance / settlement-slashing / basefee / vrf-runner-selection
+- 综合: parameters / drift / index / log（本条目）
+
+**drift.md 重大变化**：
+- 已收口（5 项）：I-1（CIP-13 opcode 冲突）/ N-1（GET_MANIFEST）/ N-2（manifest serialization）/ TEE-1（CIP-23 amend CIP-2 配套补 CIP-2 v2）/ L-6（RouteRegistration → DomainBinding 迁移规则）
+- 仍活跃漂移移到独立段
+- 新增 v2 precondition gap 段（10 条 V-* 条目）：跟踪 v2 spec 已就位但代码尚未跟进的项；包含 system actor 0x0C-0x0F 缺常量、registry 缺 3 entries、opcodes 52-67 缺、Receipt Registry prune loop 未实装、WP §9 0x0A 错配、`nitro` 待加入 CANONICAL_TEE_TYPES、`target_pool` enum 待扩展等
+
+**parameters.md 重大变化**：
+- Timer 段全面重写（CIP-5 revised + 双预算 + fee_payer 模型）
+- 新增 SystemInstruction Opcode 主分配表段（canonical CIP-13 v2 §1 全 v2 系列权威）
+- 新增 SettlementConfig target_pool 枚举段（canonical CIP-14 v2 Part III §6）
+- 新增 Container Runtime (CIP-10 v2) 段
+- CIP-13 / 14 / 15 / 16 / 23 各段重写（地址 / opcode / entitlement / 费分配等）
+
+**权威层级标注**: v2 系列文档全部为 Draft；spec 已自洽对齐；代码尚未实装的项明确列在 `drift.md` v2 precondition gap 段。激活前需按 V-1 → V-10 顺序补齐代码侧。
+
+---

@@ -7,7 +7,7 @@ sources:
   - refs/pvm/03-Checkpoint-Resume实现指南.md
   - refs/pvm/04-编码规范与最佳实践.md
   - refs/pvm/05-测试评估与升级.md
-last_updated: 2026-04-15
+last_updated: 2026-04-21
 status: authoritative
 ---
 
@@ -36,16 +36,37 @@ Cowboy 的 Actor 执行环境：基于 RustPython 的确定性 Python 运行时�
 
 ## Host API（Python → Rust）
 
-- `state_get(key) / state_set(key, value)` — Actor 本地 KV 存储
+- `state_get(key) / state_set(key, value) / state_delete(key) / state_scan_prefix(...)` — Actor 本地 KV 存储
 - `send_message(addr, payload)` — 异步发消息
 - `call_actor(addr, method, args)` — 同步跨 Actor 调用（最深 32 层）
 - `submit_job(...)` — 发起链下计算（Runner）
-- `schedule_timer(height, callback, gas)` — GBA timer 注册（[[../concepts/timer-mechanism]]）
-- CIP-20 Token ops（mint / transfer / burn / freeze / permit / hook）
+- `schedule_timer(height, payload)` / `schedule_timer_ex(height, payload, fee_payer?, gas_limit?, expires_at?)` / `extend_timer` / `cancel_timer` — Timer 注册（[[../concepts/timer-mechanism]]）
+- `token_transfer` / `token_transfer_from` + CIP-20 Token ops（mint / transfer / burn / freeze / permit / hook）
+- `emit_event(topic, data)` — 事件日志
+- `randomness(domain)` — host RNG（共识派生）
+- `create_deferred_tx(handler, payload)` — 协议级延迟交易
+- `upgrade_self(...)` — 自升级（需 `sys.upgrade` entitlement）
 
 每个 host 调用扣 cycles（Compute）与 cells（Data），见 [[../parameters]]。
 
 `ActorStorageCache` 追踪 read_count，PVM 执行结束后批量按 `STORAGE_READ_CYCLES` 补扣。
+
+---
+
+## 两种执行模式（CIP-14 v2 引入 read-only）
+
+`PvmExecutor::execute_handler(read_only: bool, ...)`：
+
+| 模式 | 入口 | 状态视图 | 副作用 syscall |
+|---|---|---|---|
+| **Transactional**（默认）| `ActorMessage` 共识执行 | 投机 (speculative) | 全部允许 |
+| **Read-only**（CIP-14 v2 §5）| `POST /actor/{address}/read_handler` RPC | 已提交 (committed) state | **全部 trap** `ERR_READONLY_VIOLATION` |
+
+Read-only 模式的 trap 表（CIP-14 v2 Part III §5.3，**所有 mutating syscall**）：`state_set` / `state_delete` / `send_message` / `call_actor` / `schedule_timer*` / `cancel_timer` / `extend_timer` / `submit_job` / `token_transfer*` / `create_deferred_tx` / `upgrade_self` / `emit_event` / **`randomness`**（v1 漏掉了，v2 补上）。
+
+**允许**：`state_get` / `state_scan_prefix` + ambient context (`block_height`, `block_timestamp`, `self_address`)；`caller` 返回 `Address::ZERO`，`ctx.sender` 返回 `None`。
+
+确定性保证：两 Gateway 在同一 `block_height` 跑同一 `read_handler` 请求 → 字节相同响应。
 
 ---
 

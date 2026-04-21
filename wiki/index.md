@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-04-20
+**最后更新**: 2026-04-21（v2 alignment round 6：opcode 重排 / 系统 actor 收回 0x0C-0x0F / target_pool enum / CIP-5 revised 集成）
 
 ---
 
@@ -20,8 +20,8 @@
 
 | 页面 | 摘要 |
 |---|---|
-| [parameters.md](parameters.md) | 全系统参数/常量权威表（cycles、cells、stake、timer 预算等）|
-| [drift.md](drift.md) | 文档-代码漂移看板（指向最新修正案）|
+| [parameters.md](parameters.md) | 全系统参数/常量权威表（cycles、cells、stake、timer 预算、SystemInstruction opcode 主分配表、SettlementConfig target_pool 枚举）|
+| [drift.md](drift.md) | 文档-代码漂移看板 + v2 precondition gap |
 
 ---
 
@@ -34,18 +34,18 @@
 | [actor-model.md](concepts/actor-model.md) | Cowboy Actor 模型：Message、Actor、调度、隔离 |
 | [continuation.md](concepts/continuation.md) | Actor↔Actor / Actor↔Runner 挂起-恢复机制、Checkpoint、FSM |
 | [dual-gas-model.md](concepts/dual-gas-model.md) | Cycles（计算）+ Cells（数据）双计量、EIP-1559 基模型 |
-| [basefee.md](concepts/basefee.md) | Basefee 几何更新公式、MIN/MAX、代码实测参数 |
+| [basefee.md](concepts/basefee.md) | Basefee 几何更新公式、MIN/MAX、代码实测参数 + CIP-5 revised timer fee_payer 关联 |
 | [speculative-execution.md](concepts/speculative-execution.md) | 块生命周期：propose/verify 投机执行 + report 提交 |
-| [timer-mechanism.md](concepts/timer-mechanism.md) | Timer 调度模型（GBA 已实现，EOB 未实现）、预算 |
-| [runner-verification.md](concepts/runner-verification.md) | 6 种 VerificationMode、结算与仲裁窗口 |
-| [settlement-slashing.md](concepts/settlement-slashing.md) | SettlementConfig 分成、Slashing 50/50 规则 |
-| [vrf-runner-selection.md](concepts/vrf-runner-selection.md) | Fisher-Yates VRF + stake-weighted sortition 算法 |
+| [timer-mechanism.md](concepts/timer-mechanism.md) | Timer 调度模型（CIP-5 revised 2026-04-20：per-fire fee_payer + 三路退出 + LANE/GC 双预算）|
+| [runner-verification.md](concepts/runner-verification.md) | 6 种 VerificationMode + CIP-2 v2 新增 DnsTxtRecordMatch / DnsCnameMatch、结算与仲裁窗口 |
+| [settlement-slashing.md](concepts/settlement-slashing.md) | SettlementConfig 6-enum target_pool（MAIN/REGISTRY/GATEWAY_POOL/CONTAINER/REGISTRY_TLD_*）、Slashing 50/50 默认 |
+| [vrf-runner-selection.md](concepts/vrf-runner-selection.md) | Fisher-Yates VRF + CIP-13 v2 effective_stake 修正、CIP-23 v2 measurement_binding 过滤 |
 | [governance.md](concepts/governance.md) | CIP-12 双院治理、Tier 0-4 提案、Security Council、系统 Actor 升级（Draft）|
-| [runner-delegation.md](concepts/runner-delegation.md) | CIP-13 Runner Stake 委托：Tranche、分账、slash 级联、懒惰解绑（Draft）|
-| [dns-addressable-actors.md](concepts/dns-addressable-actors.md) 🆕 | CIP-14 HTTP ingress：`ingress.http` entitlement、Query/Command 双路径、系统中介 dispatch（Draft）|
-| [public-asset-hosting.md](concepts/public-asset-hosting.md) 🆕 | CIP-15 Gateway 直服 CIP-9 public volume 静态资产；路由清单、CORS、`GET_MANIFEST`（Draft）|
-| [custom-domains.md](concepts/custom-domains.md) 🆕 | CIP-16 `.cow` / `.cowboy` TLD + 外部 FQDN 绑定（TXT 挑战 + ACME 委派 + 周期重验证, Draft）|
-| [tee-attestation.md](concepts/tee-attestation.md) 🆕 | CIP-23 CAE 复合证明 + attestation-first 注册 + Deterministic 模式密码学强制（Draft）|
+| [runner-delegation.md](concepts/runner-delegation.md) | CIP-13 v2 Runner Stake 委托：Tranche、分账、slash 级联、懒惰解绑、opcode 52-56（Draft）|
+| [dns-addressable-actors.md](concepts/dns-addressable-actors.md) | CIP-14 v2 HTTP ingress：`ingress.http` entitlement、Read-only/Command 双路径、IngressDispatch 65/CompleteReceipt 66、ROUTE_REGISTRY=0x0C/GATEWAY_REGISTRY=0x0D/RECEIPT_REGISTRY=0x0E（Draft）|
+| [public-asset-hosting.md](concepts/public-asset-hosting.md) | CIP-15 v2 Gateway 直服 CIP-9 public volume 静态资产；独立 ingress.static entitlement、route_manifest on-chain、`GET_MANIFEST` (AMEND 9-G)、CORS 优先级修正（Draft）|
+| [custom-domains.md](concepts/custom-domains.md) | CIP-16 v2 `.cow` / `.cowboy` TLD + 外部 FQDN 绑定（MajorityVote DNS 验证 + ExternalDomainCallback opcode 67 + 双层 reverify fee + verified_fqdn 注入, Draft）|
+| [tee-attestation.md](concepts/tee-attestation.md) | CIP-23 v2 CAE 复合证明 + 三层资格 chain + opcode 57-60 + 与 CIP-13 委托正交（Draft）|
 
 ---
 
@@ -55,13 +55,13 @@
 
 | 页面 | 摘要 |
 |---|---|
-| [system-actors.md](entities/system-actors.md) | 0x01-0x0B 系统 Actor 地址权威表 |
-| [runner-lifecycle.md](entities/runner-lifecycle.md) | Runner 从 register → 接单 → 结算 → 可能 slash 的全流程 |
-| [pvm.md](entities/pvm.md) | Python VM：API、确定性约束、Checkpoint、黑名单 |
+| [system-actors.md](entities/system-actors.md) | `0x01-0x0F` 系统 Actor 地址权威表（含 v2 提案 0x0C-0x0F precondition）|
+| [runner-lifecycle.md](entities/runner-lifecycle.md) | Runner 从 register → 接单 → 结算 → 可能 slash 的全流程；含 CIP-13 v2 / CIP-23 v2 集成 |
+| [pvm.md](entities/pvm.md) | Python VM：API、确定性约束、Checkpoint、黑名单 + CIP-14 v2 read_handler RPC 只读模式 |
 | [node.md](entities/node.md) | 主链节点：chain/execution/storage/types/rpc 架构 |
 | [plans-inventory.md](entities/plans-inventory.md) | `refs/plans/` 23 份工程实施计划清单（按主题分组、slug → 标题映射）|
-| [gateway.md](entities/gateway.md) 🆕 | Gateway 节点角色（第 4 个协议 role）：TLS/DNS/路由/静态 serving/速率限制（CIP-14/15 Draft）|
-| [route-registry.md](entities/route-registry.md) 🆕 | 系统 Actor `0x0011`：FQDN 注册 + 三类命名空间 + Binding 状态机（CIP-14/16 Draft）|
+| [gateway.md](entities/gateway.md) | Gateway 节点角色（第 4 个协议 role）：TLS/DNS/路由/静态 serving/速率限制（CIP-14 v2 / CIP-15 v2 Draft，地址 0x0D）|
+| [route-registry.md](entities/route-registry.md) | 系统 Actor `0x0C`：FQDN 注册 + 三类命名空间 + Binding 状态机（CIP-14 v2 / CIP-16 v2 Draft）|
 
 ---
 
@@ -69,8 +69,8 @@
 
 按主题指向 raw 目录（`refs/wiki/` 外的原始文档）：
 
-- [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）
-- [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-23，含 CIP-12/13/14/15/16/23 Draft）
+- [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）+ WP v2 deltas
+- [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-23）+ v2 alignment 系列（CIP-1/2/9/10/13/14/15/16/23 v2）
 - [`refs/analysis/`](../analysis/) — 分析、会议、**修正案**（`2026-04-15_documentation_amendments.md` 为权威）
 - [`refs/plans/`](../plans/) — 工程实施计划 / 评估（22 份，详见 [entities/plans-inventory.md](entities/plans-inventory.md)）
 - [`refs/economics/`](../economics/) — 费用模型、Basefee、Tokenomics
@@ -90,8 +90,10 @@
 
 **开发 Runner**: `entities/runner-lifecycle.md` → `concepts/vrf-runner-selection.md` → `concepts/runner-verification.md` → `concepts/settlement-slashing.md` → `concepts/tee-attestation.md`
 
-**审计经济**: `parameters.md` → `concepts/basefee.md` → `concepts/dual-gas-model.md` → `drift.md`
+**审计经济**: `parameters.md` → `concepts/basefee.md` → `concepts/dual-gas-model.md` → `concepts/settlement-slashing.md`（target_pool enum） → `drift.md`
 
 **HTTP Ingress / Web 应用**: `concepts/dns-addressable-actors.md` → `entities/gateway.md` → `entities/route-registry.md` → `concepts/public-asset-hosting.md` → `concepts/custom-domains.md`
+
+**v2 协议落地路径**（实装前清单）: `drift.md` v2 precondition gap → `parameters.md` SystemInstruction Opcode 主分配表 → 相应 entity / concept 页
 
 **排查冲突**: `drift.md` → `refs/analysis/2026-04-15_documentation_amendments.md`

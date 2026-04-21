@@ -4,10 +4,11 @@ tags: [basefee, eip-1559, economics]
 sources:
   - node/execution/src/basefee.rs
   - refs/cips/cip-3-fee-model.mdx
+  - refs/cips/cip-5-timers.md
   - refs/economics/2026-04-12_Basefee_Throttle_Analysis
   - refs/economics/2026-04-13_fee-audit-report.md
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-04-15
+last_updated: 2026-04-21
 status: authoritative
 ---
 
@@ -65,6 +66,19 @@ load → prepare_block_basefee → execute block → finalize_block_basefee → 
 用户交易 tip 的去向按 `SettlementConfig`（`0x09` 治理）：`runner / burn / treasury`。详见 [[settlement-slashing]]。
 
 Basefee 本身 **100% burn**（EIP-1559 经典做法）。
+
+---
+
+## Timer fee_payer 与 basefee 的关系（CIP-5 revised 2026-04-20）
+
+CIP-5 revision 后 timer 不再免费 —— 每次 fire 按 basefee 预扣（`max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee`）从 `fee_payer` 扣 + 退还实际差额。Basefee 部分 burn，tip 给 proposer，与普通 tx 同。
+
+因此 basefee 直接影响 timer 经济：
+
+- 高 basefee → timer `max_cost` 上升 → `fee_payer` 余额阈值提高 → 更易触发 `TimerCancelledInsufficientFunds` 自毁
+- 多个 v2 协议路径中 timer 持有者：CIP-9 v2 §12 PoR (`fee_payer = STORAGE_MANAGER`)、CIP-16 v2 §5.10 reverify (`fee_payer = binding.owner`)、CIP-14 v2 §8 receipt prune（系统循环不依赖 timer）
+
+详见 [[timer-mechanism]]。
 
 ---
 

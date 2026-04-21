@@ -3,9 +3,13 @@ type: concept
 tags: [governance, cip-12, upgrades, security-council, draft]
 sources:
   - refs/cips/cip-12-governance.md
+  - refs/cips/cip-14-dns-addressable-actors-v2.md
+  - refs/cips/cip-10-runner-containers-v2.md
+  - refs/cips/cip-23-tee-execution-v2.md
   - node/types/src/constants.rs
+  - node/types/src/execution.rs
   - node/execution/src/execution/system_instruction.rs
-last_updated: 2026-04-16
+last_updated: 2026-04-21
 status: draft
 ---
 
@@ -134,6 +138,10 @@ Council 的 Cancel 权不限频率，但累计触发**社区 review**：
 | `0x09` 系统 Actor 地址 | ✅ `node/types/src/constants.rs:139`（`GOVERNANCE_SYSTEM_ACTOR = 0x09`）|
 | `SettlementConfig` 存 `0x09` | ✅ 已实现（`runner_percent/burn_percent/treasury_percent`）|
 | `UpdateSettlementConfig` opcode 40 授权仅 `0x09` | ✅ `system_instruction.rs:448-506` |
+| `target_pool` 枚举（CIP-14 v2 / CIP-10 v2 共用）| ❌ v2 precondition：`UpdateSettlementConfig` 需扩展 `target_pool` 字段，6 个变体（MAIN / REGISTRY / GATEWAY_POOL / CONTAINER / REGISTRY_TLD_COW / REGISTRY_TLD_COWBOY）。详见 [[settlement-slashing]] §SettlementConfig |
+| `SubmitProposal/CastVote/ExecuteProposal` opcodes 45/46/47 | ✅ 代码已分配占位（`node/types/src/execution.rs:517-525`），完整双院流程未实现 |
+| `UpdateBasefeeConfig` opcode 44 / `UpdateTimerConfig` opcode 49 | ✅ 代码占位；前者 CIP-3 governance、后者 CIP-5 revised §6.4 治理可调 |
+| `UpdateCpuRoot` (opcode 58) / `UpdateNrasRoot` (opcode 59) | ❌ CIP-23 v2 §4 spec：`0x09` 通过这两条更新 TEE 根证书，`effective_at` 强制 ≥ 1 week 延迟 |
 | 治理投票 / Temp check / 双院 / Timelock | ❌ 未实现 |
 | Security Council / Fast-Track / Circuit-Break | ❌ 未实现 |
 | 系统 Actor 字节码升级（`SystemActorUpgrade` payload）| ❌ 未实现（Tier 3 Payload 与现有 opcode 43 `UpgradeActor` 并非同一物，需分清）|

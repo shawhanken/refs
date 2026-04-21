@@ -1,11 +1,13 @@
 ---
 type: concept
-tags: [vrf, selection, algorithm, cip-2]
+tags: [vrf, selection, algorithm, cip-2, cip-13, cip-23]
 sources:
   - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-13-runner-delegation-v2.md
+  - refs/cips/cip-23-tee-execution-v2.md
   - refs/runner/2026-03-05_deterministic_runner_selection.md
   - refs/runner/2026-03-05_deterministic_runner_selection_en.md
-last_updated: 2026-04-15
+last_updated: 2026-04-21
 status: authoritative
 ---
 
@@ -34,9 +36,11 @@ Job Dispatcher（`0x02`）用确定性但不可预测的算法从注册 Runner �
 
 2. **Stake 权重计算**（每个候选）:
    ```
-   weight(r) = floor(log₂(stake_r / MIN_STAKE + 1)) + 1
+   weight(r) = floor(log₂(effective_stake_r / MIN_STAKE + 1)) + 1
    ```
    对数化避免巨鲸垄断；所有合格 Runner 权重 ≥ 1。
+
+   **CIP-13 v2 §2 显式 amend CIP-2 §5.4**：基数从 `registration.stake` 改为 `effective_stake = registration.stake + delegation_totals.total_active`。委托质押直接计入 VRF 权重。`log₂` 压缩仍生效，限制极端集中。
 
 3. **VRF seed**: `seed = VRF(prev_block_hash ‖ job_id ‖ epoch)`
 
@@ -65,6 +69,12 @@ Job Dispatcher（`0x02`）用确定性但不可预测的算法从注册 Runner �
 - 调度器重新运行算法（`seed = VRF(... ‖ nonce)` nonce++）
 - 移除原 Runner 从候选池（本 Job 内），降低其信誉
 - **无 `skip_task` 机制**（2026-03-05 废除）
+
+---
+
+## CIP-23 v2 TEE 资格过滤（amend CIP-2 §5.4 step 4）
+
+`tee_required = true` 的 job：dispatcher 候选池预过滤改用 `MeasurementBinding.status == Active && expires_at > submission_block`（不再用自报 `runner.capabilities.tee_support` 布尔）。**TEE 资格是分类能力检查（categorical），与 stake 无关** —— 即低自质押 + 高委托的 runner 仍可作 TEE runner（资格独立、权重靠委托）。详见 [[tee-attestation]] §3。
 
 ---
 

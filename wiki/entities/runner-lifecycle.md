@@ -3,14 +3,15 @@ type: entity
 tags: [runner, lifecycle, cip-2, cip-13, cip-23]
 sources:
   - refs/cips/cip-2-offchain-compute.mdx
-  - refs/cips/cip-13-runner-delegation.md
-  - refs/cips/cip-23-tee-execution.md
+  - refs/cips/cip-2-offchain-compute-v2.md
+  - refs/cips/cip-13-runner-delegation-v2.md
+  - refs/cips/cip-23-tee-execution-v2.md
   - refs/runner/2026-01-27_NODE_ACTOR_RUNNER_FLOW.md
   - refs/runner/2026-01-27_README_CN.md
   - refs/runner/2026-02-05_DOCUMENTATION.md
   - refs/runner/2026-03-03_Entitlement.md
   - refs/runner/2026-03-05_deterministic_runner_selection.md
-last_updated: 2026-04-20
+last_updated: 2026-04-21
 status: authoritative
 ---
 
@@ -44,13 +45,14 @@ runner register --stake <N CBY> --verification-modes [None|MajorityVote|...]
 
 详见 [[../concepts/tee-attestation]]。
 
-### 阶段 1b（可选，CIP-13 Draft）：接受委托
+### 阶段 1b（可选，CIP-13 v2 Draft）：接受委托
 
-Runner 可通过 `RunnerUpdateDelegationConfig` 打开 `DelegationConfig { accept_delegation, commission_bps, max_delegated_stake, min_delegation }`。打开后：
+Runner 可通过 `RunnerUpdateDelegationConfig`（**opcode 52**，CIP-13 v2 §1 主表）打开 `DelegationConfig { accept_delegation, commission_bps, max_delegated_stake, min_delegation }`。打开后：
 
-- **有效质押** = 自质押 + 委托 Active 总额；VRF 权重与最大 Job 价值均基于此
+- **有效质押** = 自质押 + 委托 Active 总额；VRF 权重与最大 Job 价值均基于此（CIP-2 §5/§6 amendment）
 - **自质押下限** = `max(10,000 CBY, effective_stake × MIN_SELF_BOND_BPS / 10000)`（默认 10%）
 - Commission 改动下一 epoch 生效；其他字段立即生效
+- Delegator 5 个新 opcode（52-56）：`RunnerDelegateStake` / `RunnerIncreaseDelegation` / `RunnerUndelegateStake` / `RunnerClaimUnbonded` 等
 - 详见 [[../concepts/runner-delegation]]
 
 ---
@@ -86,7 +88,8 @@ Runner 守护进程（workspace `runner/`）：
 Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - 按 Job 声明的 `VerificationMode` 分支验证（[[../concepts/runner-verification]]）
 - 若 `MajorityVote` / `StructuredMatch`：等待 N-of-M 结果 commit-reveal 后聚合
-- 若 `Deterministic`：TEE attestation + 字节级相同（**CIP-23 Draft**：强制调 `0x05::VerifyCae` 逐条验 CAE；任一失败整 Job 失败）
+- 若 `Deterministic`：TEE attestation + 字节级相同（**CIP-23 v2 Draft**：强制调 `0x05::VerifyCae`（**opcode 57**，CIP-23 v2 §4 从 v1 §3.6.2 的 50 改正）逐条验 CAE；任一失败整 Job 失败）
+- 若 `MajorityVote` + `DnsTxtRecordMatch` / `DnsCnameMatch` 检查（CIP-2 v2 §2 + CIP-16 v2 §5.3 新增 verifier check）：N-of-M runner 各查 `min_resolvers` 个独立 DNS resolver，多数决
 
 ---
 
@@ -119,10 +122,10 @@ Runner 提交结果到 `0x03`（RESULT_VERIFIER）：
 - Dispute 被判定有效
 
 规则：
-- 50% 入 TREASURY（0x08），50% burn
+- 默认 50% TREASURY (`0x08`) / 50% burn；CIP-13 v2 §4 改用 `system:settlement_config.slash_*_percent`（治理可调，仍走 `UpdateSettlementConfig` opcode 40）
 - 若 stake 降至 `MIN_STAKE` 以下 → 设 `reputation = 0`（冻结接单）
 - `slash_runner()` in `node/execution/src/runner/verifier.rs`
-- **若接受委托（CIP-13 Draft）**：Slash 按 `self_stake + Σ slashable_tranches` 比例分摊；自质押不受封顶，Delegator 侧受 `MAX_DELEGATION_SLASH_PER_EPOCH_BPS`（默认 500 bps）per-epoch 限制；**Unbonding 中但 `now < claimable_at` 的 Tranche 仍可 slash**（防 slash-and-run）
+- **若接受委托（CIP-13 v2 Draft）**：Slash 按 `self_stake + Σ slashable_tranches` 比例分摊；自质押不受封顶，Delegator 侧受 `MAX_DELEGATION_SLASH_PER_EPOCH_BPS`（默认 500 bps）per-epoch 限制；**Unbonding 中但 `now < claimable_at` 的 Tranche 仍可 slash**（防 slash-and-run）
 
 ---
 

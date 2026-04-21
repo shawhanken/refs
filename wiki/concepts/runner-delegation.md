@@ -2,21 +2,24 @@
 type: concept
 tags: [runner, delegation, staking, cip-13, draft]
 sources:
+  - refs/cips/cip-13-runner-delegation-v2.md
   - refs/cips/cip-13-runner-delegation.md
-  - refs/cips/cip-2-offchain-compute.mdx
+  - refs/cips/cip-2-offchain-compute-v2.md
+  - refs/cips/cip-23-tee-execution-v2.md
   - refs/plans/runner-economics-and-delegation-cip13.md
   - node/runner/src/system_actors.rs
   - node/execution/src/runner/dispatcher.rs
   - node/execution/src/runner/verifier.rs
-last_updated: 2026-04-17
+  - node/types/src/execution.rs
+last_updated: 2026-04-21
 status: draft
 ---
 
-# Runner Stake 委托（CIP-13）
+# Runner Stake 委托（CIP-13 v2）
 
 CBY 持有人可将代币**锁定委托**给某 Runner，提升其有效质押（VRF 权重与最大 Job 价值），换取 Runner 配置的 89% 结算分成的一部分。协议只实现**最小 hook**（注册、分账、slash 级联、解绑）；流动性质押池、收益代币、舰队管理金库等由三方 Actor 在此之上构建。
 
-**状态**：CIP-13 为 Draft（2026-04-12 创建），`Requires: CIP-12`；本页随之为 draft；协议尚未实现。opcode 40–44 与现有 SystemInstruction 40–43 **冲突**（CIP-13 中有 TODO）。
+**状态**：CIP-13 v1 创建于 2026-04-12，CIP-13 v2 alignment 于 2026-04-21；`Requires: CIP-12`；协议尚未实现。**v1 提议的 opcodes 40–44 与代码 `node/types/src/execution.rs:509-541` 已分配的 40–51 全段冲突**（v1 §3.3 自带 TODO；CIP-13 v2 §1 重排到 **52–56**，并把全 v2 系列的 opcode 主分配表落地于此 —— 详见下文 §"新增 SystemInstruction"）。
 
 **配套设计指南**：`refs/plans/runner-economics-and-delegation-cip13.md` 提供了超出 CIP-13 文本的**框架性解读**（见 §"核心框架：Compute as a Segmented Yield Primitive"）。
 
@@ -132,17 +135,19 @@ effective_stake = registration.stake + delegation_totals.total_active
 
 ---
 
-## 新增 SystemInstruction（5 个）
+## 新增 SystemInstruction（5 个，CIP-13 v2 §1 主分配表）
 
-| 指令 | 草案 opcode | 发起方 | 说明 |
-|---|---|---|---|
-| `RunnerUpdateDelegationConfig` | 40* | Runner | 开启/调整 DelegationConfig |
-| `RunnerDelegateStake` | 41* | Delegator | 首次委托或追加时建新 Active Tranche |
-| `RunnerIncreaseDelegation` | 42* | Delegator | 已有 Active Tranche 的追加（省去 `MAX_DELEGATORS_PER_RUNNER` 检查）|
-| `RunnerUndelegateStake` | 43* | Delegator | 按 FIFO 从 Active 抽出 `amount`，转 Unbonding |
-| `RunnerClaimUnbonded` | 44* | Delegator | 到期提取（显式列 `tranche_ids`，`len <= CLAIM_MAX_TRANCHES = 32`）|
+CIP-13 v2 §1 是全 v2 系列的 **canonical opcode master allocation table**。代码现状 `node/types/src/execution.rs:482-541` 已分配 0–51（含 CIP-5 revision 的 48/49/50 timer ops 与 51 DeployCode）。CIP-13 v2 取 52–56：
 
-**\* opcode 冲突**：40–43 在 `node/types/src/execution.rs:1281-1294` 已被 `UpdateSettlementConfig / FundActor / KeyDelivery / UpgradeActor` 占用。CIP-13 已加 TODO，实现前必须重排（推荐 44–48 或下一段空位）。
+| Opcode | 指令 | 发起方 | 说明 |
+|---:|---|---|---|
+| **52** | `RunnerUpdateDelegationConfig` | Runner | 开启/调整 DelegationConfig |
+| **53** | `RunnerDelegateStake` | Delegator | 首次委托或追加时建新 Active Tranche |
+| **54** | `RunnerIncreaseDelegation` | Delegator | 已有 Active Tranche 的追加（省去 `MAX_DELEGATORS_PER_RUNNER` 检查）|
+| **55** | `RunnerUndelegateStake` | Delegator | 按 FIFO 从 Active 抽出 `amount`，转 Unbonding |
+| **56** | `RunnerClaimUnbonded` | Delegator | 到期提取（显式列 `tranche_ids`，`len <= CLAIM_MAX_TRANCHES = 32`）|
+
+后续 v2 opcode 在主表中：57–60 = CIP-23 v2 (`VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces`，从 v1 50–53 修正）；61–64 = CIP-10 v2 (Container Registry 治理指令)；65 = CIP-14 v2 `IngressDispatch`；66 = CIP-14 v2 `CompleteReceipt`；67 = CIP-16 v2 `ExternalDomainCallback`。68+ 保留。
 
 **Redelegation（原子转委托）刻意不实现**：需要双重责任记账（源 Runner slash 窗口结束前与目标 Runner 同时可 slash），复杂度过高。v1 只能 undelegate → 等 24h → delegate。
 
@@ -243,12 +248,13 @@ CIP-12 §6.2 定义 Stake 院权重为**质押给 Validator 的 CBY**。Runner �
 | 规范要素 | 代码现状 |
 |---|---|
 | `RunnerRegistration` | ✅ 已有；需加 `delegation_config: Option<DelegationConfig>` 字段 |
-| VRF 权重基数 | ✅ 已用 `registration.stake`；CIP-13 要求改为 `effective_stake` |
-| `slash_runner()` | ✅ 已有（50/50 treasury/burn）；需加 tranche 级联与 per-epoch cap |
+| VRF 权重基数 | ✅ 已用 `registration.stake`；CIP-13 v2 §2 显式 amend CIP-2 §5.4 改为 `effective_stake` |
+| Max job value | ✅ 已用 `registration.stake × 2/3`；CIP-13 v2 §3 显式 amend CIP-2 §6 改为 `effective_stake × 2/3` |
+| `slash_runner()` | ✅ 已有（默认 50/50 treasury/burn）；CIP-13 v2 §4 改用 `system:settlement_config.slash_*_percent` 治理可调；需加 tranche 级联与 per-epoch cap |
 | 结算分账 | ✅ 现为 `per_runner / consensus_count`；需加 `delegator_pool` 切分 |
-| `RunnerDeregister` | ❌ 当前 `UnsupportedInstruction`，CIP-13 要求实装 force-unbond |
+| `RunnerDeregister` | ❌ 当前 `UnsupportedInstruction`，CIP-13 v2 要求实装 force-unbond |
 | Tranche 存储键族 | ❌ 新增在 `0x01` 下 |
-| Opcode 40–44 占用 | ⚠️ **冲突**，见 [[../drift]] |
+| Opcodes 52–56 | ❌ v2 spec 落在 free range（代码 0–51 已用）|
 
 ---
 
@@ -263,14 +269,17 @@ CIP-12 §6.2 定义 Stake 院权重为**质押给 Validator 的 CBY**。Runner �
 
 ## 源文档冲突 / 漂移
 
-- **CIP-13 opcode 40–44 与 `node/types/src/execution.rs:1281-1294` 现有 opcode 40 `UpdateSettlementConfig` / 41 `FundActor` / 42 `KeyDelivery` / 43 `UpgradeActor` 冲突**。CIP-13 已加 TODO，实现前需重排。[[../drift]] 已记录。
+- **opcode 重排**：CIP-13 v1 §3.3 提议 40-44，与代码 `SYS_UPDATE_SETTLEMENT_CONFIG=40` ... `SYS_UPGRADE_ACTOR=43` 冲突；早期 CIP-13 v2 草案改 44-48，**仍冲突**（代码 44-51 是 basefee/governance/timer/deploy）。CIP-13 v2 §1 现行版本落在 **52-56**（代码 0-51 已用，52+ 为 free）。详见 [[../drift]]。
 - CIP-13 §9.5 明确不实装原子 Redelegation，需外部流动质押池平滑 24h 等待。
+- **CIP-23 v2 §3 正交**：TEE runner 接受委托后，TEE 资格仍由 `MeasurementBinding.status` 决定（categorical capability check），与 stake 来源无关。
 
 ## Sources
 
-- `refs/cips/cip-13-runner-delegation.md` — 全文规范（Draft, 2026-04-12）
-- `refs/cips/cip-2-offchain-compute.mdx` — 当前 Runner 框架与自质押基线
+- `refs/cips/cip-13-runner-delegation-v2.md` — v2 alignment（Draft, 2026-04-21）：opcode 52-56 + 主分配表 + CIP-2 §5/§6 显式 amendment + CIP-23 v2 正交说明 + slash routing 走 SettlementConfig
+- `refs/cips/cip-13-runner-delegation.md` — v1 原文（Draft, 2026-04-12）保留参考
+- `refs/cips/cip-2-offchain-compute-v2.md` / `cip-2-offchain-compute.mdx` — Runner 框架与自质押基线
+- `refs/cips/cip-23-tee-execution-v2.md` §3 — 与 TEE 资格的正交关系
 - `refs/plans/runner-economics-and-delegation-cip13.md` — 配套设计指南（"Compute as Segmented Yield Primitive"、两种 tip 辨析、双重通缩、架构总览图）
 - `node/runner/src/system_actors.rs:13-21` — `0x01`–`0x05` 地址
 - `node/execution/src/runner/{registry,dispatcher,verifier}.rs` — 实装位置（需改动）
-- `node/types/src/execution.rs:1281-1294` — opcode 40–43 现有占用
+- `node/types/src/execution.rs:482-541` — opcodes 0–51 现有占用
