@@ -1170,6 +1170,7 @@ The current low-byte sequence (`node/types/src/constants.rs`, `node/runner/src/s
 | `0x0C` | `ROUTE_REGISTRY` (CIP-14-aligned §4) | new |
 | `0x0D` | `GATEWAY_REGISTRY` (CIP-14-aligned §7) | new |
 | `0x0E` | `RECEIPT_REGISTRY` (CIP-14-aligned §8) | new |
+| `0x0F` | `CONTAINER_REGISTRY` (CIP-10 v2 Part II §1) | new |
 
 Rationale: keeping the sequence dense matches `system_actors.rs` convention and avoids the appearance of a reserved block. Original CIP-14 numbers (`0x0011` / `0x0012`) are renumbered to `0x0C` / `0x0D`.
 

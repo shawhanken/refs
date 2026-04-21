@@ -1922,3 +1922,32 @@ This addendum corrects an over-broad set of "missing" items previously listed in
 | Claim that `PUBLIC_READ` is the CBFS visibility name | Wrong — CBFS uses `Visibility::Public`; original CIP-15 was the document with the typo |
 
 The corrected references are tracked in the updated former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs) §7 and `cip-15-public-asset-hosting-v2.md` (Part II) §1 / §3 / §5.3.
+
+---
+
+## 10. CIP-11 reference correction (v1 errata)
+
+CIP-9 v1 references **CIP-11** in multiple places (e.g., §1 "enabling use cases like web asset hosting (CIP-11)"; §7.6 "DNS-addressable actors (CIP-11)"). There is no CIP-11 in this repository. The work that was tentatively numbered CIP-11 was split into:
+
+- **CIP-14** (`cip-14-dns-addressable-actors-v2.md`) — DNS-addressable actors
+- **CIP-15** (`cip-15-public-asset-hosting-v2.md`) — Public asset hosting
+
+All v1 references to "CIP-11" SHOULD be read as referring to **CIP-14 + CIP-15** collectively, depending on context:
+
+| v1 § | v1 phrase | Correct reference |
+|---|---|---|
+| §1 (Abstract) | "enabling use cases like web asset hosting (CIP-11)" | CIP-15 |
+| §7.6.1 (Public Volumes Overview) | "enables DNS-addressable actors (CIP-11)" | CIP-14 |
+| §7.6.1 (same paragraph) | "serve static web assets" | CIP-15 |
+
+This is documentation-only; no protocol change.
+
+## 11. STORAGE_MANAGER concrete address (v1 errata)
+
+CIP-9 v1 §11.1 reads "A new system actor at a canonical address (e.g., `0x0...cowboy.storage`)". The concrete address is:
+
+> **`STORAGE_MANAGER = 0x0A`**
+
+per `node/runner/src/system_actors.rs:31`. All v1 references to `0x0...cowboy.storage` resolve to `0x0A`. The companion Relay Registry is at `0x0B` (CIP-9 v1 §11.2 referenced as "0x0...cowboy.relay" — same correction).
+
+`ext_cip-2-9-10-runner-fee-chain.md` Phase 0 also lists "Volume Registry (address TBD)" — that is the same `0x0A` Storage Manager. No separate "Volume Registry" actor exists or is needed.
