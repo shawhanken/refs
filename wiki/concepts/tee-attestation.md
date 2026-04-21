@@ -129,13 +129,13 @@ CIP-10 原 `BillingAttestation.tee_signature: Option<Vec<u8>>` 改为 `Option<Co
 
 ## 硬件栈选型（`refs/plans/cowboy-tee-execution-design.md` §4）
 
-| Tier | 选择 |
-|---|---|
-| **主 CPU** | Intel TDX |
-| **主 GPU** | NVIDIA NCC (H100 / H200) |
-| **次 CPU** | AMD SEV-SNP, AWS Nitro Enclaves |
-| **三线** | ARM CCA（年轻），SGX（legacy）|
-| **启用层** | Confidential Containers (CoCo) + Trustee / KBS |
+| Tier      | 选择                                             |
+| --------- | ---------------------------------------------- |
+| **主 CPU** | Intel TDX                                      |
+| **主 GPU** | NVIDIA NCC (H100 / H200)                       |
+| **次 CPU** | AMD SEV-SNP, AWS Nitro Enclaves                |
+| **三线**    | ARM CCA（年轻），SGX（legacy）                        |
+| **启用层**   | Confidential Containers (CoCo) + Trustee / KBS |
 
 CVM 基础镜像：`cowboy/runner-tee-base:v1`，CIP-10 §5.5 扩展；Yocto / buildroot 可复现构建。
 

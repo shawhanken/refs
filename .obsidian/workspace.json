@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "wiki/concepts/actor-model.md",
+                "file": "wiki/concepts/tee-attestation.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "actor-model"
+              "title": "tee-attestation"
             }
           }
         ]
@@ -185,32 +185,35 @@
   },
   "active": "0d7064b5bfd3dee3",
   "lastOpenFiles": [
-    "wiki/concepts/runner-delegation.md",
-    "wiki/parameters.md",
-    "wiki/concepts/governance.md",
-    "wiki/concepts/runner-verification.md",
-    "wiki/concepts/continuation.md",
-    "wiki/concepts/basefee.md",
-    "wiki/concepts/actor-model.md",
-    "wiki/concepts/vrf-runner-selection.md",
+    "cips/cip-20-fungible-tokens.mdx",
+    "cips/cip-18-payment-gating.md",
+    "cips/cip-11-runner-connectivity.md",
+    "cips/cip-3-fee-model.mdx",
+    "cips/cip-2-offchain-compute.mdx",
+    "cips/cip-1-actor-scheduler.mdx",
+    "whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md",
+    "cips/cip-9-runner-storage-v2.md",
+    "cips/cip-2-offchain-compute-v2.md",
+    "cips/cip-16-custom-domains-v2.md",
+    "cips/cip-15-public-asset-hosting-v2.md",
+    "cips/cip-14-dns-addressable-actors-v2.md",
     "wiki/concepts/timer-mechanism.md",
+    "wiki/concepts/tee-attestation.md",
     "wiki/concepts/speculative-execution.md",
     "wiki/concepts/settlement-slashing.md",
-    "plans/runner-economics-and-delegation-cip13.md",
-    "plans/runner-economics-and-delegation(CIP13).md",
-    "plans/governance-7phase-roadmap.md",
-    "plans/basefee-constants-lower.md",
+    "wiki/concepts/runner-verification.md",
+    "wiki/concepts/runner-delegation.md",
+    "wiki/concepts/public-asset-hosting.md",
+    "wiki/concepts/governance.md",
+    "wiki/concepts/dual-gas-model.md",
+    "wiki/concepts/dns-addressable-actors.md",
+    "wiki/concepts/custom-domains.md",
+    "wiki/entities/runner-lifecycle.md",
+    "wiki/entities/system-actors.md",
+    "wiki/entities/route-registry.md",
     "wiki/entities/plans-inventory.md",
-    "plans/transfer-lifecycle-profiling.md",
-    "plans/wallet-ui-dark-theme.md",
-    "plans/wallet-passkey-protection.md",
-    "plans/validator-10100-stall-fix.md",
-    "plans/tps-improvement-roadmap.md",
-    "plans/tps-avg-throughput-improvement.md",
-    "plans/runner-test-coverage-plan.md",
-    "plans/receipt-pruning-periodic.md",
-    "plans/pvm-structured-errors.md",
-    "plans/pvm-bytecode-gas-feasibility.md",
+    "wiki/entities/node.md",
+    "wiki/entities/gateway.md",
     "plans"
   ]
 }
