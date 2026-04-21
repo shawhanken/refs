@@ -1951,3 +1951,16 @@ CIP-9 v1 §11.1 reads "A new system actor at a canonical address (e.g., `0x0...c
 per `node/runner/src/system_actors.rs:31`. All v1 references to `0x0...cowboy.storage` resolve to `0x0A`. The companion Relay Registry is at `0x0B` (CIP-9 v1 §11.2 referenced as "0x0...cowboy.relay" — same correction).
 
 `ext_cip-2-9-10-runner-fee-chain.md` Phase 0 also lists "Volume Registry (address TBD)" — that is the same `0x0A` Storage Manager. No separate "Volume Registry" actor exists or is needed.
+
+---
+
+## 12. PoR challenge timer `fee_payer` (CIP-5 revision alignment)
+
+CIP-5 (revised 2026-04-20) §6.3 introduces a per-fire `fee_payer` model: every CIP-5 timer fire is metered (`max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee`) and pre-charged from `fee_payer`. CIP-9 v1 §5.6 describes a periodic PoR-challenge timer ("A periodic onchain timer (CIP-5, every `POR_CHALLENGE_INTERVAL` blocks)") but pre-dates the fee model.
+
+v2 alignment:
+
+- The PoR challenge timer MUST be scheduled with `fee_payer = STORAGE_MANAGER` (`0x0A`).
+- The Storage Manager funds itself from `POR_CHALLENGE_FEE_SHARE` of the storage fee pool (CIP-9 v1 §5.7) — same source as today, only the routing through `fee_payer` is new.
+- If the Storage Manager balance is insufficient at fire time (highly unusual since the pool is replenished every epoch by storage rent), CIP-5 self-destructs the timer with `TimerCancelledInsufficientFunds`. The Storage Manager SHOULD subscribe to this event and emit `PorChallengePaused { reason: INSUFFICIENT_POOL }`; challenges resume on the next interval after the pool refills.
+- No change to PoR semantics, challenge generation, or shard validation. Only the timer's billing source is now explicit.

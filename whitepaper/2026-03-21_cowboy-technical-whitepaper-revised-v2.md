@@ -1185,7 +1185,9 @@ CIP-14-aligned §8 introduced this as a one-off for HTTP receipts. The constrain
 
 ---
 
-## Delta 4 — System-reserved selectors
+## Delta 4 — System-mediated message authenticity (revised; selector reservation withdrawn)
+
+> **Note.** An earlier WP-v2 draft of this delta proposed adding a "system-reserved selectors" mechanism (the PVM router would reject non-system senders for reserved selectors like `"http.request"`). That proposal was withdrawn in CIP-14 v2 §6.2 because it broke router-actor forwarding patterns. The revised delta below describes the actually-canonical approach: handler-side `ctx.sender` checks against the canonical sender table.
 
 ### Proposed insertion: §6.y (PVM Execution)
 
@@ -1245,6 +1247,48 @@ CIP-15-aligned moves route manifests out of CBFS volumes (where the original CIP
 
 ---
 
+## Delta 6 — System actor address allocation correction (WP §9)
+
+### Proposed insertion: §9 amendment (replace existing 0x0A entry)
+
+WP §9 (line 704) currently asserts `0x0A = Container Image Registry (CIP-10)`. This conflicts with the canonical code allocation in `node/runner/src/system_actors.rs:31`, which assigns `0x0A = STORAGE_MANAGER (CIP-9)`. The CIP-9 allocation is implemented and shipping; the WP §9 entry is stale.
+
+WP §9 normative text already says "**If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**" — but it does not extend the same deference to CIP-9 / CIP-10. This delta does so.
+
+#### Proposed text
+
+> **§9.* — Corrected system actor allocation**
+>
+> The canonical low-byte system actor allocation, authoritative as `node/runner/src/system_actors.rs` and the CIP v2 series:
+>
+> | Address | Actor | Source |
+> |---:|---|---|
+> | `0x01` | Runner Registry | CIP-2 |
+> | `0x02` | Job Dispatcher | CIP-2 |
+> | `0x03` | Result Verifier | CIP-2 |
+> | `0x04` | Secrets Manager | CIP-2 |
+> | `0x05` | TEE Verifier | CIP-2 / CIP-23 v2 |
+> | `0x06` | DualBasefee | CIP-3 |
+> | `0x07` | Entitlement Registry | CIP-2 |
+> | `0x08` | Treasury | CIP-2 |
+> | `0x09` | Governance | CIP-12 |
+> | `0x0A` | **Storage Manager (CIP-9)** — supersedes WP §9's prior "Container Image Registry" claim | CIP-9 |
+> | `0x0B` | Relay Registry | CIP-9 |
+> | `0x0C` | Route Registry | CIP-14 v2 |
+> | `0x0D` | Gateway Registry | CIP-14 v2 |
+> | `0x0E` | Receipt Registry | CIP-14 v2 |
+> | `0x0F` | Container Registry | CIP-10 v2 |
+>
+> **Container Registry** (CIP-10 v2 §1) is at `0x0F`, NOT `0x0A`. WP §9 readers should treat the v1 WP table's `0x0A = Container Image Registry` entry as obsolete — code chose `0x0A` for `STORAGE_MANAGER` (CIP-9) because CIP-9 was implemented first and the conflict was resolved in code's favor.
+>
+> **Conflict resolution rule (revised):** If this WP conflicts with any deployed CIP on system actor allocations, the deployed CIP is authoritative; if no CIP is deployed for a contested address, the lowest-numbered CIP claiming the address wins.
+
+### Rationale
+
+WP §9's "0x0A = Container Image Registry" predates the CIP-9 implementation. Code took 0x0A for STORAGE_MANAGER because CIP-9 was further along. CIP-10 v2 §1 reallocated Container Registry to 0x0F to resolve the collision. The WP needs to reflect what code did.
+
+---
+
 ## 6. Summary
 
 | Delta | Proposed WP section | Required by |
@@ -1252,8 +1296,9 @@ CIP-15-aligned moves route manifests out of CBFS volumes (where the original CIP
 | 1 — Stake vs. operating balance | §17.x | CIP-14-aligned §6.3; existing runner / relay practice |
 | 2 — Read-only handler execution | §6.x | CIP-14-aligned §5 |
 | 3 — Deferred result storage | §9.x | CIP-14-aligned §8 |
-| 4 — System-reserved selectors | §6.y | CIP-14-aligned §6.2, CIP-16-aligned §5.6 |
+| 4 — System-mediated message authenticity (selector reservation withdrawn) | §6.y | CIP-14-aligned §6.2, CIP-16-aligned §5.6 |
 | 5 — Owner-mutable config at STORAGE_MANAGER | §9.y | CIP-15-aligned §4.1, §7.1 |
+| 6 — System actor address allocation correction (WP §9 0x0A) | §9 amendment | CIP-9, CIP-10 v2 §1 |
 
 These deltas are scoped to the alignment exercise. They do not address other potential WP revisions (CIP-13 actor-model delegation, CIP-23 TEE execution, CIP-21 liquidity pools, etc.); those would require separate analysis.
 
@@ -1323,9 +1368,9 @@ This brief does not propose any change to the WP itself.
 
 > WP claim: every privileged actor capability flows through a manifest-declared entitlement, validated against the normative registry at deploy time.
 
-- **CIP-14-aligned**: respected. `ingress.http` becomes a real `RegistryEntry` in `node/types/src/registry.rs::REGISTRY` (the alignment-conventions content (now inlined as Part III of cip-14/15/16 v2 docs) §2.1). The aligned draft drops the original's "Quota: ✅" because the registry has no on-chain quota accumulation primitive — `quota: false` matches reality.
-- **CIP-15-aligned**: respected. Separate `ingress.static` entitlement (the alignment-conventions content (now inlined as Part III of cip-14/15/16 v2 docs) §2.2) keeps the param schema flat (works inside actual `ParamValue` shape constraints — no nested objects needed). Coexistence rule: declaring `ingress.static` without `ingress.http` is rejected.
-- **CIP-16-aligned**: respected. New `dns.attach_external` entitlement gates external attachment per actor.
+- **CIP-14-aligned**: respected. `ingress.http` is **proposed as** a new `RegistryEntry` in `node/types/src/registry.rs::REGISTRY` (precondition for CIP-14 v2 activation; the registry currently has 14 entries and would gain a 15th). The aligned draft drops the original's "Quota: ✅" because the registry has no on-chain quota accumulation primitive — `quota: false` matches reality. **Until the registry entry actually lands in code, CIP-14 v2 cannot activate.**
+- **CIP-15-aligned**: respected. Separate `ingress.static` entitlement (proposed as a 16th registry entry; precondition for CIP-15 v2 activation) keeps the param schema flat (works inside actual `ParamValue` shape constraints — no nested objects needed). Coexistence rule: declaring `ingress.static` without `ingress.http` is rejected.
+- **CIP-16-aligned**: respected. New `dns.attach_external` entitlement (proposed 17th registry entry) gates external attachment per actor. Same activation precondition as CIP-14/15 v2: the registry entry must land in code before CIP-16 v2 can activate.
 
 ## 7. Self-sovereign service primitive
 

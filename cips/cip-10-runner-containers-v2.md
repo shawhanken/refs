@@ -15,7 +15,7 @@ description: Code-aligned v2 — concrete container registry actor address (0x0F
 > - **Fee distribution routes through `SettlementConfig`** at `GOVERNANCE_SYSTEM_ACTOR=0x09` via the existing `UpdateSettlementConfig` opcode with `target_pool: CONTAINER` discriminant. Same pattern as CIP-2/3/14/15 v2.
 > - **Three-flow off-chain billing model** clarified: runner job (CIP-2), storage rent (CIP-9), container compute (CIP-10) are independent escrows that share only the SettlementConfig template.
 > - **`BillingAttestation.tee_signature` upgrades to `CompositeAttestation`** per CIP-23 v2 §3.12.
-> - **System instruction opcodes 60–63** allocated for image / class registration (governance-only senders). No collision with CIP-13 v2 (44–48), CIP-23 (50–53), or current allocations (40–43).
+> - **System instruction opcodes 61–64** allocated for image / class registration (governance-only senders) per the canonical master table in CIP-13 v2 §1. Earlier draft used 60–63; renumbered to give CIP-23 v2 the 57–60 range cleanly. Code currently allocates 0–51; the master table extends from 52 upward.
 
 ---
 
@@ -1104,18 +1104,18 @@ pub tee_signature: Option<CompositeAttestation>,    // per CIP-23 §3.4
 
 Verification: `0x0F` Container Registry calls `0x05::VerifyCae` with `result_hash = keccak(billing_fields_rlp)` per CIP-23 §3.12 pipeline. Non-TEE runners continue to self-sign and rely on the `BILLING_DISPUTE_WINDOW = 300` blocks for dispute resolution; v1 §12.3 dispute table is otherwise unchanged.
 
-### 5. Container Registry instructions (opcodes 60–63)
+### 5. Container Registry instructions (opcodes 61–64)
 
-CIP-10 v1 implies but does not enumerate the system instructions for image / class management. v2 names them and allocates concrete opcodes:
+CIP-10 v1 implies but does not enumerate the system instructions for image / class management. v2 allocates concrete opcodes per the canonical master table in CIP-13 v2 §1:
 
 | Opcode | Instruction | Sender |
 |---:|---|---|
-| 60 | `RegisterBaseImage { name, digest, size_bytes, platforms }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
-| 61 | `DeregisterBaseImage { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
-| 62 | `RegisterResourceClass { name, cpu, memory, disk, max_duration, gpu_count, gpu_min_vram }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
-| 63 | `DeregisterResourceClass { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **61** | `RegisterBaseImage { name, digest, size_bytes, platforms }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **62** | `DeregisterBaseImage { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **63** | `RegisterResourceClass { name, cpu, memory, disk, max_duration, gpu_count, gpu_min_vram }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **64** | `DeregisterResourceClass { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
 
-Opcodes 60–63 do not collide with: CIP-13 v2 (44–48), CIP-23 (50–53), or current code (40–43). See CIP-23 v2 Part II §4 for the full opcode map.
+Earlier CIP-10 v2 drafts proposed 60–63; renumbered here to give CIP-23 v2 §4 the 57–60 range cleanly. The canonical master allocation table is in CIP-13 v2 §1.
 
 ### 6. Backwards compatibility
 

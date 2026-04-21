@@ -13,7 +13,7 @@ description: Code-aligned v2 — real PVM syscalls, real RPC primitives, real ad
 >
 > - **`queryActor` → `read_handler` RPC + PVM read-only mode.** v1 referenced a hypothetical "Milestone 2 §5.2 `queryActor`" that does not exist in `node/rpc/src/rpc.rs`. v2 specifies a concrete RPC and PVM mode flag with an exhaustive trapped-syscall table.
 > - **System actor renumbering** `0x0011` / `0x0012` → `0x0C` / `0x0D` / `0x0E` (continues the existing `0x01..0x0B` sequence).
-> - **System-reserved selector for `"http.request"`.** v1 placed authenticity in SDK `ctx.sender` checks; v2 makes it a protocol invariant via PVM router rejection of non-system senders.
+> - **Sender authenticity for `"http.request"`.** Actors check `ctx.sender == GATEWAY_REGISTRY=0x0D` (SDK-default in `@http.handler`). An earlier CIP-14 v2 draft proposed PVM-router selector reservation; that proposal is **withdrawn** because it broke router-actor forwarding patterns — see §6.2 Note.
 > - **Receipt registry replaces `_http/results/{request_id}` actor-KV pattern.** Avoids exhausting `MAX_TIMERS_PER_ACTOR=1024` per actor.
 > - **Stake vs. operating balance separation.** Gateway stake stays locked collateral; gas comes from the operating account. Actor-funded ingress uses existing `Action::UseOwnerBalance`.
 > - **Real syscall names.** Trap table uses `state_set` / `schedule_timer` / `token_transfer` / `submit_job` (not `set_storage` / `set_timeout` / `transfer` / `submit_task`). Adds `randomness` to the trap list — v1 missed it.
@@ -1020,9 +1020,9 @@ The original CIP-14 §11.3 omitted `randomness` from the trapped list, which wou
 
 ## 6. Command path (system-mediated)
 
-### 6.1 `IngressDispatch` system instruction
+### 6.1 `IngressDispatch` system instruction (opcode 65)
 
-A new `SystemInstruction` opcode `IngressDispatch` carries:
+A new `SystemInstruction` opcode `IngressDispatch` (allocated **65** per the canonical master allocation table in CIP-13 v2 §1) carries:
 
 ```
 IngressDispatch {
@@ -1040,11 +1040,15 @@ Sender allowlist: only `GATEWAY_REGISTRY=0x0D`. Dispatch flow (idiom matches the
 4. Synthesise an internal `ActorMessage` to `target.http_request` with `ctx.sender = GATEWAY_REGISTRY=0x0D`.
 5. After the actor handler returns (or traps), write the result to `RECEIPT_REGISTRY` (§8).
 
-### 6.2 Selector reservation (corrects original §8.5)
+### 6.2 Sender authenticity (revises original §8.5)
 
-The PVM message router treats `"http.request"` as a system-reserved selector: any `send_message` / `call_actor` from a non-system address using this selector is rejected at routing time with `ERR_RESERVED_SELECTOR`. This means an actor receiving an `http.request` message **necessarily** sees `ctx.sender == GATEWAY_REGISTRY=0x0D`.
+Actors implementing the `http.request` selector MUST verify `ctx.sender == GATEWAY_REGISTRY=0x0D`. Any `ActorMessage` carrying that selector with a different sender MUST be rejected by the actor handler.
 
-The original §8.5 placed this guarantee in SDK convention (`@http.handler` decorator includes the `ctx.sender` check by default). That works for SDK users but is unenforceable against custom-PVM-bytecode actors. Selector reservation makes the property a protocol invariant.
+The SDK (CIP-6) `@http.handler` decorator MUST include this check by default. Actors using the raw `@actor.handler("http.request")` form MUST include it manually.
+
+> **Note (withdrawal of an earlier proposal).** An earlier CIP-14 v2 draft proposed making `"http.request"` a PVM-router-reserved selector — i.e., the message router would reject any non-system `send_message` / `call_actor` with that selector at routing time, returning `ERR_RESERVED_SELECTOR`. **That proposal is withdrawn** because it broke a legitimate pattern: an intermediary router actor that receives `http.request` from the Gateway and wants to forward to a backend implementation would be unable to use the same selector for the forwarded call.
+>
+> The SDK-enforced sender check at the receiving actor is sufficient for authenticity: `ctx.sender` is set by the protocol message router from the calling tx's signer (it cannot be forged by the caller's own code), so a check inside the receiving handler IS the protocol guarantee. This matches the established pattern used by other system-mediated handlers (e.g., result-verifier callbacks). Custom-PVM-bytecode actors that omit the check are accepting the risk on their own behalf, the same as any other handler-side validation.
 
 ### 6.3 Gas payment (separates stake from fees)
 
@@ -1141,7 +1145,7 @@ Receipt {
 ### 8.2 Storage and lifecycle
 
 - **Written by the system instruction dispatcher**, not by actor code. After `IngressDispatch` invokes the actor handler:
-  - Successful return → `complete_receipt(request_id, envelope)` opcode (sender = current handler context, verified to equal `target_actor`).
+  - Successful return → `complete_receipt(request_id, envelope)` opcode (allocated **66** per CIP-13 v2 §1; sender = current handler context, verified to equal `target_actor`).
   - Handler panic / cycle limit → dispatcher writes `status = FAILED` directly with no envelope.
 - **TTL**: `receipt_ttl_blocks` is read from the actor's `ingress.http` entitlement (default `RECEIPT_TTL_BLOCKS = 3_600`, max `RECEIPT_TTL_MAX = 86_400`).
 - **Pruning**: a single registry-wide pruning loop scans `expires_at` per block. Per-actor timer budget is **not** consumed.
@@ -1197,7 +1201,7 @@ def on_llm(ctx, result):
 
 ## 9. Actor handler convention
 
-Because `"http.request"` is a system-reserved selector (§6.2), any `ActorMessage` carrying that method **necessarily** came from `GATEWAY_REGISTRY=0x0D`. The original §8.5 SDK guard (`assert ctx.sender == GATEWAY_REGISTRY`) becomes belt-and-suspenders rather than load-bearing.
+An actor receiving an `ActorMessage` with selector `"http.request"` MUST verify `ctx.sender == GATEWAY_REGISTRY=0x0D` and reject otherwise (§6.2). The SDK enforces this by default; custom handlers must include it explicitly.
 
 ```python
 from cowboy_sdk import http
@@ -1256,7 +1260,7 @@ PROTOCOL_MAX_QUERY_CYCLES           = 100_000_000         // 100M cycles
 
 | Threat | Original mitigation | Aligned mitigation |
 |---|---|---|
-| Spoofed `http.request` from arbitrary on-chain account | SDK `ctx.sender` check (defeated by custom-PVM actors) | Selector `"http.request"` is system-reserved at the PVM router (§6.2); SDK check is redundant |
+| Spoofed `http.request` from arbitrary on-chain account | SDK `ctx.sender` check; original spec didn't make this MUST | SDK check is **mandatory** (MUST) per §6.2; selector reservation at the PVM router was considered and withdrawn (§6.2 Note) because it broke router-actor forwarding |
 | Read-path side-effect leak | Trap list using imaginary syscall names (`set_storage`, `set_timeout`, ...) | Real syscall names in Part III of this document §5.3, including the `randomness` trap the original missed |
 | Per-request cleanup timers exhausting `MAX_TIMERS_PER_ACTOR=1024` | Not addressed | Receipts owned by `RECEIPT_REGISTRY`; single registry-wide pruning loop (§8.2) |
 | Subdomain DoS via `ACTOR_MANAGED` default | Not addressed | Default `subdomain_policy = OWNER_ONLY` (§4.2) |
@@ -1430,10 +1434,12 @@ The pattern (matches the existing `BASEFEE_SYSTEM_ACTOR=0x06` idiom for `UpdateB
 
 1. Define a new `SystemInstruction` opcode (e.g. `IngressDispatch`, `ExternalDomainCallback`) carrying `(target_actor, selector, payload)`.
 2. The dispatch handler enforces a sender allowlist: only the named system actor address may emit the opcode.
-3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this.
-4. The PVM message router additionally **reserves** the corresponding selectors (e.g. `"http.request"`, `"_dns.callback"`). Non-system attempts to send a reserved selector are rejected at routing time with `ERR_RESERVED_SELECTOR`.
+3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this `ctx.sender` value because the message router populates `ctx.sender` from the calling tx's signer (it cannot be forged by the caller's own code).
+4. **Receiving actors MUST verify `ctx.sender` against the canonical sender for that selector** (e.g. `ctx.sender == GATEWAY_REGISTRY=0x0D` for `"http.request"`; `ctx.sender == RESULT_VERIFIER=0x03` for `"_dns.callback"`). The SDK (CIP-6) decorator-based handlers MUST include this check by default; raw handlers MUST include it manually.
 
-This makes ingress / verifier authenticity a protocol property, not an SDK convention.
+> **Note (revision).** An earlier draft of this section described a 4th step in which the PVM message router would *additionally* reserve the corresponding selectors (rejecting any non-system sender with `ERR_RESERVED_SELECTOR` at routing time). **That proposal was withdrawn** (see CIP-14 v2 Part II §6.2 Note) because it broke legitimate router-actor patterns where an intermediary needs to forward `http.request` to a backend implementation. The handler-side `ctx.sender` check above is sufficient — `ctx.sender` is protocol-set, not caller-set.
+
+This makes ingress / verifier authenticity a protocol property: `ctx.sender` is set by the message router from on-chain signer state and cannot be spoofed by arbitrary actors. SDK-default sender checks at the receiving handler are mandatory.
 
 ---
 
@@ -1509,7 +1515,21 @@ The aligned drafts add **two parallel configs** under the same governance actor 
 - `system:registry_settlement_config` — splits for name registration / renewal fees (CIP-14-aligned §4.5, CIP-16-aligned §4)
 - `system:gateway_pool_config` — splits for the Gateway serving fee pool (CIP-14-aligned §7.4)
 
-Both updated via the existing `UpdateSettlementConfig` opcode with a new `target_pool` discriminant (one new enum variant; not a new opcode). This avoids forking burn/treasury routing across multiple ad-hoc paths.
+Both updated via the existing `UpdateSettlementConfig` opcode (40, code) with a new `target_pool` discriminant. This avoids forking burn/treasury routing across multiple ad-hoc paths.
+
+**`target_pool` discriminant (canonical enumeration).** All v2 CIPs that need a SettlementConfig variant share this enum. Implementations MUST exhaustively switch on this value and reject unknown variants with `ERR_UNKNOWN_POOL`:
+
+| Value | Pool name | Source CIP | Storage key |
+|---:|---|---|---|
+| 0 | `MAIN` | CIP-3 (existing) | `system:settlement_config` |
+| 1 | `REGISTRY` | CIP-14 v2 §4.5 | `system:registry_settlement_config` |
+| 2 | `GATEWAY_POOL` | CIP-14 v2 §7.4 | `system:gateway_pool_config` |
+| 3 | `CONTAINER` | CIP-10 v2 §2 | `system:container_settlement_config` |
+| 4 | `REGISTRY_TLD_COW` | CIP-16 v2 §4 (optional override) | `system:registry_tld_cow_config` |
+| 5 | `REGISTRY_TLD_COWBOY` | CIP-16 v2 §4 (optional override) | `system:registry_tld_cowboy_config` |
+| 6+ | (reserved for future CIPs) | — | — |
+
+Adding a new pool variant requires a CIP that explicitly extends this table. Handlers receiving an `UpdateSettlementConfig` with an unrecognized `target_pool` MUST reject the transaction; this is a soft form of governance (the variant must exist in code before it can be set).
 
 ---
 

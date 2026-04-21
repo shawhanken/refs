@@ -905,7 +905,7 @@ Failure rejects the deploy. CIP-9 §11.1 already pins the formula `volume_id = k
 
 ### 4.1 Location: on-chain at `STORAGE_MANAGER`
 
-The route manifest is stored on-chain at `STORAGE_MANAGER=0x0A`, keyed by `actor_address`. The actor owner updates it via the new `update_route_manifest(actor_address, manifest_bytes)` system instruction (sender == actor owner).
+The route manifest is stored on-chain at `STORAGE_MANAGER=0x0A`, keyed by `actor_address`. The actor owner updates it via an `update_route_manifest(actor_address, manifest_bytes)` ActorMessage to `STORAGE_MANAGER` — the STORAGE_MANAGER handler enforces `tx.sender == actor.owner`. **This is an ordinary ActorMessage, not a new `SystemInstruction` opcode** — STORAGE_MANAGER is an existing system actor (`0x0A`) and its handlers are addressable via standard messaging. No opcode allocation is needed.
 
 Rationale (departure from original §6.1, which placed it at `_meta/routes.json` in the volume):
 
@@ -1040,7 +1040,7 @@ Unchanged from original §8.11 except that §5.3 above bounds the externality.
 
 ### 7.1 Configuration location
 
-Stored on-chain at `STORAGE_MANAGER` keyed by `actor_address` (parallel to the route manifest §4.1). Updated via `update_cors_config(actor_address, config)` (sender == actor owner). Same schema as original §9.2.
+Stored on-chain at `STORAGE_MANAGER` keyed by `actor_address` (parallel to the route manifest §4.1). Updated via an `update_cors_config(actor_address, config)` ActorMessage to `STORAGE_MANAGER` (sender == actor owner enforced by the handler). Same schema as original §9.2. Same as §4.1, this is an ordinary ActorMessage, not a new `SystemInstruction` opcode.
 
 Co-locating with `route_manifest` lets one transaction update both atomically.
 
@@ -1114,7 +1114,7 @@ CIP-15-aligned is additive over both the original CIP-15 (draft only), CIP-9, an
 
 - One entitlement registry entry (`ingress.static`, per Part III of this document §2.2).
 - Two `STORAGE_MANAGER` record kinds (route manifest, CORS config).
-- Two system instructions (`update_route_manifest`, `update_cors_config`).
+- Two new ActorMessage handlers on `STORAGE_MANAGER` (`update_route_manifest`, `update_cors_config`) — **no new `SystemInstruction` opcodes needed**; STORAGE_MANAGER's handlers enforce `sender == actor.owner`.
 - One new Relay RPC (`GET_MANIFEST`, per `cip-9-runner-storage-v2.md` (Part II) §2).
 - One new chain event (`ManifestCommitted`, per `cip-9-runner-storage-v2.md` (Part II) §4).
 
@@ -1276,10 +1276,12 @@ The pattern (matches the existing `BASEFEE_SYSTEM_ACTOR=0x06` idiom for `UpdateB
 
 1. Define a new `SystemInstruction` opcode (e.g. `IngressDispatch`, `ExternalDomainCallback`) carrying `(target_actor, selector, payload)`.
 2. The dispatch handler enforces a sender allowlist: only the named system actor address may emit the opcode.
-3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this.
-4. The PVM message router additionally **reserves** the corresponding selectors (e.g. `"http.request"`, `"_dns.callback"`). Non-system attempts to send a reserved selector are rejected at routing time with `ERR_RESERVED_SELECTOR`.
+3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this `ctx.sender` value because the message router populates `ctx.sender` from the calling tx's signer (it cannot be forged by the caller's own code).
+4. **Receiving actors MUST verify `ctx.sender` against the canonical sender for that selector** (e.g. `ctx.sender == GATEWAY_REGISTRY=0x0D` for `"http.request"`; `ctx.sender == RESULT_VERIFIER=0x03` for `"_dns.callback"`). The SDK (CIP-6) decorator-based handlers MUST include this check by default; raw handlers MUST include it manually.
 
-This makes ingress / verifier authenticity a protocol property, not an SDK convention.
+> **Note (revision).** An earlier draft described a 4th step in which the PVM message router would *additionally* reserve the corresponding selectors. **That proposal was withdrawn** (see `cip-14-dns-addressable-actors-v2.md` (Part II) §6.2 Note) because it broke legitimate router-actor forwarding patterns. The handler-side `ctx.sender` check above is sufficient.
+
+This makes ingress / verifier authenticity a protocol property: `ctx.sender` is set by the message router from on-chain signer state. SDK-default sender checks at the receiving handler are mandatory.
 
 ---
 

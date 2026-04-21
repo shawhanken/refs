@@ -671,7 +671,7 @@ Replaces the original "system-only callback" hand-wave with an enforceable rule.
 
 Implementation:
 
-- A new `SystemInstruction::ExternalDomainCallback { fqdn, runner_consensus, attestation }`.
+- A new `SystemInstruction::ExternalDomainCallback { fqdn, runner_consensus, attestation }` (opcode **67** per the canonical master allocation table in CIP-13 v2 §1).
 - Sender allowlist: only `RESULT_VERIFIER=0x03`. The verifier's normal callback path emits this opcode after `MajorityVote` aggregation succeeds.
 - The dispatcher routes the opcode to `ROUTE_REGISTRY.complete_attach_external_internal(fqdn, attestation)`.
 - The Route Registry verifies `attestation.verification_nonce` matches the PENDING record, then:
@@ -713,6 +713,33 @@ A binding owner can prepay reverify cost by holding sufficient balance; the prot
 ### 5.9 Detachment
 
 `detach_external(fqdn)` — caller is owner. Unschedules the reverify timer, transitions to `DETACHED`, allows the FQDN to be reattached later via a fresh `begin_attach_external`.
+
+### 5.10 Reverify timer `fee_payer` (CIP-5 revision alignment)
+
+CIP-5 (revised 2026-04-20) §6.3 introduces a per-fire `fee_payer` model: every CIP-5 timer fire is itself metered and pre-charged. The reverify timer scheduled in §5.6 / §5.7 MUST be scheduled with `fee_payer = binding.owner`.
+
+Two distinct fee surfaces now apply to a single reverification:
+
+| Surface | Source | When charged | Fail-mode |
+|---|---|---|---|
+| Timer fire (`max_cost`) | CIP-5 §6.3 | At timer fire, before `_reverify_external` runs | `TimerCancelledInsufficientFunds`; reverify never attempted |
+| `EXTERNAL_REVERIFY_FEE` | §5.8 above | Inside `_reverify_external` step 1 | `INSUFFICIENT_REVERIFY_FEE`; binding → `SUSPENDED`, no verifier dispatch |
+
+Because the timer-fire charge happens BEFORE the handler runs, an owner who can't cover `max_cost` will see the timer silently self-destruct without ever entering `_reverify_external`. The binding stays in its prior status (typically `ACTIVE`) but no reverification occurs — and the next reverify is never scheduled either, since scheduling happens inside `_reverify_external` step 4. Without intervention this leaves the binding in a "frozen-ACTIVE" state past `next_reverify_at`.
+
+Mitigation:
+
+- The Route Registry MUST subscribe to `TimerCancelledInsufficientFunds` events whose `timer_id` matches a scheduled reverify timer (looked up via the reverify-timer index it maintains).
+- On receipt, the Route Registry transitions the corresponding binding to `SUSPENDED` with reason `INSUFFICIENT_TIMER_FUEL` (a new reason code distinct from `INSUFFICIENT_REVERIFY_FEE`).
+- §7.1's existing `current_block > next_reverify_at + EXTERNAL_REVERIFY_GRACE_BLOCKS` overdue check provides a second-line defense if the event-subscription path is missed.
+
+This adds one new `SUSPENDED` reason to §6:
+
+```
+INSUFFICIENT_TIMER_FUEL    // owner balance < CIP-5 timer max_cost at fire time
+```
+
+Recovery is identical to other SUSPENDED reasons: owner tops up balance and calls `reverify_external(fqdn)`.
 
 ---
 
@@ -987,10 +1014,12 @@ The pattern (matches the existing `BASEFEE_SYSTEM_ACTOR=0x06` idiom for `UpdateB
 
 1. Define a new `SystemInstruction` opcode (e.g. `IngressDispatch`, `ExternalDomainCallback`) carrying `(target_actor, selector, payload)`.
 2. The dispatch handler enforces a sender allowlist: only the named system actor address may emit the opcode.
-3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this.
-4. The PVM message router additionally **reserves** the corresponding selectors (e.g. `"http.request"`, `"_dns.callback"`). Non-system attempts to send a reserved selector are rejected at routing time with `ERR_RESERVED_SELECTOR`.
+3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this `ctx.sender` value because the message router populates `ctx.sender` from the calling tx's signer (it cannot be forged by the caller's own code).
+4. **Receiving actors MUST verify `ctx.sender` against the canonical sender for that selector** (e.g. `ctx.sender == GATEWAY_REGISTRY=0x0D` for `"http.request"`; `ctx.sender == RESULT_VERIFIER=0x03` for `"_dns.callback"`). The SDK (CIP-6) decorator-based handlers MUST include this check by default; raw handlers MUST include it manually.
 
-This makes ingress / verifier authenticity a protocol property, not an SDK convention.
+> **Note (revision).** An earlier draft described a 4th step in which the PVM message router would *additionally* reserve the corresponding selectors. **That proposal was withdrawn** (see `cip-14-dns-addressable-actors-v2.md` (Part II) §6.2 Note) because it broke legitimate router-actor forwarding patterns. The handler-side `ctx.sender` check above is sufficient.
+
+This makes ingress / verifier authenticity a protocol property: `ctx.sender` is set by the message router from on-chain signer state. SDK-default sender checks at the receiving handler are mandatory.
 
 ---
 

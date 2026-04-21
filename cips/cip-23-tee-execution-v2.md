@@ -14,7 +14,7 @@ description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec /
 > - **TEE three-layer chain** made explicit: `sec.tee_required` entitlement (manifest) → `VerificationConfig.tee_required` (job spec) → `measurement_binding` (runner). Each at a different lifecycle moment, providing defense in depth.
 > - **`nitro` added to `CANONICAL_TEE_TYPES`** (`registry.rs:211`). v1 §3.3 lists Nitro as a secondary backend but the registry's canonical list does not yet include it.
 > - **CIP-13 delegation interaction** clarified: TEE eligibility is a categorical capability check (not stake-thresholded). Delegation increases VRF weight but does not confer eligibility.
-> - **Opcode space confirmed**: 50–53 do not collide with CIP-13 v2 (44–48) or CIP-10 v2 (60–63).
+> - **Opcode renumbering**: CIP-23 instructions move from v1 §3.6.2's 50–53 (which collides with `SYS_EXTEND_TIMER=50` and `SYS_DEPLOY_CODE=51` in code) to **57–60** per the canonical master allocation table in CIP-13 v2 §1. CIP-13 v2 itself moves from earlier 44–48 to 52–56 (also a collision fix); CIP-10 v2 from 60–63 to 61–64.
 > - **`sec.tee_required` → `VerificationMode` mapping** spelled out: `tdx`/`sev`/`nitro` eligible for `Deterministic`; `sgx` legacy-only (`EconomicBond` / others), per v1 §3.3.
 
 ---
@@ -491,22 +491,38 @@ A runner with delegations MAY hold a TEE `measurement_binding`. Properties:
 - A runner with low self-stake but high delegated stake CAN be a high-throughput TEE runner: eligible because of `measurement_binding`, high VRF weight because of `effective_stake`. The 10% `MIN_SELF_BOND_BPS` (CIP-13 §4.2) ensures meaningful skin in the game even when most stake is delegated.
 - Slashing for forged attestation: self-stake is uncapped; delegator slash is capped at `MAX_DELEGATION_SLASH_PER_EPOCH_BPS = 500` (5%) per the CIP-13 §3.6 algorithm.
 
-### 4. Opcode space confirmation
+### 4. Opcode allocation: CIP-23 takes 57–60 (renumbered from v1 §3.6.2)
 
-| Opcode range | Instructions | Source |
+CIP-23 v1 §3.6.2 allocated opcodes **50–53**, but code (`node/types/src/execution.rs:534-541`) shows 50 = `SYS_EXTEND_TIMER` and 51 = `SYS_DEPLOY_CODE`, so 50–53 collides with CIP-5 timer revisions and core deploy. Per the canonical master allocation table in CIP-13 v2 §1, CIP-23 takes **57–60**:
+
+| Opcode | Instruction | Sender allowlist |
 |---:|---|---|
-| 40–43 | `UpdateSettlementConfig`, `FundActor`, `KeyDelivery`, `UpgradeActor` | current code |
-| 44–48 | CIP-13 delegation instructions (renumbered from v1) | CIP-13 v2 §1 |
-| 49 | (reserved) | — |
-| **50–53** | **`VerifyCae`, `UpdateCpuRoot`, `UpdateNrasRoot`, `GcNonces`** | **CIP-23 (this CIP)** |
-| 54–59 | (reserved) | — |
-| 60–63 | Container Registry instructions | CIP-10 v2 §5 |
+| **57** | `VerifyCae { cae, job_id, req_hash, result_hash }` | Result Verifier `0x03` |
+| **58** | `UpdateCpuRoot { tee_type, cert_der, effective_at }` | Governance `0x09` |
+| **59** | `UpdateNrasRoot { pubkey, effective_at }` | Governance `0x09` |
+| **60** | `GcNonces { upto_block }` | Permissionless |
 
-No collisions. CIP-23 v1 §3.6.2 opcode 50–53 allocations stand.
+All v1 §3.6.2 references to opcodes 50–53 are **superseded** by 57–60. The master allocation table in CIP-13 v2 §1 is the canonical source for the full opcode map.
 
 ### 5. Secrets Manager interaction with delegation
 
 CIP-23 v1 §3.10 makes `get_secret` require a `CompositeAttestation`. v2 clarifies: a runner accepting delegations may still request and use secrets via `get_secret` — release is gated on TEE measurement, not on stake source. Delegators have no claim on or visibility into secrets accessed by the runner they delegate to.
+
+### 5.1 BillingAttestation data source (clarifies §3.12)
+
+CIP-23 v1 §3.12 redefines `BillingAttestation.tee_signature: Option<CompositeAttestation>` (replacing CIP-10 v1's `Option<bytes64>` Ed25519 signature) but does not specify whether the `CompositeAttestation` is **freshly generated per billing event** or **cached from `measurement_binding`**. v2 pins this:
+
+> **The `BillingAttestation.tee_signature` CAE is freshly generated per billing event, not cached.**
+
+Specifically, per the §3.4 binding rule:
+
+- The CAE's `freshness.nonce` MUST be `keccak(billing_attestation_fields_excluding_signature ‖ submission_block_hash)`.
+- The CPU quote's `REPORTDATA` MUST equal `keccak(nonce ‖ service_pubkey ‖ keccak(billing_fields_rlp))`.
+- The CAE's `freshness.deadline` and `generated_at` MUST satisfy `MAX_QUOTE_AGE = 150 blocks` (§3.13) — i.e., the quote MUST have been generated within ~75 s of the billing event.
+
+A cached `measurement_binding`-time CAE would reuse a stale nonce / REPORTDATA and would fail the per-billing-event integrity check. Runners therefore generate one CAE per billing event, not per `measurement_binding` lifecycle. The `measurement_binding` is verified separately at registration / renewal time per §3.7 — that's a distinct CAE with a distinct nonce binding.
+
+**Caching is permitted at the cert-chain level** (the cert chain returned by Intel PCS / NRAS for a given platform doesn't change per quote; runners SHOULD cache it). It is the **quote itself** that must be fresh per event.
 
 ### 6. Backwards compatibility
 
