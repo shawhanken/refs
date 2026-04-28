@@ -5,6 +5,22 @@
 **状态**: 研究草稿（尚未形成 CIP）
 **关联 CIP**: CIP-2（Off-Chain Compute）、CIP-3（Fee Model）、CIP-7（Simple Stream Protocol）、CIP-20（Fungible Tokens）
 
+**图索引**：
+
+| Fig | 内容 | 章节 |
+|-----|------|------|
+| 1 | 两种支付模式选择 — flowchart | §2.3 |
+| 2 | Charge / 402 流程 — sequence | §2.3.1 |
+| 3 | Tempo session 生命周期 — sequence | §2.4 |
+| 4 | Cowboy 现状（单 Job 路径） — graph | §4.1 |
+| 5 | Cowboy MPP Session 架构 — graph | §5.2 |
+| 6 | Session 状态机 — state | §5.3 |
+| 7 | Cowboy 端到端时序 — sequence | §5.5 |
+| 8 | Settlement 分润流向 — flowchart | §5.5 |
+| 9 | Dispute 仲裁路径 — flowchart | §5.6 |
+| 10 | CIP-7 vs MPP Session — graph | §5.8 |
+| 11 | 战略定位（Cowboy 作为结算层） — graph | §7 |
+
 ---
 
 ## 1. 研究背景与目标
@@ -47,22 +63,43 @@ MPP 是 Stripe 与 Tempo Labs 联合提交给 IETF 的开放支付协议草案�
 
 ### 2.3 两种支付模式
 
+```mermaid
+flowchart TD
+    A["Agent 发起请求"] --> B{"调用频率 / 单价"}
+    B -- "低频 / 单价高 单次 API 或内容购买" --> C["Charge 模式 HTTP 402"]
+    B -- "高频 / 微付费 LLM token 或流式 API" --> D["Session 模式"]
+
+    C --> C1["每次请求<br/>触发一笔链上结算"]
+    C --> C2["Tempo 上 ~500ms<br/>finality 延迟"]
+    C --> C3["适合稀疏支付"]
+
+    D --> D1["Open 一次性托管<br/>~500ms 上链"]
+    D --> D2["N 次请求 / N 张累积 voucher<br/>纯链下，小于 100ms"]
+    D --> D3["Close + Settle 一次性结算<br/>未消耗自动退款"]
+
+    classDef charge fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
+    classDef session fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    class C,C1,C2,C3 charge
+    class D,D1,D2,D3 session
+```
+
 #### 2.3.1 Charge（402，单次结算）
 
-```
-Client                              Server
-  |  GET /resource                    |
-  |---------------------------------->|
-  |  402 Payment Required             |
-  |  WWW-Authenticate: Payment ...    |
-  |<----------------------------------|
-  |  pay (link-chain tx / card / ...) |
-  |  GET /resource                    |
-  |  Authorization: Payment <cred>    |
-  |---------------------------------->|
-  |  200 OK                           |
-  |  Payment-Receipt: <receipt>       |
-  |<----------------------------------|
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant S as Server
+    participant L as Chain
+    C->>S: GET /resource
+    S-->>C: 402 Payment Required<br/>WWW-Authenticate Payment
+    Note over C: 选择支付方式<br/>链上 tx 卡 Lightning
+    C->>L: 提交支付 tx 或 charge
+    L-->>C: receipt 与 tx_hash
+    C->>S: GET /resource<br/>Authorization Payment 凭据
+    S->>L: verify cred
+    L-->>S: ok
+    S-->>C: 200 OK<br/>Payment-Receipt
 ```
 
 - HTTP 头：`WWW-Authenticate: Payment`、`Authorization: Payment`、`Payment-Receipt`、`Retry-After`
@@ -81,22 +118,41 @@ Tempo 把它定位为 LLM 推理、流式数据、模型推理等 **高频微付
 
 ### 2.4 Session 生命周期（Tempo 实现）
 
-```
-                         ┌──────────────────────┐
-   ┌─────────┐  open      │   Escrow Contract     │
-   │ Client  ├──────────► │   (on-chain)          │
-   │ (Agent) │            │  - holds deposit      │
-   └────┬────┘            │  - emits SessionOpen  │
-        │ deposit (~500ms)│  - emits Settle       │
-        │                 └──────────┬───────────┘
-        │                            │
-        │ request + cumulative       │
-        │ EIP-712 voucher V_n        │ settle(channelId, V_final)
-        ▼                            ▲
-   ┌─────────┐  off-chain (HTTP/WS)  │
-   │ Server  │◄──────────────────────┘
-   │  (API)  │   ecrecover(V_n) on every call
-   └─────────┘   keep V_max in memory
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant S as Server
+    participant E as Escrow
+
+    rect rgb(40,55,80)
+    note over C,E: 阶段一 上链一次 Open
+    C->>E: open channel_id runner max_amount expires_at
+    E-->>C: ChannelOpened channel_id 大约 500ms
+    end
+
+    rect rgb(40,40,60)
+    note over C,S: 阶段二 链下高频 N 次请求 N 张累积 voucher
+    loop n = 1 .. N
+        C->>C: 本地签 voucher_n cumulative_n nonce_n
+        C->>S: request 加 Authorization Payment voucher_n
+        S->>S: ecrecover voucher_n 通过<br/>cumulative_n 单调递增<br/>cumulative_n 不超 deposit
+        S-->>C: 200 OK 加 Payment-Receipt
+        S->>S: 缓存 V_max 更新为 voucher_n
+    end
+    end
+
+    rect rgb(40,55,80)
+    note over C,E: 阶段三 上链一次 Close 加 Settle 加 Refund
+    alt Client 主动关闭
+        C->>E: close channel_id
+    else Server 主动结算
+        S->>E: settle channel_id V_max
+    end
+    E->>E: 转 cumulative 给 Server<br/>退余额给 Client
+    E-->>C: refund deposit 减 cumulative
+    E-->>S: payout cumulative
+    end
 ```
 
 #### 步骤
@@ -184,6 +240,52 @@ Tempo 是 MPP 的 reference settlement chain。它的特征：
 | **CIP-7 Simple Stream Protocol** | `refs/cips/cip-7-simple-stream-protocol.md` | 按 epoch 滚动续费的「流」原语，Stream Key Manager `0x06` 管 X25519 密钥；账户级 entitlement |
 | **CIP-20 Fungible Tokens** | `refs/cips/cip-20-fungible-tokens.md` | hook gas 上限 50k 的代币标准，已可作为 USD-pegged 资产（未来支持 USDC peg）|
 
+下图描绘当前 Cowboy 单 Job 的支付/结算路径。每一次调用都要走完整一圈链上流程，没有「批量摊销」的入口：
+
+```mermaid
+flowchart LR
+    subgraph CHAIN["Cowboy Chain"]
+        direction TB
+        REG["Runner Registry<br/>0x91"]
+        DSP["Job Dispatcher<br/>0x92"]
+        VER["Result Verifier<br/>0x93"]
+        GOV["Governance 0x09<br/>SettlementConfig 89 / 10 / 1"]
+        TRE["Treasury 0x08"]
+        BURN["Burn 0x00"]
+    end
+
+    SUB["Submitter 或 dApp"]
+    R1["Runner 1"]
+    R2["Runner 2"]
+    R3["Runner 3"]
+
+    SUB -- "JobSubmit<br/>escrow max_price 加 tip" --> DSP
+    DSP -- "VRF 加 stake-weight" --> REG
+    DSP -. "选 N 名 Runner" .-> R1
+    DSP -. " " .-> R2
+    DSP -. " " .-> R3
+    R1 -- "Commit hash" --> VER
+    R2 -- "Commit hash" --> VER
+    R3 -- "Commit hash" --> VER
+    R1 -- "Reveal result 加 sig" --> VER
+    R2 -- "Reveal result 加 sig" --> VER
+    R3 -- "Reveal result 加 sig" --> VER
+    VER -- "consensus 多数派<br/>少数派 slash" --> R1
+    GOV -. "split ratios" .-> VER
+    VER -- "89%" --> R1
+    VER -- "10%" --> BURN
+    VER -- "1%" --> TRE
+
+    classDef chain fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
+    classDef offchain fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
+    classDef user fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
+    class REG,DSP,VER,GOV,TRE,BURN chain
+    class R1,R2,R3 offchain
+    class SUB user
+```
+
+每完成一次调用，都需要 1 笔 `JobSubmit` + 1 轮多人 commit + 1 轮 reveal + 1 笔 settle。这套机制保证了正确性但代价高，不适合 LLM 高频微调用——这正是 Session 模式要补的空白。
+
 ### 4.2 既有结构与 MPP session 的对照
 
 | MPP session 概念 | Cowboy 已有 | 差距 |
@@ -218,33 +320,48 @@ Tempo 是 MPP 的 reference settlement chain。它的特征：
 
 ### 5.2 角色
 
+```mermaid
+flowchart TB
+    subgraph CHAIN["Cowboy Chain"]
+        direction TB
+        SES["Session Actor 0x96 新增<br/>OpenSession Deposit<br/>Settle Close Finalize Slash"]
+        REG["Runner Registry 0x91"]
+        DSP["Job Dispatcher 0x92<br/>fallback only"]
+        VER["Result Verifier 0x93<br/>dispute path"]
+        GOV["Governance 0x09<br/>SettlementConfig"]
+        TRE["Treasury 0x08"]
+        BURN["Burn 0x00"]
+    end
+
+    subgraph OFFCHAIN["Off-chain 链下 hot path"]
+        AGENT["Client 或 Agent<br/>持有 secp256k1 sk<br/>对累积金额做<br/>EIP-712 签名"]
+        RUNNER["Runner daemon MPP server<br/>axum HTTP chat 端口<br/>ecrecover voucher<br/>缓存 V_max<br/>复用 runner-llm http mcp"]
+    end
+
+    AGENT -- "1 次 OpenSession 含 deposit" --> SES
+    AGENT == "N 次请求 加 voucher_n<br/>HTTP 402 加 Authorization Payment" ==> RUNNER
+    RUNNER -- "M 次 Settle 含 V_max 批量" --> SES
+    AGENT -- "Close" --> SES
+    SES -- "refund" --> AGENT
+    SES -- "payout 89%" --> RUNNER
+    SES -- "10%" --> BURN
+    SES -- "1%" --> TRE
+    GOV -. "split policy" .-> SES
+    REG -. "stake check" .-> SES
+    SES -. "Slash 触发仲裁" .-> VER
+    VER -. "复用既有<br/>commit-reveal 加 slash" .-> DSP
+
+    classDef chain fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
+    classDef offchain fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
+    classDef agent fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
+    classDef new stroke:#8b5cf6,stroke-width:3px,fill:#8b5cf622,color:#ede9fe
+    class REG,DSP,VER,GOV,TRE,BURN chain
+    class RUNNER offchain
+    class AGENT agent
+    class SES new
 ```
-            ┌────────────────────────────┐
-            │       Cowboy Chain          │
-            │                              │
-            │  Session Actor (0x96)        │
-            │  ├─ open_session             │
-            │  ├─ deposit                  │
-            │  ├─ settle (V_max)           │
-            │  └─ close + refund           │
-            │                              │
-            │  Runner Registry (0x91)      │
-            │  Job Dispatcher (0x92) ◄──── │ (fallback path, dispute)
-            │  Result Verifier (0x93)      │
-            │  Governance (0x09) ──────────│ SettlementConfig
-            └──────────────┬───────────────┘
-                           │ (only at session boundaries
-                           │  + occasional fallback)
-                           ▼
-        ┌─────────────┐                ┌─────────────┐
-        │  Client /   │   HTTP+402     │   Runner    │
-        │   Agent     │ ──────────────►│  (off-chain │
-        │             │ ◄────────────── │   daemon)  │
-        │  signs      │  voucher_n     │  verifies   │
-        │  voucher_n  │  ──────────►   │  voucher    │
-        │             │  serves answer │  ecrecover  │
-        └─────────────┘                └─────────────┘
-```
+
+> 紫色框 `Session Actor 0x96` 是唯一新增的链上组件；其他系统 actor 都已存在并以最小侵入方式接入（`Slash` 路径调用既有 `Verifier 0x93`/`Dispatcher 0x92`，分润比例从 `Governance 0x09` 读取）。链下侧 Runner daemon 复用既有 `runner-llm` / `runner-http` / `runner-mcp` executor。
 
 ### 5.3 链上：Session Actor
 
@@ -286,6 +403,29 @@ pub enum SessionAsset {
 | `Slash` | `session_id, evidence` | 仲裁路径（见 §5.6） |
 
 **所需新指令 opcode**（占位）：基于 CIP-3 已经分配的 opcode 表新增 6 个，详见 §6.1。
+
+**Session 状态机**：
+
+```mermaid
+stateDiagram-v2
+    [*] --> Open: OpenSession 含 deposit
+    Open --> Open: Deposit 追加托管
+    Open --> Open: Settle 付 runner burn treasury
+    Open --> Closing: CloseSession payer 主动
+    Open --> Closing: Settle 触达 deposit 自动
+    Open --> Closing: expires_at 到期 任意人 poke
+    Closing --> Closing: Settle 在 dispute 窗口内
+    Closing --> Disputed: Slash 由 payer 质疑
+    Disputed --> Settled: 仲裁 runner 对 继续 V_max 结算
+    Disputed --> Slashed: 仲裁 runner 错 slash stake
+    Closing --> Settled: Finalize 无 refund
+    Closing --> Refunded: Finalize 有剩余退款
+    Slashed --> Refunded: Finalize refund 加 slash 分给 payer
+    Refunded --> [*]
+    Settled --> [*]
+```
+
+四个稳定状态：`Open`（接受 voucher / Deposit / Settle）、`Closing`（dispute window 中，仍可补提 voucher）、`Settled` / `Refunded`（终态）。`Disputed` 是中间瞬态：入口为 `Slash`，出口走 CIP-2 既有共识。
 
 ### 5.4 Voucher 格式（链下）
 
@@ -346,6 +486,93 @@ types = {
 4. **Pricing**：和 `RateCard` 一致；price_advert 在 OpenSession 时由双方协商，Runner 必须遵守。
 5. **执行器复用**：LLM / HTTP / MCP 三类完全复用 `runner-llm`、`runner-http`、`runner-mcp`，只是不再从 chain 拉 JobSpec，而是从 HTTP body 拉。
 
+**端到端时序**（Cowboy 上一次完整 LLM session）：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Alice
+    participant R as Runner
+    participant SA as SessionActor
+    participant GOV as Governance
+    participant T as Treasury
+    participant B as Burn
+
+    rect rgb(40,55,80)
+    Note over A,SA: 阶段一 上链一次 Open
+    A->>SA: OpenSession payer runner max_amount 1 CBY
+    SA->>SA: alice 扣 1 CBY，escrow 加 1 CBY
+    SA-->>A: 返回 session_id
+    SA-->>R: 触发 SessionOpened 事件
+    end
+
+    rect rgb(50,40,40)
+    Note over A,R: 阶段二 探价 无 voucher 返 402
+    A->>R: POST /chat 无 Authorization
+    R-->>A: 402 加 WWW-Authenticate Payment<br/>price_per_token_wei 1000
+    end
+
+    rect rgb(40,40,60)
+    Note over A,R: 阶段三 链下高频 5 次 LLM 调用
+    loop n = 1..5
+        A->>A: voucher_n 用 EIP-712 累积 nonce 递增
+        A->>R: POST /chat 加 Authorization Payment voucher_n
+        R->>R: ecrecover 通过<br/>cumulative_n 单调递增<br/>cumulative_n 不超 deposit
+        R->>R: V_max 更新为 voucher_n
+        R-->>A: 200 OK 加 Payment-Receipt<br/>stub LLM 输出
+    end
+    Note over R: V_max cumulative_amount 等于 61_000 wei
+    end
+
+    rect rgb(40,55,80)
+    Note over A,B: 阶段四 上链一次 Close 加 Settle
+    A->>SA: CloseSession session_id
+    SA->>SA: status 转为 Closing<br/>dispute window 75 blocks
+    R->>SA: Settle session_id V_max
+    SA->>GOV: 读 SettlementConfig
+    GOV-->>SA: 89 / 10 / 1
+    SA->>R: payout 54_290 占 89%
+    SA->>B: burn 6_100 占 10%
+    SA->>T: treasury 610 占 1%
+    end
+
+    rect rgb(40,55,80)
+    Note over A,SA: 阶段五 Dispute 窗口结束 Finalize
+    Note over A: 无质疑
+    A->>SA: Finalize session_id
+    SA->>A: refund 999_939_000 wei<br/>等于 deposit 减 spent
+    SA->>SA: status 转为 Refunded
+    end
+```
+
+> 整段流程链上仅产生 **3 笔 tx**（OpenSession / Settle / Finalize），却覆盖了任意多次 LLM 调用——这就是 MPP session 相对单 Job 的核心收益。
+
+**Settle 时刻的资金流向**（以 voucher.cumulative_amount = 61_000 wei、deposit = 1_000_000_000 wei 为例）：
+
+```mermaid
+flowchart LR
+    DEP["Session 托管<br/>1_000_000_000"] -->|"Settle increment 61_000"| INC["increment 61_000"]
+    DEP -->|"剩余 999_939_000<br/>Finalize 时退还"| REFUND["Refund 给 Alice<br/>999_939_000"]
+    INC -->|"占 89%"| RUN["Runner<br/>54_290"]
+    INC -->|"占 10%"| BURN["Burn 0x00<br/>6_100"]
+    INC -->|"占 1%"| TRE["Treasury 0x08<br/>610"]
+
+    classDef escrow fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
+    classDef runner fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
+    classDef burn fill:#ef444422,stroke:#ef4444,color:#fee2e2
+    classDef treasury fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
+    classDef refund fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
+    classDef step stroke:#8b5cf6,stroke-width:2px
+    class DEP escrow
+    class RUN runner
+    class BURN burn
+    class TRE treasury
+    class REFUND refund
+    class INC step
+```
+
+分润比例完全取自 `node/runner/src/types.rs::SettlementConfig`，governance actor `0x09` 通过 `UpdateSettlementConfig` 调整时，session 与单 Job 路径同步生效。
+
 ### 5.6 验证 / 仲裁路径
 
 MPP 默认乐观信任 voucher（`ecrecover` 即生效）。但 Cowboy 已有的 commit-reveal + slashing 给我们提供了一条 **可选** 的 dispute fallback：
@@ -358,6 +585,30 @@ MPP 默认乐观信任 voucher（`ecrecover` 即生效）。但 Cowboy 已有的
 4. Runner 错 → slash 部分 stake；payer 错 → 罚没 dispute deposit（防滥用）。
 
 > 实务上：默认所有 Session 都是「单 Runner + 乐观信任」，因为这才是 MPP 的速度优势所在。dispute 路径只在被触发时才付出多 Runner 共识的成本，类似 optimistic rollup 的争议机制。
+
+```mermaid
+flowchart TD
+    A["Settle 完成<br/>session 进入 Closing"] --> B{"dispute window 内<br/>payer 是否质疑"}
+    B -- "否" --> Z1["Finalize 转 Refunded<br/>正常退款"]
+    B -- "是 Slash session_id evidence" --> C["Result Verifier 0x93<br/>启动仲裁"]
+    C --> D["按 VerificationConfig 选 N 名验证 Runner<br/>复用 CIP-2 commit-reveal"]
+    D --> E["N 名 Runner 重跑同一请求<br/>提交 result 加 sig"]
+    E --> F{"对照 voucher.usage_digest<br/>VerificationMode 共识"}
+    F -- "Runner 对" --> G["继续按 V_max 结算<br/>payer 罚没 dispute deposit"]
+    F -- "Runner 错" --> H["Slash Runner stake<br/>50% treasury 50% burn"]
+    H --> I["refund payer<br/>外加 slash 部分赔偿"]
+    G --> Z2["Settled"]
+    I --> Z3["Refunded"]
+
+    classDef happy fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
+    classDef bad fill:#ef444422,stroke:#ef4444,color:#fee2e2
+    classDef neutral fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    class Z1,Z2 happy
+    class H,I,Z3 bad
+    class C,D,E,F neutral
+```
+
+仲裁路径**完全复用** CIP-2 既有的 `Result Verifier 0x93` + commit-reveal + slashing，没有引入新的共识机制——session 本身只是"乐观快路径 + 既有慢路径"的组合。
 
 ### 5.7 安全 / 拒绝服务考量
 
@@ -383,6 +634,40 @@ CIP-7 是「按 epoch 续费的密钥访问流」，针对的是 **publisher 把
 | Use case | 直播/订阅 | LLM 推理、API 调用 |
 
 两者**正交**，可共存。一个 Runner 完全可以同时跑 CIP-7 stream 和 MPP session。
+
+```mermaid
+flowchart LR
+    subgraph CIP7["CIP-7 Simple Stream"]
+        direction TB
+        K["Stream Key Manager 0x06"]
+        E1["Epoch t"]
+        E2["Epoch t plus 1"]
+        E3["Epoch t plus 2"]
+        E1 -.->|"prepay"| K
+        E2 -.->|"prepay"| K
+        E3 -.->|"prepay"| K
+    end
+
+    subgraph MPPSESS["MPP Session"]
+        direction TB
+        SA2["Session Actor 0x96"]
+        D1["deposit once"]
+        V1["voucher_1"]
+        V2["voucher_2"]
+        VN["voucher_N"]
+        D1 --> SA2
+        V1 -.->|"cumulative"| V2
+        V2 -.->|"cumulative"| VN
+    end
+
+    UC1["按时间段付费<br/>直播 或 订阅<br/>Substack 风格"] --> CIP7
+    UC2["按消耗付费<br/>LLM token 计费<br/>OpenAI 风格"] --> MPPSESS
+
+    classDef cip7 fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
+    classDef mpp fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    class K,E1,E2,E3,UC1 cip7
+    class SA2,D1,V1,V2,VN,UC2 mpp
+```
 
 ---
 
@@ -427,6 +712,38 @@ CIP-7 是「按 epoch 续费的密钥访问流」，针对的是 **publisher 把
 - 反过来，Cowboy 的 Job 也可以从其它链导入：用户在 Solana / Stellar 上签 voucher，Runner 把 settlement 桥到 Cowboy。
 
 短期推荐**先做单链 PoC**，确认 voucher + Session Actor + Runner 端流程跑通，再考虑跨链。
+
+```mermaid
+flowchart TB
+    subgraph SVCS["全网 MPP 服务 Service 端"]
+        direction LR
+        L1["OpenAI 或 Anthropic<br/>via runner-llm"]
+        L2["MCP servers"]
+        L3["HTTP API"]
+        L4["Cowboy actors"]
+    end
+
+    subgraph CHAINS["MPP 支付方式 Method 端"]
+        direction LR
+        M1["Tempo USDG"]
+        M2["Stripe Card"]
+        M3["Lightning BTC"]
+        M4["Solana SPL"]
+        M5["Cowboy CBY 主推"]
+    end
+
+    SVCS -. "voucher 或 402<br/>MPP 协议层" .-> CHAINS
+    M5 --> COW["Cowboy<br/>AI 工作负载的结算层"]
+
+    classDef svc fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
+    classDef chain fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
+    classDef cowboy fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe,stroke-width:3px
+    class L1,L2,L3,L4 svc
+    class M1,M2,M3,M4 chain
+    class M5,COW cowboy
+```
+
+只要 Cowboy 的 Session Actor 能跟 MPP 兼容，任何 MPP service 都可以选 CBY 作结算路径，反过来 Cowboy Runner 也可以同时为多个 MPP method 服务。这是 Cowboy 不必自己抢「执行层」就能吃到 AI 经济的入场券。
 
 ---
 
