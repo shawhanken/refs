@@ -77,8 +77,8 @@ flowchart TD
     D --> D2["N 次请求 / N 张累积 voucher<br/>纯链下，小于 100ms"]
     D --> D3["Close + Settle 一次性结算<br/>未消耗自动退款"]
 
-    classDef charge fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
-    classDef session fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    classDef charge fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef session fill:#ede9fe,stroke:#8b5cf6,color:#4c1d95
     class C,C1,C2,C3 charge
     class D,D1,D2,D3 session
 ```
@@ -125,13 +125,13 @@ sequenceDiagram
     participant S as Server
     participant E as Escrow
 
-    rect rgb(40,55,80)
+    rect rgb(220,235,255)
     note over C,E: 阶段一 上链一次 Open
     C->>E: open channel_id runner max_amount expires_at
     E-->>C: ChannelOpened channel_id 大约 500ms
     end
 
-    rect rgb(40,40,60)
+    rect rgb(235,230,250)
     note over C,S: 阶段二 链下高频 N 次请求 N 张累积 voucher
     loop n = 1 .. N
         C->>C: 本地签 voucher_n cumulative_n nonce_n
@@ -142,7 +142,7 @@ sequenceDiagram
     end
     end
 
-    rect rgb(40,55,80)
+    rect rgb(220,245,230)
     note over C,E: 阶段三 上链一次 Close 加 Settle 加 Refund
     alt Client 主动关闭
         C->>E: close channel_id
@@ -276,9 +276,9 @@ flowchart LR
     VER -- "10%" --> BURN
     VER -- "1%" --> TRE
 
-    classDef chain fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
-    classDef offchain fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
-    classDef user fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
+    classDef chain fill:#dcfce7,stroke:#3ddc84,color:#14532d
+    classDef offchain fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef user fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
     class REG,DSP,VER,GOV,TRE,BURN chain
     class R1,R2,R3 offchain
     class SUB user
@@ -351,10 +351,10 @@ flowchart TB
     SES -. "Slash 触发仲裁" .-> VER
     VER -. "复用既有<br/>commit-reveal 加 slash" .-> DSP
 
-    classDef chain fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
-    classDef offchain fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
-    classDef agent fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
-    classDef new stroke:#8b5cf6,stroke-width:3px,fill:#8b5cf622,color:#ede9fe
+    classDef chain fill:#dcfce7,stroke:#3ddc84,color:#14532d
+    classDef offchain fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef agent fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef new fill:#ede9fe,stroke:#8b5cf6,stroke-width:3px,color:#4c1d95
     class REG,DSP,VER,GOV,TRE,BURN chain
     class RUNNER offchain
     class AGENT agent
@@ -498,7 +498,7 @@ sequenceDiagram
     participant T as Treasury
     participant B as Burn
 
-    rect rgb(40,55,80)
+    rect rgb(220,235,255)
     Note over A,SA: 阶段一 上链一次 Open
     A->>SA: OpenSession payer runner max_amount 1 CBY
     SA->>SA: alice 扣 1 CBY，escrow 加 1 CBY
@@ -506,13 +506,13 @@ sequenceDiagram
     SA-->>R: 触发 SessionOpened 事件
     end
 
-    rect rgb(50,40,40)
+    rect rgb(255,230,230)
     Note over A,R: 阶段二 探价 无 voucher 返 402
     A->>R: POST /chat 无 Authorization
     R-->>A: 402 加 WWW-Authenticate Payment<br/>price_per_token_wei 1000
     end
 
-    rect rgb(40,40,60)
+    rect rgb(235,230,250)
     Note over A,R: 阶段三 链下高频 5 次 LLM 调用
     loop n = 1..5
         A->>A: voucher_n 用 EIP-712 累积 nonce 递增
@@ -524,7 +524,7 @@ sequenceDiagram
     Note over R: V_max cumulative_amount 等于 61_000 wei
     end
 
-    rect rgb(40,55,80)
+    rect rgb(220,245,230)
     Note over A,B: 阶段四 上链一次 Close 加 Settle
     A->>SA: CloseSession session_id
     SA->>SA: status 转为 Closing<br/>dispute window 75 blocks
@@ -536,7 +536,7 @@ sequenceDiagram
     SA->>T: treasury 610 占 1%
     end
 
-    rect rgb(40,55,80)
+    rect rgb(255,243,224)
     Note over A,SA: 阶段五 Dispute 窗口结束 Finalize
     Note over A: 无质疑
     A->>SA: Finalize session_id
@@ -557,12 +557,12 @@ flowchart LR
     INC -->|"占 10%"| BURN["Burn 0x00<br/>6_100"]
     INC -->|"占 1%"| TRE["Treasury 0x08<br/>610"]
 
-    classDef escrow fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
-    classDef runner fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
-    classDef burn fill:#ef444422,stroke:#ef4444,color:#fee2e2
-    classDef treasury fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
-    classDef refund fill:#3b82f622,stroke:#3b82f6,color:#dbeafe
-    classDef step stroke:#8b5cf6,stroke-width:2px
+    classDef escrow fill:#dcfce7,stroke:#3ddc84,color:#14532d
+    classDef runner fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef burn fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    classDef treasury fill:#cffafe,stroke:#22d3ee,color:#155e75
+    classDef refund fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef step fill:#ede9fe,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95
     class DEP escrow
     class RUN runner
     class BURN burn
@@ -600,9 +600,9 @@ flowchart TD
     G --> Z2["Settled"]
     I --> Z3["Refunded"]
 
-    classDef happy fill:#3ddc8422,stroke:#3ddc84,color:#dcfce7
-    classDef bad fill:#ef444422,stroke:#ef4444,color:#fee2e2
-    classDef neutral fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    classDef happy fill:#dcfce7,stroke:#3ddc84,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    classDef neutral fill:#ede9fe,stroke:#8b5cf6,color:#4c1d95
     class Z1,Z2 happy
     class H,I,Z3 bad
     class C,D,E,F neutral
@@ -663,8 +663,8 @@ flowchart LR
     UC1["按时间段付费<br/>直播 或 订阅<br/>Substack 风格"] --> CIP7
     UC2["按消耗付费<br/>LLM token 计费<br/>OpenAI 风格"] --> MPPSESS
 
-    classDef cip7 fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
-    classDef mpp fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe
+    classDef cip7 fill:#cffafe,stroke:#22d3ee,color:#155e75
+    classDef mpp fill:#ede9fe,stroke:#8b5cf6,color:#4c1d95
     class K,E1,E2,E3,UC1 cip7
     class SA2,D1,V1,V2,VN,UC2 mpp
 ```
@@ -735,9 +735,9 @@ flowchart TB
     SVCS -. "voucher 或 402<br/>MPP 协议层" .-> CHAINS
     M5 --> COW["Cowboy<br/>AI 工作负载的结算层"]
 
-    classDef svc fill:#f59e0b22,stroke:#f59e0b,color:#fef3c7
-    classDef chain fill:#22d3ee22,stroke:#22d3ee,color:#cffafe
-    classDef cowboy fill:#8b5cf622,stroke:#8b5cf6,color:#ede9fe,stroke-width:3px
+    classDef svc fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef chain fill:#cffafe,stroke:#22d3ee,color:#155e75
+    classDef cowboy fill:#ede9fe,stroke:#8b5cf6,stroke-width:3px,color:#4c1d95
     class L1,L2,L3,L4 svc
     class M1,M2,M3,M4 chain
     class M5,COW cowboy
