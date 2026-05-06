@@ -232,13 +232,15 @@ Tempo 是 MPP 的 reference settlement chain。它的特征：
 
 | 原语 | 出处 | 概要 |
 |------|------|------|
-| **按 Job 单笔托管** | `node/execution/src/runner/dispatcher.rs:515-533` | 提交 Job 时立即从 submitter 扣 `max_price + tip`，记账到 Job Dispatcher（`0x92`）名下 |
-| **commit-reveal + 多人共识** | `node/execution/src/runner/verifier.rs:87-251` | 60% 时间窗 commit、40% 窗口 reveal；按 `VerificationMode` 做共识；少数派会被 slash |
-| **Settlement 分润** | `verifier.rs:317-418` | `SettlementConfig{runner_percent, burn_percent, treasury_percent}`，默认 89/10/1，由 governance actor `0x09` 通过 `UpdateSettlementConfig` 修改 |
-| **Slashing** | `verifier.rs:31-84` | 50% treasury / 50% burn；stake 跌破 MIN_STAKE 就 reputation = 0 |
-| **Stake-weighted VRF 选 Runner** | `dispatcher.rs:925-1010` | Fisher-Yates + log2(stake) 权重压缩，避免大鲸垄断 |
-| **CIP-7 Simple Stream Protocol** | `refs/cips/cip-7-simple-stream-protocol.md` | 按 epoch 滚动续费的「流」原语，Stream Key Manager `0x06` 管 X25519 密钥；账户级 entitlement |
+| **按 Job 单笔托管** | `node/execution/src/runner/dispatcher.rs:678-708`（D1: Escrow） | 提交 Job 时立即从 submitter 扣 `max_price + tip`，记账到 Job Dispatcher（`0x02`）名下 |
+| **commit-reveal + 多人共识** | `node/execution/src/runner/verifier.rs:36-251`（commit/reveal 入口）、`verifier.rs:524-771`（`verify_results` 各 mode 分支） | 60% 时间窗 commit、40% 窗口 reveal；按 `VerificationMode` 做共识；少数派会被 slash |
+| **Settlement 分润** | `verifier.rs:332-465`（`handle_job_result_submit` 内 governance 读取 + payout） | `SettlementConfig{runner_percent, burn_percent, treasury_percent}`，默认 89/10/1，由 governance actor `0x09` 通过 `UpdateSettlementConfig` 修改 |
+| **Slashing** | `node/execution/src/runner/registry.rs:317`（CIP-25 §β Task 8 后从 verifier 搬至 registry） | 50% treasury / 50% burn；stake 跌破 `MIN_STAKE_CBY_WEI` 就 reputation = 0 |
+| **Stake-weighted VRF 选 Runner** | `dispatcher.rs:950-1100+`（`select_runner_committee_with_seed`） | Fisher-Yates + log2(stake) 权重压缩，避免大鲸垄断 |
+| **CIP-7 Simple Stream Protocol**（草案，**未实现**） | `refs/cips/cip-7-simple-stream-protocol.md` | 按 epoch 滚动续费的「流」原语；CIP 中拟把 Stream Key Manager 放在 `0x06`，但当前实现已把 `0x06` 用作 `DUAL_BASEFEE`（见脚注[^a]），CIP-7 落地需另行选址。账户级 entitlement 当前在 `ENTITLEMENT_REGISTRY 0x07` |
 | **CIP-20 Fungible Tokens** | `refs/cips/cip-20-fungible-tokens.md` | hook gas 上限 50k 的代币标准，已可作为 USD-pegged 资产（未来支持 USDC peg）|
+
+[^a]: 截至 2026-05-06，`node/runner/src/system_actors.rs` 已分配的 system actor 地址为：`0x01` RunnerRegistry、`0x02` JobDispatcher、`0x03` ResultVerifier、`0x04` SecretsManager、`0x05` TeeVerifier、`0x06` DualBasefee、`0x07` EntitlementRegistry、`0x08` Treasury、`0x09` Governance、`0x0A` StorageManager、`0x0B` RelayRegistry。CIP-7 文本中的 `0x06` 为草案占位，需要重新协商。
 
 下图描绘当前 Cowboy 单 Job 的支付/结算路径。每一次调用都要走完整一圈链上流程，没有「批量摊销」的入口：
 
@@ -246,9 +248,9 @@ Tempo 是 MPP 的 reference settlement chain。它的特征：
 flowchart LR
     subgraph CHAIN["Cowboy Chain"]
         direction TB
-        REG["Runner Registry<br/>0x91"]
-        DSP["Job Dispatcher<br/>0x92"]
-        VER["Result Verifier<br/>0x93"]
+        REG["Runner Registry<br/>0x01"]
+        DSP["Job Dispatcher<br/>0x02"]
+        VER["Result Verifier<br/>0x03"]
         GOV["Governance 0x09<br/>SettlementConfig 89 / 10 / 1"]
         TRE["Treasury 0x08"]
         BURN["Burn 0x00"]
@@ -291,12 +293,12 @@ flowchart LR
 | MPP session 概念 | Cowboy 已有 | 差距 |
 |------------------|-------------|------|
 | Escrow contract | Job Dispatcher 单 job 托管；CIP-7 stream key 账户托管 | **没有 channel/session 级托管**，每个 job 单独走一遍 |
-| Cumulative voucher | RunnerResult 已经签名（`signature: Option<[u8; 65]>` 在 `node/runner/src/types.rs:243-257`） | RunnerResult 是「单次执行结果签名」，**不是累积金额签名**；payer 方目前不直接对金额签名 |
+| Cumulative voucher | RunnerResult 已经签名（`signature: Option<[u8; 65]>` 在 `node/runner/src/types.rs:355-365`，serde 在 `596-660`） | RunnerResult 是「单次执行结果签名」，**不是累积金额签名**；payer 方目前不直接对金额签名 |
 | Channel ID | 无 | 需要新增 `session_id` 概念 |
 | Off-chain voucher exchange | 无；当前所有 Job 都要先上链托管 + 选 Runner + commit-reveal | **当前没有「绕开链直接调 Runner」的路径** |
 | Settlement 关闭 | 单 job 触发 settle；governable 分润 | 改成「批量结算 N 张 job/cost 凭证」即可复用，分润机制完全沿用 |
 | 退款 | 单 job 内 max_price 没用完会保留在 Dispatcher（事实退还到 submitter？需查） | session 结束时退余额是新需求 |
-| 仲裁/争议窗口 | `dispute_window_blocks` 已经在 `VerificationConfig` 里但暂未启用 | 自然扩展点 |
+| 仲裁/争议窗口 | `dispute_window_blocks` 已落地（`types/src/constants.rs:232` 定义 `DISPUTE_WINDOW_BLOCKS = 75`，dispatcher/verifier 全路径启用） | 直接复用作为 Session Closing 窗口 |
 
 ### 4.3 关键发现
 
@@ -324,10 +326,10 @@ flowchart LR
 flowchart TB
     subgraph CHAIN["Cowboy Chain"]
         direction TB
-        SES["Session Actor 0x96 新增<br/>OpenSession Deposit<br/>Settle Close Finalize Slash"]
-        REG["Runner Registry 0x91"]
-        DSP["Job Dispatcher 0x92<br/>fallback only"]
-        VER["Result Verifier 0x93<br/>dispute path"]
+        SES["Session Actor 0x0C 新增<br/>OpenSession Deposit<br/>Settle Close Finalize Slash"]
+        REG["Runner Registry 0x01"]
+        DSP["Job Dispatcher 0x02<br/>fallback only"]
+        VER["Result Verifier 0x03<br/>dispute path"]
         GOV["Governance 0x09<br/>SettlementConfig"]
         TRE["Treasury 0x08"]
         BURN["Burn 0x00"]
@@ -361,11 +363,11 @@ flowchart TB
     class SES new
 ```
 
-> 紫色框 `Session Actor 0x96` 是唯一新增的链上组件；其他系统 actor 都已存在并以最小侵入方式接入（`Slash` 路径调用既有 `Verifier 0x93`/`Dispatcher 0x92`，分润比例从 `Governance 0x09` 读取）。链下侧 Runner daemon 复用既有 `runner-llm` / `runner-http` / `runner-mcp` executor。
+> 紫色框 `Session Actor 0x0C` 是唯一新增的链上组件；其他系统 actor 都已存在并以最小侵入方式接入（`Slash` 路径调用既有 `Verifier 0x03`/`Dispatcher 0x02`，分润比例从 `Governance 0x09` 读取）。链下侧 Runner daemon 复用既有 `runner-llm` / `runner-http` / `runner-mcp` executor。
 
 ### 5.3 链上：Session Actor
 
-新增一个 system actor，地址建议 `0x96`（与既有 `0x91-0x95` 邻接）。
+新增一个 system actor，地址建议 `0x0C`（紧邻已分配的 `0x0A` `STORAGE_MANAGER`、`0x0B` `RELAY_REGISTRY`）。
 
 ```rust
 // node/runner/src/types.rs（或 node/types）
@@ -590,7 +592,7 @@ MPP 默认乐观信任 voucher（`ecrecover` 即生效）。但 Cowboy 已有的
 flowchart TD
     A["Settle 完成<br/>session 进入 Closing"] --> B{"dispute window 内<br/>payer 是否质疑"}
     B -- "否" --> Z1["Finalize 转 Refunded<br/>正常退款"]
-    B -- "是 Slash session_id evidence" --> C["Result Verifier 0x93<br/>启动仲裁"]
+    B -- "是 Slash session_id evidence" --> C["Result Verifier 0x03<br/>启动仲裁"]
     C --> D["按 VerificationConfig 选 N 名验证 Runner<br/>复用 CIP-2 commit-reveal"]
     D --> E["N 名 Runner 重跑同一请求<br/>提交 result 加 sig"]
     E --> F{"对照 voucher.usage_digest<br/>VerificationMode 共识"}
@@ -608,7 +610,7 @@ flowchart TD
     class C,D,E,F neutral
 ```
 
-仲裁路径**完全复用** CIP-2 既有的 `Result Verifier 0x93` + commit-reveal + slashing，没有引入新的共识机制——session 本身只是"乐观快路径 + 既有慢路径"的组合。
+仲裁路径**完全复用** CIP-2 既有的 `Result Verifier 0x03` + commit-reveal + slashing，没有引入新的共识机制——session 本身只是"乐观快路径 + 既有慢路径"的组合。
 
 ### 5.7 安全 / 拒绝服务考量
 
@@ -637,9 +639,9 @@ CIP-7 是「按 epoch 续费的密钥访问流」，针对的是 **publisher 把
 
 ```mermaid
 flowchart LR
-    subgraph CIP7["CIP-7 Simple Stream"]
+    subgraph CIP7["CIP-7 Simple Stream（草案，未实现）"]
         direction TB
-        K["Stream Key Manager 0x06"]
+        K["Stream Key Manager 待选址<br/>CIP 草案 0x06 已被 DualBasefee 占用"]
         E1["Epoch t"]
         E2["Epoch t plus 1"]
         E3["Epoch t plus 2"]
@@ -650,7 +652,7 @@ flowchart LR
 
     subgraph MPPSESS["MPP Session"]
         direction TB
-        SA2["Session Actor 0x96"]
+        SA2["Session Actor 0x0C"]
         D1["deposit once"]
         V1["voucher_1"]
         V2["voucher_2"]
@@ -693,7 +695,7 @@ flowchart LR
 ### 6.3 后续
 
 - **CIP-20 token 作为 session 资产**：让 USD-pegged 的 CIP-20 代币也能托管，对应 Tempo 用 USDG 的体验。
-- **TEE 增强**：CIP-23 的 TEE Verifier `0x95` 给 Runner 提供 `tee_attestation`，session voucher 的 `usage_digest` 可与 TEE 报告绑定，提高乐观信任的可靠性。
+- **TEE 增强**：CIP-23 的 TEE Verifier `0x05` 给 Runner 提供 `tee_attestation`，session voucher 的 `usage_digest` 可与 TEE 报告绑定，提高乐观信任的可靠性。
 - **Multi-runner session**：把单 Runner session 扩展为 N-of-M 共识 session（可惜延迟会回落）。短期不做，长期作为高安全档位。
 - **跨链 session bridge**：把 Tempo / Stripe / Lightning 的 session voucher 通过 MPP 协议层桥接到 Cowboy 结算（见 §7）。
 
@@ -753,10 +755,12 @@ flowchart TB
 - Tempo：[docs.tempo.xyz/guide/machine-payments](https://docs.tempo.xyz/guide/machine-payments)、[docs.tempo.xyz/learn/tempo/machine-payments](https://docs.tempo.xyz/learn/tempo/machine-payments)、[Tempo CLI wallet](https://docs.tempo.xyz/cli/wallet)、[tempoxyz/wallet](https://github.com/tempoxyz/wallet)
 - 解读：[Cloudflare Agents MPP](https://developers.cloudflare.com/agents/agentic-payments/mpp/)、[Stripe blog](https://stripe.com/blog/machine-payments-protocol)、[Privy blog](https://privy.io/blog/building-on-privy-with-tempo-machine-payments-protocol)、[Formo blog](https://formo.so/blog/mpp-machine-payments-protocol-explained)、[Visa announcement](https://corporate.visa.com/en/sites/visa-perspectives/innovation/visa-card-specification-sdk-for-machine-payments-protocol.html)、[Apify blog](https://blog.apify.com/machine-payments-protocol-overview/)、[QuickNode docs](https://www.quicknode.com/docs/build-with-ai/mpp-payments)、[GetBlock blog](https://getblock.io/blog/what-is-a-machine-payments-protocol-mpp/)
 - SDK：[wevm/mppx](https://github.com/wevm/mppx)、[tempoxyz/mpp-rs](https://github.com/tempoxyz/mpp-rs)、[mpp.dev/sdk/python](https://mpp.dev/sdk/python)、[solana-foundation/mpp-sdk](https://github.com/solana-foundation/mpp-sdk)、[stellar/stellar-mpp-sdk](https://github.com/stellar/stellar-mpp-sdk)、[starc007/mppx-proxy](https://github.com/starc007/mppx-proxy)
-- Cowboy 现状（重点文件）：
-  - `node/runner/src/types.rs:16-38, 100-117, 220-227, 243-257, 589-625`
-  - `node/execution/src/runner/dispatcher.rs:35-37, 515-533, 925-1010`
-  - `node/execution/src/runner/verifier.rs:31-84, 87-251, 317-418`
-  - `node/execution/src/runner/registry.rs:64-81`
-  - `runner/src/main.rs:1-163`
-  - `refs/cips/cip-2-offchain-compute.md`、`refs/cips/cip-7-simple-stream-protocol.md`、`refs/cips/cip-3-fee-model.md`、`refs/cips/cip-23-tee-execution.md`
+- Cowboy 现状（重点文件，行号截至 2026-05-06）：
+  - `node/runner/src/system_actors.rs:11-66`（system actor 地址权威定义：`0x01-0x0B`）
+  - `node/types/src/constants.rs:142-232`（`BASEFEE_SYSTEM_ACTOR=0x06`、`GOVERNANCE_SYSTEM_ACTOR=0x09`、`SETTLEMENT_CONFIG_KEY`、`DISPUTE_WINDOW_BLOCKS=75`）
+  - `node/runner/src/types.rs:91-117`（`RunnerRegistration`）、`136-156`（`RateCard`）、`283-340`（`VerificationConfig` / `VerificationMode` 五变体）、`355-365`（`RunnerResult.signature: Option<[u8; 65]>`）、`596-660`（`RunnerResult` serde）、`746-779`（`SettlementConfig` 默认 89/10/1 + `is_valid`）
+  - `node/execution/src/runner/dispatcher.rs:297-708`（`handle_job_submit` + D1 escrow `678-708`）、`830-910`（`handle_job_cancel` D3 退款）、`950-1100+`（`select_runner_committee_with_seed` + 1.5× stake filter）
+  - `node/execution/src/runner/verifier.rs:36-251`（commit/reveal 入口）、`332-465`（settlement payout + governance 读取）、`524-771`（`verify_results` 五种 mode）
+  - `node/execution/src/runner/registry.rs:18`（`handle_runner_register` + 1.5× stake check）、`317`（`slash_runner`，CIP-25 §β Task 8 后从 verifier.rs 搬至此）
+  - `runner/crates/runner-node/src/`（runner daemon 主体）
+  - `refs/cips/cip-2-offchain-compute.md`（含 `cip-2-offchain-compute-v2.md`）、`refs/cips/cip-3-fee-model.md`、`refs/cips/cip-7-simple-stream-protocol.md`、`refs/cips/cip-23-tee-execution.md`（含 `-v2.md`）

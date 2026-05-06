@@ -27,17 +27,17 @@ The manual revert took ~2 hours per PR and could not safely strip all noise. Cos
 
 ### 1.3 Measured drift (as of 2026-04-30)
 
-Run on local `devnet` / `main` HEAD with `rustfmt 1.8.0-stable` (rustc 1.92.0):
+Run on each repo's `devnet` HEAD with `rustfmt 1.8.0-stable` (verified identical output under both rustc 1.92.0 and 1.93.0):
 
 | Workspace | Files needing reformat | Diff hunks |
 |---|---|---|
-| `node/` (main workspace) | **147** | 3,070 |
-| `node/pvm/` (workspace-excluded, separate workspace) | **44** | 584 |
+| `node/` (main workspace) | **148** | 3,147 |
+| `node/pvm/` (workspace-excluded, separate workspace) | **44** | 585 |
 | `runner/` | **58** | 765 |
 | `cbfs/` | **35** | 118 |
-| **Total** | **284 files** | **4,537 hunks** |
+| **Total** | **285 files** | **4,615 hunks** |
 
-> Charles's post said `node = 103` and `cbfs = 35`. The cbfs number matches exactly. The node number (103 vs our 191) likely differs because Charles only measured the main workspace and skipped `pvm/` (44 files) and possibly drifted further in the past 2 weeks.
+> Charles's post said `node = 103` and `cbfs = 35`. The cbfs number matches exactly. The node number (103 vs our 192) differs because Charles measured only the main workspace and skipped `pvm/` (44 files), and there's been further drift in the intervening 2 weeks.
 
 ### 1.4 Concrete examples (from `chain/src/application.rs`)
 **Import regrouping** (edition 2024 default `style_edition` behavior):
@@ -100,6 +100,27 @@ Pin to **`1.93.0`** across all three repos.
 
 **Action item for Phase 1:** also bump `runner/.github/workflows/pipeline.yml` `RUST_VERSION` from `"1.92.0"` → `"1.93.0"` so the three repos are aligned. One-line change, can ride in the same Phase 1 PR.
 
+### 2.4 CI trigger gap on devnet (discovered 2026-05-02)
+
+When prepping Phase 1 we found that **CI doesn't currently run on devnet** for two of three repos:
+
+| Repo | `pipeline.yml` triggers (before fix) | devnet covered? |
+|---|---|---|
+| `node` | `push` to any branch (with paths-ignore for cli/) + `workflow_dispatch` | ✅ yes |
+| `runner` | `push` only to `main` / `feature/*` / `fix/*` / `hotfix/*`; **no `pull_request` trigger at all** | ❌ no |
+| `cbfs` | `push` only to `main`; `pull_request` only with base=`main` | ❌ no |
+
+This means devnet has been an unprotected branch — no automated build/test verification on push or PR to it. For our campaign that's a hard blocker: Phase 2's tree-wide format pass MUST be CI-verified, and Phase 3's fmt-check gate is meaningless if CI doesn't run on devnet at all.
+
+**Action item, bundled into Phase 1 PRs:**
+- `cbfs/.github/workflows/pipeline.yml`: add `devnet` to both `push.branches` and `pull_request.branches` (alongside existing `main`).
+- `runner/.github/workflows/pipeline.yml`: add `devnet` to `push.branches`, and add a new `pull_request` trigger with `branches: [main, devnet]`.
+- `node/`: no change needed — already triggers on any branch.
+
+Note: the trigger extension PR's *own* pull_request to devnet won't run CI yet (workflows are loaded from base branch, which still has the old triggers). That's fine — the toolchain-pin commits in the same PR are validated by local smoke build (§2.5), and once merged, future PRs to devnet (Phase 2/3) will run CI normally.
+
+Out of scope for this campaign (do later if anyone cares): cbfs's `cbfs-cli-pipeline.yml` and node's `cli-pipeline.yml` still only trigger on main. They have path filters that don't match fmt changes anyway, so leaving them alone is fine.
+
 **Sanity check we ran:** rustfmt's internal binary version is `1.8.0-stable` in **both** rustc 1.92 and 1.93. Verified by running `cargo fmt --all -- --check` under both toolchains — file count and hunk count are byte-identical across all four workspaces. So the current 1.92↔1.93 skew between runner and node/cbfs has been benign by luck. We should not rely on this going forward; lockstep the version anyway.
 
 **Why a fixed patch version (vs "stable"):** future rustfmt updates become a deliberate, reviewable bump-PR rather than a silent surprise. When the team is ready, it's a one-line change to `rust-toolchain.toml` + `RUST_VERSION` + a new format-pass PR.
@@ -143,7 +164,7 @@ Why bother if defaults are fine? Two reasons:
 Only stable rustfmt options. **Do not** use `group_imports`, `imports_granularity`, `wrap_comments`, or anything else that requires nightly — they will break `cargo fmt` for stable users (which is everyone on CI).
 
 **Acceptance for Phase 1:**
-- [ ] PRs merged to `node/devnet`, `runner/<main-branch>`, `cbfs/main`
+- [ ] PRs merged to `node/devnet`, `runner/devnet`, `cbfs/devnet` (all three target the same branch name; `origin/devnet` confirmed to exist on all three repos as of 2026-04-30)
 - [ ] `cargo --version` after fresh clone reports 1.93.0 in all three repos
 - [ ] `cargo fmt --version` reports `rustfmt 1.8.0-stable` (matching what 1.93.0 ships)
 - [ ] runner's CI `RUST_VERSION` bumped to `1.93.0`
@@ -161,13 +182,15 @@ Only stable rustfmt options. **Do not** use `group_imports`, `imports_granularit
 
 - [ ] Phase 1 has merged to all three repos (no need for a 24h soak — re-clone locally, confirm `cargo fmt --version` reports `rustfmt 1.8.0-stable`, that's enough)
 - [ ] Quick Slack check with **Martin** that no big node PR is mid-merge (per CLAUDE.md he drives big merges). One-message ack is sufficient.
-- [ ] `gh pr list` on each repo: identify any open PRs targeting `devnet`/`main`. Ping each author with a heads-up that they'll need a quick rebase + `cargo fmt --all` after the format PR lands. (Number of authors should be small enough to ping individually.)
+- [ ] `gh pr list` on each repo: identify any open PRs targeting `devnet`. Ping each author with a heads-up that they'll need a quick rebase + `cargo fmt --all` after the format PR lands. (Number of authors should be small enough to ping individually.)
 - [ ] Confirm Tony **and** Pavilion are both online during the window (one drives, one reviews — don't single-point this).
 
 #### 2.2 Execution (per repo)
-For each of the four workspaces, run:
+**All three repos target their `devnet` branches.** Verified 2026-04-30: `origin/devnet` exists in all three. cbfs's `origin/devnet` was just created from current `main` (same commit), so it has no divergence from main yet.
+
+For each repo, run:
 ```bash
-git checkout <main-branch>           # devnet for node, main for cbfs/runner
+git checkout devnet
 git pull
 git checkout -b chore/tree-wide-fmt-pass
 
@@ -278,7 +301,7 @@ Match the install pattern already used by other jobs in `pipeline.yml` (uses `dt
 ```
 
 #### 3.2 Make it a required check
-GitHub branch protection rules → `devnet` (node) and `main` (cbfs, runner):
+GitHub branch protection rules → `devnet` on **all three repos** (node, cbfs, runner):
 - Add `cargo fmt` (or whatever the job name resolves to in GitHub Checks UI) to **required status checks**.
 - Do **not** enable this until Phase 2 merges — otherwise every open PR's CI breaks instantly.
 
@@ -309,7 +332,7 @@ And document `git config core.hooksPath .githooks` in CONTRIBUTING / CLAUDE.md.
 
 All three repos are private with a small contributor set (Tony, Pavilion, Martin, Charles, plus a few others). No external contributors. We do **not** need scheduled freeze events, calendar invites, T-24h pre-announcements, or timezone matrices.
 
-The Phase 2 "freeze" is just an ad-hoc chat message: *"starting fmt pass, please hold devnet/main merges for ~2h"*. That's the entire ceremony.
+The Phase 2 "freeze" is just an ad-hoc chat message: *"starting fmt pass, please hold devnet merges for ~2h"*. That's the entire ceremony.
 
 Roles:
 - **Tony** drives — opens PRs, runs the format pass
@@ -323,7 +346,7 @@ Roles:
 |---|---|---|
 | Day 1 morning | Open + merge Phase 1 PRs (toolchain pin × 3 repos + runner CI bump 1.92→1.93). Small, mechanical, can ride normal review flow. | Tony |
 | Day 1 end of day | Re-clone each repo locally, confirm `cargo fmt --version` reports `rustfmt 1.8.0-stable`. Catches any toolchain surprise before Day 2. | Tony |
-| Day 2 (Tue/Wed/Thu, afternoon) | T-30min: chat ping to Martin asking if any big PR is incoming. T-0: chat says *"starting fmt pass on 3 repos, please hold devnet/main merges for ~2h"*. Then open Phase 2 PRs in parallel; Pavilion reviews; merge as each goes CI-green. | Tony, Pavilion |
+| Day 2 (Tue/Wed/Thu, afternoon) | T-30min: chat ping to Martin asking if any big PR is incoming. T-0: chat says *"starting fmt pass on 3 repos, please hold devnet merges for ~2h"*. Then open Phase 2 PRs in parallel; Pavilion reviews; merge as each goes CI-green. | Tony, Pavilion |
 | Day 2 right after merges | Follow-up PR per repo adding `.git-blame-ignore-revs` with the format-pass SHA. Direct-message any open-PR authors with the rebase recipe (§2.5). | Tony |
 | Day 3 | Phase 3: open CI-enforcement PRs; once merged, enable as required status check in branch protection. | Tony |
 | Day 3 + 1 week | Verification audit (§7). | Tony |
@@ -395,7 +418,7 @@ Skip for now. CI is the enforcement; hooks add per-developer setup friction. Rev
 Run **one week** after Phase 3 enables:
 
 ```bash
-# In each repo, on the latest main/devnet:
+# In each repo, on the latest devnet:
 cargo fmt --all -- --check && echo "CLEAN" || echo "DRIFT DETECTED"
 
 # In node specifically:
@@ -432,7 +455,7 @@ Trivial: revert the `rust-toolchain.toml` PR. No code state was changed.
 | `rustfmt.toml` (optional but recommended) | each workspace root | Make style explicit |
 | `RUST_VERSION` bump 1.92→1.93 in `pipeline.yml` | runner only | Align runner CI with node/cbfs |
 | `.git-blame-ignore-revs` | node, cbfs, runner | Hide format commit from blame |
-| Format-pass commit | each repo (4 workspaces total: node main, node/pvm, runner, cbfs) | The actual reformat |
+| Format-pass commit | each repo on `devnet` (4 workspaces total: node main, node/pvm, runner, cbfs) | The actual reformat |
 | CI fmt job in `pipeline.yml` | each repo (the existing pipeline file, not a new ci.yml) | Enforce going forward |
 | Branch protection update | each repo (GitHub UI) | Make CI fmt required |
 | README / CLAUDE.md note | each repo | Document `git config blame.ignoreRevsFile` |
