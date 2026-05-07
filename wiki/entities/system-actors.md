@@ -12,7 +12,7 @@ sources:
   - refs/cips/cip-14-dns-addressable-actors-v2.md
   - refs/cips/cip-23-tee-execution-v2.md
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-04-21
+last_updated: 2026-05-07
 status: authoritative
 ---
 
@@ -131,6 +131,14 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 
 ---
 
+### Session Actor（提案 `0x0C` —— 与 ROUTE_REGISTRY 冲突）
+- **当前实装**：无
+- **研究 / 计划提案**：`refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 + `refs/plans/2026-05-06_mpp_session_implementation.md` §3.1 提议 `SESSION_ACTOR = 0x0C`，承载 MPP Session 托管 / 累积结算 / 退款 / 仲裁入口
+- ⚠️ **地址冲突**：`0x0C` 已在 CIP-14 v2 §1 分配给 `ROUTE_REGISTRY`（v2 alignment round 6 已对齐到主分配表）。研究文档 / 计划是研究阶段提案，**未走 v2 alignment**。激活前需治理选址重排到 ≥`0x10` free range（[[../drift]] V-11）
+- 详见 [[../concepts/mpp-session]]
+
+---
+
 ## 源文档冲突 / 漂移
 
 **1. v1 → v2 地址段重命名**
@@ -149,6 +157,11 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 - `0x0C` / `0x0D` / `0x0E` / `0x0F` 在代码中尚未存在；属于 v2 协议 precondition（详见 [[../drift]]）
 - 实现时需在 `node/runner/src/system_actors.rs` 追加常量 + 同步 workspace CLAUDE.md
 
+**5. MPP Session 提案 `0x0C` 撞 ROUTE_REGISTRY**
+- 研究文档（2026-04-28）/ 计划（2026-05-06）提议 `SESSION_ACTOR = 0x0C`
+- CIP-14 v2 §1 已把 `0x0C` 分配给 `ROUTE_REGISTRY`
+- 研究文档未引入 v2 alignment 上下文；激活前必须治理选址（[[../drift]] V-11）
+
 详见 [`refs/analysis/2026-04-15_documentation_amendments.md §二`](../../analysis/2026-04-15_documentation_amendments.md)。
 
 ---
@@ -165,3 +178,5 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 - `refs/cips/cip-16-custom-domains-v2.md` — `0x0C` 扩展（TLD / external FQDN, Draft）
 - `refs/cips/cip-23-tee-execution-v2.md` §4 — `0x05` 真实 attestation 流水线 + opcodes 57–60
 - `refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md` Part II Delta 6 — WP §9 0x0A 修正
+- `refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 — Session Actor 提案（与 `0x0C` ROUTE_REGISTRY 冲突）
+- `refs/plans/2026-05-06_mpp_session_implementation.md` §3.1 — Session Actor 实施计划（PoC 阶段）

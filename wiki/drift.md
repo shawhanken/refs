@@ -10,7 +10,9 @@ sources:
   - refs/cips/cip-23-tee-execution-v2.md
   - refs/cips/cip-9-runner-storage-v2.md
   - refs/cips/cip-10-runner-containers-v2.md
-last_updated: 2026-04-21
+  - refs/runner/2026-04-28_MPP_Session_Research.md
+  - refs/plans/2026-05-06_mpp_session_implementation.md
+last_updated: 2026-05-07
 status: authoritative
 ---
 
@@ -108,6 +110,18 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 |---|---|---|
 | **V-9** | SettlementConfig `target_pool` 6 enum 变体在代码中尚未存在 | ⚠️ CIP-14 v2 Part III §6 canonical；需扩 `UpdateSettlementConfig` schema 加 discriminant |
 | **V-10** | `EXTERNAL_REVERIFY_FEE` 治理 governance-set 默认值未拍板 | ⚠️ CIP-16 v2 §5.8 留 governance-set；激活前需治理选定数值 |
+
+---
+
+## MPP Session 研究 / 计划与 v2 主表冲突（2026-05-07 新增）
+
+`refs/runner/2026-04-28_MPP_Session_Research.md` + `refs/plans/2026-05-06_mpp_session_implementation.md` 是研究 / PoC 实施阶段的提案，未走 v2 alignment round 6。其提议的地址 / opcode 与 v2 主表全段冲突，激活前必须重排。
+
+| ID | 主题 | 状态 |
+|---|---|---|
+| **V-11** | MPP Session 提议 `SESSION_ACTOR = 0x0C` 撞 CIP-14 v2 `ROUTE_REGISTRY = 0x0C` | ⚠️ 研究 2026-04-28 + 计划 2026-05-06 提议；**实施前必须改地址**（建议 ≥`0x10`）+ 起 CIP 草案纳入主表 |
+| **V-12** | MPP Session 提议 opcodes 52-57（OpenSession / Deposit / Settle / Close / Finalize / Slash）撞 CIP-13 v2 (52-56) + CIP-23 v2 (57) | ⚠️ 同上；建议 PoC 阶段使用临时本地常量，正式合并前重排到 ≥68 |
+| **V-13** | EIP-712 `domain.chainId` 来源未明 | ⚠️ 计划 §10 待澄清；查 `node/types/src/constants.rs` 或 validator 配置；激活前需选定来源 |
 
 ---
 

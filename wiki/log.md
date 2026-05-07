@@ -259,3 +259,38 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 **权威层级标注**: v2 系列文档全部为 Draft；spec 已自洽对齐；代码尚未实装的项明确列在 `drift.md` v2 precondition gap 段。激活前需按 V-1 → V-10 顺序补齐代码侧。
 
 ---
+
+## [2026-05-07] ingest | MPP Session 研究 + 实施计划
+
+入库来源：
+
+- `refs/runner/2026-04-28_MPP_Session_Research.md` — 研究草稿，把 Stripe + Tempo Labs 提交 IETF 的 Machine Payment Protocol（MPP）的 session 模式嫁接到 Cowboy；提议新增 `Session Actor 0x0C` 承载链上托管 / 累积结算 / 退款 / 仲裁入口；voucher 用 EIP-712 签累积金额；执行器复用 `runner-llm` / `runner-http` / `runner-mcp`；分润复用 `SettlementConfig` 89/10/1。研究阶段重要文档微调（行号刷新到 2026-05-06：`verifier.rs` settlement 段 332-465 → 351-465；`VerificationMode` 五变体 → 六变体含 `SemanticSimilarity`；`registry.rs` 起点行号补全；`dispatcher.rs:830-910` → `830-903`）。
+- `refs/plans/2026-05-06_mpp_session_implementation.md`（新文件） — 把研究文档 §5–§6 转成可执行任务表：6 个新 opcode（52-57）、新 `node/types/src/session.rs`、新 `node/execution/src/runner/session.rs`、新 `runner/crates/runner-node/src/session/`、CLI `cowboy session` 子命令、`examples/llm_session/`；10 个 SPEC-SES-* 单元测试；6-8 个 runner integration 测试；端到端验收 3 笔链上 tx + 89/10/1 比例验证；PoC 2-3 周；§7 后续工作（CIP 草案、CIP-2 dispute 实装、CIP-20 token 资产、TEE 增强、跨链 bridge）。
+
+**新建 wiki 页（1 个）**：
+
+- `wiki/concepts/mpp-session.md`（status: draft） — Cowboy MPP Session 综合：与 MPP 协议对接（charge vs session）、Session 生命周期 4 状态机、链上 6 handler 表、链下 voucher / Runner 端、Settlement 复用 89/10/1、与 CIP-2 / CIP-7 关系、安全 / DoS 缓解、PoC 范围与待澄清
+
+**更新 wiki 页（5 个）**：
+
+- `wiki/entities/system-actors.md` — 新增 "Session Actor（提案 0x0C）" 小节；冲突段 §5 标注与 ROUTE_REGISTRY 撞地址；Sources 段补研究/计划路径
+- `wiki/parameters.md` — SystemInstruction Opcode 主分配表后追加冲突告警；变更记录加 2026-05-07
+- `wiki/drift.md` — 新增 "MPP Session 研究 / 计划与 v2 主表冲突" 段（V-11 / V-12 / V-13）；source 列表补两份新文档
+- `wiki/entities/plans-inventory.md` — 新增 "CIP / 跨子系统集成（3）" 分组（含 cowboy-tee-execution-design / 2026-04-22 gap-assessment / 2026-05-06 mpp_session）；"文档/测试/待办" 增 1 项 (`2026-04-30_rust-fmt-cleanup-node-cbfs`)；命名约定补"日期前缀允许"惯例；总数 23 → 27
+- `wiki/index.md` — concepts 段加入 mpp-session；plans 数量 22 → 27；"最后更新" 顶栏
+
+**冲突摘要（drift V-11 / V-12 / V-13）**：
+
+研究 / 计划是研究阶段提案，**未走 v2 alignment round 6**：
+- `0x0C` SESSION_ACTOR 撞 CIP-14 v2 ROUTE_REGISTRY
+- opcodes 52-57 撞 CIP-13 v2 (52-56) + CIP-23 v2 (57)
+- EIP-712 `domain.chainId` 来源未明（计划 §10 待澄清）
+
+**未触发**：
+- 未改 `parameters.md` 的 v2 opcode 主表（v2 系列权威）
+- 未改 `entities/runner-lifecycle.md`（MPP session 是叠加 fast path，CIP-2 lifecycle 不变；如果二期 dispute 落地，再加 §"MPP Session dispute 路径"）
+- 未改 `concepts/runner-verification.md`（session 默认乐观 `ecrecover`，仲裁路径完全复用 CIP-2 commit-reveal，无新增 VerificationMode）
+
+**权威层级标注**: 研究 / 计划全部为 Draft / Research / PoC；激活路径需经 CIP 草案（计划 §9 列出 `cip-2x-mpp-session.md`） + 治理 + 主分配表对齐才能合并到 v2 主表。
+
+---

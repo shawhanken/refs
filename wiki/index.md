@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-04-21（v2 alignment round 6：opcode 重排 / 系统 actor 收回 0x0C-0x0F / target_pool enum / CIP-5 revised 集成）
+**最后更新**: 2026-05-07（ingest MPP Session 研究 2026-04-28 + 实施计划 2026-05-06；标注 0x0C / opcode 52-57 与 v2 主表冲突）
 
 ---
 
@@ -46,6 +46,7 @@
 | [public-asset-hosting.md](concepts/public-asset-hosting.md) | CIP-15 v2 Gateway 直服 CIP-9 public volume 静态资产；独立 ingress.static entitlement、route_manifest on-chain、`GET_MANIFEST` (AMEND 9-G)、CORS 优先级修正（Draft）|
 | [custom-domains.md](concepts/custom-domains.md) | CIP-16 v2 `.cow` / `.cowboy` TLD + 外部 FQDN 绑定（MajorityVote DNS 验证 + ExternalDomainCallback opcode 67 + 双层 reverify fee + verified_fqdn 注入, Draft）|
 | [tee-attestation.md](concepts/tee-attestation.md) | CIP-23 v2 CAE 复合证明 + 三层资格 chain + opcode 57-60 + 与 CIP-13 委托正交（Draft）|
+| [mpp-session.md](concepts/mpp-session.md) | MPP Session：链上托管 + 链下累积 voucher + 链上结算；3 笔 tx 摊到 N 次 Runner 调用；提议 SESSION_ACTOR=0x0C / opcodes 52-57（**与 CIP-14 v2 / CIP-13 v2 / CIP-23 v2 冲突**, Research）|
 
 ---
 
@@ -72,7 +73,7 @@
 - [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）+ WP v2 deltas
 - [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-23）+ v2 alignment 系列（CIP-1/2/9/10/13/14/15/16/23 v2）
 - [`refs/analysis/`](../analysis/) — 分析、会议、**修正案**（`2026-04-15_documentation_amendments.md` 为权威）
-- [`refs/plans/`](../plans/) — 工程实施计划 / 评估（22 份，详见 [entities/plans-inventory.md](entities/plans-inventory.md)）
+- [`refs/plans/`](../plans/) — 工程实施计划 / 评估（27 份，详见 [entities/plans-inventory.md](entities/plans-inventory.md)）
 - [`refs/economics/`](../economics/) — 费用模型、Basefee、Tokenomics
 - [`refs/node/`](../node/) — 节点专题
 - [`refs/pvm/`](../pvm/) — PVM 专题

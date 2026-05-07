@@ -3,7 +3,7 @@ type: entity
 tags: [plans, inventory, engineering, roadmap]
 sources:
   - refs/plans/
-last_updated: 2026-04-17
+last_updated: 2026-05-07
 status: authoritative
 ---
 
@@ -74,13 +74,22 @@ status: authoritative
 |---|---|---|
 | [governance-7phase-roadmap](../../plans/governance-7phase-roadmap.md) | 社区治理可行性与七阶段路径图（中英） | CIP-12 + OZ Governor / OP / Polkadot / Cosmos / Beanstalk 经验落地 |
 
-## 文档 / 测试 / 待办（3）
+## 文档 / 测试 / 待办（4）
 
 | 文件 | 标题 | 摘要 |
 |---|---|---|
 | [runner-test-coverage-plan](../../plans/runner-test-coverage-plan.md) | runner/ 测试完整性改进计划 | off-chain daemon 零覆盖的补救；弱断言 edge_cases 收尾 |
 | [node-readme-update-plan](../../plans/node-readme-update-plan.md) | 更新 node/ READMEs（devnet 分支） | 对照代码修正 7 处过时常量与新特性文档 |
 | [github-issues-batch-plan](../../plans/github-issues-batch-plan.md) | GitHub Issues 分类与批量实施计划 | 95 个未关 Issue 按模块聚合分批的优先级方案 |
+| [2026-04-30_rust-fmt-cleanup-node-cbfs](../../plans/2026-04-30_rust-fmt-cleanup-node-cbfs.md) 🆕 | Rust 格式化清理（node + cbfs） | 跨 workspace 全量 `cargo fmt` 落地策略 + devnet CI 触发 |
+
+## CIP / 跨子系统集成（3）
+
+| 文件 | 标题 | 摘要 |
+|---|---|---|
+| [cowboy-tee-execution-design](../../plans/cowboy-tee-execution-design.md) | Cowboy TEE Execution 设计文档（CIP-23） | CIP-23 Draft 配套实施设计 §12 代码改造清单 + §13 4-phase 路线图 |
+| [2026-04-22_cip-wp-gap-assessment-and-priorities](../../plans/2026-04-22_cip-wp-gap-assessment-and-priorities.md) 🆕 | CIP / Whitepaper Gap 评估与优先级 | 跨 CIP 与 WP v2 的差距盘点 + 优先级排序 |
+| [2026-05-06_mpp_session_implementation](../../plans/2026-05-06_mpp_session_implementation.md) 🆕 | MPP Session 集成实施方案 | 把 `refs/runner/2026-04-28_MPP_Session_Research.md` 第 §5–§6 设计转化为可执行任务表（PoC 2-3 周）；详见 [[../concepts/mpp-session]] |
 
 ---
 
@@ -90,6 +99,7 @@ status: authoritative
 - **前缀即主题域**：`economics-*` / `basefee-*` / `tps-*` / `block-time-*` / `bench-*` / `wallet-*` / `pvm-*` / `runner-*` / `node-*` / `validator-*` / `governance-*` / `receipt-*` / `transfer-*` / `github-*`
 - **名称表意**，方便在 grep / CLI / 引用中一眼识别
 - **CIP 关联**：若计划紧跟某 CIP，用 `-cipNN` 后缀（如 `runner-economics-and-delegation-cip13.md`）
+- **日期前缀**（2026-04 起新引入）：跨多主题或紧密关联当日提案的计划允许 `YYYY-MM-DD_<slug>.md`（如 `2026-05-06_mpp_session_implementation.md`）；slug 内允许 `_` 也允许 `-`，但单一计划内保持一致
 
 ## 使用指引
 
@@ -105,4 +115,4 @@ status: authoritative
 
 ## Sources
 
-- `refs/plans/` 目录下 23 份 markdown 文件（2026-04-17 盘点 + 统一 kebab-case 重命名；新增 `runner-economics-and-delegation-cip13.md` 设计指南）
+- `refs/plans/` 目录下 27 份 markdown 文件（2026-05-07 盘点；新增日期前缀的 CIP/Gap 类计划：`cowboy-tee-execution-design.md` / `2026-04-22_cip-wp-gap-assessment-and-priorities.md` / `2026-04-30_rust-fmt-cleanup-node-cbfs.md` / `2026-05-06_mpp_session_implementation.md`）

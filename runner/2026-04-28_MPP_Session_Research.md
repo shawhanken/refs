@@ -234,7 +234,7 @@ Tempo 是 MPP 的 reference settlement chain。它的特征：
 |------|------|------|
 | **按 Job 单笔托管** | `node/execution/src/runner/dispatcher.rs:678-708`（D1: Escrow） | 提交 Job 时立即从 submitter 扣 `max_price + tip`，记账到 Job Dispatcher（`0x02`）名下 |
 | **commit-reveal + 多人共识** | `node/execution/src/runner/verifier.rs:36-251`（commit/reveal 入口）、`verifier.rs:524-771`（`verify_results` 各 mode 分支） | 60% 时间窗 commit、40% 窗口 reveal；按 `VerificationMode` 做共识；少数派会被 slash |
-| **Settlement 分润** | `verifier.rs:332-465`（`handle_job_result_submit` 内 governance 读取 + payout） | `SettlementConfig{runner_percent, burn_percent, treasury_percent}`，默认 89/10/1，由 governance actor `0x09` 通过 `UpdateSettlementConfig` 修改 |
+| **Settlement 分润** | `verifier.rs:351-465`（`handle_job_result_submit` 内"C5: Runner settlement split" 段：governance 读取 + payout + 日志） | `SettlementConfig{runner_percent, burn_percent, treasury_percent}`，默认 89/10/1，由 governance actor `0x09` 通过 `UpdateSettlementConfig` 修改 |
 | **Slashing** | `node/execution/src/runner/registry.rs:317`（CIP-25 §β Task 8 后从 verifier 搬至 registry） | 50% treasury / 50% burn；stake 跌破 `MIN_STAKE_CBY_WEI` 就 reputation = 0 |
 | **Stake-weighted VRF 选 Runner** | `dispatcher.rs:950-1100+`（`select_runner_committee_with_seed`） | Fisher-Yates + log2(stake) 权重压缩，避免大鲸垄断 |
 | **CIP-7 Simple Stream Protocol**（草案，**未实现**） | `refs/cips/cip-7-simple-stream-protocol.md` | 按 epoch 滚动续费的「流」原语；CIP 中拟把 Stream Key Manager 放在 `0x06`，但当前实现已把 `0x06` 用作 `DUAL_BASEFEE`（见脚注[^a]），CIP-7 落地需另行选址。账户级 entitlement 当前在 `ENTITLEMENT_REGISTRY 0x07` |
@@ -758,9 +758,9 @@ flowchart TB
 - Cowboy 现状（重点文件，行号截至 2026-05-06）：
   - `node/runner/src/system_actors.rs:11-66`（system actor 地址权威定义：`0x01-0x0B`）
   - `node/types/src/constants.rs:142-232`（`BASEFEE_SYSTEM_ACTOR=0x06`、`GOVERNANCE_SYSTEM_ACTOR=0x09`、`SETTLEMENT_CONFIG_KEY`、`DISPUTE_WINDOW_BLOCKS=75`）
-  - `node/runner/src/types.rs:91-117`（`RunnerRegistration`）、`136-156`（`RateCard`）、`283-340`（`VerificationConfig` / `VerificationMode` 五变体）、`355-365`（`RunnerResult.signature: Option<[u8; 65]>`）、`596-660`（`RunnerResult` serde）、`746-779`（`SettlementConfig` 默认 89/10/1 + `is_valid`）
-  - `node/execution/src/runner/dispatcher.rs:297-708`（`handle_job_submit` + D1 escrow `678-708`）、`830-910`（`handle_job_cancel` D3 退款）、`950-1100+`（`select_runner_committee_with_seed` + 1.5× stake filter）
-  - `node/execution/src/runner/verifier.rs:36-251`（commit/reveal 入口）、`332-465`（settlement payout + governance 读取）、`524-771`（`verify_results` 五种 mode）
-  - `node/execution/src/runner/registry.rs:18`（`handle_runner_register` + 1.5× stake check）、`317`（`slash_runner`，CIP-25 §β Task 8 后从 verifier.rs 搬至此）
+  - `node/runner/src/types.rs:91-124`（`RunnerRegistration`）、`136-151`（`RateCard`）、`283-336`（`VerificationConfig` 含 `dispute_window_blocks`；`VerificationMode` 六变体：`None / EconomicBond / MajorityVote / StructuredMatch / Deterministic / SemanticSimilarity`，其中 `SemanticSimilarity` 已入枚举但 `verify_results` 暂未实现）、`355-365`（`RunnerResult.signature: Option<[u8; 65]>`）、`596-660`（`RunnerResult` serde）、`746-779`（`SettlementConfig` 默认 89/10/1 + `is_valid`）
+  - `node/execution/src/runner/dispatcher.rs:297-708`（`handle_job_submit` + D1 escrow `678-708`）、`830-903`（`handle_job_cancel` D3 退款）、`950-1131`（`select_runner_committee_with_seed` + 1.5× stake filter）
+  - `node/execution/src/runner/verifier.rs:36-251`（commit/reveal 入口与 reveal 后聚合）、`351-465`（settlement payout + governance 读取）、`524-773`（`verify_results` 五种 mode 实现 + `_ => UnsupportedVerificationMode`）
+  - `node/execution/src/runner/registry.rs:18`（`handle_runner_register` 起点）、`66-82`（最小质押 + CIP-2 §4 1.5× stake 检查）、`317`（`slash_runner`，CIP-25 §β Task 8 后从 verifier.rs 搬至此）
   - `runner/crates/runner-node/src/`（runner daemon 主体）
   - `refs/cips/cip-2-offchain-compute.md`（含 `cip-2-offchain-compute-v2.md`）、`refs/cips/cip-3-fee-model.md`、`refs/cips/cip-7-simple-stream-protocol.md`、`refs/cips/cip-23-tee-execution.md`（含 `-v2.md`）

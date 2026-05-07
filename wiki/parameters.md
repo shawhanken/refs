@@ -16,7 +16,7 @@ sources:
   - refs/cips/cip-15-public-asset-hosting-v2.md
   - refs/cips/cip-16-custom-domains-v2.md
   - refs/cips/cip-23-tee-execution-v2.md
-last_updated: 2026-04-21
+last_updated: 2026-05-07
 status: authoritative
 ---
 
@@ -330,6 +330,8 @@ status: authoritative
 
 代码现状 0–51 已分配。v2 系列 52–67 是 precondition。
 
+⚠️ **MPP Session 研究 / 计划提案与 v2 主表冲突**：`refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 + `refs/plans/2026-05-06_mpp_session_implementation.md` §3.2 提议 `OpenSession`/`Deposit`/`Settle`/`Close`/`Finalize`/`Slash` 占 52-57，**与 CIP-13 v2 (52-56) + CIP-23 v2 (57) 全段冲突**。研究阶段未对齐 v2 alignment round 6；激活前必须重排到 ≥68 free range（drift V-12）。
+
 ---
 
 ## SettlementConfig `target_pool` 枚举（CIP-14 v2 Part III §6 canonical）
@@ -367,6 +369,7 @@ handler MUST exhaustive switch；未知 → `ERR_UNKNOWN_POOL`。
 ---
 
 ## 变更记录
+- **2026-05-07** 在 SystemInstruction Opcode 主分配表段追加 MPP Session 研究/计划与 v2 主表 52-57 冲突告警；不改 v2 主表（v2 系列权威）
 - **2026-04-21** 全 v2 系列对齐：opcode 重排（CIP-13 → 52-56；CIP-23 → 57-60；CIP-10 → 61-64；CIP-14 → 65/66；CIP-16 → 67）；新增 SettlementConfig target_pool 6 enum；CIP-14 系统 actor 收回到 0x0C/D/E + CIP-10 取 0x0F；CIP-5 revised 2026-04-20 timer fee_payer 模型；新增 SystemInstruction Opcode 主分配表与 Container Runtime 段
 - **2026-04-20** 纳入 CIP-14 / CIP-15 / CIP-16 / CIP-23（全部 Draft）参数段；标注块时间假设不一致（1s vs 500ms）
 - **2026-04-16** 纳入 CIP-12 / CIP-13（Draft）参数段，标明尚未实装；opcode 冲突标注至 drift
