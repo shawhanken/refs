@@ -2,7 +2,7 @@
 
 本目录包含 Cowboy 项目的所有参考文档，按**主题**分类整理。跨主题的综合分析、报告、会议纪要集中在 `analysis/`，由 LLM 维护的综合 wiki 位于 `wiki/`。
 
-**最后更新**: 2026-04-15
+**最后更新**: 2026-05-07
 
 ---
 
@@ -19,9 +19,10 @@
 
 ```
 refs/
-├── wiki/         🆕 LLM 维护的综合知识库（概念/实体/参数/漂移）
-├── whitepaper/   核心技术白皮书（受保护，不改动）
-├── cips/         CIP 规范（living specs，以 cip-N 命名）
+├── wiki/         LLM 维护的综合知识库（概念/实体/参数/漂移/日志）
+├── whitepaper/   核心技术白皮书（受保护，不改动）+ WP v2 deltas
+├── cips/         CIP 规范（living specs，含 v2 alignment 系列）
+├── plans/        🆕 工程实施计划 / 评估 / 路径图（2026-04-17 入库）
 ├── chain/        跨系统集成与整体架构
 ├── node/         主链节点实现
 ├── pvm/          Python 虚拟机
@@ -58,10 +59,10 @@ refs/
 - [`wiki/log.md`](wiki/log.md) — 变更时序日志
 
 **页面分类**:
-- `concepts/` — 跨文档综合的抽象主题（9 页：actor-model、continuation、basefee、timer 等）
-- `entities/` — 具体系统实体（4 页：system-actors、runner-lifecycle、pvm、node）
+- `concepts/` — 跨文档综合的抽象主题（15 页：actor-model、continuation、basefee、timer-mechanism、runner-verification、settlement-slashing、vrf-runner-selection、governance、runner-delegation、dns-addressable-actors、public-asset-hosting、custom-domains、tee-attestation、mpp-session 等）
+- `entities/` — 具体系统实体（7 页：system-actors、runner-lifecycle、pvm、node、plans-inventory、gateway、route-registry）
 
-**权威层级**: 代码 > 修正案 > CIP > 白皮书 > 其它 raw。
+**权威层级**: 代码 > 修正案 > CIP > 白皮书 > 其它 raw（含 plans/）。
 
 ---
 
@@ -78,7 +79,23 @@ refs/
 
 ## 📋 cips/ — Cowboy Improvement Proposals
 
-见 CLAUDE.md 表格：CIP-1 到 CIP-22（Actor 调度、链下计算、费用模型、Tokens、存储、Timer、SDK、Runner 容器等）。
+CIP-1 到 CIP-23（Actor 调度、链下计算、费用模型、Tokens、存储、Timer、SDK、Runner 容器、治理、Runner Delegation、DNS-Addressable Actors、Public Asset Hosting、Custom Domains、TEE Execution）。
+
+**v2 alignment 系列**（2026-04-21 round 6）：CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 各发布 `*-v2.md` alignment 文件，统一系统 actor 地址段（`0x0C-0x0F`）与 SystemInstruction opcode 主分配表（CIP-13 v2 §1 canonical, 52-67）。
+
+详见 [`wiki/parameters.md`](wiki/parameters.md) Opcode 主分配表与 [`wiki/entities/system-actors.md`](wiki/entities/system-actors.md)。
+
+---
+
+## 🗺️ plans/ — 工程实施计划
+
+27 份工程实施计划 / 评估 / 路径图（2026-04-17 入库 22 份；2026-04-20 起新增 5 份）。详见 [`wiki/entities/plans-inventory.md`](wiki/entities/plans-inventory.md)。
+
+**主题分组**：经济/费用/Basefee（7）、性能/TPS/出块（6）、可靠性（1）、Bench/可观测性（2）、PVM（1）、钱包（2）、治理（1）、文档/测试/待办（4）、CIP/跨子系统集成（3）。
+
+**命名约定**：kebab-case slug 为主；2026-04 起新引入 `YYYY-MM-DD_<slug>.md` 日期前缀（用于跨多主题或紧密关联当日提案的计划，如 `2026-05-06_mpp_session_implementation.md`）。
+
+**性质**：非规范性 raw source，权威顺序仍是 **代码 > 修正案 > CIP > 白皮书 > plans/**。
 
 ---
 
@@ -146,6 +163,7 @@ refs/
 - `2026-02-26_Runner_Graceful_Shutdown_Plan_CN/EN.md`
 - `2026-03-03_Entitlement.md` — 权限机制
 - `2026-03-05_deterministic_runner_selection.md` / `_en.md` — 确定性选择算法
+- `2026-04-28_MPP_Session_Research.md` — MPP（Machine Payment Protocol）Session 模式集成研究（详见 [`wiki/concepts/mpp-session.md`](wiki/concepts/mpp-session.md)）
 
 ---
 
@@ -236,6 +254,8 @@ refs/
 
 1. **主题归位**：新文档按主题（node/pvm/runner/chain/economics/devex/common）放入对应目录
 2. **跨主题放 analysis/**：涉及多个子系统的综合分析、gap 报告、会议纪要进 `analysis/`
-3. **日期前缀**：新文档以 `YYYY-MM-DD_` 为前缀，日期为首次提交日（出生日，不随修订变更）
-4. **替代则归档**：文档被新版本完全替代时，移入 `_archive_/` 并在 PR 中标注替代者
-5. **whitepaper/ 受保护**：不改动
+3. **工程计划放 plans/**：可执行的实施方案 / 评估 / 路径图进 `plans/`（与 `analysis/` 区分：plans 偏「打算做什么」，analysis 偏「现状是什么」）
+4. **日期前缀**：新文档以 `YYYY-MM-DD_` 为前缀，日期为首次提交日（出生日，不随修订变更）
+5. **替代则归档**：文档被新版本完全替代时，移入 `_archive_/` 并在 PR 中标注替代者
+6. **whitepaper/ 受保护**：不改动
+7. **wiki/ 由 LLM 维护**：raw 文档新增/修订时按 [`wiki/AGENTS.md`](wiki/AGENTS.md) 的 Ingest 流程同步更新概念页 / 实体页 / 参数表 / 漂移看板 / 日志
