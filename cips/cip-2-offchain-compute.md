@@ -1,8 +1,25 @@
 ---
-title: "CIP-2: Verifiable Off-Chain Compute"
-description: Framework for executing verifiable, asynchronous off-chain computations
-icon: microchip
+title: "CIP-2: Verifiable Off-Chain Compute (v2)"
+description: Code-aligned v2 — adds DNS verification primitives required by CIP-16 v2 and clarifies the Custom executor extension pattern
 ---
+
+# CIP-2 v2
+
+> **Versioning.** This is v2 of CIP-2. v1 is the canonical document `cip-2-offchain-compute.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I.
+>
+> **Summary of v2 changes**
+>
+> - Adds two `VerifierCheck` variants — `DnsTxtRecordMatch` and `DnsCnameMatch` — required by CIP-16 v2 for DNS-based external-domain verification.
+> - Documents `JobType::Custom { executor_hash, params }` as the established mechanism for new built-in verifier executors without expanding `JobType` discriminants.
+> - Notes `VerificationMode::MajorityVote` (already implemented) as the structurally correct mode for non-deterministic operations like DNS resolution.
+> - Carries forward the existing 2026-04-15 amendment block on system actor table, runner stake formula, and `VerificationMode` discriminants — no further change to those items.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-2-offchain-compute.md`)
+
 
 <Note>
   **Status:** Draft for Internal Review  
@@ -507,3 +524,145 @@ This CIP is fully backwards compatible with the core protocol. System Actor addr
 * **Delegation Chain Depth:** `delegation_depth_max` (max 5) and the requirement that delegated constraints be a strict subset of parent constraints prevent privilege escalation through chained delegation.
 
 * **Pool Membership Expiry:** Pool Entitlements with `valid_until` set are automatically ineligible after the specified block. Node operators running compliance-sensitive pools should set time-bounded grants and renew via governance.
+
+---
+
+## Part II — v2 Revision (canonical; verbatim from former `cip-2-aligned.md`)
+
+
+<Note>
+  **Status:** Draft (alignment addendum; non-modifying companion to `cip-2-offchain-compute.md`)
+  **Type:** Standards Track
+  **Category:** Core
+  **Created:** 2026-04-21
+  **Companion to:** `cip-2-offchain-compute.md`
+  **Reads with:** former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs), `cip-16-custom-domains-v2.md` (Part II)
+</Note>
+
+## 0. What this document is
+
+A code-aligned addendum to CIP-2. CIP-2 already carries a 2026-04-15 amendment block that addresses system actor addresses, runner stake formula, and `VerificationMode` discriminants; this document layers two more amendments on top:
+
+- **AMEND 2-A** — `VerifierCheck::DnsTxtRecordMatch` variant (required by CIP-16-aligned §5.3).
+- **AMEND 2-B** — `VerifierCheck::DnsCnameMatch` variant (required by CIP-16-aligned §5.3).
+
+It also clarifies how `JobType::Custom` (`runner/src/types.rs:146-149`) is the established mechanism for adding new verifier executors without forking `JobType` discriminants.
+
+This document does not change CIP-2's existing primitives. The seven on-chain System Actor components, Fisher-Yates VRF selection, commit-reveal aggregation, deferred-tx callbacks, and Pool membership rules all stand.
+
+---
+
+## 1. Preconditions
+
+None. The amendments here are additive over CIP-2's current content.
+
+---
+
+## 2. New `VerifierCheck` variants
+
+Add two variants to the `VerifierCheck` enum (`runner/src/types.rs:177-201`). The current variants are `MajorityVote`, `JsonSchemaValid`, `StructuredMatch`, `NumericTolerance`, `NumericRange`, `Custom`. The additions:
+
+```rust
+pub enum VerifierCheck {
+    // existing variants (unchanged)
+    MajorityVote     { field: String },
+    JsonSchemaValid  { schema: String },
+    StructuredMatch  { fields: Vec<String> },
+    NumericTolerance { field: String, tolerance: f64 },
+    NumericRange     { field: String, min: f64, max: f64 },
+    Custom           { actor_hex: String, method: String },
+
+    // NEW (AMEND 2-A)
+    DnsTxtRecordMatch {
+        fqdn:           String,
+        expected_value: String,
+        min_resolvers:  u32,
+    },
+
+    // NEW (AMEND 2-B)
+    DnsCnameMatch {
+        fqdn:            String,
+        expected_target: String,
+        min_resolvers:   u32,
+    },
+}
+```
+
+### 2.1 `DnsTxtRecordMatch` semantics
+
+Each verifier runner queries `min_resolvers` independent recursive resolvers (operator-configured public list — see §2.3). For each resolver, the runner reports whether the TXT records at `fqdn` contain `expected_value` (exact byte match against any single record). The check passes for that runner if a strict majority of its resolvers confirm.
+
+Aggregation under `VerificationMode::MajorityVote` (the only mode that makes sense for non-deterministic DNS — see §3): the result verifier counts runner-level pass/fail and the binding transitions only if ≥ `threshold` runners report pass.
+
+### 2.2 `DnsCnameMatch` semantics
+
+Same shape as 2.1 but follows the CNAME chain for `fqdn`, requiring it to terminate at `expected_target`. The chain is followed up to `MAX_CNAME_HOPS = 8` per RFC 1034 §3.6.2; longer chains report fail.
+
+### 2.3 Resolver pool configuration
+
+Each runner advertises a configurable list of recursive resolvers in its capabilities. Recommended public defaults:
+
+```
+1.1.1.1            (Cloudflare)
+8.8.8.8            (Google Public DNS)
+9.9.9.9            (Quad9)
+208.67.222.222     (OpenDNS)
+```
+
+A runner whose advertised resolver pool is smaller than the job's `min_resolvers` MUST decline the job during VRF selection rather than re-querying the same resolver to hit the count. This prevents single-resolver bias from being laundered as multi-resolver consensus.
+
+### 2.4 Why `MajorityVote` and not `Deterministic`
+
+DNS resolution is not byte-identical across resolvers — TTL state, edge anycast routing, and per-resolver caching produce divergent observed records even when the authoritative zone is consistent. `VerificationMode::Deterministic` (`runner/src/types.rs:217`) requires byte-identical output and TEE attestation; using it for DNS would either fail constantly (different resolvers see different bytes) or force runners into a single shared resolver that defeats the point of multi-runner verification.
+
+`MajorityVote` already exists and is the structurally correct mode. The original CIP-16 §9.6's choice of `Deterministic` was the mismatch CIP-16-aligned corrects.
+
+---
+
+## 3. `JobType::Custom` as the extension pattern (clarification)
+
+CIP-2's existing `JobType::Custom { executor_hash: [u8; 32], params: Vec<u8> }` (`runner/src/types.rs:146-149`) is the established mechanism for adding new verifier-bearing job types without expanding the `JobType` discriminant set.
+
+Pattern for a new built-in verifier (DNS verification is the first instance; future TLS-cert validation, on-chain proof verification, RPC liveness checks, etc. should follow):
+
+1. Build the verifier as a deterministic executor binary (Rust → reproducible build).
+2. Hash the binary with BLAKE3.
+3. Pin the hash via governance: write a record at `GOVERNANCE_SYSTEM_ACTOR=0x09` keyed `system:executor_registry:<name>`.
+4. Issue jobs as `JobType::Custom { executor_hash: PINNED_HASH, params: <serialized job-specific params> }`.
+5. Runners that have whitelisted the executor execute the job. Verification proceeds via the standard `VerifierCheck` chain — §2 above adds DNS checks; future amendments add their own.
+
+This avoids fragmenting `JobType` for every new built-in verifier and keeps the discriminant space stable. CIP-16-aligned uses this for `DNS_VERIFIER_EXECUTOR_HASH`; the same hash-pinning pattern works for any future system-pinned executor.
+
+### 3.1 Governance pinning vs. open executors
+
+`JobType::Custom` accepts any `executor_hash`, including user-supplied ones — the protocol does not require governance pinning. Governance pinning is the convention for **protocol-level** executors used by system actors; user-deployed verification jobs (e.g., a DAO running custom market-data validation) can use any hash they trust.
+
+The distinction is purely operational: governance-pinned executors can be referenced by system actors (e.g., the Route Registry calling DNS verification) because the hash is itself part of the chain's normative state. User-supplied hashes are the user's own trust assumption.
+
+---
+
+## 4. `JobSpec` shape (no change)
+
+`JobSpec` (`runner/src/types.rs:101-117`) is unchanged. The new `VerifierCheck` variants slot into the existing `verification.checks: Vec<VerifierCheck>` field. CIP-16-aligned §5.3 shows the full `JobSpec` template for DNS verification, which uses only existing `JobSpec` fields.
+
+---
+
+## 5. Backwards compatibility
+
+Additive over CIP-2 and the running codebase:
+
+- Two new `VerifierCheck` variants. Existing consumers must add match arms for `DnsTxtRecordMatch` / `DnsCnameMatch`; otherwise unchanged.
+- `JobType::Custom` is unchanged; §3 documents an existing extension mechanism.
+- No existing job type, RPC, storage format, or VRF semantics is modified.
+
+Runners that have not been upgraded to support DNS executors simply do not advertise the resolver capability and are not selected for DNS verification jobs (existing capability-matching logic in `runner-registry`).
+
+---
+
+## 6. Summary
+
+| Amendment | Required by | Impact |
+|---|---|---|
+| AMEND 2-A — `DnsTxtRecordMatch` variant | CIP-16-aligned §5.3 | New enum variant; new runner capability |
+| AMEND 2-B — `DnsCnameMatch` variant | CIP-16-aligned §5.3 | New enum variant; reuses resolver pool |
+| §3 — `JobType::Custom` extension pattern (documentation) | Future built-in verifiers | No code change; pinning convention |

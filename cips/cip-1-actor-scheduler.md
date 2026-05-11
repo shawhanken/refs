@@ -1,8 +1,27 @@
 ---
-title: "CIP-1: Actor Message Scheduler"
-description: Specification for protocol-level timers and autonomous execution
-icon: calendar-clock
+title: "CIP-1: Actor Message Scheduler (v2)"
+description: Code-aligned v2 — aligns with CIP-5 revised 2026-04-20 (per-fire fee_payer model, three-path lifecycle, LANE_TIMER_CYCLES naming); unifies CIP-1 GBA with CIP-5 §9 auction
 ---
+
+# CIP-1 v2
+
+> **Versioning.** This is v2 of CIP-1. v1 is the canonical document `cip-1-actor-scheduler.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I. Part II also realigns with CIP-5 (revised 2026-04-20).
+>
+> **Summary of v2 changes**
+>
+> - Aligns with CIP-5 (revised 2026-04-20) which now specifies **Tx-then-Timer** block ordering natively in §5.1. CIP-1 v1's 2026-04-15 amendment caveat is superseded — there is no discrepancy left to flag.
+> - Recognises CIP-5 §6.3's **per-fire `fee_payer` model**: timers are NOT free. Each fire pre-charges `fee_payer` for `max_cost = gas_limit_per_fire × basefee + cells × basefee`, then refunds the unused portion. CIP-5 v1's "system-triggered, no fee charged" claim is superseded.
+> - Recognises CIP-5 §5.4's **three-path lifecycle** (natural fire / TTL expiry / insufficient-funds self-destruct) plus explicit cancellation, and CIP-5 §6.5's **separation of `LANE_TIMER_CYCLES` (execution) from `TIMER_GC_CYCLES` (cleanup)** so a TTL-expiry storm cannot starve live timers.
+> - **Unifies** CIP-1's GBA contracts with CIP-5 §9's exponential-bias auction. They are NOT competing designs: GBA produces the bid; the auction selects winners. The auction layer adds **priority** on top of the basefee — it does not replace the per-fire fee model. Closes CIP-5 §9.9 open question.
+> - Renames v1's `TIMER_PROCESSING_BUDGET_CYCLES` → `LANE_TIMER_CYCLES` per CIP-5 §6.5.
+> - Acknowledges new CIP-5 system instructions (`SYS_CANCEL_TIMER` / `SYS_UPDATE_TIMER_CONFIG` / `SYS_EXTEND_TIMER`) which are **already in code at opcodes 48 / 49 / 50** — no new allocation needed. (Earlier draft recommended 70–72; that was based on a stale opcode map and is withdrawn — see §6.)
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-1-actor-scheduler.md`)
+
 
 <Note>
   **Status:** Draft for Internal Review  
@@ -134,3 +153,129 @@ The combination of a fixed budget and competitive bidding creates a robust defen
 * **Bounded Execution:** The TIMER_PROCESSING_BUDGET_CYCLES provides a hard cap on the resources consumed by timers in any given block, ensuring that regular user transactions are not crowded out.  
 * **Economic Prioritization:** Instead of a simple FIFO queue, the system creates an **intra-block auction** for the timer budget. Timers deemed more important by their owners (and thus given higher bids by their GBAs) will execute first. Low-priority or "spam" timers will be priced out during periods of congestion.  
 * **Best-Effort Delivery:** Timers that are not executed—either due to a low bid or the budget being exhausted—are automatically carried over to the next block's bucket. This ensures eventual execution and preserves liveness, while still allowing for market-based prioritization.
+
+---
+
+## Part II — v2 Revision (canonical; alignment with CIP-5 revised 2026-04-20 + code reality)
+
+### 0. What this revision does
+
+CIP-1 v1 specifies a **future** scheduler (tiered Calendar Queue + Gas Bidding Agent contracts) that is not implemented. CIP-5 (revised 2026-04-20) is now the canonical spec for the **currently implemented** behavior:
+
+- **Tx-then-Timer** block ordering (§5.1)
+- FIFO timers within a height bucket (§5.1)
+- **Per-fire `fee_payer` model** with pre-charge + refund (§6.3) — timers are NOT free
+- **Three-path timer lifecycle** (§5.4): natural fire / TTL expiry / insufficient-funds self-destruct, plus actor-self and validator-set explicit cancellation
+- `TimerConfig` (§6.4) governance-tunable; `LANE_TIMER_CYCLES` separated from `TIMER_GC_CYCLES` (§6.5)
+
+CIP-5 §9 still describes a **future** auction (exponential bias + VCG). v2 unifies CIP-1's GBA with CIP-5 §9 as one future design (see §2 below).
+
+### 1. Block ordering: Tx-then-Timer (canonical)
+
+CIP-5 §5.1 (revised 2026-04-20) specifies Tx-then-Timer natively. The earlier 2026-04-15 amendment in CIP-1 v1 (which flagged the discrepancy) is **superseded** — there is no longer a discrepancy. Canonical sequence per CIP-5 §5.1:
+
+1. Execute all user transactions (TX phase).
+2. Query `get_timers_by_height(current_height)`; classify per CIP-5 §5.4 (TTL expired / insufficient funds → self-destruct under `TIMER_GC_CYCLES`; otherwise pre-charge `fee_payer` and enqueue).
+3. Execute timer deferred transactions (FIFO) before engine and mailbox deferred transactions.
+
+Any document still asserting Timer-then-Tx (CIP-1 v1 §3 step 4) is **superseded** by CIP-5 §5.1.
+
+### 2. Unified future design — GBA + Auction are complementary
+
+CIP-1's GBA contracts and CIP-5 §9's auction mechanism do NOT compete. They are different layers of the same future system:
+
+| Layer | Component | Source |
+|---|---|---|
+| **Bid generation** | Per-timer GBA contract returns `(bid, gas_limit_per_fire)` based on real-time context | CIP-1 v1 §4.2 |
+| **Auction mechanism** | Sort timers by `(bid + Bias(n)) / gas_limit_per_fire`; greedy fill within `LANE_TIMER_CYCLES`; VCG payment (or first-price fallback) | CIP-5 §9.2–9.5 |
+| **Caps and fairness** | `MAX_FIRES_PER_BLOCK`, `MAX_FIRES_PER_ACTOR`, exponential bias prevents starvation | CIP-5 §9.4 |
+| **Underlying basefee** | Per-fire `fee_payer` pre-charge / refund (auction-independent) | CIP-5 §6.3 |
+
+In the unified future design:
+
+- A timer's `bid` parameter is supplied by the actor's GBA contract (per CIP-1 v1 §4.2).
+- The auction selects winners using `(bid + Bias(n)) / gas_limit_per_fire` (per CIP-5 §9.2).
+- VCG is the target payment rule; first-price is the fallback (per CIP-5 §9.5).
+- The auction layer rides ON TOP OF the per-fire fee model (§3 below) — bid is for **priority within the lane**, not for the basefee. Basefee is always paid per CIP-5 §6.3 regardless of auction state.
+
+CIP-5 §9.9's "Open question — Interaction with CIP-1 GBA" is hereby **closed**: GBA produces the bid; the auction selects winners; basefee is independent.
+
+### 3. Per-fire fee model (CIP-5 §6.3) — auction adds priority, not pricing
+
+Even with the auction inactive (current state), every timer fire under CIP-5 §6.3 is a **paid execution**:
+
+```
+1. max_cost = gas_limit_per_fire × cycle_basefee + max_cells_per_fire × cell_basefee
+2. If balance(fee_payer) < max_cost → insufficient-funds self-destruct (CIP-5 §5.4 path 2)
+3. Otherwise: pre-charge max_cost from fee_payer, execute, refund unused
+```
+
+This is a fundamental change from CIP-5 v1's "Timer execution is system-triggered — no explicit basefee or tip is charged" claim (now superseded by CIP-5 revised 2026-04-20 §6.3). The future auction layer (CIP-5 §9) sits ATOP this fee model:
+
+- The **bid** is the actor's stated maximum *priority budget*, paid into the auction clearing price (VCG or first-price). It is **separate** from `max_cost` (basefee).
+- A timer with `bid = 0` and `Bias(n) = 0` may still fire if the lane is uncongested — it pays the basefee normally and uses no priority budget.
+- Under congestion (lane full), only timers whose `(bid + Bias(n)) / gas_limit_per_fire` exceeds the marginal kicked-out timer make the cut. Losers carry over to the next block, accumulating bias.
+
+Bid is a **layer above** basefee, not a replacement.
+
+### 4. Lane budget naming: `LANE_TIMER_CYCLES` (per CIP-5 §6.5)
+
+The future-design constant is named `LANE_TIMER_CYCLES` per CIP-5 §6.5. v1 §3 used `TIMER_PROCESSING_BUDGET_CYCLES`; v2 normalizes to the CIP-5 name and keeps GC cleanly separate:
+
+| Source | Name | Default | Purpose |
+|---|---|---|---|
+| CIP-1 v1 §3 | `TIMER_PROCESSING_BUDGET_CYCLES` | (governance-tunable) | obsolete name |
+| **CIP-5 §6.5** | **`LANE_TIMER_CYCLES`** | (governance-tunable; per `TimerConfig`) | **execution lane (path 1)** |
+| **CIP-5 §6.5** | **`TIMER_GC_CYCLES`** | `TimerConfig.gc_cycles_per_block = 5_000_000` | **cleanup lane (paths 2 / 3)** |
+| Code (`node/types/src/constants.rs`) | block timer execution budget | matches `LANE_TIMER_CYCLES` | implementation |
+
+`LANE_TIMER_CYCLES` and `TIMER_GC_CYCLES` are independent budgets. The auction (CIP-5 §9.4) operates only on `LANE_TIMER_CYCLES`; GC (TTL expiry, insufficient-funds destruction) draws from `TIMER_GC_CYCLES` to prevent a resume-after-outage storm from starving live timer execution.
+
+### 5. Migration from FIFO to auction
+
+When the future auction is activated, existing FIFO behavior MUST be preserved as a degenerate case:
+
+- Timers scheduled without a `bid` (today, all of them) default to `bid = 0` and rely on bias accumulation under the auction.
+- Timers scheduled without an explicit `gas_limit_per_fire` (today, all of them) default to `TimerConfig.max_cycles_per_fire = 550_000` per CIP-5 §6.4.
+- The per-fire **`fee_payer` model** (CIP-5 §6.3) is independent of the auction and is **already in effect today**. Auction activation does not change basefee economics.
+- The activation block is governance-determined; until then, CIP-5 §1–7 FIFO is canonical.
+
+### 6. New CIP-5 system instructions (no opcode collision)
+
+CIP-5 (revised) §5.4 and §6.4 introduces three new `SystemInstruction` variants that did not exist in CIP-5 v1:
+
+| Symbolic name | Sender | Purpose |
+|---|---|---|
+| `SYS_CANCEL_TIMER { timer_id }` | `system_deployers` | Validator-set emergency cancel of a misbehaving / abandoned timer |
+| `SYS_EXTEND_TIMER { timer_id, new_expires_at }` | `system_deployers` | Emergency TTL extension when actor can no longer self-extend |
+| `SYS_UPDATE_TIMER_CONFIG { config }` | `system_deployers` | Governance-tune `TimerConfig` (TTL / per-fire caps / GC budget) |
+
+**These instructions are ALREADY in code** (`node/types/src/execution.rs:525-534`):
+
+| Symbolic name | Opcode | Code line |
+|---|---:|---|
+| `SYS_CANCEL_TIMER` | **48** | `pub const SYS_CANCEL_TIMER: u8 = 48;` |
+| `SYS_UPDATE_TIMER_CONFIG` | **49** | `pub const SYS_UPDATE_TIMER_CONFIG: u8 = 49;` |
+| `SYS_EXTEND_TIMER` | **50** | `pub const SYS_EXTEND_TIMER: u8 = 50;` |
+
+CIP-5 (revised 2026-04-20) §5.4 / §6.4 specify these instructions; the code constants pre-date the spec revision. **No new opcode allocation is needed** for CIP-5 timer ops. An earlier CIP-1 v2 draft incorrectly recommended slots 70–72 because it was based on a stale opcode map that did not yet show 44–51 as taken. The canonical master allocation table is in CIP-13 v2 §1.
+
+CIP-1 itself introduces no new system instruction opcodes. The future `schedule_timer` extension (`bid` + `cycles_limit` per CIP-5 §9.7) is a host-API change, not a `SystemInstruction` change. Existing PVM host syscalls (`schedule_timer` / `schedule_timer_ex` / `cancel_timer` / `extend_timer` at `node/execution/src/pvm_host.rs:1489-1652`) gain optional parameters when the auction activates.
+
+### 7. Same-block prohibition (reaffirmed)
+
+CIP-1 v1 §3 step 5c and CIP-5 §5.3 both state: timers created within the current block's transactions MUST NOT execute in the same block. v2 reaffirms this; consensus-critical (avoids reentrancy via timer scheduling).
+
+### 8. Migration impact of CIP-5 fee model
+
+The CIP-5 revision (2026-04-20) introduces the per-fire fee model as a substantive change from CIP-5 v1. Pre-revision callers who assumed timers were free will hit `TimerCancelledInsufficientFunds` events on their first fire after activation. Migration:
+
+- Each scheduling actor MUST fund either itself or a designated `fee_payer` with at least one `max_cost` reserve per pending timer.
+- Long-running heartbeat actors SHOULD use `schedule_timer_ex` with explicit `fee_payer` (default `actor_self`) and monitor balance.
+- The `TimerCancelledInsufficientFunds` event is the canonical signal that a timer self-destructed for funding reasons — actors / their watchtowers SHOULD subscribe.
+- TTL-protected timers (`expires_at` set by `schedule_timer_ex`) auto-clean if abandoned; no manual cleanup needed.
+
+### 9. Backwards compatibility
+
+Strictly additive over CIP-5 (revised). No syscall, opcode, or constant changes are introduced by CIP-1 v2 itself. The future auction (CIP-5 §9) and GBA contracts (CIP-1) remain Phase 2 / Phase 3 work and require separate governance activation. The CIP-5 fee model (§3 above) is binding from CIP-5's revision activation; all existing v2 docs that schedule CIP-5 timers (notably CIP-9 v2 PoR challenges, CIP-16 v2 external-domain reverify) MUST specify a `fee_payer` and handle the insufficient-funds self-destruct case.
+
