@@ -260,6 +260,47 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 
 ---
 
+## [2026-05-11] ingest | CIP-18 Payments + CIP-19 Gateway MCP Ingress + CIP-25 Cross-Chain Architecture + CIP-15 Gateway Implementation companion
+
+入库来源（4 份新文档，全部 2026-05-11 commit）：
+
+- `refs/cips/cip-18-payments.md` — Payments (Draft 2026-03-08 / Updated 2026-04-28)：HTTP-native 付款；MPP（primary, IETF `draft-ryan-httpauth-payment`）+ x402（Coinbase 兼容）双 wire 并行 normalize 为 PaymentIntent；PaymentGate 系统 actor `0x0013`（地址段对齐 gap, V-14）；4 个付款模型（per-request / actor-funded / prepaid pass / epoch subscription）；入站 EVM bridge facilitator（runner 新 entitlement `bridge.facilitate.evm`）；24 sections
+- `refs/cips/cip-19-gateway-mcp-ingress.md` — Gateway MCP Ingress (Draft 2026-04-28)：让每个 CIP-14 actor 自动成为 MCP server，Gateway 在 `/_cowboy/mcp` (MCP 2025-11-25 streamable HTTP) terminate；`tools/list` 从 CIP-15 路由表派生；`tools/call` 翻译为 CIP-14 既有 dispatch；付款经 JSON-RPC `_meta` + 错误码 -32402；新 entitlement `ingress.mcp`
+- `refs/cips/cip-25-cross-chain-architecture.md` — Cross-Chain Architecture (Draft 2026-04-23)：三层正交架构 L1（state anchoring，pluggable 4 后端：runner committee / ZK / optimistic / native LC）/ L2（Mailbox，exactly-once + 单调）/ L3（bridge / lending / oracle / generic call）；§A worked examples + §B 安全模型（15 攻击 taxonomy + composition theorem + defense-in-depth）；与 Tony 团队既有 ETH withdrawal bridge 对称
+- `refs/cips/cip-15-gateway-implementation.md` — companion implementation handbook (Living document)：CIP-15 v2 Gateway 端 6-phase 实施 build order（P1 routes resolve + method dispatch / P2 静态 volume / P3 runtime mutability / P4 `pays=caller` 经 CIP-18 / P5 CORS+conditional / P6 优化）
+
+**新建 wiki 页（3 个）**：
+
+- `wiki/concepts/payments.md`（status: draft）— PaymentGate / MPP-vs-x402 双 wire / 4 模型 / 入站 bridge / 收入分配 / `payment.gate` entitlement / 与 CIP-14/15/19/Session 的关系 / 安全要点
+- `wiki/concepts/mcp-ingress.md`（status: draft）— `ingress.mcp` entitlement / `/_cowboy/mcp` 端点契约 / `tools/list` 派生算法 / `tools/call` dispatch 翻译 / 付款集成 / 保留 `_cowboy_*` tool name 前缀 / 安全要点
+- `wiki/concepts/cross-chain.md`（status: draft）— 三层架构 / 4 信任后端 / Mailbox 不变量与 deliver 模板 / 4 类 L3 应用 payload skeleton / 性能信封 / 安全模型与 defense-in-depth
+
+**更新 wiki 页（6 个）**：
+
+- `wiki/entities/system-actors.md` — 表格新增 `0x13 PAYMENT_GATE`（CIP-18 Draft）；§"PaymentGate" 详细职责段；冲突段 §6 标注 CIP-18 §22 沿用 v1 numbering vs v2 单字节序列对齐；Sources 段补 CIP-18 §8 / §22
+- `wiki/parameters.md` — 新增 3 大段：Payments（含 13 个常量 + 2 entitlement + 4 子配置结构 + fallback 链）/ MCP Ingress（含 8 常量 + entitlement params + tool name 规则）/ Cross-Chain（L1 / L2 / L3 各分段 + 性能信封）；变更记录加 2026-05-11
+- `wiki/drift.md` — 新增 "CIP-18 / CIP-19 入库引入的 precondition gap" 段：V-14（PaymentGate `0x13` 段对齐 gap）/ V-15（entitlement registry +3 新 entries）/ V-16（CIP-15 `pays=caller` 依赖 CIP-18）/ V-17（CIP-19 `tools/list` 依赖 CIP-15 v2 + GET_STATE）；监控维度加 entitlement registry 行
+- `wiki/index.md` — concepts 段加 payments / mcp-ingress / cross-chain 三页；阅读路径加跨链分支；HTTP ingress 分支扩到 payments → mcp-ingress；最后更新顶栏
+- `wiki/concepts/public-asset-hosting.md` — 头部 v2 变更段引用 gateway-implementation companion；与 CIP-18 `pays=caller` 字段交互 callout
+- `wiki/concepts/mpp-session.md` — "与 CIP-2 / CIP-7 关系" 段后追加 vs CIP-18 段（charge intent 由 CIP-18 落地；Session 仍是后续 CIP 工作）
+
+**未触发**：
+
+- 未改 `wiki/entities/gateway.md`（Gateway 既有 entity 已含 ingress 角色叙述；CIP-18 边缘 enforce + CIP-19 MCP terminate 加在 concepts 层，gateway entity 暂不增章节，待 V-14 选址落定后回写）
+- 未改 `wiki/entities/runner-lifecycle.md`（CIP-25 runner committee attestation 是 CIP-2 既有职责的同构应用；待 V-14/V-15 落地或独立 L1 后端 CIP 草案出 → 再加 §"跨链 attestation 角色"）
+- 未改 `wiki/concepts/runner-verification.md`（CIP-25 L1 committee 用既有 VerificationMode 模型，无新 variant 需求）
+
+**冲突摘要（drift V-14 / V-15 / V-16 / V-17）**：
+
+- **V-14**：CIP-18 §22 PaymentGate `0x0013` 续 CIP-14 v1 (`0x0011`/`0x0012`)；v2 主表 CIP-10 v2 已取 `0x0F`，PaymentGate 应落 `0x10`
+- **V-15**：entitlement registry 累计需 +6 entries（CIP-14/15/16 v2 各 1 + CIP-18/19 共 3）
+- **V-16**：CIP-15 v2 schema 有 `pays` 字段但 `caller` 路径 enforce 需 CIP-18 实装
+- **V-17**：CIP-19 `tools/list` 需 CIP-15 §8.12 `GET_STATE` RPC 已就位
+
+**权威层级标注**：CIP-18 / CIP-19 / CIP-25 全部 Draft，未实装；wiki 新页 `status: draft`；参数段显式标"尚未实装"；激活路径列在 drift V-14 → V-17。
+
+---
+
 ## [2026-05-07] ingest | MPP Session 研究 + 实施计划
 
 入库来源：
@@ -292,5 +333,193 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 - 未改 `concepts/runner-verification.md`（session 默认乐观 `ecrecover`，仲裁路径完全复用 CIP-2 commit-reveal，无新增 VerificationMode）
 
 **权威层级标注**: 研究 / 计划全部为 Draft / Research / PoC；激活路径需经 CIP 草案（计划 §9 列出 `cip-2x-mpp-session.md`） + 治理 + 主分配表对齐才能合并到 v2 主表。
+
+---
+
+## [2026-05-11] alignment | r2 跨 CIP 修订收口已知冲突（doc-only，代码不动）
+
+代码 ground-truth 审计发现 `node/runner/src/system_actors.rs:35` 已 commit `SESSION_ACTOR = 0x0C`（含 `node/types/src/session.rs` / `session_eip712.rs` / `node/execution/src/runner/session.rs` / `runner/crates/runner-common/src/voucher.rs` 全栈）；`cbfs/manifest/src/merkle.rs:32-66` 是 power-of-2 padded BLAKE3，不是 RFC-6962；`node/types/src/registry.rs:35-219` 实际 15 entries（不是 14）；`node/types/src/execution.rs` SystemInstruction 是 Rust enum 没有 numeric opcodes 抽象。
+
+按"代码先到先得 + 不动代码"原则，对以下 CIP / WP 文档发 r2 修订：
+
+**地址段后移 +1**（为 `SESSION_ACTOR = 0x0C` 让位）：
+- **CIP-14 v2 → v2.r2** — ROUTE 0x0C → 0x0D / GATEWAY 0x0D → 0x0E / RECEIPT 0x0E → 0x0F；Part II + Part III §1 表 + 散落引用全部更新；标题加版本号
+- **CIP-10 v2 → v2.r2** — CONTAINER 0x0F → 0x10；Part II §1 + 表更新
+- **CIP-15 v2 → v2.r2** — Part III §1 表更新；地址段联动 + Merkle 描述（见下）
+- **CIP-16 v2 → v2.r2** — Part II 散落 ROUTE 0x0C → 0x0D + GATEWAY 0x0D → 0x0E
+- **CIP-18 → r2** — PAYMENT_GATE 0x0013 → 0x11；§22 sequential-allocation rationale 重写（剔除错引 CIP-7 0x0006 + CIP-14 v1 0x0011/0x0012）；§1 / §8 / §17 / §19 全部更新
+- **WP-v2 → v2.r2** — §13 / Delta 6 系统 actor 表更新；散落 GATEWAY_REGISTRY=0x0D → 0x0E、RECEIPT_REGISTRY=0x0E → 0x0F
+
+**CBFS Merkle 描述修正**：
+- **CIP-9 v2 → v2.r2** — Part II §3 / 顶部 changelog 改"power-of-2 padded BLAKE3 binary Merkle"，附 `cbfs/manifest/src/merkle.rs:32-66` 详细 algorithm
+- **CIP-15 v2 → v2.r2** — Part II 同步改 + 顶部 changelog
+
+**互引标签修正**：
+- **CIP-18 → r2** — Companions: CIP-19 → **Requires: CIP-19**
+- **CIP-19 → r2** — Companions: CIP-18 → **Requires: CIP-18**
+
+**Open question 引用错位**：
+- **CIP-15 gateway-implementation → r2** — §2.2 从"CIP-15 §8.12"（不存在）改为"未规范、未实装；建议起 sibling CIP / 扩 CIP-14 v2.r2 Part II §5"；§9 open-questions 同步；§13 / Part I 标题引用从 "CIP-18: Payment Gating" → "CIP-18: Payments"
+
+**wiki 同步**：
+- `wiki/entities/system-actors.md` — 表格全面重写（含 `0x0C = SESSION_ACTOR` 行，`0x0D–0x11` v2.r2 提案行）；冲突段重新框定
+- `wiki/parameters.md` — DNS-Addressable / Container / Payments / Cross-Chain / MCP Ingress 各段地址更新；变更记录加 r2
+- `wiki/drift.md` — V-1 / V-11 / V-14 标 ✅ resolved；V-2 / V-15 修正 baseline 14→15 entries；顶部加 r2 sync 旗帜；MPP Session 段重新框定（"代码先到先得"）
+- `wiki/concepts/dns-addressable-actors.md` — 全文 0x0C/D/E → 0x0D/E/F
+- `wiki/concepts/payments.md` — 顶部"地址段 gap"段落改为"已解决"叙述；PAYMENT_GATE 0x0013 → 0x11
+- `wiki/concepts/public-asset-hosting.md` — Merkle 描述改正
+- `wiki/concepts/mcp-ingress.md` + `wiki/entities/gateway.md` + `wiki/entities/route-registry.md` — 地址段联动
+
+**未触动（按用户指令）**：
+- 代码（`node/` / `runner/` / `cbfs/`）— 任何修改
+- CIP-1 v2 / CIP-2 v2 / CIP-13 v2 / CIP-23 v2 — 未引用 0x0C-0x11 段
+- CIP-25 / CIP-15-gateway-implementation 跨链 / runner-committee 设计冲突（CIP-25 §1.4 vs WP-v2 §16.2 第三方桥路线）— 这是 spec 之间的设计方向选择，不是文档-代码 ground-truth 冲突；保留待治理决策
+
+**仍待解决（未在本轮 r2 修订内）**：
+- entitlement registry +6 entries 实装（V-2 + V-15）
+- `read_handler` RPC（CIP-14 v2.r2 §5）+ `GET_STATE` RPC（CIP-15 gateway-impl r2 §2.2 标 open）
+- 系统 actor const 5 个（V-1 仍待）
+- timer fee_payer field（V-8 仍待）
+- VerificationMode `DnsTxtRecordMatch` / `DnsCnameMatch`（CIP-2 v2 §2 仍待）
+- CIP-25 跨链 L1 anchor / L2 mailbox 整套未实装（设计 spec）
+- WP / WP-v2 加 Payments + MCP Ingress Delta（之前识别为白皮书空白）
+
+---
+
+## [2026-05-11] ingest+amend | 第二轮收口：CIP-8 (MPP Session retroactive) / CIP-17 (GET_STATE) / WP-v2 r2 Delta 7-9 / CIP-25 r1.1
+
+**新建 CIP（2 份）**：
+
+- **`refs/cips/cip-8-mpp-session.md`**（Draft，2026-05-11，retroactive）— 追认代码已实装的 MPP Session 协议。SESSION_ACTOR `0x0C`（`system_actors.rs:35`）；6 handler（`handle_session_open` / `_deposit` / `_settle` / `_close` / `_finalize` / `_slash` per `node/execution/src/runner/session.rs`）；on-chain Session 结构 / off-chain SessionVoucher / EIP-712 domain（`node/types/src/session*.rs`）；链下 voucher 库（`runner/crates/runner-common/src/voucher.rs`）。18 sections 含 §3 retroactive 说明、§12 opcode-vs-enum 澄清（关闭 V-12）、§13 EIP-712 chainId 激活规则（部分关闭 V-13）、§11 dispute 路径（PoC `Slash` 返 Unsupported，二期接 CIP-2 Result Verifier）
+
+- **`refs/cips/cip-17-verifiable-state-read.md`**（Draft，2026-05-11）— 起草 `GET /state/{actor}/{key}` RPC，返回 `(value, merkle_proof, state_root, block_height)`，客户端本地验证。复用 CIP-4 既有 MPT trie 原语；估实现 < 200 行。12 sections。**关闭 V-17**（CIP-15 v2.r2 Gateway routes-table fetch + CIP-19 `tools/list` derivation 的唯一硬阻塞 RPC）。CIP-15-gateway-implementation r2 §2.2 + §9 / CIP-19 §10.1 step 1 同步指向 CIP-17
+
+**WP-v2 → v2.r2 + 3 新 Delta**：
+
+- **Delta 7**（§17.y）—— Payment Layer（CIP-18 r2）：PaymentGate `0x11` + 4 付款模型 + MPP/x402 双 wire + EVM bridge facilitator
+- **Delta 8**（§6.z）—— MCP Ingress（CIP-19）：actor-as-MCP-server 经 Gateway，tools/list 派生自 CIP-15 routes
+- **Delta 9**（§16.z）—— Cross-Chain Architecture（CIP-25）：三层架构 + 接口契约 vs §16.2 governance 分工的明文澄清
+- §6 Summary table 扩到 9 Delta；frontmatter "Summary of proposed deltas" 同步更新
+
+**CIP-25 → r1.1**（小修订）：
+
+- 加 §1.4 governance scope 段：CIP-25 标准化 `IChainAnchor` **interface contract**；具体后端部署由 **WP-v2 §16.2** 治理决定。明文化与 WP §16.2 "no protocol validator set" 框架的一致性。frontmatter 加 revision history
+
+**Wiki 同步**：
+
+- **`wiki/concepts/mpp-session.md`** — 状态从"研究阶段"改为"代码已实装 + CIP-8 已起草（retroactive）"；frontmatter 加 CIP-8 + 代码源；V-11/V-12 标 ✅，V-13 标 PoC chainId 待澄清
+- **`wiki/concepts/verifiable-state-read.md`** —— 新建概念页，标 CIP-17；说明 vs `read_handler` 互补；主消费者表 + 实现路径 + 待解决项
+- **`wiki/index.md`** —— concepts 段加 `verifiable-state-read`；顶部"最后更新"含 r2 + 后续补 CIP
+- **`wiki/drift.md`** —— V-12 标 ✅（CIP-8 §12 给说明）；V-13 状态从"未明"改"PoC + 激活规则已在 CIP-8 §13"；V-17 标 ✅（CIP-17 起草）；顶部 r2 sync 段扩到包含第二轮补 CIP；累计已收口 V-* = V-1 / V-11 / V-12 / V-14 / V-17
+
+**仍待解决（已无文档侧动作可做，全部是代码侧 precondition）**：
+
+- entitlement registry +6 entries (V-2 + V-15) — `node/types/src/registry.rs:35-219` 加 6 行
+- 系统 actor const 5 个 (V-1) — `node/runner/src/system_actors.rs` 加 5 行 + 同步 workspace `CLAUDE.md`
+- `read_handler` RPC + `GET_STATE` RPC 实装 — `node/rpc/src/rpc.rs` 加 2 routes + storage backend method
+- `target_pool` enum 实装 (V-9) — `node/runner/src/types.rs` SettlementConfig discriminant
+- timer `fee_payer` field 实装 (V-8) — `node/execution/src/timer_config.rs`
+- VerificationMode `DnsTxtRecordMatch` / `DnsCnameMatch` 实装 — `node/runner/src/types.rs`
+- CIP-25 L1 anchor + L2 mailbox 整套实装 — 新 actor / contract 工作
+- `EXTERNAL_REVERIFY_FEE` 治理选定数值 (V-10)
+- 各 CIP `0x06` Stream Key Manager (CIP-7 v1) 与代码 `DUAL_BASEFEE = 0x06` 的根冲突 —— 需 CIP-7 v2 / v3 修文档（**未在本轮触动**，待 CIP-7 团队负责人发版）
+
+**权威层级标注**: CIP-8 / CIP-17 / WP-v2 Delta 7-9 全部 Draft；激活路径全部经治理（CIP-12）+ 代码 PR + 跨子系统集成。
+
+---
+
+## [2026-05-11] amend | 第三轮审计 — CIP-7 r2 + WP-v2 Delta 6 微修
+
+第三轮跨 CIP / CIP-vs-WP / CIP-vs-代码冲突全面审计完成。除既知精确度，agent 报告全部段（地址段对齐 / Merkle 描述 / CIP-18-19 互引 / CIP-8 内部一致性 / CIP-17 引用 / SystemInstruction enum / VerificationMode / TimerConfig / SettlementConfig / CBFS Merkle）全部 CLEAN。**剩 2 项可修文档侧 + 1 项可澄清**：
+
+**Fix 1 — CIP-7 r2 bump（解长期 drift）**
+
+- 现状：`refs/cips/cip-7-simple-stream-protocol.md` v1 line 136 仍写 `0x06 = Stream Key Manager`，与代码 `node/runner/src/system_actors.rs:23` `DUAL_BASEFEE = 0x06` 冲突。CIP-7 自 2026-02-17 起未发 v2，长期 drift。
+- 修：CIP-7 → r2 frontmatter + revision history banner；§4 system actor 表 `0x06` 改 `0x12`（v2.r2 序列下一空位，在 CIP-18 r2 `0x11` 之后）；表整体扩展到 `0x01-0x12`；内部 storage prefix `0x6` 保留 + 加 r2 namespace 澄清注（系统 actor 地址 vs 单 actor 内部 storage 命名空间正交，不冲突）
+
+**Fix 2 — WP-v2 Delta 6 表微修**
+
+- 现状：`0x0C` 行字段写 "code (Draft CIP TBD)"；CIP-8 (MPP Session retroactive) 已起草。
+- 修：改 "code (Draft CIP TBD)" → "CIP-8 (retroactive)"
+- 同步追加 `0x12 = Stream Key Manager (CIP-7 r2)` 行
+
+**Fix 3（自动联动）— CIP-14 v2.r2 / CIP-15 v2.r2 / CIP-16 v2.r2 Part III §1 表**
+
+- 三个 Part III 系统 actor 表追加 `0x12 = STREAM_KEY_MANAGER` 行
+- CIP-18 r2 §22 rationale 段：把"CIP-7's `0x06` 是另一码事独立 drift"改为"CIP-7 r2 已解决，移到 `0x12`"
+
+**Fix 4（联动）— wiki/entities/system-actors.md**
+
+- 表格追加 `0x12` 行；脚注"源"字段加 CIP-7 r2
+
+**CIP-4 storage key prefix 0x0C / 0x0D 视觉冲突（澄清，未修）**
+
+- `refs/cips/cip-4-storage.md` line 99-100 用 `0x0C` / `0x0D` 作 storage key prefix（namespace 内字节，不是系统 actor 地址）；视觉上与 v2.r2 系统 actor `0x0C SESSION_ACTOR` / `0x0D ROUTE_REGISTRY` 撞符号
+- 实际不冲突 —— 系统 actor 地址是 20-byte 全局 address trie key；storage key prefix 是单 actor 内部 trie 内的 1-byte namespace
+- 类比 CIP-7 r2 storage prefix `0x6` 的解释：同样命名空间正交
+- 不修：CIP-4 是 1-byte namespace 习惯，迁移成本高；视觉混淆可由后续编辑澄清
+
+**剩余 11 项纯代码 precondition 状态不变**：V-2 / V-3 / V-4 / V-6 / V-8 / V-9 / V-10 / V-13 / V-15 / V-16 + 5 个 system actor const + GET_STATE RPC 实装。全部需代码 PR。
+
+**第三轮 audit 已找完所有文档侧可修内容；无遗漏**。
+
+---
+
+## [2026-05-11] amend | 第四轮审计 — CIP-11 入库 + r1.1 修订
+
+用户新增 `refs/cips/cip-11-runner-connectivity.md`（Runner Connectivity and Push Job Delivery；Created 2026-04-14；**预 v2 alignment round 6**）。第四轮跨 CIP 审计发现 3 项 CIP-11 相关冲突，全部为文档侧可修：
+
+**Finding 1 — CIP-11 §9.3 weight 基数与 CIP-13 v2 §3 不一致**
+
+- CIP-11 v0.2 §9.3 algorithm（line 397 / 404）：`stake_to_weight(candidate[i].stake, MIN_STAKE_CBY_WEI)`
+- CIP-13 v2 §3 (Updated 2026-04-21)：normative VRF / Fisher-Yates 权重必须用 `effective_stake = registration.stake + delegation_totals.total_active`
+- CIP-11 §9.3 prose（line 415）实际描述了 "effective stake on iteration 0" —— 内部 algorithm vs prose 已有不一致
+- **修**：CIP-11 → r1.1，§9.3 algorithm 改为 `base[i] = stake_to_weight(effective_stake(candidate[i]), MIN_STAKE_CBY_WEI)`；frontmatter `Requires` 加 CIP-13 v2
+
+**Finding 2 — 块时间假设 5s vs CIP-14 / CIP-23**
+
+- CIP-11 §13 系统常量全部按 "5 s blocks" 标注（`SUBSET_EPOCH_BLOCKS = 8192 ~12h`, `STALE_HEARTBEAT_BLOCKS = 1024 ~85min`, `MRU_TTL_BLOCKS = 256 ~21min`）
+- 既有 drift L-5 只列 CIP-14 v1 (1s) / CIP-23 v2 (500ms) 不一致；现 CIP-11 加入第三种 5s
+- **修**：CIP-11 r1.1 §13 加块时间 disclaimer：wall-clock 数值（~12h / ~21min / ~85min）权威；raw block counts 是导出；governance 激活前需 rescale；drift L-5 扩展加 CIP-11
+
+**Finding 3 — README + wiki/index 未列 CIP-11**
+
+- CIP-11 自 2026-04-14 在 raw cips 目录但 README / wiki/index 未列入
+- **修**：README §"📋 cips/" + "新 CIPs" 段加 CIP-11；wiki/index 顶部"最后更新"日期同步
+
+**新 CIP-11 验证（无新冲突点）**
+
+- 不引入新 system actor、新 SystemInstruction opcode、新 entitlement
+- 引用现有 `Runner Registry (0x01)` / `Job Dispatcher (0x02)` / `Result Verifier (0x03)` —— 与 v2.r2 系统 actor 主表无冲突
+- 唯一新增链上状态：`mru_key(submitter, job_kind)` 加入 `0x02` Job Dispatcher 的现有 storage map（不需新 key prefix 命名空间）
+- §7.1 / §12.3 扩展 vote 消息加 `vote_presence_bitmap` —— 经 grep 全 spec 无其他 CIP 声称扩展 vote 消息，无冲突
+- §10 push-dispatch / §11 失败处理 / §14 三阶段 migration —— 完全在 CIP-2 既有框架内增量
+
+**新 CIP-11 内部一致性问题（除 Finding 1/2 外）**
+
+- §10.6 / §11 dispatch 失败分类与 CIP-2 §6 timeout-based re-selection 兼容；不引入新 slashing
+- §15 安全考量：MRU 在 iteration 0 偏置 + cap MULTIPLIER=4 + 仅 iteration 0 生效 —— 与 CIP-13 v2 effective_stake 模型组合下，效果是 "delegated runner 同时享受 effective_stake × 4 优势 on iteration 0"。这是合理的级联（delegated runner 已经因为 stake 增加在 base weight 上有优势），不需要额外限制
+- §14 phase 1 shadow / phase 2 hot-path / phase 3 sunset migration 完整闭环
+
+**与新 v2.r2 CIPs 关系**
+
+- vs CIP-8 (MPP Session)：session 模式调用走 off-chain HTTP，不经 CIP-11 push 路径；正交
+- vs CIP-18 (Payments)：CIP-11 是 runner 调度优化，不涉付款；正交
+- vs CIP-19 (MCP Ingress)：MCP 经 Gateway → runner，runner 端调度仍走 CIP-11；CIP-11 是 CIP-19 hot-path 性能保障
+- vs CIP-25 (Cross-Chain)：CIP-25 §1.4 runner-committee 后端依赖 runner 选举 + dispatch，CIP-11 优化二者 latency；正交
+
+**wiki 修订**
+
+- `wiki/drift.md` L-5 扩展加 CIP-11 5s 信息
+- `README.md` —— CIP 列表 "1 到 17" → "1 到 25"；新 CIPs 段加 CIP-11 r1.1 + CIP-7 r2
+- `wiki/index.md` 顶部"最后更新"刷新
+
+**未触动**
+
+- 代码（按用户指令"代码不动"）
+- wiki/entities/runner-lifecycle.md —— CIP-11 是 dispatch 路径优化，不改 runner 生命周期阶段，无需新建 concept page；如未来 push-delivery 实装可加一段 "CIP-11 Push Path"
+- 未新建 `wiki/concepts/runner-connectivity.md` —— CIP-11 单 CIP 自包含，wiki 综合层暂不需要专门页面（参 [[runner-verification]] / [[vrf-runner-selection]] / [[runner-delegation]] 仅在 spec 跨 3+ 文档时建页的规则）
+
+**第四轮 audit 完结。文档侧可修问题全部 ✅。剩余 11 项纯代码 precondition 状态不变**。
 
 ---

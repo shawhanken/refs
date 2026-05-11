@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-05-07（ingest MPP Session 研究 2026-04-28 + 实施计划 2026-05-06；标注 0x0C / opcode 52-57 与 v2 主表冲突）
+**最后更新**: 2026-05-11（r2 alignment + 新 CIP-8 / 11 / 17 / 18 / 19 / 25；CIP-7 r2 解 0x06 drift；CIP-11 r1.1 锚定 effective_stake + 块时间 disclaimer）
 
 ---
 
@@ -47,6 +47,10 @@
 | [custom-domains.md](concepts/custom-domains.md) | CIP-16 v2 `.cow` / `.cowboy` TLD + 外部 FQDN 绑定（MajorityVote DNS 验证 + ExternalDomainCallback opcode 67 + 双层 reverify fee + verified_fqdn 注入, Draft）|
 | [tee-attestation.md](concepts/tee-attestation.md) | CIP-23 v2 CAE 复合证明 + 三层资格 chain + opcode 57-60 + 与 CIP-13 委托正交（Draft）|
 | [mpp-session.md](concepts/mpp-session.md) | MPP Session：链上托管 + 链下累积 voucher + 链上结算；3 笔 tx 摊到 N 次 Runner 调用；提议 SESSION_ACTOR=0x0C / opcodes 52-57（**与 CIP-14 v2 / CIP-13 v2 / CIP-23 v2 冲突**, Research）|
+| [payments.md](concepts/payments.md) | CIP-18 PaymentGate（`0x13`）：MPP（primary）+ x402（compat）双 wire；per-request / actor-funded / pass / epoch subscription 四种付款模型；入站 EVM bridge facilitator；`payment.gate` entitlement（Draft）|
+| [mcp-ingress.md](concepts/mcp-ingress.md) | CIP-19 Gateway 边缘把每个 actor 暴露为 MCP server；`tools/list` 从 CIP-15 路由表派生；`tools/call` 复用 CIP-14 dispatch；付款经 JSON-RPC `_meta` + 错误码 -32402（Draft）|
+| [cross-chain.md](concepts/cross-chain.md) | CIP-25 三层架构：L1 state anchoring（可换信任后端：runner committee / ZK / optimistic / native LC）+ L2 mailbox（exactly-once + 单调）+ L3 应用（bridge / lending / oracle / generic call），跨链流式经 send_stream 复用 CIP-7（Draft）|
+| [verifiable-state-read.md](concepts/verifiable-state-read.md) | CIP-17 `GET /state/{actor}/{key}` 返回 KV + Merkle proof；CIP-15 v2.r2 Gateway 路由缓存 + CIP-19 `tools/list` 派生硬阻塞 RPC；与 `read_handler` 互补（Draft）|
 
 ---
 
@@ -93,7 +97,9 @@
 
 **审计经济**: `parameters.md` → `concepts/basefee.md` → `concepts/dual-gas-model.md` → `concepts/settlement-slashing.md`（target_pool enum） → `drift.md`
 
-**HTTP Ingress / Web 应用**: `concepts/dns-addressable-actors.md` → `entities/gateway.md` → `entities/route-registry.md` → `concepts/public-asset-hosting.md` → `concepts/custom-domains.md`
+**HTTP Ingress / Web 应用**: `concepts/dns-addressable-actors.md` → `entities/gateway.md` → `entities/route-registry.md` → `concepts/public-asset-hosting.md` → `concepts/custom-domains.md` → `concepts/payments.md`（付款）→ `concepts/mcp-ingress.md`（agent 调用）
+
+**跨链 / 桥**: `concepts/cross-chain.md` → `concepts/runner-verification.md`（committee 后端）→ `concepts/vrf-runner-selection.md`
 
 **v2 协议落地路径**（实装前清单）: `drift.md` v2 precondition gap → `parameters.md` SystemInstruction Opcode 主分配表 → 相应 entity / concept 页
 

@@ -1,5 +1,5 @@
 ---
-title: "CIP-19: Gateway MCP Ingress"
+title: "CIP-19: Gateway MCP Ingress (r2)"
 description: Expose every CIP-14 actor as a Model Context Protocol (MCP) server through the Gateway. Tools are auto-derived from the CIP-15 routes table, tool calls dispatch to the same handlers as the equivalent HTTP request, and payment gating reuses CIP-18 wire formats over MCP's JSON-RPC transport.
 icon: plug
 ---
@@ -9,9 +9,14 @@ icon: plug
   **Type:** Standards Track
   **Category:** Core
   **Created:** 2026-04-28
-  **Requires:** CIP-14 (DNS-Addressable Actors), CIP-15 (Public Asset Hosting and HTTP Routing)
-  **Companions:** CIP-18 (Payments) — required to gate MCP tool calls behind payment
+  **Updated:** 2026-05-11 (r2)
+  **Requires:** CIP-14 v2 (DNS-Addressable Actors), CIP-15 v2 (Public Asset Hosting and HTTP Routing), CIP-18 (Payments — §12 normatively defers to CIP-18 §13 for payment wire format and `_meta` field semantics)
 </Note>
+
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — **CIP-18 elevated from Companions to Requires.** §12 (Authentication and Payment) normatively defers to CIP-18 §13 for the MCP JSON-RPC payment wire format, `_meta.payment-authorization` carrier, and `-32402` error mapping; without CIP-18, §12 has no implementable definition. Symmetric to CIP-18 r2 listing CIP-19 as Requires for activating §13 MCP gating.
+> - **r1 (2026-04-28)** — Initial draft.
 
 ## 1. Abstract
 

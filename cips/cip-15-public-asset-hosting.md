@@ -1,8 +1,37 @@
 ---
-title: "CIP-15: Public Asset Hosting"
-description: Gateway-side static asset serving from CIP-9 public volumes, with route manifests, caching, CORS, and a Gateway-to-Relay-Node fetch protocol
-icon: image
+title: "CIP-15: Public Asset Hosting (v2.r2)"
+description: Code-aligned v2 — separates ingress.static, conforms terminology to CIP-9 / CBFS, fixes routing & CORS precedence, ties serving to existing CIP-9 status; r2 corrects Merkle description and shifts system actor address segment +1
 ---
+
+# CIP-15 v2
+
+> **Versioning.** This is v2 of CIP-15. v1 is the canonical document `cip-15-public-asset-hosting.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II) + the cross-cutting conventions (Part III).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I. CIP-15 v2 also depends on `cip-9-runner-storage-v2.md` Part II for the small set of Relay-Node / event additions.
+>
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — Two corrections grounded in current code:
+>   1. **CBFS Merkle algorithm description corrected** — `cbfs/manifest/src/merkle.rs:42-44` uses **power-of-2 padded BLAKE3 binary Merkle** (`leaves.resize(padded_len, ContentHash([0u8;32]))` then standard balanced bottom-up), **not** RFC-6962 imbalanced-tree promotion. Earlier v2 changelog and Part II §3 claim of "RFC-6962-style imbalanced-tree promotion" was incorrect — the algorithm pads to the next power of two with zero-hashes and then forms a perfect binary tree. Both schemes avoid CVE-2012-2459 (duplicate-last-leaf), but they are different schemes. Part II §3 + cross references rewritten.
+>   2. **System actor address shifts paired with CIP-14 v2.r2** — `0x0C = SESSION_ACTOR` (code at `system_actors.rs:35`); v2 sequence shifted +1: ROUTE_REGISTRY `0x0D` / GATEWAY_REGISTRY `0x0E` / RECEIPT_REGISTRY `0x0F` / CONTAINER_REGISTRY `0x10` / PAYMENT_GATE `0x11` (Part III §1 table updated).
+> - **r1 (2026-04-21)** — Initial v2 alignment round 6 (ingress.static, route manifest on-chain, status mapping, etc.).
+>
+> **Summary of v2 changes**
+>
+> - **`ingress.static` is a separate entitlement**, not nested params under `ingress.http` (the latter would require a `ParamValue::Object` variant the codec does not have).
+> - **CBFS terminology** — `Visibility::Public` (canonical name in CIP-9 §7.6 and `cbfs/types/src/lib.rs:126`); `volume_id = keccak256(account || name)` reused from CIP-9 §11.1.
+> - **Strict route priority ordering** — `min(dynamic_routes.priority) > max(static_routes.priority)` enforced at `update_route_manifest` validation. Prevents static fallback from silently shadowing dynamic API on a priority typo.
+> - **Route manifest moved on-chain** to `STORAGE_MANAGER`, keyed by `actor_address` — decouples routing lifecycle from any single volume.
+> - **`X-Cowboy-Manifest-Root` response header** alongside `X-Cowboy-Block` — closes the dual-versioning gap.
+> - **CORS precedence reversed for dynamic routes** — actor-set `Access-Control-*` headers in the response envelope win; `cors_config` is fallback.
+> - **Gateway serving authority tied to existing CIP-9 status states** (`ACTIVE` / `GRACE_PERIOD` / `DELETED` / `GARBAGE_COLLECTING`) — no new `DELINQUENT` status.
+> - **CBFS Merkle reused** (**power-of-2 padded BLAKE3 binary Merkle** per `cbfs/manifest/src/merkle.rs` — pad to next power of two with zero-hash leaves, then balanced bottom-up; **not** Bitcoin-style duplicate-last-leaf, CVE-2012-2459).
+> - **Errata.** An earlier draft of this v2 over-claimed CIP-9 was missing `StorageCommitment` / `commit_manifest` / `volume_id` formula. They are not — see `cip-9-runner-storage-v2.md` Part II §9.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-15-public-asset-hosting.md`)
+
 
 <Note>
   **Status:** Draft
@@ -798,3 +827,604 @@ CIP-15 is fully backwards compatible:
 - Existing `PUBLIC_READ` volumes gain no new behavior unless an actor explicitly references them in `static_volumes`.
 - The `_meta/routes.json`, `_meta/cors.json` files are optional. Volumes without them work exactly as they do today.
 - Gateway nodes must be upgraded to support CIP-15 behavior. Gateways that have not been upgraded will ignore `static_volumes` and dispatch all requests to the actor handler — safe degradation with no data loss or protocol violations.
+
+---
+
+## Part II — v2 Revision (canonical; verbatim from former `cip-15-aligned.md`)
+
+
+<Note>
+  **Status:** Draft (alignment revision; non-modifying companion to `cip-15-public-asset-hosting.md`)
+  **Type:** Standards Track
+  **Category:** Core
+  **Created:** 2026-04-21
+  **Companion to:** `cip-15-public-asset-hosting.md`
+  **Reads with:** Part III of this document, `cip-14-dns-addressable-actors-v2.md` (Part II)
+</Note>
+
+## 0. What this document is
+
+A code-aligned revision of CIP-15. The original is mostly correct against CIP-9 but uses inconsistent terminology (`PUBLIC_READ` vs. CIP-9's `Visibility::Public`), assumes a different `volume_id` formula than CIP-9 §11.1 actually pins down, and silently nests an `array<StaticVolumeBinding>` object inside `ingress.http.params` that the codec cannot encode. This revision conforms terminology to CIP-9 / CBFS, factors static-asset hosting into a separate `ingress.static` entitlement, and tightens four points where the original under-specifies (priority ordering, dual-versioning headers, storage-delinquency halt, CORS precedence).
+
+> **Errata.** The first revision of this document claimed CIP-9 was missing `StorageCommitment`, `commit_manifest`, the `volume_id = keccak256(...)` formula, and `Visibility::Public`. They are NOT missing — all four are in CIP-9 today (§11.1 and §12.2). The corrected upstream-amendment surface is much smaller and is documented in `cip-9-runner-storage-v2.md` (Part II).
+
+It also:
+
+- Separates static-asset hosting into a new `ingress.static` entitlement (the original's nested `StaticVolumeBinding` exceeds `ParamValue` capability).
+- Imposes a structural priority rule that prevents static fallback from silently shadowing dynamic API routes.
+- Adds `X-Cowboy-Manifest-Root` headers to close the dual-versioning gap between dynamic `X-Cowboy-Block` and static manifest-root caching.
+- Halts serving on storage-fee delinquency (avoids turning Gateway cache into free CDN at Relay-Node expense).
+- Reverses CORS precedence so actor-set CORS headers win on dynamic responses.
+
+---
+
+## 1. Preconditions
+
+| Amendment | Source | Required for |
+|-----------|--------|---------------|
+| AMEND 9-G | `cip-9-runner-storage-v2.md` (Part II) §2 | `GET_MANIFEST` Relay Node RPC — direct manifest fetch |
+| AMEND 9-H | `cip-9-runner-storage-v2.md` (Part II) §4 | `ManifestCommitted` chain event — eager Gateway invalidation |
+| `cip-9-runner-storage-v2.md` (Part II) §3 | — | Pin canonical manifest serialization to `cbfs/manifest/src/merkle.rs` |
+| `cip-9-runner-storage-v2.md` (Part II) §5 | — | Gateway HTTP serving authority over existing CIP-9 status states |
+| Part III of this document §2.2 | — | Add `ingress.static` to entitlement registry |
+
+The first two (AMEND 9-G/H) are the only true protocol additions; the third and fourth are documentation alignments over CIP-9's existing `manifest_root` and `status` fields. If AMEND 9-G/H have not landed, CIP-15-aligned can still be partially deployed by falling back to indirect manifest fetch (`GET_SHARD` against `__manifest__`) plus polling — at the cost of higher per-request latency and slower invalidation.
+
+---
+
+## 2. Scope
+
+Functionally equivalent to original §1 with three differences:
+
+- Separate `ingress.static` entitlement (rather than overloading `ingress.http`'s param schema with nested objects, which `ParamValue` cannot encode).
+- CBFS terminology: `Visibility::Public` (not `PUBLIC_READ`), opaque `VolumeId` (not `keccak256`-derived).
+- Route manifest stored on-chain at `STORAGE_MANAGER`, not in the "first volume" — decouples routing lifecycle from any one volume.
+
+---
+
+## 3. The `ingress.static` entitlement
+
+Registry entry: Part III of this document §2.2.
+
+```
+ingress.static.params:
+  static_volume_names:        StrArray  (required, ≤ 8)
+  max_static_response_bytes:  Uint      (default 10_485_760, ceiling 104_857_600)
+  max_cache_bytes_total:      Uint      (default 104_857_600; advisory)
+```
+
+### 3.1 Deploy-time validation
+
+For each `name` in `static_volume_names`:
+
+1. Resolve `volume_id` via the on-chain `Volume` record at `STORAGE_MANAGER`. The volume's `owner` MUST equal the deploying account.
+2. The volume's `visibility` MUST be `Visibility::Public` (`cbfs/types/src/lib.rs:128`).
+
+Failure rejects the deploy. CIP-9 §11.1 already pins the formula `volume_id = keccak256(account_address || volume_name)`; deploy-time validation can compute the expected `volume_id` directly from the supplied name and the deploying account, then look it up in `STORAGE_MANAGER` to confirm existence and visibility.
+
+### 3.2 Coexistence with `ingress.http`
+
+`ingress.static` is meaningful only in conjunction with `ingress.http`. An actor declaring `ingress.static` without `ingress.http` is rejected at deploy time (the Gateway has no way to handle dynamic fallback for non-static paths).
+
+---
+
+## 4. Route manifest
+
+### 4.1 Location: on-chain at `STORAGE_MANAGER`
+
+The route manifest is stored on-chain at `STORAGE_MANAGER=0x0A`, keyed by `actor_address`. The actor owner updates it via an `update_route_manifest(actor_address, manifest_bytes)` ActorMessage to `STORAGE_MANAGER` — the STORAGE_MANAGER handler enforces `tx.sender == actor.owner`. **This is an ordinary ActorMessage, not a new `SystemInstruction` opcode** — STORAGE_MANAGER is an existing system actor (`0x0A`) and its handlers are addressable via standard messaging. No opcode allocation is needed.
+
+Rationale (departure from original §6.1, which placed it at `_meta/routes.json` in the volume):
+
+- The original §6.5 forces a "primary route manifest = first volume's `_meta/routes.json`" convention. Multi-volume actors then have routing tied to one specific volume's lifecycle. If that volume is deleted or its visibility flips, routing breaks for *all* volumes.
+- On-chain residence lets `update_route_manifest` and `commit_manifest` be independent: a developer can publish new assets without re-publishing routes, and vice versa.
+- Cost is a single on-chain write per routing change. Routing changes are infrequent.
+
+### 4.2 Schema
+
+```
+RouteManifest {
+  version:           u8 (= 1),
+  static_routes:     [StaticRoute],         // ≤ 100
+  dynamic_routes:    [DynamicRoute],         // ≤ 100
+  default_behavior:  u8                     // 0 = DYNAMIC, 1 = STATIC
+}
+
+StaticRoute {
+  volume_name:        string,
+  path_prefix:        string,
+  strip_prefix:       bool,
+  volume_path_prefix: string,
+  priority:           u16,
+  fallback_path:      string?,
+  fallback_status:    u16
+}
+
+DynamicRoute {
+  path_prefix:        string,
+  priority:           u16
+}
+```
+
+Same shape as original §6.2; `default_behavior` is an integer to match codec norms. `version` carries on the manifest itself (not implicit per-route).
+
+### 4.3 Strict priority ordering (corrects original §6.6)
+
+The original §6.6 tie-breaks with "longer prefix wins, then dynamic > static". A typo in a new dynamic route's priority can let `/api/login` match a `/` static fallback, silently breaking authentication. CIP-15-aligned imposes a structural constraint at `update_route_manifest` validation time:
+
+> **`min(dynamic_routes.priority) > max(static_routes.priority)`**, or `update_route_manifest` is rejected with `ERR_ROUTE_PRIORITY_INVERSION`.
+
+This makes "dynamic routes always shadow static routes when they match" structural rather than best-effort. Within a class, longer prefix wins; same prefix length within the same class is rejected at validation (`ERR_ROUTE_PREFIX_DUPLICATE`).
+
+### 4.4 Volume object path resolution
+
+Unchanged from original §6.7.
+
+### 4.5 SPA fallback semantics (clarified)
+
+The original §6.6 step 4 reads "if no fallback, return 404" and step 6 reads "follow `default_behavior`". The order is ambiguous: if a static route matches but the object is missing and no fallback is set, does control fall through to `default_behavior` or terminate at 404?
+
+**Aligned semantics:** within a matched route, `fallback` is the only fallback; if it's null and the object is missing, return 404 (do not fall through). `default_behavior` only applies when **no route matches at all**.
+
+### 4.6 Validation summary
+
+Same as original §6.8 plus:
+- `min(dynamic_routes.priority) > max(static_routes.priority)` (§4.3).
+- No two routes within the same class share a `path_prefix`.
+
+---
+
+## 5. Cache invalidation and consistency
+
+### 5.1 Two-version-number gap (closed)
+
+The original §8.3 polls `manifest_root` per volume; the dynamic path uses `X-Cowboy-Block`. Two version namespaces over the same response surface lets a Gateway return `body @ manifest_root_N-1` with `X-Cowboy-Block: N`, masking staleness. CIP-15-aligned response headers always carry both:
+
+```
+X-Cowboy-Block:          <committed block height>
+X-Cowboy-Manifest-Root:  <hex(manifest_root)>             // static responses only
+X-Cowboy-Volume:         <volume_name>                    // static responses only
+X-Cowboy-Source:         "static" | "dynamic"
+```
+
+Clients can pin both via:
+
+- `X-Cowboy-Min-Block: N` (existing CIP-14 mechanism)
+- `X-Cowboy-Manifest-Root: <hex>` request header — Gateway returns `409 Conflict` if its cached manifest does not match.
+
+### 5.2 Polling + event hint
+
+`MANIFEST_POLL_INTERVAL = 6` blocks (unchanged) is the **floor** for invalidation reliability. Additionally, every successful `commit_manifest` emits `ManifestCommitted{volume_id, manifest_root, block_height, raw_size_delta, visibility}` (AMEND 9-H per `cip-9-runner-storage-v2.md` (Part II) §4). Gateways subscribed to chain events invalidate eagerly on the event; polling catches up if events are missed.
+
+### 5.3 Gateway serving authority by storage status
+
+CIP-9 already has the relevant lifecycle states (`ACTIVE → GRACE_PERIOD → DELETED → GARBAGE_COLLECTING`, CIP-9 §13). CIP-15-aligned does **not** introduce a new `DELINQUENT` status; it maps the existing CIP-9 statuses to HTTP behavior per the table in `cip-9-runner-storage-v2.md` (Part II) §5:
+
+| `StorageCommitment.status` | Gateway behavior |
+|---|---|
+| `ACTIVE` | Serve normally |
+| `GRACE_PERIOD` | Serve, with advisory header `X-Cowboy-Storage-Status: grace` |
+| `DELETED` | `503 Service Unavailable` + `X-Cowboy-Error: VOLUME_DELETED` |
+| `GARBAGE_COLLECTING` | `410 Gone` + `X-Cowboy-Error: VOLUME_GC` |
+
+Continuing to serve in `GRACE_PERIOD` is intentional — the owner may top up at any moment, and abrupt 503s would be a worse user experience than serving with an advisory header. The hard halt happens at `DELETED` (intentional removal) and `GARBAGE_COLLECTING` (irreversible).
+
+This addresses the original "free CDN" externality (Gateway caches keep serving after the owner stops paying) by tying Gateway authority to a CIP-9 state that already terminates within `STORAGE_GRACE_EPOCHS`. It does so without inventing a new status enum value.
+
+---
+
+## 6. Gateway-to-Relay-Node fetch
+
+### 6.1 RPCs
+
+`GET_SHARD` (existing CIP-9 §16.3) plus `GET_MANIFEST` (AMEND 9-G per `cip-9-runner-storage-v2.md` (Part II) §2). CIP-15-aligned does not redefine either. Gateways MUST fall back to indirect manifest fetch via `GET_SHARD` against the well-known manifest shard address (`BLAKE3(volume_id || "__manifest__")`) when `GET_MANIFEST` is unavailable, marking the Relay as outdated rather than malfunctioning.
+
+### 6.2 Manifest verification (uses CBFS canonical Merkle)
+
+CIP-15-aligned defers to `cip-9-runner-storage-v2.md` (Part II) §3 for canonical serialization (CBFS bincode + **power-of-2 padded BLAKE3 binary Merkle** per `cbfs/manifest/src/merkle.rs:32-66`: leaves are `BLAKE3(bincode(ManifestEntry))`, padded to next power of two with `ContentHash([0u8;32])`, then balanced bottom-up `BLAKE3(left||right)`). The `manifest_root` returned by `GET_MANIFEST` MUST match the on-chain `StorageCommitment.manifest_root` byte-for-byte; mismatch → reject manifest, fetch from another Relay Node, mark the offending Relay as suspect.
+
+The "if odd, duplicate the last leaf" passage in original §8.5 is dropped — that pattern carries the CVE-2012-2459 second-preimage shape. CBFS uses zero-hash power-of-2 padding instead (an earlier v2 draft mis-described this as RFC-6962-style; corrected in v2.r2), and CIP-15-aligned binds to the CBFS implementation rather than redefining the algorithm.
+
+### 6.3 Shard fetch, hedging, integrity
+
+Unchanged from original §8.6–8.7.
+
+### 6.4 Response headers
+
+§5.1 above plus the originals from §8.8 (`Content-Type`, `ETag`, `Cache-Control`, `Vary`).
+
+### 6.5 Conditional requests, compression
+
+Unchanged from original §8.9–8.10.
+
+### 6.6 Bandwidth economics
+
+Unchanged from original §8.11 except that §5.3 above bounds the externality.
+
+---
+
+## 7. CORS
+
+### 7.1 Configuration location
+
+Stored on-chain at `STORAGE_MANAGER` keyed by `actor_address` (parallel to the route manifest §4.1). Updated via an `update_cors_config(actor_address, config)` ActorMessage to `STORAGE_MANAGER` (sender == actor owner enforced by the handler). Same schema as original §9.2. Same as §4.1, this is an ordinary ActorMessage, not a new `SystemInstruction` opcode.
+
+Co-locating with `route_manifest` lets one transaction update both atomically.
+
+### 7.2 Default policy
+
+Unchanged from original §9.4 (permissive default for static `GET`/`HEAD`/`OPTIONS`; no default for dynamic routes).
+
+### 7.3 Precedence (reversed from original §9.4)
+
+The original last paragraph of §9.4 reads "[for dynamic routes] the Gateway applies those rules, **overriding any CORS headers the actor sets**." This silently strips actor-authored CORS that the actor may consider load-bearing for its security posture. CIP-15-aligned reverses this:
+
+> **Dynamic routes**:
+> 1. If the actor's `HttpResponseEnvelope` includes any `Access-Control-*` headers, those are passed through unmodified. Gateway adds nothing.
+> 2. Otherwise, Gateway applies `cors_config` rules.
+> 3. Otherwise, no CORS headers are added.
+>
+> **Static routes**: Gateway applies `cors_config` rules. Default policy applies if no `cors_config` is set.
+
+This restores the actor's authority over its own dynamic-response CORS while preserving the Gateway-handled flow for static assets (where the actor isn't even invoked).
+
+### 7.4 Preflight handling
+
+Unchanged from original §9.5 (Gateway handles `OPTIONS` directly, never dispatches to actor).
+
+---
+
+## 8. Constants
+
+```
+// Inherited from original §10
+MAX_STATIC_ROUTES                 = 100
+MAX_DYNAMIC_ROUTES                = 100
+MAX_ROUTE_MANIFEST_SIZE           = 65_536
+MANIFEST_POLL_INTERVAL            = 6
+METADATA_CACHE_TTL                = 60
+MAX_GATEWAY_CACHE_BYTES           = 10_737_418_240
+DEFAULT_MAX_CACHE_PER_VOLUME      = 104_857_600
+DEFAULT_MAX_STATIC_RESPONSE_BYTES = 10_485_760
+PROTOCOL_MAX_STATIC_RESPONSE_BYTES = 104_857_600
+HEDGE_THRESHOLD_MS                = 100
+MAX_CONCURRENT_SHARD_FETCHES      = 8
+DEFAULT_CORS_MAX_AGE              = 86_400
+MAX_CORS_RULES                    = 50
+
+// New in CIP-15-aligned
+ROUTE_PRIORITY_GAP                = 1                    // min separation between max(static) and min(dynamic)
+// Note: storage-grace handling reuses CIP-9 STORAGE_GRACE_EPOCHS; no new constant needed.
+```
+
+---
+
+## 9. Security delta vs. original
+
+| Threat | Aligned mitigation |
+|---|---|
+| Static fallback shadowing dynamic API on priority typo | §4.3 structural inversion check at `update_route_manifest` |
+| Gateway returning stale body with fresh `X-Cowboy-Block` | §5.1 dual versioning headers + `X-Cowboy-Manifest-Root` |
+| Stale volumes turning Gateway cache into free CDN after owner stops paying | §5.3 hard halt at CIP-9 `DELETED` / `GARBAGE_COLLECTING`; advisory at `GRACE_PERIOD` |
+| `cors_config` silently overriding actor-set CORS on dynamic responses | §7.3 reversed precedence |
+| Multi-volume manifest tied to one volume's lifecycle | §4.1 on-chain manifest, independent of any volume |
+| `static_volumes` requiring nested-object `ParamValue` | §3 separate `ingress.static` with flat `StrArray` schema |
+| Bitcoin-style Merkle CVE-2012-2459 surface | §6.2 reuses CBFS Merkle (`cbfs/manifest/src/merkle.rs`) |
+| Cache poisoning (unchanged threat) | §6.2 manifest_root match + §6.3 shard hash verify (carried) |
+| Volume impersonation (unchanged threat) | §3.1 deploy-time owner check (carried) |
+
+---
+
+## 10. Backwards compatibility
+
+CIP-15-aligned is additive over both the original CIP-15 (draft only), CIP-9, and the running codebase. It adds:
+
+- One entitlement registry entry (`ingress.static`, per Part III of this document §2.2).
+- Two `STORAGE_MANAGER` record kinds (route manifest, CORS config).
+- Two new ActorMessage handlers on `STORAGE_MANAGER` (`update_route_manifest`, `update_cors_config`) — **no new `SystemInstruction` opcodes needed**; STORAGE_MANAGER's handlers enforce `sender == actor.owner`.
+- One new Relay RPC (`GET_MANIFEST`, per `cip-9-runner-storage-v2.md` (Part II) §2).
+- One new chain event (`ManifestCommitted`, per `cip-9-runner-storage-v2.md` (Part II) §4).
+
+It does NOT modify any existing CBFS types, the `StorageCommitment` schema, or the `commit_manifest` signature — those are already in CIP-9.
+
+Actors without `ingress.static` are unaffected — Gateways dispatch all requests to the actor's `http.request` handler as in CIP-14-aligned. Gateways without CIP-15 implementation degrade safely: they ignore `ingress.static` and serve everything as dynamic.
+
+---
+
+## 11. Future work
+
+| Item | Status |
+|------|--------|
+| Pre-compressed asset variants (`.gz`, `.br`) | Deferred (carried from original §13) |
+| Small object inlining (≤ 64 KiB) | Deferred (carried) |
+| Image optimization (Gateway-side) | Deferred (carried) |
+| Range requests (`Range:` header) | Deferred (carried) |
+| Gateway cache warming | Deferred (carried) |
+| External CDN peering | Deferred (carried) |
+| Per-read bandwidth accounting between Gateway and Relay | Deferred (carried §8.11) |
+
+---
+
+## Part III — Cross-Cutting Conventions (verbatim from former `alignment-conventions.md`)
+
+# Alignment Conventions for CIP-14 / CIP-15 / CIP-16
+
+**Status:** Draft alignment companion (non-modifying)
+**Created:** 2026-04-21
+**Scope:** Cross-cutting conventions used by `cip-14-dns-addressable-actors-v2.md` (Part II), Part II of this document, `cip-16-custom-domains-v2.md` (Part II). Anything that would otherwise be repeated across all three drafts lives here.
+
+This document also enumerates upstream amendments these aligned drafts assume in CIP-2, CIP-3, CIP-5, CIP-9, and the normative entitlement registry — without modifying those source documents. Each `AMEND` item is a precondition: implementing CIP-14/15/16 requires the corresponding amendment to land first.
+
+---
+
+## 1. System actor address allocation
+
+The current low-byte sequence (`node/types/src/constants.rs`, `node/runner/src/system_actors.rs:13-35`) ends at `0x0C` (`SESSION_ACTOR`). The aligned drafts continue the same dense sequence rather than jumping into the `0x10`+ range used by the original CIP-14 (`0x0011`, `0x0012`).
+
+| Address | Name | Source |
+|--------:|------|--------|
+| `0x01` | `RUNNER_REGISTRY` | existing |
+| `0x02` | `JOB_DISPATCHER` | existing |
+| `0x03` | `RESULT_VERIFIER` | existing |
+| `0x04` | `SECRETS_MANAGER` | existing |
+| `0x05` | `TEE_VERIFIER` | existing |
+| `0x06` | `BASEFEE_SYSTEM_ACTOR` (alias `DUAL_BASEFEE`) | existing |
+| `0x07` | `ENTITLEMENT_REGISTRY` | existing |
+| `0x08` | `TREASURY` | existing |
+| `0x09` | `GOVERNANCE_SYSTEM_ACTOR` | existing |
+| `0x0A` | `STORAGE_MANAGER` (CIP-9) | existing |
+| `0x0B` | `RELAY_REGISTRY` (CIP-9) | existing |
+| `0x0C` | `SESSION_ACTOR` (MPP session model, `system_actors.rs:35`) | existing |
+| `0x0D` | `ROUTE_REGISTRY` (CIP-14-aligned §4) | new (v2.r2: shifted from `0x0C`) |
+| `0x0E` | `GATEWAY_REGISTRY` (CIP-14-aligned §7) | new (v2.r2: shifted from `0x0D`) |
+| `0x0F` | `RECEIPT_REGISTRY` (CIP-14-aligned §8) | new (v2.r2: shifted from `0x0E`) |
+| `0x10` | `CONTAINER_REGISTRY` (CIP-10 v2 Part II §1) | new (v2.r2: shifted from `0x0F`) |
+| `0x11` | `PAYMENT_GATE` (CIP-18 §8) | new (v2.r2: shifted from `0x0013`) |
+| `0x12` | `STREAM_KEY_MANAGER` (CIP-7 r2 §4) | new (r2: shifted from `0x06` which conflicts with DUAL_BASEFEE) |
+
+Rationale: keeping the sequence dense matches `system_actors.rs` convention and avoids the appearance of a reserved block. Original CIP-14 v1 numbers (`0x0011` / `0x0012`) are renumbered to `0x0D` / `0x0E` (v2.r2 shift; the v2.r1 draft used `0x0C` / `0x0D`, but `0x0C` was subsequently committed to code as `SESSION_ACTOR`).
+
+---
+
+## 2. Entitlement registry amendments (entitlement spec §9)
+
+Adopting the aligned drafts requires three new entries in `node/types/src/registry.rs::REGISTRY`. The registry is lexicographically sorted (enforced by `registry_is_sorted_lexicographically`); insert at the indicated positions.
+
+### 2.1 `ingress.http` (CIP-14)
+
+```rust
+RegistryEntry {
+    id: "ingress.http",
+    inheritable: false,
+    attested: false,
+    quota: false,
+    params: &[
+        ParamSchema { name: "allowlist_methods",     param_type: ParamType::StrArray, required: false },
+        ParamSchema { name: "max_request_bytes",     param_type: ParamType::Uint,     required: false },
+        ParamSchema { name: "max_response_bytes",    param_type: ParamType::Uint,     required: false },
+        ParamSchema { name: "max_query_cycles",      param_type: ParamType::Uint,     required: false },
+        ParamSchema { name: "receipt_ttl_blocks",    param_type: ParamType::Uint,     required: false },
+    ],
+},
+```
+
+Insertion position: between `http.fetch` and `oracle.llm`.
+
+`quota: false` is intentional and differs from the original CIP-14 §6.1 table. The manifest has no on-chain quota accumulation mechanism: every `max_*` value is a per-request **limit**, not a cumulative quota. The flag matches reality.
+
+### 2.2 `ingress.static` (CIP-15)
+
+```rust
+RegistryEntry {
+    id: "ingress.static",
+    inheritable: false,
+    attested: false,
+    quota: false,
+    params: &[
+        ParamSchema { name: "static_volume_names",       param_type: ParamType::StrArray, required: true  },
+        ParamSchema { name: "max_static_response_bytes", param_type: ParamType::Uint,     required: false },
+        ParamSchema { name: "max_cache_bytes_total",     param_type: ParamType::Uint,     required: false },
+    ],
+},
+```
+
+Insertion position: immediately after `ingress.http`.
+
+This is a **separate** entitlement, not an extension of `ingress.http`. The original CIP-15 §7.1 nests `array<StaticVolumeBinding>` (object array) inside `ingress.http.params.static_volumes` — but `ParamValue` (`node/types/src/manifest.rs:29-34`) only supports `Uint` / `Str` / `StrArray` / `AddressArray`. There is no `Object` variant and adding one would touch manifest serialization, signature digests, and codec round-trip tests for every existing actor.
+
+`static_volume_names: StrArray` lists volume names by ordinal; per-volume cache budgets collapse to a single `max_cache_bytes_total` (Gateway operators may apply local LRU splits — not protocol-enforced).
+
+### 2.3 `dns.attach_external` (CIP-16)
+
+```rust
+RegistryEntry {
+    id: "dns.attach_external",
+    inheritable: false,
+    attested: false,
+    quota: false,
+    params: &[
+        ParamSchema { name: "max_bindings", param_type: ParamType::Uint, required: false },
+    ],
+},
+```
+
+Insertion position: between `bridge.subscribe_event` and `econ.hold_balance`.
+
+Required so an actor can be the *target* of `begin_attach_external`. First-party TLD and `cowboy.network` registrations remain governed only by `ingress.http`.
+
+### 2.4 Test update
+
+`registry_has_exactly_14_entries` (`node/types/src/registry.rs:241`) becomes `_has_exactly_17_entries`.
+
+---
+
+## 3. ParamValue limits (binding for spec authors)
+
+`ParamValue` only supports four shapes (`node/types/src/manifest.rs:29-34`). The aligned drafts conform to this without proposing a `ParamValue::Object` variant, because that change would force a coordinated schema migration of every deployed manifest.
+
+**Allowed:**
+- a scalar `Uint` (≤ `u64`)
+- a single `Str` (≤ 256 bytes)
+- a `StrArray` (≤ 64 entries × 256 bytes)
+- an `AddressArray` (≤ 64 addresses)
+
+**Disallowed in entitlement params (workaround patterns):**
+- nested objects → flatten to multiple entitlements, or two parallel `StrArray`s pairing by index
+- booleans → use `Uint` with `0`/`1`
+- arrays of structs → use parallel arrays
+- maps → store JSON in a `Str` (deploy-time validation cannot recurse into the JSON)
+
+If a parameter does not fit these shapes, the aligned drafts move it out of the manifest entirely (typically into a `STORAGE_MANAGER` record or a separate system-actor table that the actor owner updates by transaction).
+
+---
+
+## 4. System-mediated handler invocation pattern
+
+Several flows in CIP-14-aligned and CIP-16-aligned require an actor to trust that a specific selector was invoked **only** by a specific system actor (e.g. `GATEWAY_REGISTRY=0x0E`, `RESULT_VERIFIER=0x03`). The aligned drafts implement this in the system-instruction dispatcher (`node/execution/src/system_instruction.rs`) rather than relying on SDK-side `ctx.sender` checks.
+
+The pattern (matches the existing `BASEFEE_SYSTEM_ACTOR=0x06` idiom for `UpdateBasefee`):
+
+1. Define a new `SystemInstruction` opcode (e.g. `IngressDispatch`, `ExternalDomainCallback`) carrying `(target_actor, selector, payload)`.
+2. The dispatch handler enforces a sender allowlist: only the named system actor address may emit the opcode.
+3. The dispatcher synthesises an internal `ActorMessage` whose `ctx.sender` is set to the system actor address. Ordinary `send_message` / `call_actor` from arbitrary accounts cannot reproduce this `ctx.sender` value because the message router populates `ctx.sender` from the calling tx's signer (it cannot be forged by the caller's own code).
+4. **Receiving actors MUST verify `ctx.sender` against the canonical sender for that selector** (e.g. `ctx.sender == GATEWAY_REGISTRY=0x0E` for `"http.request"`; `ctx.sender == RESULT_VERIFIER=0x03` for `"_dns.callback"`). The SDK (CIP-6) decorator-based handlers MUST include this check by default; raw handlers MUST include it manually.
+
+> **Note (revision).** An earlier draft described a 4th step in which the PVM message router would *additionally* reserve the corresponding selectors. **That proposal was withdrawn** (see `cip-14-dns-addressable-actors-v2.md` (Part II) §6.2 Note) because it broke legitimate router-actor forwarding patterns. The handler-side `ctx.sender` check above is sufficient.
+
+This makes ingress / verifier authenticity a protocol property: `ctx.sender` is set by the message router from on-chain signer state. SDK-default sender checks at the receiving handler are mandatory.
+
+---
+
+## 5. Read-only handler execution (replaces "queryActor")
+
+CIP-14-aligned introduces a new RPC and a corresponding PVM mode. The current node RPC layer (`node/rpc/src/rpc.rs:140-210`) has no read-only handler invocation today — only REST committed-state reads (`/actor/{addr}/storage`, etc.). The original CIP-14 cites a "Milestone 2 §5.2 `queryActor` primitive" that is not present in the codebase.
+
+### 5.1 RPC
+
+```
+POST /actor/{address}/read_handler
+{
+  "selector":   string,        // method name, e.g. "http.request"
+  "payload":    base64,        // serialized arguments
+  "max_cycles": u64?,          // overrides actor entitlement up to PROTOCOL_MAX_QUERY_CYCLES
+  "min_block":  u64?           // optional consistency floor
+}
+→ {
+  "block_height": u64,
+  "result":       base64,      // handler return bytes
+  "cycles_used":  u64
+}
+```
+
+### 5.2 PVM mode
+
+`PvmExecutor::execute_handler` gains a `read_only: bool` argument. When true, the host:
+
+- Returns from `state_get` / `state_scan_prefix` as today.
+- Traps on every mutating syscall — see §5.3 for the exhaustive table.
+- Returns `Address::ZERO` for `caller` and `None` for `ctx.sender` (no transaction context).
+
+Implementable with one new `HostContext` flag plus per-syscall guard clauses.
+
+### 5.3 Permitted vs. trapped syscalls (definitive table)
+
+Names match `node/execution/src/pvm_host.rs` exactly. This table supersedes the original CIP-14 §8.3.1, which used several syscall names that do not exist in the host (e.g. `set_storage`, `set_timeout`, `transfer`, `create_volume`, `entitlement_params`).
+
+| Syscall | Read-only | Notes |
+|---|---|---|
+| `state_get` | ✅ permitted | committed state read |
+| `state_scan_prefix` | ✅ permitted | committed state read |
+| `state_set` | ❌ trapped | mutates own KV |
+| `state_delete` | ❌ trapped | mutates own KV |
+| `send_message` | ❌ trapped | mutates target mailbox |
+| `call_actor` | ❌ trapped | synchronous cross-actor call |
+| `schedule_timer` | ❌ trapped | mutates timer queue |
+| `schedule_timer_ex` | ❌ trapped | mutates timer queue |
+| `extend_timer` | ❌ trapped | mutates timer queue |
+| `cancel_timer` | ❌ trapped | mutates timer queue |
+| `submit_job` | ❌ trapped | dispatches off-chain task |
+| `token_transfer` | ❌ trapped | mutates token balances |
+| `token_transfer_from` | ❌ trapped | mutates token balances |
+| `create_deferred_tx` | ❌ trapped | mutates deferred tx pool |
+| `upgrade_self` | ❌ trapped | replaces actor code |
+| `emit_event` | ❌ trapped | appends to event log |
+| `randomness` | ❌ trapped | host RNG is consensus-derived; no consensus context on read path |
+
+Ambient context syscalls (`block_height`, `block_timestamp`, `self_address`) are permitted; they read fields from `HostContext` rather than calling the host trait.
+
+Trap code: `ERR_READONLY_VIOLATION` (new). Gateway maps to HTTP `500` with `X-Cowboy-Error: READ_ONLY_VIOLATION`.
+
+The `randomness` trap fixes a bug in the original CIP-14 §11.3 determinism argument — `randomness` is exposed at `pvm_host.rs:1372` and would have allowed read-path divergence between Gateways without this trap.
+
+---
+
+## 6. Settlement / fee distribution reuse
+
+CIP-3 routes burn / treasury / runner-tip splits through `SettlementConfig` stored at `GOVERNANCE_SYSTEM_ACTOR=0x09` under key `system:settlement_config`, updatable via `UpdateSettlementConfig` (opcode 40, sender must be `0x09` per `system_instruction.rs`).
+
+The aligned drafts add **two parallel configs** under the same governance actor (no new system actor required):
+
+- `system:registry_settlement_config` — splits for name registration / renewal fees (CIP-14-aligned §4.5, CIP-16-aligned §4)
+- `system:gateway_pool_config` — splits for the Gateway serving fee pool (CIP-14-aligned §7.4)
+
+Both updated via the existing `UpdateSettlementConfig` opcode with a new `target_pool` discriminant (one new enum variant; not a new opcode). This avoids forking burn/treasury routing across multiple ad-hoc paths.
+
+---
+
+## 7. CIP-9 amendments (precondition for CIP-15-aligned)
+
+> **Errata note.** An earlier revision of this section (v1) listed AMEND 9-A through 9-E claiming that `StorageCommitment`, `commit_manifest`, the `volume_id = keccak256(...)` formula, and `Visibility::Public` were missing. They are NOT missing — they are all in CIP-9 today. The corrected, smaller delta list is below; details are in `cip-9-runner-storage-v2.md` (Part II).
+
+CIP-9 already provides the bulk of what CIP-15-aligned needs:
+
+- `StorageCommitment` with `volume_id`, `owner`, `visibility`, `manifest_root`, `status` (CIP-9 §11.1).
+- `commit_manifest(cap_token, manifest_root)` system instruction (CIP-9 §12.2).
+- `volume_id = keccak256(account_address || volume_name)` (CIP-9 §11.1).
+- `Visibility::Public` model for unauthenticated reads via shard metadata (CIP-9 §7.6.3) — note: original CIP-15 used `PUBLIC_READ`; the canonical CIP-9 / CBFS name is `Visibility::Public`.
+- Volume status state machine `ACTIVE → GRACE_PERIOD → DELETED → GARBAGE_COLLECTING` (CIP-9 §13).
+
+The remaining genuine gaps are detailed in `cip-9-runner-storage-v2.md` (Part II). Summary:
+
+- **AMEND 9-G** — `GET_MANIFEST` Relay Node RPC (`cip-9-runner-storage-v2.md` (Part II) §2). Direct manifest fetch in one round trip without per-shard reconstruction; required for low-latency Gateway operation against `Visibility::Public` volumes.
+- **AMEND 9-H** — `ManifestCommitted` chain event (`cip-9-runner-storage-v2.md` (Part II) §4). Powers Gateway eager cache invalidation; polling remains as a floor.
+- **Pin canonical manifest serialization** to `cbfs/manifest/src/merkle.rs` (`cip-9-runner-storage-v2.md` (Part II) §3). Reuses existing CBFS bincode + power-of-2 padded BLAKE3 binary Merkle (avoids the Bitcoin-style duplicate-last-leaf shape; CVE-2012-2459 free).
+- **Gateway serving authority** mapped from existing CIP-9 statuses (`cip-9-runner-storage-v2.md` (Part II) §5). Uses existing `ACTIVE` / `GRACE_PERIOD` / `DELETED` / `GARBAGE_COLLECTING` rather than introducing a new `DELINQUENT` status.
+
+(Sequence numbers AMEND 9-A through 9-E are deliberately retired to avoid confusion with the v1 list. AMEND 9-F is unallocated. New CIP-9 amendments resume at AMEND 9-G.)
+
+If the AMEND 9-G / 9-H items have not landed, CIP-15-aligned can still be partially deployed by falling back to indirect manifest fetch (`GET_SHARD` against `__manifest__`) and time-based polling — at the cost of higher per-request latency and slower invalidation.
+
+---
+
+## 8. CIP-2 amendments (precondition for CIP-16-aligned)
+
+The current `runner/src/types.rs::VerifierCheck` enum has no DNS primitive (`runner/src/types.rs:177-201`). CIP-16-aligned uses CIP-2 multi-runner verification with `VerificationMode::MajorityVote` (already implemented per `runner/src/types.rs:215`) and two new check variants:
+
+- **AMEND 2-A** — Add `VerifierCheck::DnsTxtRecordMatch { fqdn: String, expected_value: String, min_resolvers: u32 }`. Verifier runners resolve `fqdn` via `min_resolvers` independent recursive resolvers (operator-configured public list) and report match / mismatch.
+- **AMEND 2-B** — Add `VerifierCheck::DnsCnameMatch { fqdn: String, expected_target: String, min_resolvers: u32 }`. Used to check the canonical-edge CNAME.
+- **AMEND 2-C** — `JobType::Custom { executor_hash, params }` already exists (`runner/src/types.rs:146-149`). CIP-16-aligned uses it for the verification job; `executor_hash` references a built-in DNS-verification executor whose hash is governance-pinned (`DNS_VERIFIER_EXECUTOR_HASH`).
+
+The original CIP-16 §9.6 prescribes `VerificationMode::Deterministic`, which (per `node/runner/src/types.rs:217` semantics and CLAUDE.md) requires TEE + byte-identical comparison. DNS resolution is not byte-identical across resolvers / cache states; `MajorityVote` is the structurally correct mode.
+
+---
+
+## 9. CIP-5 amendments
+
+None required. The aligned drafts use existing `schedule_timer`, `schedule_timer_ex`, `extend_timer`, `cancel_timer` syscalls without changes. The hard ceiling `MAX_TIMERS_PER_ACTOR=1024` (`node/types/src/constants.rs`) is treated as a constraint that motivates §10 below.
+
+---
+
+## 10. Receipt model (replaces SDK-conventional `_http/results/{request_id}`)
+
+The original CIP-14 §8.4 stores command-path results in actor KV at `_http/results/{request_id}` and registers a per-request cleanup timer. With `MAX_TIMERS_PER_ACTOR = 1024`, a popular API actor exhausts its timer budget within ~1k pending requests.
+
+CIP-14-aligned defines a `RECEIPT_REGISTRY=0x0F` system actor that owns receipt storage and lifetime. See `cip-14-dns-addressable-actors-v2.md` (Part II) §8 for the full schema. Two key properties:
+
+- Receipts are written by the `IngressDispatch` system instruction post-handler-return, not by actor code. Actors do not consume their own KV or timer budget for receipt management.
+- A single registry-wide pruning loop expires receipts via TTL, replacing per-request timers. One timer slot total, not one per pending request.
+
+---
+
+## 11. Whitepaper alignment
+
+These aligned drafts respect every WP principle exercised by CIP-14/15/16. The companion the WP v2 Part III enumerates the principles and the specific clauses that uphold them, including three places where the aligned drafts knowingly bend WP framing (Gateway as a fourth node class, receipt registry as a new state surface, ACME / TLD centralization at v1).

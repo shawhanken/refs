@@ -1,10 +1,15 @@
-# Cowboy Technical Whitepaper (v2)
+# Cowboy Technical Whitepaper (v2.r2)
 
 > **Versioning.** This is v2 of the technical whitepaper. v1 is the canonical document `2026-03-21_cowboy-technical-whitepaper-revised.md` (preserved verbatim as Part I). v2 = v1 + proposed deltas surfaced by the CIP-14/15/16 v2 alignment exercise (Part II) + the WP-vs-CIP-aligned audit brief (Part III).
 >
 > **Status of Part II.** The deltas are PROPOSALS, not adopted edits. The WP §-numbers each delta references are insertion targets, not existing sections.
 >
 > **Conflict rule.** Part I is the canonical WP today. Part II is forward-looking; if and when adopted, the deltas would supersede whatever Part I says about each surface. Part III is a one-time audit, not normative.
+>
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — §13 / Delta 6 (system actor table) updated for the v2.r2 address shift: `0x0C = SESSION_ACTOR` (code at `system_actors.rs:35`); CIP-14 v2.r2 → `0x0D`/`0x0E`/`0x0F`; CIP-10 v2.r2 → `0x10`; CIP-18 r2 PaymentGate → `0x11`. Inline `GATEWAY_REGISTRY` / `RECEIPT_REGISTRY` references shifted to `0x0E` / `0x0F`.
+> - **r1 (2026-04-21)** — Initial v2 deltas (Parts II–III) introduced.
 >
 > **Summary of proposed deltas (Part II)**
 >
@@ -13,6 +18,10 @@
 > 3. **§9.x — Deferred result storage** (CIP-14 v2 §8).
 > 4. **§6.y — System-reserved selectors** (CIP-14 v2 §6.2, CIP-16 v2 §5.6).
 > 5. **§9.y — Owner-mutable per-actor configuration at `STORAGE_MANAGER`** (CIP-15 v2 §4.1, §7.1).
+> 6. **§13 (revised) — System actor table** (CIP-14 v2.r2 / CIP-10 v2.r2 / CIP-18 r2; `0x0C = SESSION_ACTOR` from code).
+> 7. **§17.y — Payment layer** (CIP-18 r2): PaymentGate `0x11`, four payment models, MPP+x402 dual wire, EVM bridge facilitator.
+> 8. **§6.z — MCP Ingress** (CIP-19): actor-as-MCP-server via Gateway, `tools/list` derived from CIP-15 routes, JSON-RPC `_meta.payment-authorization`.
+> 9. **§16.z — Cross-chain architecture** (CIP-25): three-layer (state-anchoring / mailbox / apps), pluggable trust backends; reconciles WP-v2 §16's "third-party-only" framing with CIP-25's runner-committee backend.
 
 ---
 
@@ -1119,7 +1128,7 @@ WP §17 discusses runner stake, slashing, and rate cards. It implicitly conflate
 >
 > Every service-providing node (Runner per CIP-2, Gateway per CIP-14, Relay Node per CIP-9) maintains two distinct balance categories:
 >
-> - **Stake**: locked CBY held in the relevant registry — `RUNNER_REGISTRY=0x01` (CIP-2), `GATEWAY_REGISTRY=0x0D` (CIP-14), `RELAY_REGISTRY=0x0B` (CIP-9). Slashable per the registry's failure rules. Withdrawable only after an unstaking delay.
+> - **Stake**: locked CBY held in the relevant registry — `RUNNER_REGISTRY=0x01` (CIP-2), `GATEWAY_REGISTRY=0x0E` (CIP-14), `RELAY_REGISTRY=0x0B` (CIP-9). Slashable per the registry's failure rules. Withdrawable only after an unstaking delay.
 > - **Operating balance**: spendable CBY held in the node's operating account. Pays gas for transactions the node submits — result submission, ingress dispatch, storage commitments, heartbeats. Refilled from earned fees and protocol rewards.
 >
 > These categories MUST NOT be conflated in protocol logic:
@@ -1171,9 +1180,9 @@ WP §9 lists Runner Registry, Job Dispatcher, Result Verifier, etc. The WP does 
 
 > **§9.x — Deferred result storage**
 >
-> System actors that mediate third-party calls — `GATEWAY_REGISTRY=0x0D` for HTTP ingress (CIP-14), and future system actors for cross-chain bridges, oracle dispatch, sealed bid auctions — generate responses asynchronously. Result storage SHOULD follow a common pattern:
+> System actors that mediate third-party calls — `GATEWAY_REGISTRY=0x0E` for HTTP ingress (CIP-14), and future system actors for cross-chain bridges, oracle dispatch, sealed bid auctions — generate responses asynchronously. Result storage SHOULD follow a common pattern:
 >
-> - A dedicated registry actor (e.g., `RECEIPT_REGISTRY=0x0E` for HTTP) owns the result records. Keyed by `request_id`; records carry `target`, `status`, `payload` (when complete), `created_at`, `expires_at`.
+> - A dedicated registry actor (e.g., `RECEIPT_REGISTRY=0x0F` for HTTP) owns the result records. Keyed by `request_id`; records carry `target`, `status`, `payload` (when complete), `created_at`, `expires_at`.
 > - A single registry-wide pruning loop expires records via TTL. **Per-target timer budgets are NOT consumed.** This avoids the failure mode where a popular `target` exhausts its `MAX_TIMERS_PER_ACTOR=1024` budget within ~1k pending requests.
 > - Reads go through the standard `read_handler` RPC against the registry actor — no special "result polling" RPC needed.
 >
@@ -1205,7 +1214,7 @@ WP §6 describes message routing but does not establish that selectors can be sy
 >
 > Initial reservations:
 >
-> - `"http.request"` — permitted senders: `GATEWAY_REGISTRY=0x0D` (CIP-14-aligned §6.2). Used for system-mediated HTTP command-path dispatch.
+> - `"http.request"` — permitted senders: `GATEWAY_REGISTRY=0x0E` (CIP-14-aligned §6.2). Used for system-mediated HTTP command-path dispatch.
 > - `"_dns.callback"` — permitted senders: `RESULT_VERIFIER=0x03` (CIP-16-aligned §5.6). Used for system-mediated external-domain verification callbacks.
 >
 > Reserving a selector is a protocol-level action. New reservations require governance approval and are added to the canonical reservation registry (analogous to adding entries to the entitlement registry).
@@ -1274,18 +1283,101 @@ WP §9 normative text already says "**If this whitepaper conflicts with CIP-2 on
 > | `0x09` | Governance | CIP-12 |
 > | `0x0A` | **Storage Manager (CIP-9)** — supersedes WP §9's prior "Container Image Registry" claim | CIP-9 |
 > | `0x0B` | Relay Registry | CIP-9 |
-> | `0x0C` | Route Registry | CIP-14 v2 |
-> | `0x0D` | Gateway Registry | CIP-14 v2 |
-> | `0x0E` | Receipt Registry | CIP-14 v2 |
-> | `0x0F` | Container Registry | CIP-10 v2 |
+> | `0x0C` | **Session Actor** (MPP session model; `system_actors.rs:35`) | CIP-8 (retroactive) |
+> | `0x0D` | Route Registry | CIP-14 v2.r2 |
+> | `0x0E` | Gateway Registry | CIP-14 v2.r2 |
+> | `0x0F` | Receipt Registry | CIP-14 v2.r2 |
+> | `0x10` | Container Registry | CIP-10 v2.r2 |
+> | `0x11` | Payment Gate | CIP-18 r2 |
+> | `0x12` | Stream Key Manager | CIP-7 r2 (was 0x06 in v1; conflicted with DUAL_BASEFEE — resolved 2026-05-11) |
 >
-> **Container Registry** (CIP-10 v2 §1) is at `0x0F`, NOT `0x0A`. WP §9 readers should treat the v1 WP table's `0x0A = Container Image Registry` entry as obsolete — code chose `0x0A` for `STORAGE_MANAGER` (CIP-9) because CIP-9 was implemented first and the conflict was resolved in code's favor.
+> **Container Registry** (CIP-10 v2.r2 §1) is at `0x10`, NOT `0x0A`. WP §9 readers should treat the v1 WP table's `0x0A = Container Image Registry` entry as obsolete — code chose `0x0A` for `STORAGE_MANAGER` (CIP-9) because CIP-9 was implemented first and the conflict was resolved in code's favor.
+>
+> **2026-05-11 r2 shift:** `SESSION_ACTOR = 0x0C` was committed in code at `system_actors.rs:35` after the v2.r1 alignment round (which had drafted `0x0C` = `ROUTE_REGISTRY`). The v2 sequence shifted +1: CIP-14 v2.r2 (`0x0D`/`0x0E`/`0x0F`), CIP-10 v2.r2 (`0x10`), CIP-18 r2 (`0x11`). All four CIP files carry matching r2 revision notes.
 >
 > **Conflict resolution rule (revised):** If this WP conflicts with any deployed CIP on system actor allocations, the deployed CIP is authoritative; if no CIP is deployed for a contested address, the lowest-numbered CIP claiming the address wins.
 
 ### Rationale
 
-WP §9's "0x0A = Container Image Registry" predates the CIP-9 implementation. Code took 0x0A for STORAGE_MANAGER because CIP-9 was further along. CIP-10 v2 §1 reallocated Container Registry to 0x0F to resolve the collision. The WP needs to reflect what code did.
+WP §9's "0x0A = Container Image Registry" predates the CIP-9 implementation. Code took 0x0A for STORAGE_MANAGER because CIP-9 was further along. CIP-10 v2.r2 §1 reallocated Container Registry to `0x10` to resolve the collision, after CIP-14 v2.r2's `0x0D`/`0x0E`/`0x0F` block which itself shifted +1 around the code-committed `SESSION_ACTOR = 0x0C`. The WP needs to reflect what code did and how the v2 CIP family adapted.
+
+---
+
+## Delta 7 — Payment Layer (CIP-18 r2)
+
+**Proposed WP section:** new §17.y after fee model
+
+WP-v2 does not currently describe a payment layer. All `payment` references in Part I refer to **runner job settlement** (the 89/10/1 split inside CIP-2). Per-request external payment from non-Cowboy clients into actor endpoints — the entire CIP-18 r2 model — has no anchor in Part I.
+
+Proposed §17.y:
+
+> ### 17.y. Payment layer
+>
+> A dedicated payment layer (CIP-18 r2) makes HTTP-addressable actors monetizable. A new system actor **PaymentGate** at `0x11` holds per-actor `PaymentPolicy` records, escrowed budgets, prepaid passes, and epoch-subscription entitlements. Gateways enforce payment at the network edge under one or both wire formats — **MPP** (IETF `draft-ryan-httpauth-payment`, primary) and **x402** (Coinbase compatibility) — and normalize both into a wire-agnostic `PaymentIntent` before invoking `PaymentGate.settle_payment`.
+>
+> Four payment models compose orthogonally:
+> 1. **Per-request** (client pays at the edge with each call)
+> 2. **Actor-funded** (actor pre-deposits a serving budget; clients pay nothing)
+> 3. **Prepaid pass** (client purchases N call credits, redeems with each request)
+> 4. **Epoch subscription** (rolling time-window unlimited access, reusing CIP-7 epoch primitives)
+>
+> Default protocol fee: **5%** (`PROTOCOL_PAYMENT_FEE_BPS = 500`). The remainder accrues to the actor's treasury. Inbound EVM-to-Cowboy bridge for ERC-20 stablecoin payments is specified by CIP-18 r2 §12 (deferred implementation; needs a new `bridge.facilitate.evm` runner entitlement).
+>
+> The MCP transport (CIP-19) reuses the same `PaymentIntent` over JSON-RPC `_meta.payment-authorization` with error code `-32402`.
+
+### Rationale
+
+The payment layer is now a load-bearing concern for actor monetization and agent-to-agent commerce. WP-v2 should acknowledge it at the architecture-overview level even though Parts II/III adopt-or-defer it via CIPs. Without this delta, the WP system-actor table (§9 / Delta 6) lists `PAYMENT_GATE = 0x11` without explaining why it exists.
+
+---
+
+## Delta 8 — MCP Ingress (CIP-19)
+
+**Proposed WP section:** new §6.z after HTTP ingress
+
+WP-v2 mentions "MCP tool calls" only as **outbound** (actors consuming external MCP servers via Runner). The reverse — actor-as-MCP-server, exposing Cowboy actors to every MCP-aware agent runtime as a native peer — is a new ingress pattern introduced by CIP-19 and unrepresented in Part I.
+
+Proposed §6.z:
+
+> ### 6.z. MCP Ingress (CIP-19)
+>
+> Every actor holding both `ingress.http` (CIP-14 v2.r2) and `ingress.mcp` (CIP-19) entitlements is automatically exposed as a Model Context Protocol (MCP) server at `https://<actor>.cowboy.network/_cowboy/mcp`. The Gateway terminates the MCP streamable HTTP transport (spec version `2025-11-25`), derives the `tools/list` deterministically from the actor's CIP-15 v2.r2 route table (one tool per Method-target route), and dispatches `tools/call` invocations through the same CIP-14 query / command paths an equivalent HTTP request would use. Actor handler code is unchanged.
+>
+> Payment gating reuses the CIP-18 r2 wire format over JSON-RPC `_meta.payment-authorization`. The MCP error code `-32402` mirrors HTTP `402`.
+>
+> Tool discovery is deterministic, verifiable, and on-chain-anchored — distinguishing Cowboy actors from MCP servers hosted on opaque infrastructure.
+
+### Rationale
+
+MCP is the standard interface between LLM agents and external tools. Treating every Cowboy actor as natively MCP-callable, with verifiable code and payable per-call, is a major architectural inflection that the WP should describe at the overview level.
+
+---
+
+## Delta 9 — Cross-Chain Architecture (CIP-25)
+
+**Proposed WP section:** new §16.z, supplements existing §16
+
+WP-v2 §16 "Bridge Infrastructure" says (line 830): "Cowboy relies on third-party bridge infrastructure for asset transfers and cross-chain message passing." and "Bridge selection and integration are determined by governance. The protocol does not implement its own bridge validator set."
+
+CIP-25 (Cross-Chain Architecture) proposes a normative three-layer architecture — L1 (state anchoring with pluggable trust backends), L2 (mailbox messaging with exactly-once semantics), L3 (asset bridges, lending, oracles, generic calls) — and identifies **runner-attested committee** as one of four legitimate L1 backends (the others being ZK light client, optimistic, native light client).
+
+These statements partially conflict: WP-v2 §16 says "no protocol-native validator set"; CIP-25 §1.4 + §A.5 says "runner-committee is a first-class backend." Tony's team's existing Cowboy→ETH withdrawal bridge already runs the runner-committee pattern in production, validating the design.
+
+Proposed §16.z:
+
+> ### 16.z. Cross-chain architecture (CIP-25)
+>
+> The protocol provides a layered cross-chain architecture (CIP-25) rather than relying solely on third-party bridges. Three orthogonal layers:
+>
+> 1. **L1 — State anchoring.** A pluggable interface (`IChainAnchor`) that exposes verifiable Merkle-proof reads of one chain's block commitments on another. Backends include (a) Cowboy-runner-attested committee, (b) ZK light client, (c) optimistic-with-fraud-window, (d) native light client. All backends produce the same `BlockCommitment` shape.
+> 2. **L2 — Mailbox.** A symmetric typed message primitive `(src, dst, sender, recipient, nonce, payload)` providing exactly-once, per-sender-monotonic, integrity-preserving cross-chain delivery on top of any L1 backend.
+> 3. **L3 — Applications.** Asset bridges (lock-mint / burn-release), cross-chain lending, oracle / inference relays (extending CIP-7 Watchtower streams cross-chain), generic cross-chain calls.
+>
+> Which backend is deployed for which chain-pair remains a **governance decision** per §16.2. CIP-25 standardizes the interface contract any backend must satisfy; it does **not** mandate the runner-committee backend protocol-wide. §16's "no protocol validator set" guarantee should be read narrowly as "no single mandatory bridge validator set"; the L1 interface admits both Cowboy-runner backends and pure third-party backends behind the same `IChainAnchor`.
+
+### Rationale
+
+Without this delta, the WP §16 statement and CIP-25's runner-committee proposal read as contradictory. Adding §16.z reframes them as complementary: WP §16 sets the **economic / governance policy** (no protocol-mandated bridge), CIP-25 sets the **architectural pattern** (any backend implements the same interface). Both hold.
 
 ---
 
@@ -1299,8 +1391,11 @@ WP §9's "0x0A = Container Image Registry" predates the CIP-9 implementation. Co
 | 4 — System-mediated message authenticity (selector reservation withdrawn) | §6.y | CIP-14-aligned §6.2, CIP-16-aligned §5.6 |
 | 5 — Owner-mutable config at STORAGE_MANAGER | §9.y | CIP-15-aligned §4.1, §7.1 |
 | 6 — System actor address allocation correction (WP §9 0x0A) | §9 amendment | CIP-9, CIP-10 v2 §1 |
+| **7 — Payment layer** | §17.y | CIP-18 r2, CIP-19 (companion) |
+| **8 — MCP Ingress** | §6.z | CIP-19, CIP-15 v2.r2, CIP-18 r2 |
+| **9 — Cross-chain architecture** | §16.z | CIP-25 (also addresses tension with current §16.2 third-party-bridge framing) |
 
-These deltas are scoped to the alignment exercise. They do not address other potential WP revisions (CIP-13 actor-model delegation, CIP-23 TEE execution, CIP-21 liquidity pools, etc.); those would require separate analysis.
+These deltas are scoped to the v2.r2 alignment exercise. They do not address other potential WP revisions (CIP-13 actor-model delegation, CIP-23 TEE execution, CIP-21 liquidity pools, etc.); those would require separate analysis.
 
 ---
 
@@ -1387,7 +1482,7 @@ This brief does not propose any change to the WP itself.
 These are not violations — they are extensions the WP did not anticipate, surfaced by the CIP-14/15/16 work.
 
 - **Gateway as a fourth node class** (CIP-14-aligned §7): the WP frames "off-chain participants" mostly as runners. The aligned drafts add Gateways as a distinct ingress class with their own staking, health, and incentive pool. Justified by CIP-10's "no ingress" constraint on runner containers — runners architecturally cannot do ingress, and validators / relay nodes are wrong roles for it.
-- **Receipt registry as a fourth state surface** (CIP-14-aligned §8): the WP storage model centers on actor KV, mailboxes, and timers. Receipts are a new dedicated surface owned by `RECEIPT_REGISTRY=0x0E`. Justified by the `MAX_TIMERS_PER_ACTOR=1024` constraint — per-request cleanup timers would exhaust the budget on any popular actor.
+- **Receipt registry as a fourth state surface** (CIP-14-aligned §8): the WP storage model centers on actor KV, mailboxes, and timers. Receipts are a new dedicated surface owned by `RECEIPT_REGISTRY=0x0F`. Justified by the `MAX_TIMERS_PER_ACTOR=1024` constraint — per-request cleanup timers would exhaust the budget on any popular actor.
 - **ACME / first-party TLD centralization at v1** (CIP-16-aligned §10): the WP's "self-sovereign service" framing implies trustless infrastructure. CIP-16-aligned acknowledges that v1 sits inside the ICANN root and the existing CA system, with operational mitigation (multi-sig, transparency logs) rather than protocol-level trustlessness.
 
 ---

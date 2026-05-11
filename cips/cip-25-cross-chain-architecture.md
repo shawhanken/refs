@@ -9,8 +9,14 @@ icon: link
   **Type:** Standards Track
   **Category:** Core
   **Created:** 2026-04-23
+  **Updated:** 2026-05-11 (r1.1)
   **Requires:** CIP-2 (Off-chain Compute / Runners), CIP-4 (State & Merkle Proofs), CIP-7 (Watchtower Streams)
 </Note>
+
+> **Revision history**
+>
+> - **r1.1 (2026-05-11)** — §1.4 governance scope clarified: this CIP defines the `IChainAnchor` interface contract; **which** backend is deployed per chain-pair is a WP-v2 §16.2 governance decision. Reconciles apparent tension between WP-v2 §16's "no protocol validator set" framing and CIP-25's runner-committee backend (resolved by WP-v2 r2 Delta 9).
+> - **r1 (2026-04-23)** — Initial three-layer architecture draft.
 
 ## Abstract
 
@@ -158,6 +164,8 @@ L1 presents a single interface to L2; the means of producing the commitment is p
 | **Native light client** | the destination chain can afford to verify source-chain consensus directly | 1 block | varies | Requires source-chain signature/pairing precompiles on the destination (e.g., BLS12-381 pairing for Ethereum sync-committee BLS verification; Solana's `secp256k1_recover` syscall supports committee fallback). |
 
 All four backends produce the **same** `BlockCommitment` shape. L2 code written against L1 is agnostic to which backend is in use.
+
+> **Governance scope (r1.1, 2026-05-11).** This CIP standardizes the **interface contract** any L1 backend MUST satisfy (`IChainAnchor`, §1.5). It does NOT mandate a specific backend protocol-wide. Per **WP-v2 §16.2** ("Bridge selection and integration are determined by governance. The protocol does not implement its own bridge validator set."), which backend is deployed for which `(source_chain, destination_chain)` pair is a governance decision — including the runner-attested committee backend described in §1.4 / §1.6 (which Tony's team's existing outbound Cowboy→Ethereum withdrawal bridge already runs in production). The "no protocol validator set" wording in WP-v2 §16.2 should be read narrowly as "no single mandatory bridge validator set"; the `IChainAnchor` interface explicitly admits both Cowboy-runner-attested backends and pure third-party backends on equal footing. WP-v2 r2 Delta 9 §16.z documents this reconciliation.
 
 ### 1.5 Interfaces
 

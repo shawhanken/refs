@@ -6,17 +6,31 @@ sources:
   - refs/cips/cip-13-runner-delegation-v2.md
   - refs/cips/cip-14-dns-addressable-actors-v2.md
   - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-15-gateway-implementation.md
   - refs/cips/cip-16-custom-domains-v2.md
+  - refs/cips/cip-18-payments.md
+  - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-25-cross-chain-architecture.md
   - refs/cips/cip-9-runner-storage-v2.md
   - refs/cips/cip-10-runner-containers-v2.md
   - refs/runner/2026-04-28_MPP_Session_Research.md
   - refs/plans/2026-05-06_mpp_session_implementation.md
-last_updated: 2026-05-07
+last_updated: 2026-05-11 (r2 sync)
 status: authoritative
 ---
 
 # 文档-代码漂移看板
+
+> **2026-05-11 r2 sync + 后续补 CIP** — 第一轮跨 CIP 文档 v2.r2 修订完成（CIP-9 / CIP-10 / CIP-14 / CIP-15 / CIP-16 / CIP-18 / CIP-19 / CIP-15-gateway-implementation / WP-v2 全部 r2）。第二轮起草两份新 CIP 收口剩余文档空白：
+>
+> - **CIP-8 (MPP Session, retroactive)** — 追认代码已实装的 SESSION_ACTOR=0x0C + 六 handler + 链下 voucher；关闭 V-11 / V-12，部分关闭 V-13
+> - **CIP-17 (Verifiable State Read RPC)** — 起草 `GET_STATE` spec，关闭 V-17
+> - **WP-v2 r2 加 Delta 7/8/9** — Payments (CIP-18 r2) / MCP Ingress (CIP-19) / Cross-Chain (CIP-25)，收口"白皮书空白"
+> - **CIP-25 r1.1** — 加 §1.4 governance scope 段，与 WP-v2 §16.2 third-party-bridge 路线统一
+> - **CIP-7 → r2 (2026-05-11，第三轮审计追加)** — Stream Key Manager system actor 地址 `0x06` → `0x12`，解 CIP-7-vs-代码 `DUAL_BASEFEE = 0x06` 长期 drift。WP-v2 Delta 6 表 + CIP-14/15/16 v2.r2 Part III §1 表 + wiki/entities/system-actors.md 同步追加 `0x12` 行；内部 storage prefix `0x6` 不变（与系统 actor 地址不同命名空间，加澄清注）
+>
+> 当前已收口的文档-vs-文档冲突合计：V-1 / V-11 / V-12 / V-14 / V-17 + CIP-7 全部 ✅；Merkle 描述、CIP-18↔19 互引、CIP-15 §8.12 引用错位全部就位。代码未实装项（precondition gaps V-2 / V-3 / V-4 / V-6 / V-8 / V-9 / V-10 / V-13 / V-15 / V-16）保持等待，按用户指令"代码不动"原则只调整 spec。
 
 跟踪 `refs/` 中文档与 workspace 代码实际实现之间的不一致。
 
@@ -78,7 +92,7 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 | L-2 | 默认端口表缺失（RPC 4000 / indexer 8080）| 修正案记录 |
 | L-3 | pvm/01 过时警告缺权威源链接 | 修正案记录 |
 | L-4 | CIP-12 `SystemActorUpgrade` Payload vs opcode 43 `UpgradeActor` 关系未明确 | ⚠️ 实现阶段裁决 |
-| L-5 | 块时间假设不一致（CIP-14 1s / CIP-23 500ms）| ⚠️ 与 `refs/plans/block-time-500ms-to-1000ms.md` 耦合 |
+| L-5 | 块时间假设不一致（CIP-14 v1 = 1s / CIP-23 v2 = 500ms / **CIP-11 r1.1 = 5s**）| ⚠️ 三方 spec 假设不同；与 `refs/plans/block-time-500ms-to-1000ms.md` 耦合。**CIP-11 r1.1 (2026-05-11)** §13 已加块时间 disclaimer：wall-clock 数值（~12h / ~21min / ~85min）权威，raw block counts 是导出；governance 激活前需按实际块时间 rescale|
 
 ---
 
@@ -90,16 +104,16 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 
 | ID | 主题 | 状态 |
 |---|---|---|
-| **V-1** | System actor `0x0C` / `0x0D` / `0x0E` (CIP-14 v2) / `0x0F` (CIP-10 v2) 在 `node/runner/src/system_actors.rs` 尚未存在 | ⚠️ v2 协议 precondition；激活前需 4 个 const + 同步 workspace CLAUDE.md |
-| **V-2** | Entitlement registry 缺 `ingress.http` (CIP-14 v2) / `ingress.static` (CIP-15 v2) / `dns.attach_external` (CIP-16 v2) | ⚠️ `node/types/src/registry.rs:208` 当前 14 entries；需变 17 entries 才能激活 |
+| **V-1** | System actor `0x0D` / `0x0E` / `0x0F` (CIP-14 v2.r2) / `0x10` (CIP-10 v2.r2) / `0x11` (CIP-18 r2) 在 `node/runner/src/system_actors.rs` 尚未存在 | ⚠️ v2 协议 precondition；激活前需 5 个 const + 同步 workspace CLAUDE.md。**2026-05-11 r2 重排已落 doc**：代码已实装到 `0x0C = SESSION_ACTOR`；v2 CIP 系列后移 +1 到 `0x0D-0x11` |
+| **V-2** | Entitlement registry 缺 `ingress.http` (CIP-14 v2) / `ingress.static` (CIP-15 v2) / `dns.attach_external` (CIP-16 v2) | ⚠️ `node/types/src/registry.rs:35-219` 实际 **15 entries**（之前 wiki 写 14 错）；需变 18 entries 才能激活；与 V-15 合并计累计需 +6 entries（加 `ingress.mcp` / `payment.gate` / `bridge.facilitate.evm`）|
 | **V-3** | Opcodes 52–67 (CIP-13/14/15/16/23 v2) 在 `node/types/src/execution.rs` 尚未存在 | ⚠️ 代码 0–51 已分配；52+ 是 v2 主分配表的 free range；激活前补 16 个 const + Encode/Decode 实现 |
-| **V-4** | Receipt Registry (`0x0E`) 单全局 prune 循环未在 storage layer 实装 | ⚠️ CIP-14 v2 §8 spec；替代 v1 SDK-conventional `_http/results/{id}` 模式 |
+| **V-4** | Receipt Registry (`0x0F`，r2 后移) 单全局 prune 循环未在 storage layer 实装 | ⚠️ CIP-14 v2.r2 §8 spec；替代 v1 SDK-conventional `_http/results/{id}` 模式 |
 
 ### 中严重性（4）
 
 | ID | 主题 | 状态 |
 |---|---|---|
-| **V-5** | WP §9 line 704 `0x0A = Container Image Registry` 与代码 `STORAGE_MANAGER (CIP-9)` 冲突 | ⚠️ WP-v2 Part II Delta 6 提议修正：0x0A 归 STORAGE_MANAGER，0x0F 归 Container Registry |
+| **V-5** | WP §9 line 704 `0x0A = Container Image Registry` 与代码 `STORAGE_MANAGER (CIP-9)` 冲突 | ⚠️ WP-v2.r2 §13 / Delta 6 修正：0x0A 归 STORAGE_MANAGER，**0x10** 归 Container Registry（CIP-10 v2.r2 后移）|
 | **V-6** | `CANONICAL_TEE_TYPES` 缺 `nitro`（`registry.rs:211` 当前 `["sgx", "sev", "tdx"]`）| ⚠️ CIP-23 v2 §2 precondition；一行代码改动 |
 | **V-7** | CIP-23 Part I §3.6.2 仍说 opcodes 50-53 | ⚠️ 设计内（Part I 原文逐字）；Part II §4 已显式 supersede 到 57-60；阅读时按冲突规则取 Part II |
 | **V-8** | CIP-5 timer per-fire fee_payer 模型 (`max_cost` 预扣 + 退还) 是否已在代码实装 | ⚠️ CIP-5 revised 2026-04-20 spec 明确；代码侧需核 `pvm_host.rs` 的 schedule_timer_ex 是否已含 fee_payer 字段；如未实装是 V-8 工作项 |
@@ -113,15 +127,35 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 
 ---
 
-## MPP Session 研究 / 计划与 v2 主表冲突（2026-05-07 新增）
+## CIP-18 / CIP-19 入库引入的 precondition gap（2026-05-11 新增）
 
-`refs/runner/2026-04-28_MPP_Session_Research.md` + `refs/plans/2026-05-06_mpp_session_implementation.md` 是研究 / PoC 实施阶段的提案，未走 v2 alignment round 6。其提议的地址 / opcode 与 v2 主表全段冲突，激活前必须重排。
+CIP-18 (Payments) + CIP-19 (Gateway MCP Ingress) 是 Draft，spec 已自洽；代码尚未跟进，且 CIP-18 §22 地址段沿用 CIP-14 v1 numbering，需在主表对齐前澄清。
+
+### 高严重性（2）
 
 | ID | 主题 | 状态 |
 |---|---|---|
-| **V-11** | MPP Session 提议 `SESSION_ACTOR = 0x0C` 撞 CIP-14 v2 `ROUTE_REGISTRY = 0x0C` | ⚠️ 研究 2026-04-28 + 计划 2026-05-06 提议；**实施前必须改地址**（建议 ≥`0x10`）+ 起 CIP 草案纳入主表 |
-| **V-12** | MPP Session 提议 opcodes 52-57（OpenSession / Deposit / Settle / Close / Finalize / Slash）撞 CIP-13 v2 (52-56) + CIP-23 v2 (57) | ⚠️ 同上；建议 PoC 阶段使用临时本地常量，正式合并前重排到 ≥68 |
-| **V-13** | EIP-712 `domain.chainId` 来源未明 | ⚠️ 计划 §10 待澄清；查 `node/types/src/constants.rs` 或 validator 配置；激活前需选定来源 |
+| **V-14** ✅ | CIP-18 PaymentGate 地址段对齐 v2 主表 | **已收口** (2026-05-11 r2)：CIP-18 r2 把 `PAYMENT_GATE_ADDRESS` 从 `0x0013` 后移到 `0x11`，§22 rationale 同步重写。CIP-14 v2.r2 / CIP-10 v2.r2 / CIP-15 v2.r2 / CIP-16 v2.r2 / WP-v2.r2 一起完成 +1 后移以为 `SESSION_ACTOR = 0x0C`（code）让位 |
+| **V-15** | Entitlement registry 缺 `payment.gate` (CIP-18) / `ingress.mcp` (CIP-19) / `bridge.facilitate.evm` (CIP-18 deferred) | ⚠️ `node/types/src/registry.rs:35-219` 当前 **15 entries**（之前 wiki 误写 14）；CIP-14/15/16 v2 已要 +3（V-2）；CIP-18/19 再 +3 → 共 +6 entries → 目标 21 entries 才能激活整套 ingress + payment 协议栈 |
+
+### 中严重性（2）
+
+| ID | 主题 | 状态 |
+|---|---|---|
+| **V-16** | CIP-15 `pays = "caller"` 字段依赖 CIP-18 PaymentGate | ⚠️ CIP-15 gateway-implementation §5 Phase 4 描述 — CIP-18 未实装时建议 Gateway 返回 `501 Not Implemented` + `X-Cowboy-Reason: cip18-required`；CIP-15 v2 schema 已含 `pays` 字段（precondition），但实装 Phase 4 必须等 CIP-18 落地 |
+| **V-17** ✅ | CIP-19 `tools/list` + CIP-15 v2.r2 routes 缓存依赖 `GET_STATE` RPC | **已收口** (2026-05-11 CIP-17)：起草 CIP-17 (Verifiable State Read RPC)，单 KV + Merkle proof，实现 < 200 行。CIP-15 gateway-implementation r2 §2.2 / §9 open-question 1 + CIP-19 §10.1 step 1 现都指向 CIP-17 |
+
+---
+
+## MPP Session（2026-05-07 提出，2026-05-11 r2 重新框定）
+
+`refs/runner/2026-04-28_MPP_Session_Research.md` + `refs/plans/2026-05-06_mpp_session_implementation.md` 当时被定为"研究/PoC 提案"。**审计代码发现**：`node/runner/src/system_actors.rs:35` `SESSION_ACTOR = 0x0C` + `node/types/src/session.rs` / `session_eip712.rs` / `node/execution/src/runner/session.rs` / `runner/crates/runner-common/src/voucher.rs` 全栈已 commit。**代码先到先得**，因此 r2 选择让 CIP-14 v2 / CIP-10 v2 / CIP-18 整体后移 +1，而非要求 MPP Session 改地址。
+
+| ID | 主题 | 状态 |
+|---|---|---|
+| **V-11** ✅ | MPP Session `SESSION_ACTOR = 0x0C` 与 CIP-14 v2 ROUTE_REGISTRY = 0x0C 冲突 | **已收口** (2026-05-11 r2)：代码已实装 `0x0C = SESSION_ACTOR`；CIP-14 v2.r2 接受并后移 ROUTE_REGISTRY 到 `0x0D`。后续 follow-up：起 CIP 草案（暂称 CIP-2X）把 SESSION_ACTOR 正式纳入主表 |
+| **V-12** ✅ | MPP Session 提议 opcodes 52-57 与 CIP-13 v2 / CIP-23 v2 numeric 段冲突 | **已收口** (2026-05-11 CIP-8)：代码 `node/types/src/execution.rs` SystemInstruction 是 Rust enum，MPP Session handlers 是 ActorMessage to SESSION_ACTOR + 字符串 selector（`session.open` / `.deposit` / `.settle` / `.close` / `.finalize` / `.slash`），**不占用 numeric opcode 空间**。CIP-8 §12 给完整说明。如未来 SystemInstruction 引入 numeric 映射，MPP Session 占 ≥68 free range |
+| **V-13** | EIP-712 `domain.chainId` 来源 | ⚠️ PoC：`runner/crates/runner-common/src/voucher.rs:28` `COWBOY_SESSION_CHAIN_ID = 1`；激活 mainnet 前需选定来源（CIP-8 §13 给激活规则；待 `node/types/src/constants.rs` 落 `CHAIN_ID` 常量 / 或起 sibling CIP "Cowboy network identifier"）|
 
 ---
 
@@ -135,6 +169,7 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 4. 白皮书更新（`refs/whitepaper/` — 受保护，只读对比）
 5. 新 System Actor（`node/runner/src/system_actors.rs`）
 6. 新 SystemInstruction opcode（`node/types/src/execution.rs:482-541`）—— 任何新增需对照本表 V-3
+7. 新 Entitlement registry entry（`node/types/src/registry.rs:208`）—— v2/CIP-18/19 累计 +6 待加
 
 ---
 

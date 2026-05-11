@@ -2,7 +2,7 @@
 
 本目录包含 Cowboy 项目的所有参考文档，按**主题**分类整理。跨主题的综合分析、报告、会议纪要集中在 `analysis/`，由 LLM 维护的综合 wiki 位于 `wiki/`。
 
-**最后更新**: 2026-05-07
+**最后更新**: 2026-05-11（r2 alignment + 新 CIP-8 / 11 / 17 / 18 / 19 / 25 入库）
 
 ---
 
@@ -79,9 +79,18 @@ refs/
 
 ## 📋 cips/ — Cowboy Improvement Proposals
 
-CIP-1 到 CIP-23（Actor 调度、链下计算、费用模型、Tokens、存储、Timer、SDK、Runner 容器、治理、Runner Delegation、DNS-Addressable Actors、Public Asset Hosting、Custom Domains、TEE Execution）。
+CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储、Timer (r2)、SDK、MPP Session、Runner 容器、**Runner Connectivity (r1.1)**、治理、Runner Delegation、DNS-Addressable Actors、Public Asset Hosting、Custom Domains、**Verifiable State Read RPC**、Payments、MCP Ingress、Fungible Tokens、Liquidity Pools、Continuous Auctions、TEE Execution、Cross-Chain）。
 
-**v2 alignment 系列**（2026-04-21 round 6）：CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 各发布 `*-v2.md` alignment 文件，统一系统 actor 地址段（`0x0C-0x0F`）与 SystemInstruction opcode 主分配表（CIP-13 v2 §1 canonical, 52-67）。
+**v2 alignment 系列**（2026-04-21 round 6 + 2026-05-11 r2 重排）：CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 各发布 `*-v2.md` alignment 文件；2026-05-11 r2 修订把系统 actor 地址段后移 +1 为 `SESSION_ACTOR=0x0C`（代码已 commit）让位，最终序列：`0x0C` SESSION_ACTOR / `0x0D` ROUTE_REGISTRY / `0x0E` GATEWAY_REGISTRY / `0x0F` RECEIPT_REGISTRY / `0x10` CONTAINER_REGISTRY / `0x11` PAYMENT_GATE。SystemInstruction opcode 主分配表（CIP-13 v2 §1, 52-67）保持不动。
+
+**新 CIPs**（2026-05 起新增）：
+- **CIP-7**（r2）— Simple Stream Protocol：Stream Key Manager 系统 actor 从 `0x06` 重排到 `0x12`（解与 DUAL_BASEFEE 长期 drift）
+- **CIP-8** —— MPP Session（retroactive）：追认代码已实装的 SESSION_ACTOR `0x0C` + 6 handler + 链下 voucher
+- **CIP-11**（r1.1）— Runner Connectivity and Push Job Delivery：QUIC 持久连接 + vote-piggyback presence bitmap + push 派单（替代轮询）；锚定 CIP-13 v2 `effective_stake`；块时间 disclaimer
+- **CIP-17** —— Verifiable State Read RPC：`GET /state/{actor}/{key}` 返回 KV + Merkle proof
+- **CIP-18**（r2）— Payments：PaymentGate `0x11`，MPP+x402 双 wire，4 付款模型
+- **CIP-19**（r2）— Gateway MCP Ingress：actor-as-MCP-server，tools/list 派生自 CIP-15 路由表
+- **CIP-25**（r1.1）— Cross-Chain Architecture：三层（state anchoring / mailbox / apps），可换信任后端
 
 详见 [`wiki/parameters.md`](wiki/parameters.md) Opcode 主分配表与 [`wiki/entities/system-actors.md`](wiki/entities/system-actors.md)。
 

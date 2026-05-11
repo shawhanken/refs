@@ -1,8 +1,26 @@
 ---
-title: "CIP-23: TEE Execution and Composite Attestation"
-description: Hardware-backed Trusted Execution Environment for verifiable off-chain compute with CPU + GPU composite attestation
-icon: shield-check
+title: "CIP-23: TEE Execution and Composite Attestation (v2)"
+description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec / measurement binding) explicit, CIP-13 delegation interaction, opcode space confirmation, nitro added to canonical TEE types
 ---
+
+# CIP-23 v2
+
+> **Versioning.** This is v2 of CIP-23. v1 is the canonical document `cip-23-tee-execution.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I. CIP-23 v1 is mature (Created 2026-04-20); v2 is a tightly-scoped clarification layer.
+>
+> **Summary of v2 changes**
+>
+> - **TEE three-layer chain** made explicit: `sec.tee_required` entitlement (manifest) → `VerificationConfig.tee_required` (job spec) → `measurement_binding` (runner). Each at a different lifecycle moment, providing defense in depth.
+> - **`nitro` added to `CANONICAL_TEE_TYPES`** (`registry.rs:211`). v1 §3.3 lists Nitro as a secondary backend but the registry's canonical list does not yet include it.
+> - **CIP-13 delegation interaction** clarified: TEE eligibility is a categorical capability check (not stake-thresholded). Delegation increases VRF weight but does not confer eligibility.
+> - **Opcode renumbering**: CIP-23 instructions move from v1 §3.6.2's 50–53 (which collides with `SYS_EXTEND_TIMER=50` and `SYS_DEPLOY_CODE=51` in code) to **57–60** per the canonical master allocation table in CIP-13 v2 §1. CIP-13 v2 itself moves from earlier 44–48 to 52–56 (also a collision fix); CIP-10 v2 from 60–63 to 61–64.
+> - **`sec.tee_required` → `VerificationMode` mapping** spelled out: `tdx`/`sev`/`nitro` eligible for `Deterministic`; `sgx` legacy-only (`EconomicBond` / others), per v1 §3.3.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-23-tee-execution.md`)
+
 
 <Note>
   **Status:** Draft<br/>
@@ -417,3 +435,103 @@ This appendix captures the TEE ecosystem snapshot that informed the hardware sel
 - Sanctum: <https://www.csail.mit.edu/research/sanctum-secure-processor>
 - Internal Cowboy research — PythonVM × TEE secure-kernel architecture notes (see `research/`)
 - Design background: `refs/plans/cowboy-tee-execution-design.md`
+
+---
+
+## Part II — v2 Revision (canonical; entitlement chain + interaction maps)
+
+### 0. What this revision does
+
+CIP-23 v1 (Created 2026-04-20) is the most recent CIP and is broadly well-aligned. v2 layers four clarifications:
+
+1. The **TEE three-layer chain** — `sec.tee_required` entitlement vs. `VerificationConfig.tee_required` job-spec field vs. `measurement_binding` runner record. v1 doesn't make the lifecycle relationship explicit.
+2. The **CIP-13 delegation interaction** — delegation does not affect TEE eligibility.
+3. The **opcode space** — confirm 50–53 don't collide with CIP-13 v2's renumbered 44–48 or with CIP-10 v2's 60–63.
+4. The `sec.tee_required` entitlement's `tee_type` parameter mapping to `VerificationMode` eligibility, and the addition of `nitro` to the canonical TEE-type list.
+
+CIP-23 v1 §3.2 already declares itself authoritative on system actor addresses; v2 carries this forward.
+
+### 1. The TEE three-layer chain
+
+A TEE-required job touches three independent layers, each at a different lifecycle moment:
+
+| Layer | Field / record | When set | Authority |
+|---|---|---|---|
+| **Actor manifest** | `sec.tee_required` entitlement (`registry.rs:158-167`) | Actor deploy time | Actor owner |
+| **Job spec** | `VerificationConfig.tee_required: bool` (`runner/src/types.rs:171`) | At `submit_task` time | Submitter |
+| **Runner record** | `measurement_binding` (CIP-23 §3.7) | Runner registration / renewal | Runner |
+
+Resolution rule:
+
+- If the actor's manifest declares `sec.tee_required`, all jobs the actor submits MUST set `tee_required = true` in the job spec. Submitter-side validation (`pvm_host.rs::submit_job`) rejects jobs that violate.
+- The dispatcher (CIP-23 §3.8 amendment to CIP-2 §5.4) selects only runners whose `measurement_binding.status == Active` AND `expires_at > submission_block` for jobs with `tee_required = true`.
+- The Result Verifier (CIP-23 §3.9 amendment to CIP-2 §9) requires `CompositeAttestation` on every `Deterministic + tee_required` result.
+
+The three layers are checked at three different times and provide defense in depth: the manifest layer prevents the actor from omitting TEE on its own jobs; the job-spec layer is the runtime carrier; the runner layer is the cryptographic guarantee.
+
+### 2. `sec.tee_required` entitlement parameters → `VerificationMode` eligibility
+
+`registry.rs:158-167` defines `sec.tee_required` with required parameter `tee_type: Str` (canonical values currently: `sgx`, `sev`, `tdx` per `registry.rs:211`). CIP-23 v1 §3.3 deprecates `sgx` for `Deterministic` (legacy tier) and adds Nitro as a secondary backend. v2 maps these explicitly:
+
+| `tee_type` value | Eligible `VerificationMode` after CIP-23 |
+|---|---|
+| `tdx` | All modes including `Deterministic` |
+| `sev` | All modes including `Deterministic` |
+| `nitro` (new in CIP-23) | All modes including `Deterministic` |
+| `sgx` | All modes EXCEPT `Deterministic` (legacy tier per v1 §3.3) |
+
+`registry.rs::CANONICAL_TEE_TYPES` (currently `&["sgx", "sev", "tdx"]`) MUST add `"nitro"` to the valid set per CIP-23 v1 §3.3. This is a one-line code change — append `"nitro"` to the const slice.
+
+### 3. Interaction with CIP-13 (delegation)
+
+A runner with delegations MAY hold a TEE `measurement_binding`. Properties:
+
+- Delegated stake counts toward the runner's `effective_stake` for VRF selection weight (per CIP-13 v2 §2 amendment to CIP-2 §5).
+- Delegated stake does NOT affect TEE eligibility. Eligibility is determined solely by `measurement_binding.status` per CIP-23 §3.8 — a categorical capability check, not a stake threshold.
+- A runner with low self-stake but high delegated stake CAN be a high-throughput TEE runner: eligible because of `measurement_binding`, high VRF weight because of `effective_stake`. The 10% `MIN_SELF_BOND_BPS` (CIP-13 §4.2) ensures meaningful skin in the game even when most stake is delegated.
+- Slashing for forged attestation: self-stake is uncapped; delegator slash is capped at `MAX_DELEGATION_SLASH_PER_EPOCH_BPS = 500` (5%) per the CIP-13 §3.6 algorithm.
+
+### 4. Opcode allocation: CIP-23 takes 57–60 (renumbered from v1 §3.6.2)
+
+CIP-23 v1 §3.6.2 allocated opcodes **50–53**, but code (`node/types/src/execution.rs:534-541`) shows 50 = `SYS_EXTEND_TIMER` and 51 = `SYS_DEPLOY_CODE`, so 50–53 collides with CIP-5 timer revisions and core deploy. Per the canonical master allocation table in CIP-13 v2 §1, CIP-23 takes **57–60**:
+
+| Opcode | Instruction | Sender allowlist |
+|---:|---|---|
+| **57** | `VerifyCae { cae, job_id, req_hash, result_hash }` | Result Verifier `0x03` |
+| **58** | `UpdateCpuRoot { tee_type, cert_der, effective_at }` | Governance `0x09` |
+| **59** | `UpdateNrasRoot { pubkey, effective_at }` | Governance `0x09` |
+| **60** | `GcNonces { upto_block }` | Permissionless |
+
+All v1 §3.6.2 references to opcodes 50–53 are **superseded** by 57–60. The master allocation table in CIP-13 v2 §1 is the canonical source for the full opcode map.
+
+### 5. Secrets Manager interaction with delegation
+
+CIP-23 v1 §3.10 makes `get_secret` require a `CompositeAttestation`. v2 clarifies: a runner accepting delegations may still request and use secrets via `get_secret` — release is gated on TEE measurement, not on stake source. Delegators have no claim on or visibility into secrets accessed by the runner they delegate to.
+
+### 5.1 BillingAttestation data source (clarifies §3.12)
+
+CIP-23 v1 §3.12 redefines `BillingAttestation.tee_signature: Option<CompositeAttestation>` (replacing CIP-10 v1's `Option<bytes64>` Ed25519 signature) but does not specify whether the `CompositeAttestation` is **freshly generated per billing event** or **cached from `measurement_binding`**. v2 pins this:
+
+> **The `BillingAttestation.tee_signature` CAE is freshly generated per billing event, not cached.**
+
+Specifically, per the §3.4 binding rule:
+
+- The CAE's `freshness.nonce` MUST be `keccak(billing_attestation_fields_excluding_signature ‖ submission_block_hash)`.
+- The CPU quote's `REPORTDATA` MUST equal `keccak(nonce ‖ service_pubkey ‖ keccak(billing_fields_rlp))`.
+- The CAE's `freshness.deadline` and `generated_at` MUST satisfy `MAX_QUOTE_AGE = 150 blocks` (§3.13) — i.e., the quote MUST have been generated within ~75 s of the billing event.
+
+A cached `measurement_binding`-time CAE would reuse a stale nonce / REPORTDATA and would fail the per-billing-event integrity check. Runners therefore generate one CAE per billing event, not per `measurement_binding` lifecycle. The `measurement_binding` is verified separately at registration / renewal time per §3.7 — that's a distinct CAE with a distinct nonce binding.
+
+**Caching is permitted at the cert-chain level** (the cert chain returned by Intel PCS / NRAS for a given platform doesn't change per quote; runners SHOULD cache it). It is the **quote itself** that must be fresh per event.
+
+### 6. Backwards compatibility
+
+CIP-23 v1 is itself in P0 (Scaffolding) status per its §7 roadmap. v2 changes are tightly scoped clarifications:
+
+- Layer separation in §1 is documentation, not a state change.
+- `nitro` addition to `CANONICAL_TEE_TYPES` is a one-line code change.
+- Opcode confirmation is documentation.
+- CIP-13 interaction is documentation.
+
+No existing deployed system is affected.
+

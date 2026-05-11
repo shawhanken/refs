@@ -1,13 +1,19 @@
 ---
 type: concept
-tags: [mpp, session, payments, runner, cip-2, cip-7, draft]
+tags: [mpp, session, payments, runner, cip-8, cip-2, cip-7, cip-18, retroactive]
 sources:
+  - refs/cips/cip-8-mpp-session.md
   - refs/runner/2026-04-28_MPP_Session_Research.md
   - refs/plans/2026-05-06_mpp_session_implementation.md
   - refs/cips/cip-2-offchain-compute.md
   - refs/cips/cip-7-simple-stream-protocol.md
   - refs/cips/cip-3-fee-model.md
-last_updated: 2026-05-07
+  - refs/cips/cip-18-payments.md
+  - node/runner/src/system_actors.rs
+  - node/types/src/session.rs
+  - node/execution/src/runner/session.rs
+  - runner/crates/runner-common/src/voucher.rs
+last_updated: 2026-05-11
 status: draft
 ---
 
@@ -15,9 +21,14 @@ status: draft
 
 ## 概述
 
-MPP Session 是研究阶段的「链上托管 + 链下累积 voucher + 链上结算」支付通道模型，对接 Stripe/Tempo Labs 提交给 IETF 的 Machine Payment Protocol 草案。它把 N 次 Runner 微调用（典型 LLM token / HTTP API / MCP 调用）的链上开销从 N 笔 tx 摊到 **3 笔（Open / Settle / Finalize）**。研究文档 §7 给 Cowboy 的战略定位是 **"AI 工作负载的结算层"** —— Runner 调用绕过链路，付款跑在 Cowboy 上。
+MPP Session 是「链上托管 + 链下累积 voucher + 链上结算」支付通道模型，对接 Stripe/Tempo Labs 提交给 IETF 的 Machine Payment Protocol 草案。它把 N 次 Runner 微调用（典型 LLM token / HTTP API / MCP 调用）的链上开销从 N 笔 tx 摊到 **3 笔（Open / Settle / Finalize）**。Cowboy 的战略定位是 **"AI 工作负载的结算层"** —— Runner 调用绕过链路，付款跑在 Cowboy 上。
 
-**当前状态**：研究文档（2026-04-28）+ 实施计划（2026-05-06）。**未起草 CIP**，**未实装**。研究/计划提议地址 `0x0C` 与 opcodes 52-57，与 CIP-14 v2 / CIP-13 v2 / CIP-23 v2 已分配段冲突（见 [[../drift]] V-11 / V-12）。
+**当前状态**：**代码已实装** + **CIP-8 已起草**（追认）。`SESSION_ACTOR = 0x0C` 在 `node/runner/src/system_actors.rs:35`；`node/types/src/session.rs` + `session_eip712.rs` + `node/execution/src/runner/session.rs` 六 handler 框架；`runner/crates/runner-common/src/voucher.rs` 链下 voucher 库。CIP-8 (2026-05-11) 是 retroactive CIP，正式 spec 已与代码对齐。
+
+**冲突收口**（[[../drift]]）：
+- V-11 ✅ 已解决（CIP-14 v2.r2 让位 0x0C；SESSION_ACTOR 占 0x0C 正式入主表）
+- V-12 ✅ 已解决（代码用 Rust enum + ActorMessage 路径，不占用 numeric opcode；CIP-8 §12 给出说明）
+- V-13 ⚠️ PoC `COWBOY_SESSION_CHAIN_ID = 1` 暂用；激活 mainnet 前需选定来源（CIP-8 §13）
 
 ---
 
@@ -128,6 +139,20 @@ CIP-2 既有的「按 Job 单笔托管 → commit-reveal → 链上 settle」**�
 | Stake | Runner 1.5× max_job_value | Runner 仍需注册 + stake；session 不直接绑 stake 倍数 |
 
 仲裁路径**完全复用** `Result Verifier 0x03` + commit-reveal + slashing —— 没有引入新共识机制。
+
+### vs CIP-18 Payments
+
+CIP-18 Draft 2026-04-28 把 MPP 的 **`intent="charge"` 单笔模型** 落到 Cowboy：HTTP 边缘付款、PaymentGate `0x13` 链上结算、4 种付款模型（per-request / actor-funded / pass / epoch subscription）。
+
+| 维度 | CIP-18 charge / pass / epoch | MPP Session |
+|---|---|---|
+| 链上 tx / N 次调用 | per-request: N，pass: 1+N（pass 用完前免再签名），epoch: 1 笔买 N 块 | 3（Open + Settle + Finalize）|
+| 适用 | HTTP API 一次成型 / 包月 / 通行证 | 高频 token 级（LLM）+ Runner 端 voucher 累积 |
+| 状态机 | PaymentGate `0x13` 维护 PaymentPolicy / nonce / pass / entitlement | SESSION_ACTOR（提案）维护 `Session{ deposit, spent, last_voucher_nonce, ... }` |
+| Wire | MPP（primary）+ x402 双 wire，Gateway normalize 为 PaymentIntent | MPP Session 模式 EIP-712 voucher，Runner-side 校验 |
+| 落地状态 | CIP-18 Draft，已起草 | Research + Plan，未起草 CIP |
+
+二者**正交且可共存**：CIP-18 主要解 HTTP 边缘付款；MPP Session 解 Runner-side 多次微调用的 N→3 tx 摊销。CIP-18 §23 "Future Work" 列 "streaming metered billing (intent='meter')" —— 该方向更接近 Session 语义，未来可能由 Session CIP 收口或 CIP-18 v2 扩展。详见 [[payments]]。
 
 ### vs CIP-7 Simple Stream
 

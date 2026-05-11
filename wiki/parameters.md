@@ -1,6 +1,6 @@
 ---
 type: parameter
-tags: [constants, authoritative, cip-3, cip-5, cip-12, cip-13, cip-14, cip-15, cip-16, cip-23]
+tags: [constants, authoritative, cip-3, cip-5, cip-12, cip-13, cip-14, cip-15, cip-16, cip-18, cip-19, cip-23, cip-25]
 sources:
   - node/types/src/constants.rs
   - node/types/src/execution.rs
@@ -15,8 +15,11 @@ sources:
   - refs/cips/cip-14-dns-addressable-actors-v2.md
   - refs/cips/cip-15-public-asset-hosting-v2.md
   - refs/cips/cip-16-custom-domains-v2.md
+  - refs/cips/cip-18-payments.md
+  - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-23-tee-execution-v2.md
-last_updated: 2026-05-07
+  - refs/cips/cip-25-cross-chain-architecture.md
+last_updated: 2026-05-11
 status: authoritative
 ---
 
@@ -191,13 +194,13 @@ status: authoritative
 
 ---
 
-## DNS-Addressable Actors（CIP-14 v2 Draft，尚未实装）
+## DNS-Addressable Actors（CIP-14 v2.r2 Draft，尚未实装）
 
 | 常量 | 值 | 说明 |
 |---|---|---|
-| `ROUTE_REGISTRY_ADDRESS` | `0x0C` | v2 收回；v1 草案 `0x0011` 已废 |
-| `GATEWAY_REGISTRY_ADDRESS` | `0x0D` | v2 收回；v1 草案 `0x0012` 已废 |
-| `RECEIPT_REGISTRY_ADDRESS` | `0x0E` | v2 新增（替代 v1 `_http/results/{id}` actor-KV 模式）|
+| `ROUTE_REGISTRY_ADDRESS` | `0x0D` | v2.r2 后移；v1 草案 `0x0011` / v2.r1 草案 `0x0C` 均已废（`0x0C = SESSION_ACTOR` 已 commit）|
+| `GATEWAY_REGISTRY_ADDRESS` | `0x0E` | v2.r2 后移；v1 草案 `0x0012` 已废 |
+| `RECEIPT_REGISTRY_ADDRESS` | `0x0F` | v2.r2 后移（v2.r1 为 `0x0E`，因前两位后移 +1）|
 | `MIN_NAME_LENGTH` / `MAX_NAME_LENGTH` | 3 / 64 | 名称长度约束 |
 | `NAME_GRACE_PERIOD` | 2,592,000 blocks（≈30d @ 1 block/sec）| 过期后宽限期 |
 | `NAME_AUCTION_DURATION` | 604,800 blocks（≈7d）| Dutch 拍卖释放窗口 |
@@ -352,11 +355,134 @@ handler MUST exhaustive switch；未知 → `ERR_UNKNOWN_POOL`。
 
 ---
 
-## Container Runtime（CIP-10 v2 Draft，尚未实装）
+## Payments（CIP-18 r2 Draft，尚未实装）
 
 | 常量 | 值 | 说明 |
 |---|---|---|
-| `CONTAINER_REGISTRY_ADDRESS` | `0x0F` | v2 §1 落锁；v1 草案占位 `0x0...cowboy.containers` 已废 |
+| `PAYMENT_GATE_ADDRESS` | `0x11` | CIP-18 r2 (2026-05-11) 对齐 v2 主表（从 `0x0013` 后移）|
+| `PROTOCOL_PAYMENT_FEE_BPS` | 500（5%）| `actor_fee / pass / subscription` 全部抽 |
+| `MAX_PRICE_TABLE_ENTRIES` | 100 | 单 PaymentPolicy 价格规则上限 |
+| `MAX_ACCEPTED_ASSETS` | 10 | 单 PaymentPolicy 支持 asset 上限 |
+| `MIN_BUDGET_DEPOSIT` | governance-set | actor-funded 起跑线 |
+| `DEFAULT_EPOCH_BLOCKS` | 86,400（≈1d @ 1s）| 默认 epoch 长度 |
+| `MAX_EPOCH_BLOCKS` | 2,592,000（≈30d）| 单 epoch 上限 |
+| `PASS_EXPIRY_BLOCKS` | 31,536,000（≈1y）| Prepaid pass 默认过期 |
+| `MAX_PREPAID_CREDITS` | 1,000,000 | 单 pass 上限 credits |
+| `CBY_ASSET_ADDRESS` | `0x0000...0000` | native CBY 标识 |
+| `PAYMENT_POLICY_CACHE_TTL_BLOCKS` | 1 | Gateway 本地 policy 缓存 TTL（下一块生效）|
+| `MIN_BRIDGE_CONFIRMATIONS_EVM` | 32 | governance-set per-chain；高 TVL 推 64 |
+| `EVM_FINALITY_HEADROOM_BLOCKS` | 64 | challenge `valid_before` 须保留的 finality 余量 |
+| `JSONRPC_PAYMENT_REQUIRED_CODE` | -32402 | MCP 路径下 402 等价错误码（见 CIP-19）|
+
+**新 Entitlements**（[[drift]] V-15）：
+- `payment.gate`（actor）：params `accepted_methods: ["cowboy","evm"]?` / `accepted_intents: ["charge","pass","subscription"]?` / `max_price_per_request: u256`；**前置**：actor 同时持 `ingress.http`
+- `bridge.facilitate.evm`（runner，**deferred**）：params `chains: [u256]` / `min_confirmations: u32` / `facilitator_pubkey: bytes`
+
+**子配置结构**（PaymentPolicy 内嵌）：
+```
+BudgetConfig { rate_limit_rps: u32, daily_cap: u256, fallback: "402"|"503", auto_refill: bool }
+EpochConfig  { fee_per_epoch: u256, epoch_blocks: u32, min_purchase: u32, max_purchase: u32 }
+PassConfig   { min_credits: u32, max_credits: u32, expiry_blocks: u64 }
+AssetConfig  { asset: Address, network: string, method: string,
+               intents: [string], x402_scheme: string?, decimals: u8, symbol: string }
+```
+
+**Wire 格式 fallback 链**（PaymentGate 评估顺序）：1) free → 2) active subscription → 3) valid pass → 4) actor budget → 5) per-request credential (MPP/x402) → 6) 402 challenge。
+
+**Opcode**：无新 SystemInstruction（所有调用为 ActorMessage to `0x0013`）。
+
+**源**: `refs/cips/cip-18-payments.md` §6-§22 + [[concepts/payments]]。
+
+---
+
+## MCP Ingress（CIP-19 Draft，尚未实装）
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `MCP_PROTOCOL_VERSION` | `"2025-11-25"` | streamable HTTP transport spec pin |
+| `MCP_SESSION_IDLE_TIMEOUT_SECONDS` | 600（10 min）| 闲置 session 回收 |
+| `MAX_TOOL_INPUT_BYTES_DEFAULT` | 1,048,576（1 MiB）| 单 tools/call `arguments` 大小（governance default; `ingress.mcp.max_tool_input_bytes` 可调）|
+| `MAX_TOOL_OUTPUT_BYTES` | 4,194,304（4 MiB）| Tool 响应硬上限，超 → 截断 + `isError: true` |
+| `JSONRPC_PAYMENT_REQUIRED_CODE` | -32402 | 复用 CIP-18 §19 |
+| `JSONRPC_INTERNAL_ERROR_CODE` | -32603 | HTTP 5xx 映射 |
+| `JSONRPC_GATEWAY_DISPATCH_FAILED` | -32000 | 网络 / 超时 |
+| `TOOLS_LIST_CHANGED_DEBOUNCE_MS` | 250 | `notifications/tools/list_changed` 节流 |
+
+**新 Entitlement**：`ingress.mcp`（actor，**前置** `ingress.http`），params：
+
+| 参数 | 类型 | 默认 |
+|---|---|---|
+| `server_name` | string? | `<actor>.cowboy.network` |
+| `server_instructions` | string? | 空 |
+| `tool_name_prefix` | string? | 空 |
+| `exclude_routes` | [string]? | `[]` |
+| `max_tool_input_bytes` | u32? | `MAX_TOOL_INPUT_BYTES_DEFAULT` |
+
+**Tool name 规则**：`prefix + sanitize(route.target.name)`，`sanitize` 把非 `[a-zA-Z0-9_]` 替换为 `_`；保留前缀 `_cowboy_*`（v1 reserved only：`_cowboy_payment_quote` / `_cowboy_payment_subscribe` / `_cowboy_pass_purchase` / `_cowboy_health` / `_cowboy_info`）。
+
+**Opcode**：无新 SystemInstruction（dispatch 复用 CIP-14 §8）。
+
+**Endpoint**：`/_cowboy/mcp` —— 自 CIP-18 §17 已 reserved；本 CIP 定语义。
+
+**源**: `refs/cips/cip-19-gateway-mcp-ingress.md` §7-§16 + [[concepts/mcp-ingress]]。
+
+---
+
+## Cross-Chain（CIP-25 Draft，尚未实装）
+
+L1 / L2 / L3 三层架构常量。具体后端 / TVL 阈值 / TTL 由治理细化。
+
+### L1（State Anchoring）
+
+| 常量 | 值 / 默认 | 说明 |
+|---|---|---|
+| Runner committee threshold | 2-of-3（参考拓扑）| ECDSA；可由治理切其他后端 |
+| 签名 domain 前缀 | `keccak256("Anchor.v1" \|\| src_chain \|\| dst_anchor_addr \|\| height \|\| roots)` | 防协议 / 版本 / dst 跨用 |
+| Source-chain `min_confirmations` (ETH) | 32（高 TVL 64）| 反 reorg；Cowboy 源用确定性最终，无须此 |
+| Stake economic floor `k` | k ≥ 10（建议）| `stake ≥ k × max_attestable_value` |
+| Fraud-proof window | 7 days | dst 上 challenge 期；窗口内 L3 不释放资金 |
+| `commitment_revoked` 阈值 | governance | deep-reorg 协议级撤销 |
+| `MAX_TTL` (协议 GC) | 1 week | 老 commitment 自动清 |
+
+### L2（Mailbox）
+
+| 常量 | 值 / 默认 | 说明 |
+|---|---|---|
+| `expiry` (asset bridge default) | 24h（≈86,400 blocks @ 1s）| `send(...)` 默认；dst hard cutoff |
+| `expiry` (oracle push) | 5 min | 推荐 TTL |
+| `expiry` (lending) | 15 min | 推荐 TTL |
+| `expiry` (one-shot RPC call) | 2 min | 推荐 TTL |
+| `GRACE` (src reclaim 宽限) | 1h | `expiry + GRACE` 后允许 `reclaim` |
+| `MAX_TIMEOUT` (bounty refund) | 7 days | 未投递 fee 回收上限 |
+| `protocol_cut` / `relayer_bounty` | 20% / 80% | `send(..., fee)` 默认拆分 |
+
+### L3 应用 TTL
+
+| 应用 | 默认 TTL（依 `finalized_at`）|
+|---|---|
+| Asset bridge | 24h |
+| Oracle push | 5 min |
+| Lending | 15 min |
+| One-shot RPC call | 2 min |
+
+### 性能信封
+
+| 后端 | 端到端延迟 | per-message gas（EVM dst）|
+|---|---|---|
+| Committee 2-of-3 | ~3 dst blocks 加 src finality | 200–300k gas（2 sig + 1 deliver）|
+| BLS 聚合 (Stage 2) | 同 committee | per-message 降 60–70% at N ≥ 10 |
+
+**新 SystemInstruction opcode**：无（按 CIP-25 §A.5 构造，所有交互均为 contract / actor message）。
+
+**源**: `refs/cips/cip-25-cross-chain-architecture.md` §1.4–§3 + §A.6 + §B + [[concepts/cross-chain]]。
+
+---
+
+## Container Runtime（CIP-10 v2.r2 Draft，尚未实装）
+
+| 常量 | 值 | 说明 |
+|---|---|---|
+| `CONTAINER_REGISTRY_ADDRESS` | `0x10` | v2.r2 §1 落锁（从 v2.r1 `0x0F` 后移 +1）；v1 草案占位 `0x0...cowboy.containers` 已废 |
 | `BILLING_DISPUTE_WINDOW` | 300 blocks（≈1h @ 12s）| 非 TEE billing 争议窗口 |
 | Opcodes | 61–64 | 见主分配表 |
 
@@ -369,6 +495,8 @@ handler MUST exhaustive switch；未知 → `ERR_UNKNOWN_POOL`。
 ---
 
 ## 变更记录
+- **2026-05-11 (r2 sync)** — 地址段重排落地：发现代码已 commit `SESSION_ACTOR = 0x0C` (`system_actors.rs:35`)；CIP-14 / CIP-10 / CIP-15 / CIP-16 / CIP-18 各发 r2 修订把 v2 sequence 整体后移 +1（ROUTE 0x0D / GATEWAY 0x0E / RECEIPT 0x0F / CONTAINER 0x10 / PAYMENT_GATE 0x11）；CIP-9 v2 + CIP-15 v2 把 CBFS Merkle 描述从"RFC-6962-style"改正为"power-of-2 padded BLAKE3 binary Merkle"（按 `cbfs/manifest/src/merkle.rs:32-66`）。CIP-18 ↔ CIP-19 互列 Requires 而非 Companions。CIP-15 gateway-implementation 移除不存在的 §8.12 引用。
+- **2026-05-11** 入库 CIP-18（Payments）/ CIP-19（Gateway MCP Ingress）/ CIP-25（Cross-Chain Architecture）/ CIP-15 gateway-implementation companion；新增 Payments / MCP Ingress / Cross-Chain 三参数段；PaymentGate 地址段对齐 gap 标 V-14（**r2 已解决**），新 entitlements (`payment.gate` / `ingress.mcp` / `bridge.facilitate.evm`) 标 V-15
 - **2026-05-07** 在 SystemInstruction Opcode 主分配表段追加 MPP Session 研究/计划与 v2 主表 52-57 冲突告警；不改 v2 主表（v2 系列权威）
 - **2026-04-21** 全 v2 系列对齐：opcode 重排（CIP-13 → 52-56；CIP-23 → 57-60；CIP-10 → 61-64；CIP-14 → 65/66；CIP-16 → 67）；新增 SettlementConfig target_pool 6 enum；CIP-14 系统 actor 收回到 0x0C/D/E + CIP-10 取 0x0F；CIP-5 revised 2026-04-20 timer fee_payer 模型；新增 SystemInstruction Opcode 主分配表与 Container Runtime 段
 - **2026-04-20** 纳入 CIP-14 / CIP-15 / CIP-16 / CIP-23（全部 Draft）参数段；标注块时间假设不一致（1s vs 500ms）

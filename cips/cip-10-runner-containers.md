@@ -1,8 +1,31 @@
 ---
-title: "CIP-10: Runner Container Runtime"
-description: OCI-compatible container execution environment for off-chain Runner jobs
-icon: box
+title: "CIP-10: Runner Container Runtime (v2.r2)"
+description: Code-aligned v2 — concrete container registry actor address (0x10), SettlementConfig fee plumbing, CIP-23 BillingAttestation reuse
 ---
+
+# CIP-10 v2
+
+> **Versioning.** This is v2 of CIP-10. v1 is the canonical document `cip-10-runner-containers.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I.
+>
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — Container Registry address shifted `0x0F` → **`0x10`** because CIP-14 v2.r2 absorbed `0x0F` for `RECEIPT_REGISTRY` (paired shift around `SESSION_ACTOR = 0x0C` already in code at `system_actors.rs:35`). Full v2 sequence now: `0x0C` SESSION_ACTOR / `0x0D` ROUTE_REGISTRY / `0x0E` GATEWAY_REGISTRY / `0x0F` RECEIPT_REGISTRY / `0x10` CONTAINER_REGISTRY / `0x11` PAYMENT_GATE.
+> - **r1 (2026-04-21)** — v2 alignment round 6 (Container Registry actor, SettlementConfig fee plumbing, CompositeAttestation upgrade).
+>
+> **Summary of v2 changes**
+>
+> - **Container Registry actor allocated at `0x10`** (continues the v2 sequence after `0x0F` `RECEIPT_REGISTRY`). Resolves v1 §11.2 placeholder `0x0...cowboy.containers`.
+> - **Fee distribution routes through `SettlementConfig`** at `GOVERNANCE_SYSTEM_ACTOR=0x09` via the existing `UpdateSettlementConfig` opcode with `target_pool: CONTAINER` discriminant. Same pattern as CIP-2/3/14/15 v2.
+> - **Three-flow off-chain billing model** clarified: runner job (CIP-2), storage rent (CIP-9), container compute (CIP-10) are independent escrows that share only the SettlementConfig template.
+> - **`BillingAttestation.tee_signature` upgrades to `CompositeAttestation`** per CIP-23 v2 §3.12.
+> - **System instruction opcodes 61–64** allocated for image / class registration (governance-only senders) per the canonical master table in CIP-13 v2 §1. Earlier draft used 60–63; renumbered to give CIP-23 v2 the 57–60 range cleanly. Code currently allocates 0–51; the master table extends from 52 upward.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-10-runner-containers.md`)
+
 
 <Note>
   **Status:** Draft<br/>
@@ -1027,3 +1050,79 @@ The default seccomp profile for CIP-10 containers. Runners MUST apply at least t
 - Raw I/O: `iopl`, `ioperm`
 
 The FUSE filesystem is mounted by the Runner engine (host-side) before the container starts. The container process interacts with it through normal file I/O syscalls — no mount privileges required inside the container.
+
+---
+
+## Part II — v2 Revision (canonical; concrete addresses + fee plumbing)
+
+### 0. What this revision does
+
+CIP-10 v1 §11.2 placeholder-addresses the Container Registry actor as `0x0...cowboy.containers`. CIP-10 v1 §12 specifies billing fee constants but does not say where collected fees route or how they integrate with CIP-3's `SettlementConfig` pattern. CIP-23 (TEE Execution) §3.12 amends CIP-10 §12.3 BillingAttestation to use CompositeAttestation. v2 pins all three.
+
+### 1. Container Registry actor address: `0x10`
+
+The Container Registry actor is allocated at `0x10`, continuing the existing low-byte sequence. All v1 §11.2 references to `0x0...cowboy.containers` resolve to `0x10`.
+
+| Address | Actor | CIP |
+|---:|---|---|
+| `0x05` | TEE Verifier | CIP-2 / CIP-23 v2 |
+| `0x0A` | Storage Manager | CIP-9 |
+| `0x0B` | Relay Registry | CIP-9 |
+| `0x0D` | Route Registry | CIP-14 v2 |
+| `0x0E` | Gateway Registry | CIP-14 v2 |
+| `0x0F` | Receipt Registry | CIP-14 v2 |
+| **`0x10`** | **Container Registry** | **CIP-10 v2 (this section)** |
+
+### 2. Container fee distribution via SettlementConfig
+
+CIP-10 v1 §12 specifies fee constants (`CPU_FEE_PER_CORE_SEC`, `MEMORY_FEE_PER_GIB_SEC`, `GPU_FEE_PER_SEC`, `EGRESS_FEE_PER_BYTE`) but does not define how collected fees are split between runner / treasury / burn. v2 routes container compute fees through the existing `SettlementConfig` pattern at `GOVERNANCE_SYSTEM_ACTOR=0x09`:
+
+```
+ContainerSettlementConfig {
+  runner_percent:    8900,   // 89%
+  treasury_percent:   100,   // 1%
+  burn_percent:      1000,   // 10%
+}
+```
+
+Stored at `0x09` under key `system:container_settlement_config`. Updated via the existing `UpdateSettlementConfig` opcode with `target_pool: CONTAINER` discriminant — no new opcode. Defaults match the CIP-2 runner-job split for consistency. Governance MAY tune.
+
+### 3. Three independent off-chain billing flows (clarification)
+
+`ext_cip-2-9-10-runner-fee-chain.md` §3 identifies three independent billing flows. v2 confirms they share **no escrow and no settlement actor**, but DO share the `SettlementConfig` template and the `UpdateSettlementConfig` opcode:
+
+| Flow | Source | Settlement actor | Settlement key | Reservation |
+|---|---|---|---|---|
+| Runner job payment (CIP-2) | submitter at `submit_task` | `0x03` Result Verifier | `system:settlement_config` | Per-job `max_price + tip` |
+| Storage rent (CIP-9) | account, per-epoch deduction | `0x0A` Storage Manager | (per-volume billing, see CIP-9 §10) | `MIN_STORAGE_BALANCE` |
+| Container compute (CIP-10) | submitter at `submit_task` | `0x10` Container Registry | `system:container_settlement_config` | `max_compute_cost` (v1 §12.1) |
+
+All three reserve funds at request time and refund the unused portion at settlement. There is no cross-pool escrow; a deficit in one flow does not draw from another.
+
+### 4. BillingAttestation reuses CIP-23 CompositeAttestation
+
+Per CIP-23 v2 §3.12, the `BillingAttestation.tee_signature: Option<bytes64>` field defined in CIP-10 v1 §12.3 is replaced with:
+
+```rust
+pub tee_signature: Option<CompositeAttestation>,    // per CIP-23 §3.4
+```
+
+Verification: `0x10` Container Registry calls `0x05::VerifyCae` with `result_hash = keccak(billing_fields_rlp)` per CIP-23 §3.12 pipeline. Non-TEE runners continue to self-sign and rely on the `BILLING_DISPUTE_WINDOW = 300` blocks for dispute resolution; v1 §12.3 dispute table is otherwise unchanged.
+
+### 5. Container Registry instructions (opcodes 61–64)
+
+CIP-10 v1 implies but does not enumerate the system instructions for image / class management. v2 allocates concrete opcodes per the canonical master table in CIP-13 v2 §1:
+
+| Opcode | Instruction | Sender |
+|---:|---|---|
+| **61** | `RegisterBaseImage { name, digest, size_bytes, platforms }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **62** | `DeregisterBaseImage { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **63** | `RegisterResourceClass { name, cpu, memory, disk, max_duration, gpu_count, gpu_min_vram }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+| **64** | `DeregisterResourceClass { name }` | `GOVERNANCE_SYSTEM_ACTOR=0x09` |
+
+Earlier CIP-10 v2 drafts proposed 60–63; renumbered here to give CIP-23 v2 §4 the 57–60 range cleanly. The canonical master allocation table is in CIP-13 v2 §1.
+
+### 6. Backwards compatibility
+
+Strictly additive. The actor at `0x10` did not previously exist; allocating it does not change any existing state. Container fees were already specified in CIP-10 §12; v2 only pins the routing path.
+

@@ -22,9 +22,9 @@ CIP-14 v2 引入的**第一个** ingress 节点角色，与 Runner / Validator /
 | 类别 | 做 | 不做 |
 |---|---|---|
 | TLS & DNS | 终止 TLS（ACME DNS-01）；响应 `*.cowboy.network` 解析 | 不做 anycast / geo-DNS 的网络层选路（由 BGP/权威 DNS 配置）|
-| 路由 | 查 Route Registry (`0x0C`) 把 `name → actor_address`；区分 query / command 路径 | 不参与共识 |
+| 路由 | 查 Route Registry (`0x0D`) 把 `name → actor_address`；区分 query / command 路径 | 不参与共识 |
 | Read-only 执行 | Query 路径：本地节点 `read_handler` RPC（CIP-14 v2 §5 + Part III §5）跑 Actor handler，PVM 在已提交状态上只读、所有 mutating syscall trap | 不跑 CIP-2 off-chain 任务（Runner 职能）|
-| 提交 | Command 路径：签名 TX → `IngressDispatch` (opcode 65) → `GATEWAY_REGISTRY=0x0D` 验证 sender 是 active Gateway → 转发到目标 Actor | 不存 CIP-9 shard（Relay Node 职能）|
+| 提交 | Command 路径：签名 TX → `IngressDispatch` (opcode 65) → `GATEWAY_REGISTRY=0x0E` 验证 sender 是 active Gateway → 转发到目标 Actor | 不存 CIP-9 shard（Relay Node 职能）|
 | Entitlement 强制 | `max_request_bytes` / `max_response_bytes` / `max_query_cycles` / `allowlist_methods` | 不在 PVM 内强制（Gateway 侧预检）|
 | 静态 serving (CIP-15 v2) | `GET_MANIFEST` (CIP-9 AMEND 9-G) + 并行 shard fetch + Reed-Solomon 重建 + 本地 LRU cache + ETag/Cache-Control | 不做源对象变换（压缩可选；裁剪/重编码延迟到 future CIP）|
 | 速率限制 | `MAX_REQUESTS_PER_SECOND = 100` per actor per gateway；`MAX_CONCURRENT_CONNECTIONS = 1000` | Per-Gateway 独立，未协调跨 Gateway（已知漏洞 12.6）|
@@ -33,7 +33,7 @@ CIP-14 v2 引入的**第一个** ingress 节点角色，与 Runner / Validator /
 
 ---
 
-## 生命周期（Gateway Registry `0x0D`）
+## 生命周期（Gateway Registry `0x0E`）
 
 ```
 Register → Stake ≥ MIN_GATEWAY_STAKE (governance-set)
@@ -54,7 +54,7 @@ Unstake  → 等 GATEWAY_UNSTAKE_DELAY (604,800 blocks ≈ 7d)
 | `dispatch(target, envelope)` | **仅已注册且 active** 的 Gateway，emit 后由系统转 `IngressDispatch` (opcode 65) | Command 分派；非授权回 `ERR_UNAUTHORIZED_GATEWAY` |
 | `is_active_gateway(address)` | 任意 | 查询 |
 
-**Sender 真实性 (v2 修订)**：Actor 在 command 路径收到 `http.request` 消息时 **MUST** 验证 `ctx.sender == GATEWAY_REGISTRY=0x0D`，SDK (CIP-6) `@http.handler` 装饰器默认附此检查。
+**Sender 真实性 (v2 修订)**：Actor 在 command 路径收到 `http.request` 消息时 **MUST** 验证 `ctx.sender == GATEWAY_REGISTRY=0x0E`，SDK (CIP-6) `@http.handler` 装饰器默认附此检查。
 
 > **v2 selector 设计修订**：CIP-14 v2 早期草案曾提议 PVM 路由层把 `"http.request"` 设为系统保留 selector（任何非系统 sender 用此 selector 发消息 → `ERR_RESERVED_SELECTOR`）。该提案在 CIP-14 v2 §6.2 Note 被**撤销**，因为它阻断了合法的 router actor 转发模式。改为依赖 `ctx.sender` 检查 —— 由协议消息路由器从 tx 签名者填入，不可被调用者代码伪造。
 
@@ -114,7 +114,7 @@ CIP-14 v2 §8 引入。Command 路径 Gateway 返回 `202 Accepted` + `X-Cowboy-
 
 ## 相关
 
-- [[system-actors]] — `0x0C` Route Registry / `0x0D` Gateway Registry / `0x0E` Receipt Registry
+- [[system-actors]] — `0x0C` Route Registry / `0x0D` Gateway Registry / `0x0F` Receipt Registry
 - [[route-registry]] — `0x0C` 实体页
 - [[../concepts/dns-addressable-actors]] — CIP-14 v2 基础
 - [[../concepts/public-asset-hosting]] — CIP-15 v2 静态 serving

@@ -1,6 +1,6 @@
 ---
-title: "CIP-7: Simple Stream Protocol"
-description: One actor-native streaming protocol with deterministic signatures, bounded replay, header filters, VM-level payload encryption, CBY-native per-epoch key billing, and optional timer-driven ingestion
+title: "CIP-7: Simple Stream Protocol (r2)"
+description: One actor-native streaming protocol with deterministic signatures, bounded replay, header filters, VM-level payload encryption, CBY-native per-epoch key billing, and optional timer-driven ingestion. r2 reallocates Stream Key Manager from 0x06 to 0x12 to resolve a long-standing conflict with code's DUAL_BASEFEE at 0x06.
 icon: rss
 ---
 
@@ -9,8 +9,14 @@ icon: rss
   **Type:** Standards Track
   **Category:** Core
   **Created:** 2026-02-17
+  **Updated:** 2026-05-11 (r2)
   **Requires:** CIP-2 (Off-Chain Compute), CIP-3 (Dual-Metered Gas), CIP-5 (Timers)
 </Note>
+
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — **Stream Key Manager system actor address moved `0x06` → `0x12`**. The original v1 draft claimed `0x06`, but `node/runner/src/system_actors.rs:23` has held `0x06 = DUAL_BASEFEE` (CIP-3) since well before CIP-7 was first drafted. This was a long-standing CIP-7-vs-code drift, deferred through the v2 alignment round 6 (2026-04-21) and the v2.r2 system actor segment shift (2026-05-11). With the v2.r2 sequence completing at `0x11 = PAYMENT_GATE` (CIP-18 r2), `0x12` is the next free single-byte slot and is the canonical home for Stream Key Manager. All references to the system actor address (§4 table + body prose) have been updated from `0x06` to `0x12`. The **internal storage prefix `0x6`** used inside the actor's own KV namespace (§5.x storage layout) is **unchanged** — it is an internal convention within the actor's storage trie, orthogonal to the system actor address. CIP-18 r2 §22 cross-reference and `wiki/drift.md` "CIP-7 0x06 conflict" entry are now resolved by this revision.
+> - **r1 (initial, 2026-02-17)** — Original Simple Stream Protocol draft.
 
 ## Summary
 
@@ -124,7 +130,7 @@ Paid stream encryption and billing are handled by a **Stream Key Manager** syste
 
 ### Stream Key Manager System Actor
 
-A new system actor is added at deterministic seed `0x0000000000000006`:
+A new system actor is added at deterministic seed `0x12` (r2; original v1 draft claimed `0x06` but code allocates `0x06 = DUAL_BASEFEE` per CIP-3):
 
 | Seed | System Actor |
 |------|-------------|
@@ -133,7 +139,19 @@ A new system actor is added at deterministic seed `0x0000000000000006`:
 | `0x03` | Result Verifier |
 | `0x04` | Secrets Manager |
 | `0x05` | TEE Verifier |
-| **`0x06`** | **Stream Key Manager** |
+| `0x06` | DualBasefee (CIP-3) |
+| `0x07` | Entitlement Registry |
+| `0x08` | Treasury |
+| `0x09` | Governance |
+| `0x0A` | Storage Manager (CIP-9) |
+| `0x0B` | Relay Registry (CIP-9) |
+| `0x0C` | Session Actor (CIP-8) |
+| `0x0D` | Route Registry (CIP-14 v2.r2) |
+| `0x0E` | Gateway Registry (CIP-14 v2.r2) |
+| `0x0F` | Receipt Registry (CIP-14 v2.r2) |
+| `0x10` | Container Registry (CIP-10 v2.r2) |
+| `0x11` | Payment Gate (CIP-18 r2) |
+| **`0x12`** | **Stream Key Manager (this CIP, r2)** |
 
 The Stream Key Manager is the single authority for:
 
@@ -180,7 +198,7 @@ These are synchronous host calls — the actor calls `stream_encrypt(...)` and g
 
 ### Storage Layout
 
-The Stream Key Manager uses storage prefix `0x6` under its system actor address:
+The Stream Key Manager uses storage prefix `0x6` under its system actor address `0x12`:
 
 ```
 0x6 || 0x01 || keccak(stream_id)                                     -> PaidStreamConfig
@@ -189,6 +207,8 @@ The Stream Key Manager uses storage prefix `0x6` under its system actor address:
 0x6 || 0x04 || keccak(stream_id) || keccak(account)                  -> Entitlement
 0x6 || 0x05 || keccak(stream_id) || key_epoch_be64                   -> epoch_content_key (encrypted at rest)
 ```
+
+> **Namespace note (r2):** The leading `0x6` here is an **internal storage key prefix** inside this actor's own KV namespace — orthogonal to the actor's system address `0x12`. The choice of `0x6` as the prefix is historical (originally aligned with the proposed system actor address before r2 reallocated to `0x12`); kept here to avoid storage-key migration. It does **not** collide with the system actor at `0x06` (`DUAL_BASEFEE`) because system actor addresses and per-actor storage key prefixes live in disjoint namespaces (20-byte account addresses in the global account trie vs. arbitrary-length keys inside a single actor's storage trie).
 
 All state is committed through the standard MPT path and included in `state_root`.
 

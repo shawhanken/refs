@@ -3,9 +3,11 @@ type: concept
 tags: [ingress, gateway, static-assets, cip-15, cip-9, cors]
 sources:
   - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-15-gateway-implementation.md
   - refs/cips/cip-14-dns-addressable-actors-v2.md
   - refs/cips/cip-9-runner-storage-v2.md
-last_updated: 2026-04-21
+  - refs/cips/cip-18-payments.md
+last_updated: 2026-05-11
 status: draft
 ---
 
@@ -58,7 +60,7 @@ GET /about       → static route  (priority 0)   → SPA fallback → index.htm
 1. 通过 `ManifestCommitted` 链上事件（**CIP-9 v2 §4 AMEND 9-H**）触发 eager invalidation；polling `MANIFEST_POLL_INTERVAL = 6` blocks 作为 floor
 2. 调 Relay Node `GET_MANIFEST(volume_id)`（**CIP-9 v2 §2 AMEND 9-G**）一次拿全 manifest（不再是 K shard 重建）
 3. 并发取 K 份 shard（含 `HEDGE_THRESHOLD_MS = 100ms` 的投机请求），Reed-Solomon 重建
-4. 验证三级完整性（CBFS canonical Merkle = RFC-6962-style，**非** Bitcoin-style duplicate-last-leaf；CIP-9 v2 §3 pin 为 `cbfs/manifest/src/merkle.rs`）：
+4. 验证三级完整性（CBFS canonical Merkle = **power-of-2 padded BLAKE3 binary Merkle**，**非** RFC-6962（早先描述错），**非** Bitcoin-style duplicate-last-leaf；CIP-9 v2.r2 §3 pin 为 `cbfs/manifest/src/merkle.rs:32-66`，叶子 = `BLAKE3(bincode(ManifestEntry))`，缺时用 `ContentHash([0u8;32])` pad 到 2 的幂，再 bottom-up `BLAKE3(left||right)`）：
    - Manifest 对 on-chain `manifest_root`（BLAKE3 Merkle）
    - 每个 shard 对 `shard_hash`（BLAKE3）
    - 重建对象对 `content_hash`（BLAKE3）
@@ -130,15 +132,43 @@ Gateway 按量读取 shard 但**不**向 Relay Node 付 per-read 费用；Relay 
 
 ---
 
+## 实施 companion（CIP-15 Gateway Implementation）
+
+`refs/cips/cip-15-gateway-implementation.md`（Living）是给 Gateway 实施者的 6-phase build order，非规范：
+
+| Phase | 范围 | 依赖 |
+|---|---|---|
+| **P1** | Routes fetch + method-target dispatch | CIP-14 既有 |
+| **P2** | Static volume serving (Volume targets) | CIP-9 `GET_MANIFEST` / `GET_SHARD` |
+| **P3** | Runtime mutability (state_root re-poll) | P1 |
+| **P4** | Payment gating (`pays = caller`) | **CIP-18** |
+| **P5** | CORS / conditional requests / compression | P2 |
+| **P6** | Hedging / parallel fetch / optimization | P2 |
+
+**Phase 4 与 CIP-18 的 interlock**：companion §5 明确 CIP-18 未实装时建议 Gateway 路由含 `pays = "caller"` 时返回 `501 Not Implemented + X-Cowboy-Reason: cip18-required`，**禁止 Option B**（把 `caller` 路由暗暗当 `actor` 处理 —— 会让 actor 作者部署"声明付费实际免费"的端点，与文档分叉）。详见 [[payments]] / [[../drift]] V-16。
+
+**Phase 1 实现里的两个 open question**（companion §9）：
+
+- CIP-15 §8.12 `GET_STATE`（verifiable KV-with-proof read against Runner）—— companion 标注需 runtime team 确认是否已 expose；未存在则需 sibling CIP 落地
+- Named-handler dispatch on CIP-14 query / command paths —— companion 标注需 runtime team 确认（既有非 HTTP 消息走的就是 named-handler，应已支持）
+
+实现侧建议先 P1 替换"everything goes to `http.request`"为 verb-aware routing 端到端跑通，再上 P2 静态。
+
+---
+
 ## 相关
 
 - [[dns-addressable-actors]] — CIP-14 v2 基础 HTTP ingress
+- [[payments]] — CIP-18 `pays = caller` 路径付款 wire 与 settle（Phase 4 依赖）
+- [[mcp-ingress]] — CIP-19 把同一路由表当 MCP tools 列出
 - [[../entities/gateway]] — Gateway 节点缓存 / fetch 协议
-- [[../entities/system-actors]] — `0x0A` STORAGE_MANAGER
+- [[../entities/system-actors]] — `0x0A` STORAGE_MANAGER / `0x13` PAYMENT_GATE
 - [[../parameters]] — CIP-15 常量（`MAX_GATEWAY_CACHE_BYTES`, `MANIFEST_POLL_INTERVAL` 等）
 
 ## Sources
 
 - `refs/cips/cip-15-public-asset-hosting-v2.md` — v2 spec（Draft, 2026-04-21）
+- `refs/cips/cip-15-gateway-implementation.md` — 6-phase implementation handbook（Living, 2026-05-11）
+- `refs/cips/cip-18-payments.md` §6.6 / §15 — `pays` 字段与 Gateway 付款 enforce
 - `refs/cips/cip-9-runner-storage-v2.md` — v2 amendments（GET_MANIFEST §2 AMEND 9-G + ManifestCommitted §4 AMEND 9-H + canonical Merkle §3 + status mapping §5 + CIP-11 ref errata §10 + STORAGE_MANAGER 0x0A 落锁 §11）
 - `refs/cips/cip-14-dns-addressable-actors-v2.md` — read_handler / IngressDispatch / target_pool enum 上下文

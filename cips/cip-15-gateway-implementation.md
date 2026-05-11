@@ -1,16 +1,22 @@
 ---
-title: "CIP-15: Gateway Implementation Guide"
+title: "CIP-15: Gateway Implementation Guide (r2)"
 description: A build order and concrete implementation plan for shipping CIP-15 (verb-aware HTTP routing with per-route payment) on the Cowboy Gateway
 icon: hammer
 ---
 
 <Note>
-  **Companion to:** [CIP-15: Public Asset Hosting](./cip-15-public-asset-hosting). This is not a normative CIP; it is an implementation handbook.
+  **Companion to:** [CIP-15 v2: Public Asset Hosting](./cip-15-public-asset-hosting-v2). This is not a normative CIP; it is an implementation handbook.
   **Audience:** Gateway implementers
   **Status:** Living document
+  **Updated:** 2026-05-11 (r2)
 </Note>
 
-This document is a build order. The CIP describes *what* the system does; this describes *what to write*, in what order, and what to test. Read alongside [CIP-14: DNS-Addressable Actors](./cip-14-dns-addressable-actors) and [CIP-18: Payment Gating](./cip-18-payment-gating).
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — §2.2 reference to a non-existent CIP-15 §8.12 replaced with concrete pointer to CIP-14 v2.r2 Part II §5 (`read_handler` RPC) and §9 open-question item promoted: the `GET_STATE`-style verifiable KV-read RPC required by §2.3 is **not yet specified by any CIP and not yet present in `node/rpc/src/rpc.rs`**. Implementers must coordinate with the runtime team or start a sibling CIP. §9 open-questions list updated. Title in §13 corrected to "CIP-18: Payments" (was "CIP-18: Payment Gating", which was the file's earlier title).
+> - **r1 (initial)** — 6-phase build order published.
+
+This document is a build order. The CIP describes *what* the system does; this describes *what to write*, in what order, and what to test. Read alongside [CIP-14 v2: DNS-Addressable Actors](./cip-14-dns-addressable-actors-v2) and [CIP-18: Payments](./cip-18-payments).
 
 ---
 
@@ -74,12 +80,29 @@ ActorRoutesCache {
 
 ### 2.2 New RPC: `GET_STATE`
 
-CIP-15 §8.12 describes the shape. Before writing the Gateway side, confirm with the runtime team:
+**Status (r2): not yet specified by any CIP, not yet implemented.** The previous draft of this section pointed to a "CIP-15 §8.12" that does not exist in CIP-15 v2. Inspection of `node/rpc/src/rpc.rs:168-213` confirms the routes today are only:
 
-- Does Cowboy's state machine already expose a verifiable KV-with-proof read RPC against a Runner?
-- If yes: wire to it. If no: this CIP needs to spec it; coordinate with runtime team to add it. (It is cheap — a single Merkle path proof against the actor's state root.)
+- `/actor/{address}` — committed-state read of actor code + storage + manifest (no Merkle proof)
+- `/actors/{address}/storage` — paginated KV read (no Merkle proof)
+- read-only handler invocation: `read_handler` per CIP-14 v2.r2 Part II §5 (also not yet implemented)
 
-Until it lands, you can prototype with an unverified read against a trusted Runner — but do NOT ship without the proof check. The whole security model rests on it.
+What the Gateway needs is a verifiable single-KV read against a Runner:
+
+```
+GET_STATE(actor_address, key) -> {
+    value: bytes,
+    proof: MerkleProof,   // path from `key/value` to actor state_root
+    state_root: bytes32,
+    block_height: u64,
+}
+```
+
+Before writing the Gateway side:
+
+- Coordinate with the runtime team. Either start a sibling CIP (e.g. an extension to CIP-14 v2 or a fresh `CIP-15.1 / CIP-17: Verifiable State Read`), or get `GET_STATE` added to the CIP-14 v2 Part II §5 read-handler RPC family. It is cheap — a single Merkle path proof against the actor's state root, leveraging the same MPT primitives CIP-4 describes.
+- Track this as a hard precondition for shipping Phase 1.
+
+Until `GET_STATE` lands, you can prototype with an unverified read against a trusted Runner — but do NOT ship without the proof check. The whole security model rests on it.
 
 ### 2.3 Routes fetch loop
 
@@ -320,10 +343,10 @@ The `X-Cowboy-Source` header (`"static"` or `"dynamic"`) on responses already gi
 
 ## 9. Open questions (confirm before merging the PR)
 
-1. **`GET_STATE` RPC.** Does it exist? If not, who specs it — this CIP, or a sibling CIP?
+1. **`GET_STATE` RPC.** Confirmed (r2) as **not specified and not implemented** — see §2.2. Either start a sibling CIP or extend CIP-14 v2 Part II §5 `read_handler` family. Blocks Phase 1 shipping with full proof-checked routes cache.
 2. **Path-param delivery.** This CIP specifies the Gateway extracts `path_params` and passes them in the `HttpRequestEnvelope`. Confirm with the runtime team that the envelope schema can carry them, or extend it.
 3. **Named-handler dispatch.** Confirm the runner-side dispatcher accepts arbitrary handler names on the CIP-14 query and command paths (it should — that's how non-HTTP messages work — but verify).
-4. **CIP-18 readiness.** When does it land? Ship Phase 4 with it or as a follow-up?
+4. **CIP-18 readiness.** r2 elevates CIP-18 from Companion to Requires for Phase 4 — track CIP-18 r2 PaymentGate `0x11` deployment. Ship Phase 4 only after CIP-18 settles.
 5. **Rollout.** Is there an existing actor that's a good first canary? `17-hn-feed`? A toy actor in a devnet?
 
 ---

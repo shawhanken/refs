@@ -10,9 +10,10 @@ sources:
   - refs/cips/cip-12-governance.md
   - refs/cips/cip-13-runner-delegation-v2.md
   - refs/cips/cip-14-dns-addressable-actors-v2.md
+  - refs/cips/cip-18-payments.md
   - refs/cips/cip-23-tee-execution-v2.md
   - refs/analysis/2026-04-15_documentation_amendments.md
-last_updated: 2026-05-07
+last_updated: 2026-05-11
 status: authoritative
 ---
 
@@ -37,12 +38,17 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 | `0x09` | GOVERNANCE | 治理参数；`SettlementConfig` 五种 `target_pool` 变体（见下）| CIP-2 §5 / CIP-12 / CIP-14 v2 / CIP-10 v2 | 代码 |
 | `0x0A` | STORAGE_MANAGER | CIP-9 链下存储元数据；CIP-15 v2 路由清单 / CORS 配置 | CIP-9 §11.1 / CIP-15 v2 §4.1 §7.1 | 代码 |
 | `0x0B` | RELAY_REGISTRY | CIP-9 中继节点注册 | CIP-9 §11.2 | 代码 |
-| `0x0C` 🆕 | ROUTE_REGISTRY | FQDN → actor 映射；注册 / 续费 / 外部域绑定 | **CIP-14 v2** §4 | v2 提案（precondition）|
-| `0x0D` 🆕 | GATEWAY_REGISTRY | Gateway 节点注册 + 心跳 + command-path 系统中介 `dispatch()` | **CIP-14 v2** §7 | v2 提案 |
-| `0x0E` 🆕 | RECEIPT_REGISTRY | HTTP 命令路径异步结果存储；单一全局 prune 循环 | **CIP-14 v2** §8 | v2 提案 |
-| `0x0F` 🆕 | CONTAINER_REGISTRY | OCI 镜像 / 资源类 allowlist；治理可写 | **CIP-10 v2** §1 | v2 提案 |
+| `0x0C` | SESSION_ACTOR | MPP Session 模型：托管 + 累积 voucher 结算 + dispute hook | code (`system_actors.rs:35`) + MPP Session research/plan | **代码已实装** |
+| `0x0D` 🆕 | ROUTE_REGISTRY | FQDN → actor 映射；注册 / 续费 / 外部域绑定 | **CIP-14 v2.r2** §4 | v2 提案（precondition）|
+| `0x0E` 🆕 | GATEWAY_REGISTRY | Gateway 节点注册 + 心跳 + command-path 系统中介 `dispatch()` | **CIP-14 v2.r2** §7 | v2 提案 |
+| `0x0F` 🆕 | RECEIPT_REGISTRY | HTTP 命令路径异步结果存储；单一全局 prune 循环 | **CIP-14 v2.r2** §8 | v2 提案 |
+| `0x10` 🆕 | CONTAINER_REGISTRY | OCI 镜像 / 资源类 allowlist；治理可写 | **CIP-10 v2.r2** §1 | v2 提案 |
+| `0x11` 🆕 | PAYMENT_GATE | 付款策略 / 预算 / Pass / Subscription / 入站 EVM bridge credit | **CIP-18 r2** §8 | CIP Draft |
+| `0x12` 🆕 | STREAM_KEY_MANAGER | CIP-7 r2：VM-level 流加密 / 按 epoch 密钥发放 / CBY 计费（v1 草案曾占 `0x06`，与 DUAL_BASEFEE 冲突，r2 重排到 `0x12`）| **CIP-7 r2** §4 | CIP Draft |
 
-**源**: `node/runner/src/system_actors.rs:13-33`（`0x01`–`0x0B` 实装）+ CIP v2 系列（`0x0C`–`0x0F` 提案）。
+**源**: `node/runner/src/system_actors.rs:13-35`（`0x01`–`0x0C` 实装）+ CIP v2.r2 系列（`0x0D`–`0x10` 提案）+ CIP-18 r2 (`0x11`) + CIP-7 r2 (`0x12`)。
+
+> **2026-05-11 r2 地址段重排**：上一轮 wiki 把 `0x0C` 标为"v2 提案"是误判 —— `0x0C = SESSION_ACTOR` 已 commit 入代码 (`system_actors.rs:35`，含 `node/types/src/session.rs` / `session_eip712.rs` / `runner/crates/runner-common/src/voucher.rs` 全栈)。CIP-14 v2 / CIP-10 v2 / CIP-18 同步发 r2 重排：ROUTE_REGISTRY `0x0C` → `0x0D`，GATEWAY_REGISTRY `0x0D` → `0x0E`，RECEIPT_REGISTRY `0x0E` → `0x0F`，CONTAINER_REGISTRY `0x0F` → `0x10`，PAYMENT_GATE `0x0013` → `0x11`。这一重排只动文档不动代码，符合"代码先到先得"原则。
 
 > **WP §9 漂移修正**：白皮书 §9 line 704 旧表把 `0x0A` 标为 `Container Image Registry`。**这是错的** —— 代码先于 WP 把 `0x0A` 给了 STORAGE_MANAGER（CIP-9）。CIP-10 v2 §1 把 Container Registry 重新分配到 `0x0F`。WP-v2 Part II Delta 6 已显式修正。
 
@@ -129,13 +135,23 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 - 容器计算费走 `system:container_settlement_config`（`target_pool: CONTAINER`）
 - BillingAttestation 的 `tee_signature` 自 CIP-23 v2 §3.12 起改用 `Option<CompositeAttestation>`，**每次 billing event 临时生成**（不缓存 `measurement_binding` quote），由 `0x0F` 调 `0x05::VerifyCae` 校验
 
+### Session Actor（`0x0C`，code 已实装 + MPP Session research/plan）
+- **当前实装**：`node/runner/src/system_actors.rs:35` `SESSION_ACTOR = 0x0C`；`node/types/src/session.rs` Session 记录 + storage_keys；`node/types/src/session_eip712.rs` EIP-712 domain；`node/execution/src/runner/session.rs` 链上 handler 框架；`runner/crates/runner-common/src/voucher.rs` 链下 voucher + 签名/恢复
+- **职能**：MPP Session 模式 — payer 在 `OpenSession` 时托管 `max_amount`；客户端 → Runner 调用经 EIP-712 签名 voucher 累积 cumulative_amount；Runner 周期/阈值/临近过期调 `Settle` 链上结算（按 SettlementConfig 89/10/1）；payer 调 `CloseSession` 进 dispute 窗口；窗口结束后 `Finalize` 退还余款
+- **选址依据**：MPP Session research (2026-04-28) + plan (2026-05-06) 早于 CIP-14 v2 alignment round 6 (2026-04-21) ⚠️ 但代码先 commit；CIP-14 v2.r2 (2026-05-11) 接受 `0x0C` 归 SESSION_ACTOR 并把自身后移 +1
+- **后续工作**：起 CIP 草案（暂称 CIP-2X / `cip-2x-mpp-session.md`）正式纳入主表；当前 V-11 状态从"撞地址"修正为"待补 CIP 草案"
+- 详见 [[../concepts/mpp-session]]
+
 ---
 
-### Session Actor（提案 `0x0C` —— 与 ROUTE_REGISTRY 冲突）
+### PaymentGate（`0x11`，CIP-18 r2 Draft）
 - **当前实装**：无
-- **研究 / 计划提案**：`refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 + `refs/plans/2026-05-06_mpp_session_implementation.md` §3.1 提议 `SESSION_ACTOR = 0x0C`，承载 MPP Session 托管 / 累积结算 / 退款 / 仲裁入口
-- ⚠️ **地址冲突**：`0x0C` 已在 CIP-14 v2 §1 分配给 `ROUTE_REGISTRY`（v2 alignment round 6 已对齐到主分配表）。研究文档 / 计划是研究阶段提案，**未走 v2 alignment**。激活前需治理选址重排到 ≥`0x10` free range（[[../drift]] V-11）
-- 详见 [[../concepts/mpp-session]]
+- **职能**：单 system actor 承载 `PaymentPolicy` 表（per actor）+ `BudgetBalance` + `Pass` + `EpochEntitlement` + nonce table + 入站 EVM credit；handler API 含 `set_policy` / `get_policy` / `deposit_budget` / `withdraw_budget` / `purchase_pass` / `purchase_epoch` / `verify_payment` / `settle_payment` / `deduct_budget` / `credit_inbound`（详见 [[../concepts/payments]]）
+- **opcode**：无新 SystemInstruction（所有调用均为 ActorMessage to `0x11`）
+- **付款 wire**：Gateway 边缘 enforce；MPP（Authorization: Payment）+ x402（PAYMENT-SIGNATURE）双 wire 并行 normalize 为内部 `PaymentIntent`
+- **新 Entitlements**：`payment.gate`（actor 持，前置 `ingress.http`）/ `bridge.facilitate.evm`（runner 持，deferred）—— 见 [[../drift]] V-15
+- **2026-05-11 r2 地址**：从 `0x0013` 后移到 `0x11`，对齐 v2 单字节序列（在 CIP-10 v2.r2 `0x10` 之后）。CIP-18 §22 rationale 同步重写
+- 详见 [[../concepts/payments]]
 
 ---
 
@@ -162,6 +178,11 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 - CIP-14 v2 §1 已把 `0x0C` 分配给 `ROUTE_REGISTRY`
 - 研究文档未引入 v2 alignment 上下文；激活前必须治理选址（[[../drift]] V-11）
 
+**6. CIP-18 PaymentGate `0x13` 沿用 CIP-14 v1 numbering**
+- CIP-18 §22 rationale 把 `0x0013` 续到 v1 的 `0x0011/0x0012`（CIP-14 v1 老分配）
+- v2 主表上 CIP-10 v2 已取 `0x0F`，按单字节连续序列 PaymentGate 应落 `0x10`
+- 激活前需在主表确认 PaymentGate slot 并同步 CIP-18（[[../drift]] V-14）
+
 详见 [`refs/analysis/2026-04-15_documentation_amendments.md §二`](../../analysis/2026-04-15_documentation_amendments.md)。
 
 ---
@@ -176,6 +197,7 @@ Cowboy 在保留地址段注册系统 Actor，实现协议级功能。它们与�
 - `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表（v2 系列权威）
 - `refs/cips/cip-14-dns-addressable-actors-v2.md` — `0x0C` / `0x0D` / `0x0E` 提案
 - `refs/cips/cip-16-custom-domains-v2.md` — `0x0C` 扩展（TLD / external FQDN, Draft）
+- `refs/cips/cip-18-payments.md` §8 / §22 — PaymentGate `0x13` 提案 + sequential allocation rationale
 - `refs/cips/cip-23-tee-execution-v2.md` §4 — `0x05` 真实 attestation 流水线 + opcodes 57–60
 - `refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md` Part II Delta 6 — WP §9 0x0A 修正
 - `refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 — Session Actor 提案（与 `0x0C` ROUTE_REGISTRY 冲突）

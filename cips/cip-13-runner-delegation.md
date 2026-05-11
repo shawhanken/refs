@@ -1,8 +1,26 @@
 ---
-title: "CIP-13: Runner Stake Delegation"
-description: Protocol-level delegation of CBY stake to runners, enabling passive capital to earn runner compute revenue and unlocking liquid staking and compute yield products
-icon: handshake
+title: "CIP-13: Runner Stake Delegation (v2)"
+description: Code-aligned v2 — opcode renumbering (44–48 to avoid collision), explicit amendment to CIP-2 §5 VRF formula, slashing routing reuse, CIP-23 interaction
 ---
+
+# CIP-13 v2
+
+> **Versioning.** This is v2 of CIP-13. v1 is the canonical document `cip-13-runner-delegation.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I.
+>
+> **Summary of v2 changes**
+>
+> - **Opcode renumbering** to 52–56 (was 40–44 in v1). v1 §3.3 admits the v1 collision with 40–43. An earlier CIP-13 v2 draft attempted 44–48 but that also collides with code (44 `UpdateBasefeeConfig` through 51 `DeployCode` are all taken). The canonical master allocation in §1 below pins 52–56 and lays out the full opcode map for all v2 CIPs.
+> - **Explicit amendment to CIP-2 §5/§6** for VRF selection and max-job-value: both now use `effective_stake = registration.stake + delegation_totals.total_active`. v1 §3.2 implies this; v2 states it as a normative cross-CIP amendment.
+> - **Slashing routing** reuses CIP-3 `SettlementConfig.slash_*_percent` (governance-tunable) instead of hard-coding 50/50 treasury/burn. Per-tranche math is unchanged.
+> - **CIP-23 interaction**: TEE eligibility is categorical (`measurement_binding.status`), not stake-thresholded. Delegation increases VRF weight but does not confer or remove TEE eligibility.
+> - Carries forward v1 §6.1 zero-vote-weight rule for runner-delegated CBY.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-13-runner-delegation.md`)
+
 
 <Note>
   **Status:** Draft
@@ -762,3 +780,90 @@ As noted in §6.1, runner-delegated CBY has zero governance vote weight in v1. A
 **Why is the slashable base computed lazily instead of cached?** An Unbonding tranche leaves the slashable base the moment `current_block >= claimable_at` — a transition that happens implicitly at the block boundary, per §3.1. Caching that sum would require either a scheduled maintenance pass (the approach used in an earlier draft, which introduced an overflow hazard) or a block-height-dependent invariant that is easy to get subtly wrong. Slashing already iterates every slashable tranche to apply per-tranche reductions, so computing the base in the same pass is free.
 
 **Why no atomic redelegation in v1?** See §9.5. The short answer: dual liability accounting is a meaningful spec on its own, and delegators who need to move between runners can undelegate and redelegate in ~24h, or use liquid staking pools that absorb the delay.
+
+---
+
+## Part II — v2 Revision (canonical; opcode renumbering + explicit amendments)
+
+### 0. What this revision does
+
+CIP-13 v1 §3.3 carries an explicit TODO admitting opcodes 40–44 collide with currently-assigned `SystemInstruction` opcodes (40 `UpdateSettlementConfig`, 41 `FundActor`, 42 `KeyDelivery`, 43 `UpgradeActor`). CIP-13 v1 also implicitly amends CIP-2 §5/§6 (VRF weight + max job value formulas) but does not state this as a normative cross-CIP amendment. v2 resolves both.
+
+### 1. Opcode renumbering: CIP-13 takes 52–56 (canonical master allocation table)
+
+CIP-13 v1 §3.3 admitted opcodes 40–44 collide with `UpdateSettlementConfig` / `FundActor` / `KeyDelivery` / `UpgradeActor`. An earlier CIP-13 v2 draft proposed 44–48, but **that range is also taken in code**: `node/types/src/execution.rs:482-541` shows opcodes 0–51 are all allocated through `SYS_DEPLOY_CODE`. The first free slot is **52**.
+
+This table is the **canonical master allocation** for all CIP v2 work. Other v2 docs (CIP-10 v2, CIP-14 v2, CIP-16 v2, CIP-23 v2) reference it instead of declaring their own.
+
+| Opcode | Instruction | Source |
+|---:|---|---|
+| 0–9 | basic + Runner registry + Job dispatch | code |
+| 10–20 | Token operations (incl. batch) | code |
+| 21–29 | (reserved) | — |
+| 30–35 | Entitlement operations | code |
+| 36–39 | (reserved) | — |
+| 40 | `UpdateSettlementConfig` | code |
+| 41 | `FundActor` | code |
+| 42 | `KeyDelivery` | code |
+| 43 | `UpgradeActor` | code |
+| 44 | `UpdateBasefeeConfig` | code |
+| 45 | `SubmitProposal` | code |
+| 46 | `CastVote` | code |
+| 47 | `ExecuteProposal` | code |
+| 48 | `CancelTimer` | code (CIP-5 revised §5.4) |
+| 49 | `UpdateTimerConfig` | code (CIP-5 revised §6.4) |
+| 50 | `ExtendTimer` | code (CIP-5 revised §5.4) |
+| 51 | `DeployCode` | code |
+| **52** | **`RunnerUpdateDelegationConfig`** | **CIP-13 v2 (this CIP)** |
+| **53** | **`RunnerDelegateStake`** | **CIP-13 v2** |
+| **54** | **`RunnerIncreaseDelegation`** | **CIP-13 v2** |
+| **55** | **`RunnerUndelegateStake`** | **CIP-13 v2** |
+| **56** | **`RunnerClaimUnbonded`** | **CIP-13 v2** |
+| 57 | `VerifyCae` | CIP-23 v2 §4 (renumbered from v1 §3.6.2's 50) |
+| 58 | `UpdateCpuRoot` | CIP-23 v2 |
+| 59 | `UpdateNrasRoot` | CIP-23 v2 |
+| 60 | `GcNonces` | CIP-23 v2 |
+| 61 | `RegisterBaseImage` | CIP-10 v2 §5 (renumbered from earlier 60) |
+| 62 | `DeregisterBaseImage` | CIP-10 v2 |
+| 63 | `RegisterResourceClass` | CIP-10 v2 |
+| 64 | `DeregisterResourceClass` | CIP-10 v2 |
+| 65 | `IngressDispatch` | CIP-14 v2 §6.1 |
+| 66 | `CompleteReceipt` | CIP-14 v2 §8 |
+| 67 | `ExternalDomainCallback` | CIP-16 v2 §5.6 |
+| 68–69 | (reserved) | — |
+| 70+ | (reserved for future CIPs) | — |
+
+This resolves the v1 §3.3 TODO and the cascading collisions in earlier CIP v2 drafts. All v1 references to opcodes 40–44 are superseded by 52–56 here; the prior cross-references in CIP-10 v2 / CIP-23 v2 to "44–48 / 50–53 / 60–63" are obsolete and are superseded by this table.
+
+### 2. Explicit amendment to CIP-2 §5 (VRF selection)
+
+CIP-2 §5.4 defines VRF selection using `weights[i] = stake_to_weight(candidates[i].stake)`. CIP-13 v2 amends:
+
+> **Amended:** `weights[i] = stake_to_weight(effective_stake(candidates[i]))` where `effective_stake(R) = R.registration.stake + R.delegation_totals.total_active`. The `log2` compression in `stake_to_weight` is unchanged: `floor(log2(effective_stake / MIN_STAKE + 1)) + 1`. This applies to every dispatcher selection that occurs at or after CIP-13 activation.
+
+### 3. Explicit amendment to CIP-2 §6 (max job value)
+
+> **Amended:** `rate_card.max_job_value <= effective_stake × STAKE_JOB_MULTIPLIER_DENOM / STAKE_JOB_MULTIPLIER_NUM` (default 1.5×). `effective_stake` includes Active delegated tranches per §2 above.
+
+### 4. Slashing routing reuses CIP-3 `SettlementConfig`
+
+CIP-13 v1 §3.6 `slash_runner_with_delegation` ends with `route_to_treasury(slashed_total / 2); route_to_burn(slashed_total - slashed_total / 2)`. v2 clarifies: the `50/50` split is the **default**, and runtime SHOULD read from `system:settlement_config.slash_treasury_percent` (CIP-3 / `SettlementConfig`) so governance can tune slashing routing alongside other settlement routing.
+
+The per-tranche slashing math (proportional reduction by `T.amount / delegated_slashable`) is independent of the routing split and unchanged.
+
+### 5. Vote weight in CIP-12 (carry-forward, no change)
+
+CIP-13 v1 §6.1: runner-delegated CBY has zero governance vote weight in v1. v2 carries this forward without change. Validator-delegated stake retains full vote weight per CIP-12 §6.2; runner-delegated stake remains a third category with no governance voice. A future CIP MAY revisit; deliberately deferred.
+
+### 6. Interaction with CIP-23 (TEE delegation)
+
+A runner with a TEE `measurement_binding` (CIP-23 §3.7) MAY accept delegations. Properties:
+
+- Delegated stake counts toward the runner's `effective_stake` for VRF weight (§2 above) and for max job value (§3 above).
+- Delegated stake does NOT affect TEE eligibility. Eligibility is determined solely by `measurement_binding.status == Active && expires_at > submission_block` per CIP-23 §3.8 — a categorical capability check, not a stake threshold.
+- Slashing of a TEE runner under CIP-23 (e.g., for forged CompositeAttestation) cascades to delegators per the v1 §3.6 algorithm, capped at `MAX_DELEGATION_SLASH_PER_EPOCH_BPS = 500` (5%). The cap protects passive capital from acute TEE-related risk concentration. Self-stake is uncapped and fully slashable for TEE forgery (CIP-23 v2 Part II §3).
+
+### 7. Backwards compatibility
+
+CIP-13 has not yet been deployed (v1 created 2026-04-12; v2 follows 2026-04-21). The opcode renumbering replaces a placeholder TODO with concrete values — no migration cost. The CIP-2 §5/§6 amendment is binding on new dispatcher / max-job-value computations after activation; no existing deployed jobs are affected because delegation cannot exist without CIP-13 active.
+

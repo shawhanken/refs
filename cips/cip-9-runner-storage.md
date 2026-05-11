@@ -1,8 +1,32 @@
 ---
-title: "CIP-9: Steamtrain-Backed Runner Storage"
-description: Steamtrain-backed, account-scoped off-chain storage volumes for Runners
-icon: hard-drive
+title: "CIP-9: Steamtrain-Backed Runner Storage (v2.r2)"
+description: Code-aligned v2 — adds GET_MANIFEST RPC, ManifestCommitted event, canonical manifest serialization, and Gateway serving authority over existing CIP-9 status; r2 corrects Merkle description to match CBFS code
 ---
+
+# CIP-9 v2
+
+> **Versioning.** This is v2 of CIP-9. v1 is the canonical document `cip-9-runner-storage.md` (preserved verbatim as Part I). v2 = v1 + the alignment addendum (Part II), which is mostly *additive* over v1 — the bulk of CIP-9 stands unchanged.
+>
+> **Conflict rule:** Part II is canonical wherever it contradicts Part I.
+>
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — **CBFS Merkle algorithm description corrected.** Part II §3 + the v2 changelog line previously claimed "RFC-6962-style imbalanced-tree promotion". Inspection of `cbfs/manifest/src/merkle.rs:32-66` shows the implementation is in fact a **power-of-2 padded BLAKE3 binary Merkle**: leaves `BLAKE3(bincode(ManifestEntry))`, resized to the next power of two with the zero hash `ContentHash([0u8; 32])` (line 44 `leaves.resize(padded_len, ContentHash([0u8; 32]))`), then balanced bottom-up `BLAKE3(left || right)`. Both schemes avoid CVE-2012-2459 (duplicate-last-leaf), but they are different schemes; this r2 changes the spec to match what code actually does. No on-chain root format change — `manifest_root` bytes are unchanged.
+> - **r1 (2026-04-21)** — Initial v2 addendum (GET_MANIFEST RPC, ManifestCommitted event, canonical Merkle pin, status mapping, errata).
+>
+> **Summary of v2 changes**
+>
+> - **AMEND 9-G**: new `GET_MANIFEST` Relay Node RPC for direct one-round-trip manifest fetch (avoids per-shard reconstruction for public-volume Gateways).
+> - **AMEND 9-H**: new `ManifestCommitted` chain event emitted on every successful `commit_manifest`; powers Gateway eager cache invalidation. Polling remains valid as a floor.
+> - **§3 (clarification)**: pin canonical manifest serialization to `cbfs/manifest/src/merkle.rs` (existing CBFS bincode + **power-of-2 padded BLAKE3 binary Merkle** — zero-hash padding then balanced bottom-up; **not** Bitcoin-style duplicate-last-leaf, CVE-2012-2459 free).
+> - **§5 (clarification)**: map existing CIP-9 status states (`ACTIVE` / `GRACE_PERIOD` / `DELETED` / `GARBAGE_COLLECTING`) to Gateway HTTP serving behavior. **No new `DELINQUENT` status.**
+> - **§6 (clarification)**: Gateways are unauthenticated readers under the existing CIP-9 §7.6.3 PUBLIC volume model — not a privileged storage role.
+> - **§9 errata**: corrects an over-broad earlier alignment list. The following are NOT missing from CIP-9 (they are all in §11.1 / §12.2 / §7.6 / §13): `StorageCommitment` schema, `commit_manifest` system instruction, `volume_id = keccak256(account_address || volume_name)` formula, `Visibility::Public` model, status state machine.
+
+---
+
+## Part I — v1 Specification (verbatim from `cip-9-runner-storage.md`)
+
 
 <Note>
   **Status:** Draft
@@ -1706,3 +1730,247 @@ CapToken (variable length)
 ```
 
 The `caveats_hash` is `BLAKE3(rlp(caveats_list))`, enabling chained delegation without growing the token linearly with caveat depth.
+
+---
+
+## Part II — v2 Revision (canonical; verbatim from former `cip-9-aligned.md`)
+
+
+<Note>
+  **Status:** Draft (alignment addendum; non-modifying companion to `cip-9-runner-storage.md`)
+  **Type:** Standards Track
+  **Category:** Core
+  **Created:** 2026-04-21
+  **Companion to:** `cip-9-runner-storage.md`
+  **Reads with:** former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs), `cip-15-public-asset-hosting-v2.md` (Part II)
+</Note>
+
+## 0. What this document is
+
+CIP-9 is a substantial spec already covering most of what CIP-15-aligned needs at the storage layer. Specifically, the following are **already in CIP-9** — earlier drafts of former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs) and `cip-15-public-asset-hosting-v2.md` (Part II) mistakenly listed them as missing:
+
+- `StorageCommitment` with `volume_id`, `owner`, `visibility`, `manifest_root`, `status`, etc. (CIP-9 §11.1)
+- `commit_manifest(cap_token, manifest_root)` system instruction (CIP-9 §12.2)
+- `volume_id = keccak256(account_address || volume_name)` (CIP-9 §11.1)
+- `Visibility::Public` model for unauthenticated reads via shard metadata (CIP-9 §7.6.3)
+- Volume status state machine `ACTIVE → GRACE_PERIOD → DELETED → GARBAGE_COLLECTING` (CIP-9 §13)
+- Storage billing / grace period economics (CIP-9 §10)
+
+This addendum adds the small set of items CIP-15-aligned actually needs that are NOT in CIP-9 today:
+
+1. **`GET_MANIFEST` Relay Node RPC** — fetching the canonical manifest in one round trip without per-shard reconstruction.
+2. **`ManifestCommitted` chain event** — emitted on every successful `commit_manifest`; powers Gateway eager invalidation.
+3. **Canonical manifest serialization for public volumes** — pin existing CBFS algorithm so any Gateway can independently verify the on-chain root.
+4. **Gateway serving authority** — explicit mapping from existing CIP-9 status states to HTTP serving behavior.
+
+It also makes explicit that Gateways are not a privileged storage role — they are simply unauthenticated public-volume readers, a class CIP-9 already accommodates.
+
+---
+
+## 1. Preconditions
+
+None. CIP-9 §11.1 schema, §12.2 `commit_manifest`, §7.6 PUBLIC visibility model, §13 status lifecycle are all carried unchanged. This addendum slots in alongside.
+
+---
+
+## 2. `GET_MANIFEST` Relay Node RPC (AMEND 9-G)
+
+CIP-9 §5 lists Relay Node RPCs `PUT_SHARD`, `GET_SHARD`, `LIST_SHARDS`, plus the placement RPCs `GetPlacement`, `PutPlacement`, `ReplicatePlacement` (§5.3.1). The manifest is currently fetched indirectly: clients read the well-known manifest shard address (`BLAKE3(volume_id || "__manifest__")`) via `GET_SHARD` and reconstruct the manifest from K shards.
+
+For CIP-15-aligned Gateways serving public volumes, indirect fetch works but adds latency (multiple `GET_SHARD` round trips and Reed-Solomon reconstruction on every cache miss). A direct `GET_MANIFEST` RPC clarifies the public-read contract and is ~5× faster on typical volumes:
+
+```
+GET_MANIFEST {
+  volume_id:      bytes32
+}
+→ {
+  manifest:       bytes,            // canonical serialized manifest (see §3 below)
+  manifest_root:  bytes32           // computed root — must match onchain StorageCommitment.manifest_root
+}
+```
+
+### 2.1 Authorization
+
+For `Visibility::Public` volumes: served without CapToken. The Relay Node checks `StorageCommitment.visibility == PUBLIC` (cached locally with the volume's commitment record) and serves freely. This mirrors the existing `GET_SHARD` open-read model for public volumes (CIP-9 §7.6.3).
+
+For `Visibility::Private` volumes: requires a CapToken with `READ_ONLY` or `READ_WRITE` access. The fetched manifest is the encrypted blob; only the volume DEK holder can decrypt.
+
+### 2.2 Verification
+
+The Gateway MUST verify the returned `manifest_root` against the on-chain `StorageCommitment.manifest_root` for the volume. Mismatch → reject manifest, fetch from another Relay Node, mark the offending Relay as suspect (existing CIP-9 §15.3 reputation mechanism).
+
+Gateways MUST NOT cache or serve content from a manifest whose root does not match the on-chain commitment.
+
+### 2.3 Why a separate RPC instead of leveraging `GET_SHARD`
+
+- **Latency**: single round trip vs. K shard fetches + reconstruction (typically 4 shards in the default 4/6 erasure scheme).
+- **Clarity**: `GET_MANIFEST` is the named entry point for public consumers (Gateways, indexers, anyone reading public web assets). Direct `GET_SHARD` against the well-known manifest address remains valid for backward compatibility but is no longer the recommended path.
+- **Caching**: Relay Nodes can maintain a manifest cache distinct from the shard cache, sized for the (manifest count × small) working set rather than the (shard count × large) one.
+
+---
+
+## 3. Canonical manifest serialization (clarification)
+
+CIP-9 §7.5 establishes that manifests are Merkle-rooted but does not pin a canonical serialization. CIP-15-aligned needs determinism so any Gateway can independently re-compute and verify the on-chain root.
+
+This addendum pins serialization to the existing CBFS implementation (`cbfs/manifest/src/merkle.rs`, `cbfs/manifest/src/serialize.rs`) for **public volumes**:
+
+1. The manifest is a list of `ManifestEntry` (`cbfs/types/src/lib.rs:236`): `File { descriptor, metadata }`, `Symlink { ... }`, `Directory { ... }`.
+2. Entries are sorted lexicographically by `path()` (UTF-8 byte ordering).
+3. Each entry is serialized via the existing CBFS `bincode` encoding. Serialization MUST NOT switch to CBOR — the original CIP-15 §8.5 suggested CBOR; sticking with CBFS bincode avoids gratuitous divergence from the implementation that is already shipping.
+4. The Merkle root is computed per `cbfs/manifest/src/merkle.rs:32-66`, which is a **power-of-2 padded BLAKE3 binary Merkle**:
+   - Leaves are `BLAKE3(bincode(ManifestEntry))`, one per entry in the canonical sorted order from §3.
+   - The leaf vector is resized to the next power of two with the zero hash `ContentHash([0u8; 32])` (line 44 `leaves.resize(padded_len, ContentHash([0u8; 32]))`).
+   - Internal nodes are `BLAKE3(left || right)` computed bottom-up.
+   - The root is `nodes[0]`, exported as `ManifestRoot`.
+   This is **not** RFC-6962 imbalanced-tree promotion (an earlier v2 draft mis-described it as such — corrected in v2.r2). It is also **not** Bitcoin-style duplicate-last-leaf (CVE-2012-2459 second-preimage shape). The zero-hash padding makes it impossible for an attacker to construct a different leaf sequence that hashes to the same root, since (a) the real leaves are content-hashed before insertion and (b) the padding hash is a fixed constant distinguishable from any real `BLAKE3(bincode(...))`.
+
+For **private volumes**: the manifest is encrypted; serialization is the encrypted blob and the Merkle root in `StorageCommitment.manifest_root` is over the encrypted bytes (per CIP-9 §11.1 line 860 — "encrypted for PRIVATE, plaintext for PUBLIC").
+
+### 3.1 Why pin to CBFS
+
+CBFS already ships this algorithm; alternative algorithms would create a fork between what the chain anchors and what the implementation produces. The Merkle root is the trust anchor — any divergence breaks the anchoring.
+
+---
+
+## 4. `ManifestCommitted` chain event (AMEND 9-H)
+
+CIP-9 §12.2 specifies `commit_manifest(cap_token, manifest_root) → bool` but does not emit a chain event. CIP-15-aligned Gateways need to invalidate cache on manifest changes; polling `manifest_root` per-volume per-block is wasteful at scale (one storage read per volume per `MANIFEST_POLL_INTERVAL=6` blocks).
+
+This addendum adds an event emitted on every successful `commit_manifest`:
+
+```
+event ManifestCommitted {
+    volume_id:       bytes32,
+    manifest_root:   bytes32,
+    block_height:    u64,
+    raw_size_delta:  i64,        // signed delta from previous manifest
+    visibility:      u8          // 0=PRIVATE, 1=PUBLIC; redundant with StorageCommitment but cheap to include
+}
+```
+
+Subscribers (Gateways, indexers) listen via the existing chain event subscription mechanism. Polling remains valid as a floor (`MANIFEST_POLL_INTERVAL = 6` blocks per CIP-15-aligned §5.2); events are an optimization that drops invalidation latency to ~1 block.
+
+The `raw_size_delta` field lets indexers update aggregate counters without re-reading the full manifest. The `visibility` field lets event consumers (Gateways) filter for the public volumes they care about without joining against `StorageCommitment`.
+
+---
+
+## 5. Gateway serving authority by status (clarification)
+
+CIP-15-aligned originally introduced a `DELINQUENT` status — a needless duplication. CIP-9 §13 already has the relevant lifecycle states (`ACTIVE → GRACE_PERIOD → GARBAGE_COLLECTING`, plus `DELETED` for soft-delete). This addendum maps existing CIP-9 statuses to Gateway HTTP serving behavior:
+
+| `StorageCommitment.status` | Gateway behavior | Headers |
+|---|---|---|
+| `ACTIVE` | Serve normally | (none added) |
+| `GRACE_PERIOD` | Serve | `X-Cowboy-Storage-Status: grace` (advisory) |
+| `DELETED` | `503 Service Unavailable` | `X-Cowboy-Error: VOLUME_DELETED` |
+| `GARBAGE_COLLECTING` | `410 Gone` | `X-Cowboy-Error: VOLUME_GC` |
+
+Rationale per state:
+
+- **`ACTIVE`**: default. Volume is paid up and active.
+- **`GRACE_PERIOD`**: owner's storage balance is below `MIN_STORAGE_BALANCE`; the volume is in the `STORAGE_GRACE_EPOCHS` window. Data still extant. Gateway continues serving but advertises the status so monitoring can alert. Keeping serving here is intentional — the owner may top up at any moment, and abruptly returning 503 would be a worse user experience than serving with an advisory header.
+- **`DELETED`**: owner soft-deleted via `delete_volume()`. Data is recoverable via `undelete_volume()` during the deletion grace window but should not be served — the owner's intent is to remove it.
+- **`GARBAGE_COLLECTING`**: irreversible. Shards are being purged. `410 Gone` is the correct HTTP semantic for "this resource is permanently removed".
+
+This replaces the `DELINQUENT` status proposed in the first revision of `cip-15-public-asset-hosting-v2.md` (Part II). CIP-15-aligned §5.3 should be read with this table as the normative status mapping; the corrected version of `cip-15-public-asset-hosting-v2.md` (Part II) references this addendum directly.
+
+---
+
+## 6. Gateway as an authorized reader class (clarification)
+
+CIP-9 §7.6.3 already establishes the open-read model for public volumes via shard metadata: `GET_SHARD` with no CapToken passes auth if the stored `shard_metadata.visibility == PUBLIC`. This addendum makes the same rule explicit for `GET_MANIFEST`:
+
+For `Visibility::Public` volumes:
+- `GET_MANIFEST` requires no CapToken (§2.1 above).
+- `GET_SHARD` requires no CapToken (existing CIP-9 §7.6.3).
+- `LIST_SHARDS` is not exposed (existing CIP-9 §7.6.3 — listing happens client-side from the manifest).
+- `PUT_SHARD` still requires a CapToken with write access (existing CIP-9 §7.6.3).
+
+Gateways are not a privileged storage role — they are unauthenticated readers, no different from any indexer or web client. The Relay Node does not need to know that a particular request comes from a Gateway; the public-volume open-read rule applies uniformly.
+
+---
+
+## 7. Backwards compatibility
+
+Strictly additive over CIP-9:
+
+- `GET_MANIFEST` is a new RPC. Existing CapToken-authenticated `GET_SHARD` reads of `__manifest__` continue to work unchanged.
+- `ManifestCommitted` event is a new emission. Subscribers MAY ignore it; polling remains valid as a floor.
+- §3 canonical-serialization pinning aligns to what CBFS already does — no behavior change.
+- §5 status mapping clarifies HTTP semantics over existing CIP-9 statuses; no schema change, no new state.
+- §6 reaffirms an existing CIP-9 §7.6.3 model.
+
+Relay Nodes that have not been upgraded to support `GET_MANIFEST` continue to serve `GET_SHARD` requests for `__manifest__`. Gateways MUST fall back to indirect fetch when `GET_MANIFEST` is unavailable, marking the Relay as outdated rather than malfunctioning.
+
+---
+
+## 8. Summary of CIP-9 amendments
+
+| Amendment | Required by | Impact |
+|---|---|---|
+| AMEND 9-G — `GET_MANIFEST` Relay Node RPC | CIP-15-aligned §6.1 | New RPC; small Relay Node patch + Gateway fallback path |
+| AMEND 9-H — `ManifestCommitted` chain event | CIP-15-aligned §5.2 | New event emission inside `commit_manifest` |
+| §3 — Pin canonical manifest serialization to `cbfs/manifest/src/merkle.rs` | CIP-15-aligned §6.2 | Documentation; aligns spec to existing CBFS code |
+| §5 — Gateway status → HTTP behavior table | CIP-15-aligned §5.3 | Documentation; uses existing CIP-9 statuses |
+| §6 — Gateway auth model for `GET_MANIFEST` | CIP-15-aligned §6.1 | Documentation; reuses CIP-9 §7.6.3 |
+
+---
+
+## 9. Errata note
+
+This addendum corrects an over-broad set of "missing" items previously listed in former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs) v1 §7 (AMEND 9-A through 9-E). Specifically:
+
+| Earlier claim | Correction |
+|---|---|
+| AMEND 9-A: add `StorageCommitment` to chain | Already in CIP-9 §11.1 — withdrawn; only the `status` mapping (§5 here) is needed |
+| AMEND 9-B: add `commit_manifest` system instruction | Already in CIP-9 §12.2 — withdrawn |
+| AMEND 9-C: add `GET_MANIFEST` Relay RPC | Carried as AMEND 9-G (renumbered to avoid re-using a sequence already invalidated) |
+| AMEND 9-D: use CBFS Merkle (no Bitcoin-style padding) | Carried as §3 here, with stronger justification |
+| AMEND 9-E: emit `ManifestCommitted` event | Carried as AMEND 9-H |
+| Claim that `volume_id = keccak256(account || name)` was a CIP-15 guess | Already in CIP-9 §11.1 — withdrawn |
+| Claim that `PUBLIC_READ` is the CBFS visibility name | Wrong — CBFS uses `Visibility::Public`; original CIP-15 was the document with the typo |
+
+The corrected references are tracked in the updated former `alignment-conventions.md` (now inlined as Part III of cip-14/15/16 v2 docs) §7 and `cip-15-public-asset-hosting-v2.md` (Part II) §1 / §3 / §5.3.
+
+---
+
+## 10. CIP-11 reference correction (v1 errata)
+
+CIP-9 v1 references **CIP-11** in multiple places (e.g., §1 "enabling use cases like web asset hosting (CIP-11)"; §7.6 "DNS-addressable actors (CIP-11)"). There is no CIP-11 in this repository. The work that was tentatively numbered CIP-11 was split into:
+
+- **CIP-14** (`cip-14-dns-addressable-actors-v2.md`) — DNS-addressable actors
+- **CIP-15** (`cip-15-public-asset-hosting-v2.md`) — Public asset hosting
+
+All v1 references to "CIP-11" SHOULD be read as referring to **CIP-14 + CIP-15** collectively, depending on context:
+
+| v1 § | v1 phrase | Correct reference |
+|---|---|---|
+| §1 (Abstract) | "enabling use cases like web asset hosting (CIP-11)" | CIP-15 |
+| §7.6.1 (Public Volumes Overview) | "enables DNS-addressable actors (CIP-11)" | CIP-14 |
+| §7.6.1 (same paragraph) | "serve static web assets" | CIP-15 |
+
+This is documentation-only; no protocol change.
+
+## 11. STORAGE_MANAGER concrete address (v1 errata)
+
+CIP-9 v1 §11.1 reads "A new system actor at a canonical address (e.g., `0x0...cowboy.storage`)". The concrete address is:
+
+> **`STORAGE_MANAGER = 0x0A`**
+
+per `node/runner/src/system_actors.rs:31`. All v1 references to `0x0...cowboy.storage` resolve to `0x0A`. The companion Relay Registry is at `0x0B` (CIP-9 v1 §11.2 referenced as "0x0...cowboy.relay" — same correction).
+
+`ext_cip-2-9-10-runner-fee-chain.md` Phase 0 also lists "Volume Registry (address TBD)" — that is the same `0x0A` Storage Manager. No separate "Volume Registry" actor exists or is needed.
+
+---
+
+## 12. PoR challenge timer `fee_payer` (CIP-5 revision alignment)
+
+CIP-5 (revised 2026-04-20) §6.3 introduces a per-fire `fee_payer` model: every CIP-5 timer fire is metered (`max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee`) and pre-charged from `fee_payer`. CIP-9 v1 §5.6 describes a periodic PoR-challenge timer ("A periodic onchain timer (CIP-5, every `POR_CHALLENGE_INTERVAL` blocks)") but pre-dates the fee model.
+
+v2 alignment:
+
+- The PoR challenge timer MUST be scheduled with `fee_payer = STORAGE_MANAGER` (`0x0A`).
+- The Storage Manager funds itself from `POR_CHALLENGE_FEE_SHARE` of the storage fee pool (CIP-9 v1 §5.7) — same source as today, only the routing through `fee_payer` is new.
+- If the Storage Manager balance is insufficient at fire time (highly unusual since the pool is replenished every epoch by storage rent), CIP-5 self-destructs the timer with `TimerCancelledInsufficientFunds`. The Storage Manager SHOULD subscribe to this event and emit `PorChallengePaused { reason: INSUFFICIENT_POOL }`; challenges resume on the next interval after the pool refills.
+- No change to PoR semantics, challenge generation, or shard validation. Only the timer's billing source is now explicit.

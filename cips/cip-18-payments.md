@@ -1,6 +1,6 @@
 ---
-title: "CIP-18: Payments"
-description: HTTP-native payments for DNS-addressable actors. MPP (IETF HTTP Auth) as the primary wire format, x402 supported for compatibility, both collapsing to a single PaymentGate settlement layer with four payment models, an inbound EVM bridge facilitator, and conditional MCP gating.
+title: "CIP-18: Payments (r2)"
+description: HTTP-native payments for DNS-addressable actors. MPP (IETF HTTP Auth) as the primary wire format, x402 supported for compatibility, both collapsing to a single PaymentGate settlement layer (0x11) with four payment models, an inbound EVM bridge facilitator, and conditional MCP gating.
 icon: credit-card
 ---
 
@@ -9,10 +9,17 @@ icon: credit-card
   **Type:** Standards Track
   **Category:** Core
   **Created:** 2026-03-08
-  **Updated:** 2026-04-28
-  **Requires:** CIP-3 (Dual-Metered Gas), CIP-14 (DNS-Addressable Actors), CIP-20 (Fungible Token Standard)
-  **Companions:** CIP-19 (Gateway MCP Ingress) — required to activate §13 MCP gating
+  **Updated:** 2026-05-11 (r2)
+  **Requires:** CIP-3 (Dual-Metered Gas), CIP-14 v2 (DNS-Addressable Actors), CIP-19 (Gateway MCP Ingress — §13 MCP gating wire format), CIP-20 (Fungible Token Standard)
 </Note>
+
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — Three corrections:
+>   1. **`PAYMENT_GATE_ADDRESS` shifted `0x0013` → `0x11`** to align with the v2 system actor sequence (CIP-14 v2.r2 / CIP-10 v2.r2 paired shift around `SESSION_ACTOR = 0x0C` in code at `system_actors.rs:35`). §1 / §8 / §17 / §19 / §22 updated.
+>   2. **§22 sequential-allocation rationale rewritten.** The previous text — "CIP-7 reserves `0x0006`, CIP-14 reserves `0x0011` and `0x0012`. `0x11` is next." — was wrong on both citations: (a) code has `0x0006 = DUAL_BASEFEE` (CIP-3) per `system_actors.rs:23`, not Stream Key Manager (CIP-7 v1 §4.2's `0x06` claim is itself a CIP-7-vs-code drift, unrelated to this CIP); (b) CIP-14 v2 reallocated `0x0011`/`0x0012` to `0x0D`/`0x0E` (and `0x0F` for Receipt Registry) in the April 2026 v2 alignment round. §22 now references the actual current sequence.
+>   3. **CIP-19 elevated from Companions to Requires.** §13 (MCP gating wire format) is normatively load-bearing for any actor enabling MCP payment; without CIP-19 the §13 endpoint and transport semantics are undefined. (Symmetric to CIP-19 listing CIP-18 as Requires; both `_meta`-carried challenges/credentials and JSON-RPC error mapping bind tightly.)
+> - **r1 (2026-04-28)** — Two-layer (MPP + x402 presentation / PaymentGate settlement) model introduced; previous (unshipped) draft was x402-only.
 
 ## 1. Abstract
 
@@ -21,11 +28,11 @@ This proposal defines **payments** for DNS-addressable actors (CIP-14). Cowboy a
 The CIP separates **presentation** from **settlement**:
 
 - **Presentation** is the wire format clients speak. Two are supported in parallel: **MPP** (the IETF HTTP Authentication scheme `Payment`, primary) and **x402** (Coinbase's payment header convention, supported for compatibility).
-- **Settlement** is the on-chain accounting performed by the **PaymentGate** system actor at address `0x0013`. Both wire formats normalize into the same internal `PaymentIntent` and settle against the same PaymentGate state.
+- **Settlement** is the on-chain accounting performed by the **PaymentGate** system actor at address `0x11`. Both wire formats normalize into the same internal `PaymentIntent` and settle against the same PaymentGate state.
 
 Supported settlement assets are native CBY, CIP-20 fungible tokens (including bridged stablecoins via the inbound bridge facilitator specified in §12), and — once the corresponding bridges exist — assets on Tempo and other networks. Fiat (card) payments are out of scope for this CIP but reachable through MPP's existing `method="card"` registration in a future revision.
 
-A new system actor at `0x0013` manages payment policies, budgets, passes, and subscriptions. Gateways enforce payment requirements at the edge, normalize the chosen wire format, and settle on-chain through the PaymentGate.
+A new system actor at `0x11` manages payment policies, budgets, passes, and subscriptions. Gateways enforce payment requirements at the edge, normalize the chosen wire format, and settle on-chain through the PaymentGate.
 
 ---
 
@@ -67,7 +74,7 @@ Cowboy adopts both. MPP is treated as primary because of its IETF trajectory, St
 
 ## 5. Definitions
 
-- **PaymentGate.** System actor at `0x0013` that manages payment policies, budgets, passes, subscriptions, and settles payments.
+- **PaymentGate.** System actor at `0x11` that manages payment policies, budgets, passes, subscriptions, and settles payments.
 - **PaymentPolicy.** Per-actor configuration: pricing per endpoint, accepted assets, model selection (per-request / actor-funded / pass / epoch), and treasury address.
 - **PaymentIntent.** The Gateway's internal, wire-agnostic representation of a payment-bearing request: `{ method, intent, payer, recipient, asset, amount, binding }`. Both MPP credentials and x402 payloads normalize to this shape before reaching PaymentGate.
 - **MPP.** The Machine Payments Protocol, IETF draft `draft-ryan-httpauth-payment`. The HTTP Authentication scheme named `Payment`.
@@ -105,7 +112,7 @@ Cowboy adopts both. MPP is treated as primary because of its IETF trajectory, St
 │                       SETTLEMENT                                │
 │                  ┌────────▼───────┐                             │
 │                  │  PaymentGate   │  policies, budgets,         │
-│                  │  actor 0x0013  │  passes, subscriptions,     │
+│                  │  actor 0x11  │  passes, subscriptions,     │
 │                  │                │  nonces, fee distribution   │
 │                  └────────────────┘                             │
 └─────────────────────────────────────────────────────────────────┘
@@ -116,7 +123,7 @@ A PaymentPolicy applies regardless of which wire format the client speaks. The G
 ### 6.2 Components
 
 - **Gateway** (CIP-14 §5): unchanged role, extended responsibility. Now also enforces payment, advertises challenges in both wire formats, normalizes credentials, and (per §13/CIP-19) terminates MCP.
-- **PaymentGate** (this CIP §8): new system actor at `0x0013`. Stateful: holds policies, budgets, passes, subscriptions, nonces.
+- **PaymentGate** (this CIP §8): new system actor at `0x11`. Stateful: holds policies, budgets, passes, subscriptions, nonces.
 - **Bridge facilitator** (this CIP §12): new runner role with a new entitlement. Watches EVM, submits inbound credit txs to PaymentGate. Specification only — implementation is follow-on work.
 - **Compute runners** (CIP-10): unchanged. Continue to run actor handlers.
 
@@ -197,7 +204,7 @@ The first satisfied row wins.
 
 ## 8. PaymentGate System Actor
 
-**Address:** `0x0013`
+**Address:** `0x11`
 
 PaymentGate manages all payment state. It is deployed at genesis and is upgradeable only through protocol upgrades.
 
@@ -867,7 +874,7 @@ For actor-funded budgets, the same fees apply but the actor pays from its budget
 ## 19. Protocol Constants
 
 ```
-PAYMENT_GATE_ADDRESS              = 0x0013
+PAYMENT_GATE_ADDRESS              = 0x11
 PROTOCOL_PAYMENT_FEE_BPS          = 500           // 5%
 MAX_PRICE_TABLE_ENTRIES           = 100
 MAX_ACCEPTED_ASSETS               = 10
@@ -954,7 +961,19 @@ EntitlementGrant {
 
 **Why extend CIP-7's epoch model for subscriptions?** CIP-7 already solved rolling-window epoch billing with idempotent purchases and sponsored payers. Reusing it keeps the billing model consistent across streams and HTTP/MCP endpoints.
 
-**Why `0x0013`?** Sequential allocation. CIP-7 reserves `0x0006`, CIP-14 reserves `0x0011` and `0x0012`. `0x0013` is next.
+**Why `0x11`?** Sequential allocation in the v2 single-byte system actor sequence as it stands after the April 2026 v2 alignment round and the May 2026 r2 paired shift:
+
+| Address | Actor | Source |
+|--------:|---|---|
+| `0x01`–`0x0B` | RUNNER_REGISTRY / JOB_DISPATCHER / RESULT_VERIFIER / SECRETS_MANAGER / TEE_VERIFIER / DUAL_BASEFEE / ENTITLEMENT_REGISTRY / TREASURY / GOVERNANCE / STORAGE_MANAGER / RELAY_REGISTRY | `node/runner/src/system_actors.rs:13-33` (existing) |
+| `0x0C` | SESSION_ACTOR | `system_actors.rs:35` (existing; MPP session model) |
+| `0x0D` | ROUTE_REGISTRY | CIP-14 v2.r2 §4 |
+| `0x0E` | GATEWAY_REGISTRY | CIP-14 v2.r2 §7 |
+| `0x0F` | RECEIPT_REGISTRY | CIP-14 v2.r2 §8 |
+| `0x10` | CONTAINER_REGISTRY | CIP-10 v2.r2 §1 |
+| **`0x11`** | **PAYMENT_GATE** | this CIP §8 |
+
+Previous drafts placed PaymentGate at `0x0013` following CIP-14 v1's two-byte `0x0011` / `0x0012` numbering and a CIP-7 v1 claim that `0x0006` was reserved for Stream Key Manager. Neither still holds: (a) CIP-14 v2 reallocated to single-byte `0x0D` / `0x0E` (and added `0x0F`); (b) code has `0x0006 = DUAL_BASEFEE` per `system_actors.rs:23`, and CIP-7 r2 (2026-05-11) moved Stream Key Manager from `0x06` to `0x12` to resolve that drift. `0x11` is the next free single-byte slot after CIP-10 v2.r2's `0x10` Container Registry; `0x12` is then taken by CIP-7 r2.
 
 ---
 
@@ -976,7 +995,7 @@ This CIP is fully additive to CIP-14:
 
 - Actors without `payment.gate` are unaffected. Their endpoints remain free / Gateway-subsidized.
 - Gateways continue to serve free traffic for non-gated actors using the existing CIP-14 flow.
-- The PaymentGate system actor is deployed at `0x0013`, previously unallocated.
+- The PaymentGate system actor is deployed at `0x11`, previously unallocated (the v2 sequence runs `0x0C` SESSION_ACTOR → `0x0D` ROUTE_REGISTRY → `0x0E` GATEWAY_REGISTRY → `0x0F` RECEIPT_REGISTRY → `0x10` CONTAINER_REGISTRY → `0x11` PAYMENT_GATE).
 - `/_cowboy/payment/*` and `/_cowboy/mcp` reserved paths do not conflict with CIP-14's reserved paths.
 - The `payment.gate` and (future) `bridge.facilitate.evm` entitlement IDs are new.
 - No changes to the CIP-3 fee model, CIP-7 stream protocol, or CIP-20 token standard are required.
