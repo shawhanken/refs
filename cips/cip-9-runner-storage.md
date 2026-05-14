@@ -386,7 +386,14 @@ This two-level proof chain is necessary because only `manifest_root` is stored o
 
 **Design rationale:** This is a lightweight PoR scheme — it does not require the full Filecoin-style Proof-of-Spacetime (which seals sectors and requires constant re-proving). Instead, it spot-checks random byte ranges, making it cheap to verify but expensive to fake. A Relay Node that has genuinely stored the shard can respond trivially; one that has discarded it cannot.
 
-**Challenge economics:** Challenges are funded from the storage fee pool (a small portion, `POR_CHALLENGE_FEE_SHARE`, e.g., 2%). Challengers (any onchain actor that triggers a challenge via CIP-5 timer) receive a finder's fee from slashed stakes for discovering fraudulent or missing responses.
+**Challenge economics:** Challenges are funded from the storage fee pool — 2% of every per-epoch storage-fee batch accrues to the PoR challenge pool at `0x0B` (`STORAGE_FEE_CHALLENGE_POOL_BPS = 200`, formerly `POR_CHALLENGE_FEE_SHARE`; canonical split in §10.4 and CIP-31 §4).
+
+**Challenge bond (required as of CIP-31).** Calling `por_challenge(shard_id, byte_offset, byte_length)` requires the caller to escrow `RELAY_CHALLENGE_BOND` (default 10 CBY, Tier-0 tunable; see CIP-31 §7) at `0x0B` for the duration of the challenge window. Lifecycle:
+
+- **Valid response within `POR_RESPONSE_WINDOW`:** bond is refunded minus `POR_CHALLENGE_FEE` (default 1 CBY, retained by `0x0B`).
+- **Miss or fraudulent response:** bond is refunded in full, **and** the challenger additionally receives `CHALLENGER_BOUNTY` (default 5 CBY) from the PoR challenge pool. The Relay's slash (`POR_MISS_PENALTY` / `POR_FRAUD_PENALTY` / `RELAY_EVICTION_PENALTY`) follows the same 10/2/88 burn/challenge-pool/Relay-pro-rata split as storage fees, with the slashed Relay excluded from the 88% distribution that epoch (CIP-31 §8).
+
+The bond + per-challenge fee make speculative or griefing challenges economically irrational while ensuring that any challenger who provokes a real miss is net-positive (`+5 bounty − 1 fee = +4 CBY`).
 
 ### 5.7 Relay Node Incentives
 
@@ -844,14 +851,22 @@ This mirrors Sia's contract-expiry cleanup model — storage only persists while
 
 ### 10.4 Fee Distribution
 
-Storage fees flow from account owners to Relay Nodes:
+Storage fees flow from account owners to Relay Nodes in a three-way split:
 
 ```
-Account Owner ──(per-epoch storage fee)──► Protocol ──► Relay Nodes (pro-rata by shards held)
-Runner ──(per-byte transfer fee)──► Relay Node (serving the shard)
+Account Owner ──(per-epoch storage fee)──► Protocol ──► { burn (0x00) :: PoR challenge pool (0x0B) :: Relays pro-rata }
+Runner        ──(per-byte transfer fee) ──► Relay Node (serving the shard)
 ```
 
-A portion of the storage fee (`STORAGE_FEE_BURN_RATE`, e.g., 10%) is burned, consistent with CIP-3's deflationary design. The remainder is distributed to Relay Nodes.
+Per-epoch storage-fee split (canonical numeric values in CIP-31 §4):
+
+- **`STORAGE_FEE_BURN_BPS`** (default 1000 = 10%) → burned to `0x00`, consistent with CIP-3's deflationary design.
+- **`STORAGE_FEE_CHALLENGE_POOL_BPS`** (default 200 = 2%) → accrued to the PoR challenge pool at `0x0B` (this is the explicit form of the `POR_CHALLENGE_FEE_SHARE` row in §14; it funds the challenger bounty defined in CIP-31 §7).
+- **`STORAGE_FEE_RELAY_BPS`** (default 8800 = 88%) → distributed pro-rata across active Relay Nodes with weight `(shard_count × shard_age_in_epochs)` per CIP-31 §5.
+
+Invariant: `STORAGE_FEE_BURN_BPS + STORAGE_FEE_CHALLENGE_POOL_BPS + STORAGE_FEE_RELAY_BPS == 10000`. Tier-0 governance MAY rebalance the three under the invariant; CIP-31 owns the genesis defaults and Tier-0 keys.
+
+Transfer fees (`TRANSFER_FEE_PER_BYTE`) go entirely to the serving Relay Node (no burn, no challenge-pool share).
 
 ### 10.5 Relationship to CIP-3
 
@@ -1183,7 +1198,7 @@ The account owner may transfer a volume to another Cowboy account via `transfer_
 | `MAX_VOLUME_SIZE` | 100 GiB | Per-volume limit (v1) |
 | `MAX_VOLUME_NAME_LENGTH` | 64 bytes | |
 | `MAX_OBJECT_PATH_LENGTH` | 512 bytes | |
-| `VOLUME_DELETE_GRACE_EPOCHS` | 7,200 | ~24 hours soft-delete recovery window |
+| `VOLUME_DELETE_GRACE_EPOCHS` | 86,400 | ~24 hours soft-delete recovery window (at 1s blocks per WP §6.1) |
 | **Erasure Coding** | | |
 | `DEFAULT_ERASURE_K` | 4 | Data shards |
 | `DEFAULT_ERASURE_M` | 2 | Parity shards |
@@ -1191,25 +1206,30 @@ The account owner may transfer a volume to another Cowboy account via `transfer_
 | `MAX_ERASURE_M` | 8 | Upper bound for custom M |
 | **Billing** | | |
 | `BASE_ATTACHMENT_FEE` | 100 CBY | Per volume per job |
-| `STORAGE_FEE_PER_BYTE_PER_EPOCH` | TBD | Governance-tunable; market-driven |
-| `TRANSFER_FEE_PER_BYTE` | TBD | Governance-tunable |
-| `STORAGE_FEE_BURN_RATE` | 10% | Portion of storage fees burned |
-| `MIN_STORAGE_BALANCE` | TBD | Must cover 1 epoch of fees |
-| `STORAGE_GRACE_EPOCHS` | 7,200 | ~24 hours at 12s blocks |
+| `STORAGE_FEE_PER_BYTE_PER_EPOCH` | 10 nano-CBY (see CIP-31 §1) | Tier-0 tunable; canonical value in CIP-31 |
+| `TRANSFER_FEE_PER_BYTE` | 1 nano-CBY (see CIP-31 §2) | Tier-0 tunable; canonical value in CIP-31 |
+| `STORAGE_FEE_BURN_BPS` | 1000 (10%) — see CIP-31 §4 | Tier-0; three-way split invariant in CIP-31 §4 |
+| `STORAGE_FEE_CHALLENGE_POOL_BPS` | 200 (2%) — see CIP-31 §4 | Tier-0; replaces the legacy `POR_CHALLENGE_FEE_SHARE` 2% row |
+| `STORAGE_FEE_RELAY_BPS` | 8800 (88%) — see CIP-31 §4 | Tier-0; pro-rata distributed per CIP-31 §5 |
+| `MIN_STORAGE_BALANCE` | 1 × per-epoch fees at current rate (see CIP-31 §3) | formula-derived; Tier-0 multiplier |
+| `STORAGE_GRACE_EPOCHS` | 86,400 | ~24 hours at 1s blocks (WP §6.1) |
 | **Relay Nodes** | | |
-| `MIN_RELAY_STAKE` | TBD | CBY required to register |
+| `MIN_RELAY_STAKE` | 5,000 CBY (see CIP-31 §6) | Tier-0 tunable |
 | `MAX_RELAY_HEALTH` | 100 | Blocks; reset on heartbeat |
 | `MIN_HEALTH_FOR_ASSIGNMENT` | 50 | Minimum health to receive new shards |
-| `RELAY_UNSTAKE_DELAY` | 7,200 | ~24 hours cooldown |
-| `REPAIR_CHECK_INTERVAL` | 300 | Blocks between proactive repair checks |
-| `ORPHAN_SHARD_TTL` | 7,200 | Blocks before unreferenced shards are garbage collected (~24h) |
+| `RELAY_UNSTAKE_DELAY` | 86,400 | ~24 hours cooldown (at 1s blocks) |
+| `REPAIR_CHECK_INTERVAL` | 3,600 | Blocks between proactive repair checks (~1 hour at 1s blocks) |
+| `ORPHAN_SHARD_TTL` | 86,400 | Blocks before unreferenced shards are garbage collected (~24h at 1s blocks) |
 | **Proof of Retrievability** | | |
-| `POR_CHALLENGE_INTERVAL` | 600 | Blocks between challenge rounds (~2 hours at 12s blocks) |
-| `POR_RESPONSE_WINDOW` | 50 | Blocks to respond (~10 minutes) |
-| `POR_MISS_PENALTY` | TBD | CBY slashed per missed challenge |
-| `POR_FRAUD_PENALTY` | TBD | CBY slashed per invalid response (> MISS) |
-| `RELAY_EVICTION_PENALTY` | TBD | CBY slashed on forced removal |
-| `POR_CHALLENGE_FEE_SHARE` | 2% | Share of storage fees funding challenges |
+| `POR_CHALLENGE_INTERVAL` | 7,200 | Blocks between challenge rounds (~2 hours at 1s blocks per WP §6.1) |
+| `POR_RESPONSE_WINDOW` | 600 | Blocks to respond (~10 minutes at 1s blocks) |
+| `POR_MISS_PENALTY` | 50 CBY (see CIP-31 §8) | Tier-0 tunable |
+| `POR_FRAUD_PENALTY` | 500 CBY (see CIP-31 §8) | Tier-0 tunable |
+| `RELAY_EVICTION_PENALTY` | 2,000 CBY (see CIP-31 §8) | Tier-0 tunable |
+| `RELAY_CHALLENGE_BOND` | 10 CBY (see CIP-31 §7) | Tier-0; new field — required to call `por_challenge` |
+| `POR_CHALLENGE_FEE` | 1 CBY (see CIP-31 §7) | Tier-0; per-challenge fee retained by `0x0B` regardless of outcome |
+| `CHALLENGER_BOUNTY` | 5 CBY (see CIP-31 §7) | Tier-0; paid from challenge pool on valid fraud/miss detection |
+| `MAX_SHARD_AGE_FOR_WEIGHTING` | 90 epochs (see CIP-31 §5) | Tier-0; caps pro-rata weight to prevent permanent first-mover advantage |
 | **Filesystem Mount** | | |
 | `DEFAULT_SYNC_INTERVAL` | 5 seconds | Background push/pull frequency |
 | `MIN_SYNC_INTERVAL` | 1 second | Minimum allowed sync interval |
@@ -1365,13 +1385,13 @@ The operational requirements for running a Relay Node are modest: stable uptime,
 
 | Operation | Expected Latency | Notes |
 |-----------|-----------------|-------|
-| `create_volume` | 1 block (~12s) | onchain transaction |
+| `create_volume` | 1 block (~1s) | onchain transaction |
 | `put_object` (1 MiB) | ~200ms | Encrypt + erasure code + distribute 6 shards in parallel |
 | `put_object` (100 MiB) | 2-8s | Dominated by network upload of ~150 MiB total shards |
 | `get_object` (1 MiB) | ~200ms | Fetch 4 shards in parallel + reconstruct + decrypt |
 | `get_object` (100 MiB) | 2-8s | Dominated by network download of ~100 MiB from 4 shards |
-| `commit_manifest` | 1 block (~12s) | onchain transaction |
-| `delete_object` | 1 block (~12s) | onchain manifest update |
+| `commit_manifest` | 1 block (~1s) | onchain transaction |
+| `delete_object` | 1 block (~1s) | onchain manifest update |
 | Volume attachment | ~100-500ms | Key delivery + manifest fetch from Relay Nodes |
 
 **Filesystem mount (FUSE):**
@@ -1971,6 +1991,6 @@ CIP-5 (revised 2026-04-20) §6.3 introduces a per-fire `fee_payer` model: every 
 v2 alignment:
 
 - The PoR challenge timer MUST be scheduled with `fee_payer = STORAGE_MANAGER` (`0x0A`).
-- The Storage Manager funds itself from `POR_CHALLENGE_FEE_SHARE` of the storage fee pool (CIP-9 v1 §5.7) — same source as today, only the routing through `fee_payer` is new.
+- The Storage Manager funds itself from the PoR challenge pool — 2% of every per-epoch storage-fee batch accrues there per `STORAGE_FEE_CHALLENGE_POOL_BPS` (§10.4 / §14 / CIP-31 §4; formerly `POR_CHALLENGE_FEE_SHARE` in CIP-9 v1 §5.7). Same source as today; only the routing through `fee_payer` is new.
 - If the Storage Manager balance is insufficient at fire time (highly unusual since the pool is replenished every epoch by storage rent), CIP-5 self-destructs the timer with `TimerCancelledInsufficientFunds`. The Storage Manager SHOULD subscribe to this event and emit `PorChallengePaused { reason: INSUFFICIENT_POOL }`; challenges resume on the next interval after the pool refills.
 - No change to PoR semantics, challenge generation, or shard validation. Only the timer's billing source is now explicit.

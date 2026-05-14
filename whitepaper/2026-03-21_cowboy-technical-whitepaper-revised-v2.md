@@ -121,30 +121,44 @@ An actor interacts with other actors by sending **messages**. Messages carry a p
 
 ### Native Timers and the Actor Scheduler
 
-Cowboy provides protocol‑native timers, eliminating the need for external keeper networks. Actors schedule messages to themselves or other actors at a future block height or on a recurring interval.
+Cowboy provides protocol‑native timers, eliminating the need for external keeper networks. Actors schedule messages to themselves or other actors at a future block height or on a recurring interval. The whitepaper specifies two layers — the **currently implemented** mechanism (FIFO with per-fire fee payer, §5.1a) and the **target design** (EIP-1559 timer-lane basefee + priority tip + per-actor fairness weight, §5.1b). The target activates by Tier-3 governance proposal; until then, §5.1a is canonical.
 
-**Tiered Calendar Queue.** The scheduler uses three tiers to manage timers across different time horizons with constant per‑block cost:
+#### 5.1a Currently Implemented (CIP-5)
 
-- **Tier 1 — Block Ring Buffer:** Imminent timers, one slot per block. O(1) enqueue/dequeue.
-- **Tier 2 — Epoch Queue:** Medium‑term timers, migrated in batches to Tier 1 at epoch boundaries. O(1) amortized.
-- **Tier 3 — Overflow Sorted Set:** Long‑horizon timers in a Merkleized binary search tree. O(log n).
+Per CIP-5 §§3–8 (revised 2026-04-20), the running node executes:
 
-**Gas Bidding Agent (GBA).** Rather than pre‑paying a fixed gas fee, an actor may designate a GBA — another actor that dynamically bids for timer execution on its behalf. Actors that do not specify a GBA receive a protocol‑provided default that bids conservatively. When a timer becomes due, the protocol performs a read‑only call to the GBA with a context containing current basefees, timer urgency (how many blocks deferred), and the owner's balance. The GBA returns a competitive bid, creating an intra‑block auction for the timer lane's compute budget.
+- **Storage:** timers are indexed by `height`; same-height bucket is FIFO by insertion order (no priority queue, no tiered calendar).
+- **Per-fire `fee_payer` model.** Each timer records `who pays` (`fee_payer`), `how much gas per fire` (`gas_limit_per_fire`), and `when it gives up` (`expires_at`). At end-of-block the protocol pre-charges `max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee` from `fee_payer`, executes the handler, refunds unused gas, and removes the timer. Insufficient-funds or TTL-expired timers self-destruct without firing.
+- **Three-path lifecycle:** natural fire / TTL expiry / insufficient-funds self-destruct, plus explicit `cancel_timer` and validator-set `SYS_CANCEL_TIMER` (CIP-5 §5.4).
+- **Lane separation:** `LANE_TIMER_CYCLES = 2,000,000` (execution lane, 20% of block per CIP-3 §2.2.3) is separate from `TIMER_GC_CYCLES` (cleanup lane) so a TTL-expiry storm cannot starve live execution (CIP-5 §6.5).
+- **Per-actor limit:** `max_timers_per_actor = 1,024` active timers (CIP-5 §6.4 default, governance-tunable).
+- **Per-fire caps:** `max_cycles_per_fire = 550,000`, `max_cells_per_fire = 550,000` (CIP-5 §6.4).
+- **Same-block prohibition:** timers created in the current block MUST NOT fire in the same block (CIP-5 §5.3).
 
-**Fairness and Liveness.** Deferred timers receive a weighted priority boost with exponential decay, preventing perpetual starvation by high‑bidding actors.
+The deferred-timer anti-starvation boost cited in earlier drafts ("exponential decay") is not implemented at the CIP-5 layer; the target design replaces it with the per-actor fairness weight in §5.1b below.
 
-**DoS Prevention.** Multiple layers protect the timer system:
+#### 5.1b Target Design (CIP-1 v3 — EIP-1559 hybrid)
+
+Per CIP-1 v3 Part III (which supersedes CIP-1 v1's first-price auction and CIP-5 §9's exponential-bias mechanism), activated by Tier-3 governance proposal at a chosen block height:
+
+- **Timer-lane EIP-1559 basefee.** A per-block basefee is maintained against `LANE_TIMER_CYCLES` utilisation; target 50%, max change ±12.5% per block; 100% of the lane basefee is burned (consistent with CIP-3 §2.4).
+- **Priority tip.** Each `schedule_timer` call accepts `(max_fee_per_cycle, max_priority_fee_per_cycle)`. The effective priority is `min(max_priority_fee_per_cycle, max_fee_per_cycle − lane_basefee)`. Tips go to the **block proposer**.
+- **Per-actor fairness weight `W(actor) ∈ [1, 2]`** computed over a 1,000-block rolling window: actors at or below the network-median fire rate get `W = 2` (maximum boost); actors at 2× median or above get `W = 1`. Inclusion ordering: `priority_per_cycle × W(actor)`.
+- **Per-timer cycle cap during auction phase:** `MAX_CYCLES_PER_FIRE_AUCTION_PHASE = 250,000` (= 12.5% of the lane), preventing any single timer from monopolising. CIP-5's 550k cap remains in force during the FIFO phase.
+- **Default GBA (closes Gap G7):** `max_fee_per_cycle = 2 × lane_basefee`; `max_priority_fee_per_cycle = previous_block_p50_priority_tip_per_cycle`. SDKs expose a `priority_tier_hint ∈ {economy, standard, fast, urgent}` mapping to multipliers `{0.8×, 1.0×, 1.5×, 2.5×}` on the priority fee.
+- **Lane fee multiplier:** `1.0×` at genesis (no subsidy; pinned per CIP-3 §2.2.3 + §6.3 + §17.9), Tier-0 tunable.
+- **All Part II invariants retained:** Tx-then-Timer block ordering, per-fire `fee_payer` pre-charge + refund (the priority tip extends `max_cost` but does not change the mechanics), three-path lifecycle, lane separation, system-instruction opcodes 48/49/50, same-block prohibition.
+
+#### DoS Prevention (both phases)
 
 | Attack Vector | Mitigation |
 |--------------------------------------|---------------------------------------------------------------------------|
-| Schedule millions of timers | Progressive deposit: `deposit(n) = base_deposit × (1 + floor(n / 100))` |
-| Sybil attack across many actors | Per‑block execution budget caps total timer work (20% of block cycles) |
+| Schedule millions of timers | `max_timers_per_actor = 1,024` (CIP-5 §6.4) + per-fire `fee_payer` pre-charge |
+| Sybil attack across many actors | Per‑block execution budget caps total timer work (`LANE_TIMER_CYCLES`, 20% of block) |
 | Timer bomb (many timers, one block) | Exponential same‑block surcharge: `surcharge(k) = base_cost × 2^max(0, k - 16)` |
-| Fill queue far in advance | Timer basefee rises automatically as queue depth exceeds target |
-| Outbid everyone perpetually | Anti‑starvation boost for deferred timers |
-| DoS then cancel for refund | Surcharges are burned, not refunded on cancellation |
-
-Per‑actor timer limit: **256** active timers. Deposits are refunded when a timer fires or is cancelled.
+| Fill queue far in advance | (FIFO phase) per-fire `max_cost` re-checked at each fire; (auction phase) lane basefee rises with utilisation |
+| Outbid everyone perpetually | (auction phase only) per-actor fairness weight `W(actor) ∈ [1, 2]` over 1,000-block window |
+| DoS then cancel for refund | Pre-charge happens at fire time, not at schedule time; scheduling cost (200 cycles, CIP-5 §6.1) is non-refundable |
 
 ## Asynchronous Execution and Multi‑Block Semantics
 
@@ -362,7 +376,7 @@ The validator set is open and permissionless. Requirements: stake ≥ `minimum_v
 
 ### Staking and Rewards
 
-Block rewards (from inflation) are distributed proportionally to stake. Proposers additionally receive transaction tips. Staking is self‑bonded only; delegation is deferred to v2.
+Block rewards (from inflation per §8.2) are distributed proportionally to stake. Proposers additionally receive **100% of cycle/cell tips on blocks they finalize**. No per‑transaction validator commission or surcharge is charged to users beyond tips; the entire user‑derived validator income is the tip stream. Staking is self‑bonded only; delegation is deferred to v2.
 
 ### Slashing
 
@@ -383,20 +397,22 @@ Transport: QUIC over TLS 1.3 (required). Gossip: transactions flood to all peers
 
 ### Dedicated Lanes
 
-Block space is partitioned into dedicated lanes with reserved capacity:
+Block space is partitioned into dedicated lanes with reserved capacity and per‑lane fee multipliers:
 
-| Lane | Reserved Capacity | Contents |
-|------------|-------------------|------------------------------------------|
-| **System** | 5% | Validator updates, governance, slashing |
-| **Timer** | 20% | Scheduled timer executions |
-| **Runner** | 25% | Runner job results, attestations, and related on-chain follow-ups (e.g. **CIP-9** anchors) |
-| **User** | 50% | User‑initiated transactions |
+| Lane | Reserved Capacity | Fee Multiplier | Contents |
+|------------|-------------------|----------------|------------------------------------------|
+| **System** | 5% | 1.0× | Validator updates, governance, slashing |
+| **Timer** | 20% | 1.0× | Scheduled timer executions |
+| **Runner** | 25% | 1.0× | Runner job results, attestations, and related on-chain follow-ups (e.g. **CIP-9** anchors) |
+| **User** | 50% | 1.0× | User‑initiated transactions |
 
-Unused capacity in higher‑priority lanes cascades to lower‑priority lanes. Transactions are tagged by type at submission; the proposer cannot reassign lanes. Each lane has independent fee multipliers applied to the global basefees.
+Unused capacity in higher‑priority lanes cascades to lower‑priority lanes. Transactions are tagged by type at submission; the proposer cannot reassign lanes. Each lane's basefee is `lane_basefee = global_basefee × lane_fee_multiplier`; all four multipliers default to `1.0×` at genesis (no lane subsidy or surcharge). The multipliers are governance‑tunable via CIP‑12 Tier 0; see CIP‑3 §2.2.3 for normative spec and §17.9 for the canonical parameter table.
 
 ### MEV Reduction
 
-Cowboy mitigates MEV through four mechanisms: (1) mandatory per‑block proposer rotation via VRF prevents multi‑block observation; (2) VRF‑based transaction ordering within blocks prevents strategic placement; (3) ~2‑second finality minimizes the observation window; (4) lane isolation prevents congestion attacks that delay victim transactions. No encrypted mempool is used — the marginal benefit does not justify the added latency given the already‑minimal MEV surface. This does not prevent proposer inclusion/censorship or private orderflow MEV.
+Cowboy mitigates MEV through four mechanisms: (1) mandatory per‑block proposer rotation via VRF prevents multi‑block observation; (2) VRF‑based transaction ordering within blocks prevents strategic placement; (3) ~2‑second finality minimizes the observation window; (4) lane isolation prevents congestion attacks that delay victim transactions. No encrypted mempool is used — the marginal benefit does not justify the added latency given the already‑minimal MEV surface.
+
+**Out of scope.** This MEV-mitigation design explicitly does *not* prevent: (a) single‑block proposer inclusion or censorship (mitigated only by VRF rotation forcing the censoring validator out of the proposer slot on the next block); (b) private orderflow MEV (off‑chain bilateral order routing that bypasses the public mempool); (c) JIT (just‑in‑time) MEV against actor logic with predictable on‑chain state (e.g., a published reserve‑price actor invites JIT MEV at the moment its price clears). Applications that need stronger guarantees against these classes should layer commit‑reveal, slippage caps, or order‑flow‑auction mechanics in actor logic — see §6.5 for the same enumeration and SDK‑layer mitigation pointers.
 
 ## Data Availability, State Rent, and Storage
 
@@ -420,7 +436,7 @@ When an actor cannot pay rent (balance, reserve, and prepaid epochs exhausted):
 
 - **Grace period (7 rent‑epochs):** Actor remains fully functional; flagged as "rent overdue"; catch‑up fee accumulates (10% of missed rent).
 - **Warning period (3 rent‑epochs):** Actor flagged as "eviction imminent"; events emitted to alert dependent actors.
-- **Eviction (rent‑epoch N+10):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are preserved. The actor enters a "dormant" state.
+- **Eviction (after 10 rent‑epochs of unpaid rent — 7 grace + 3 warning):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are preserved. The actor enters a "dormant" state.
 
 Evicted storage can be restored by anyone who provides the original data (verified against the recorded root hash) and pays back‑rent plus catch‑up fees.
 
@@ -466,7 +482,7 @@ A transaction MUST include:
 
 2.2 **Validity checks.**
 
-Nodes MUST reject a tx if: (a) limits exceed maxima (§13.1), (b) insufficient balance, (c) signature invalid, (d) access list invalid, or (e) payload decoding fails.
+Nodes MUST reject a tx if: (a) limits exceed maxima (§12.1), (b) insufficient balance, (c) signature invalid, (d) access list invalid, or (e) payload decoding fails.
 
 2.3 **Fee accounting.**
 
@@ -517,7 +533,7 @@ Transactions MUST be encoded as canonical CBOR (RFC 8949, deterministic encoding
   - `timer_id = set_timer(height, handler, data)` — Schedule a one-time timer for the specified block height. Returns a unique `timer_id`.
   - `timer_id = set_interval(every_n_blocks, handler, data)` — Schedule a recurring timer. Returns a unique `timer_id`.
   - `cancel_timer(timer_id)` — Cancel a pending timer by its ID. Returns the deposit if successful.
-  - Timer delivery is **best‑effort**; execution depends on the GBA auction (see §Timer Rate Limiting).
+  - Timer delivery is **best‑effort**; execution depends on the timer scheduler (see §5.1 for current rules and CIP-5 §5.3 for the same-block prohibition).
 
 3.4 **Randomness.**
 
@@ -574,7 +590,7 @@ Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts, _deferr
 5.3 **Job lifecycle.**
 
 1.  **Post:** Actor posts a job with escrowed price.
-2.  **Assign:** For HTTP domains, a **committee of M=5** is sampled; **N=3** matching reveals finalize. LLM jobs MAY use committees or single-runner.
+2.  **Assign:** A committee of **M runners** is sampled per CIP‑2 (v1: fixed `M=5, N=3`; v3 once activated: adaptive `M = clip(ceil(2·log₂(N_active) / max(HHI, 0.01)), 3, 9)`, `N = ceil(2M/3)`, recomputed per epoch). LLM jobs MAY use committees or single-runner. Selection is stake‑weighted Fisher‑Yates VRF with weight `w = stake · sqrt(reputation)` (v3); v1 used `floor(log₂(stake/MIN_STAKE+1))+1`. Aggregator is uniformly drawn from committee members with reputation ≥ p50 (v3) — v1's "highest reputation" rule prevented new‑runner bootstrapping and is superseded. Aggregator receives 1.5% of gross job payment from the runner share on successful settlement.
 3.  **Commit:** Runner returns `commit = keccak256(output||salt)`.
 4.  **Reveal:** Runner reveals `{output, salt, proof?}`.
 5.  **Challenge:** A challenge window of **15 min** is opened, requiring a **100 CBY bond**.
@@ -610,20 +626,20 @@ Implementations MUST support QUIC over TLS 1.3.
 
 6.3 **Dedicated Lanes.**
 
-Block space is partitioned into **dedicated lanes** with reserved capacity:
+Block space is partitioned into **dedicated lanes** with reserved capacity and per‑lane fee multipliers:
 
-| Lane       | Reserved Capacity | Priority | Contents                                |
-| ---------- | ----------------- | -------- | --------------------------------------- |
-| **System** | 5%                | Highest  | Validator updates, governance, slashing |
-| **Timer**  | 20%               | High     | Scheduled timer executions              |
-| **Runner** | 25%               | High     | Runner job results, attestations, **CIP-9** anchors     |
-| **User**   | 50%               | Normal   | User transactions                       |
+| Lane       | Reserved Capacity | Priority | Fee Multiplier | Contents                                |
+| ---------- | ----------------- | -------- | -------------- | --------------------------------------- |
+| **System** | 5%                | Highest  | 1.0×           | Validator updates, governance, slashing |
+| **Timer**  | 20%               | High     | 1.0×           | Scheduled timer executions              |
+| **Runner** | 25%               | High     | 1.0×           | Runner job results, attestations, **CIP-9** anchors     |
+| **User**   | 50%               | Normal   | 1.0×           | User transactions                       |
 
 Lane guarantees:
 
 - Timer and runner lanes prevent user transaction spam from blocking autonomous actor execution
 - Unused capacity in higher-priority lanes cascades to lower-priority lanes
-- Each lane has independent fee multipliers applied to the global cycle/cell basefees
+- Each lane's basefee is `lane_basefee = global_basefee × lane_fee_multiplier`. All four multipliers default to `1.0×` at genesis (no subsidy, no surcharge) and are governance‑tunable via CIP‑12 Tier 0; see CIP‑3 §2.2.3 for the normative parameter spec.
 
 6.4 **Gossip (mempool).**
 
@@ -645,7 +661,7 @@ order_key = VRF(proposer_key, tx_hash, block_height)
 
 This deterministic-but-unpredictable ordering prevents proposers from strategically placing their own transactions.
 
-Note: This does not prevent proposer inclusion/censorship or private orderflow MEV.
+**Out of scope.** The MEV‑mitigation design above explicitly does *not* prevent: (a) **single‑block proposer inclusion / censorship** — VRF rotation forces the censoring validator out of the proposer slot on the next block, but a single‑block omission is unrecoverable on its own; (b) **private orderflow MEV** — off‑chain bilateral order routing that bypasses the public mempool is unobservable to the protocol; (c) **JIT (just‑in‑time) MEV against predictable actor logic** — actors that publish externally‑observable state transitions (price clearings, reserve prices, oracle pushes) invite JIT extraction at the moment of clearing. Applications that need stronger guarantees against these classes SHOULD layer commit‑reveal patterns, slippage caps, batch auctions, or order‑flow auctions in actor logic. The protocol provides the substrate (1‑second blocks, VRF ordering, lane isolation); application‑level MEV resistance is an SDK / actor concern, not a consensus concern.
 
 **Fast finality:** ~2 second finality (2 Simplex rounds) minimizes the window for:
 
@@ -710,10 +726,14 @@ Genesis supply is split into a **Company Reserve** and a **Network Distribution*
 |--------|-------|-------------|
 | Cycle & Cell basefees | 100% | Burned |
 | Cycle & Cell tips | 100% | Proposer / validators |
-| Runner job payments | 89% | Runner(s) |
+| Runner job payments | 89% | Runner(s)¹ |
 | Runner job payments | 10% | Burned |
 | Runner job payments | 1% | Treasury |
-| Slashed stake | 100% | Burned |
+| Slashed stake | 100% | Burned² |
+
+¹ The aggregator (per CIP‑2 v3 §4) receives `aggregator_bonus_bps = 150` (= 1.5% of gross) of this 89% on successful settlement. The bonus is **carved out of the runner share**, not from the burn or treasury shares — so this row remains the literal 89% to runner‑side recipients.
+
+² Distribution governance lives in `SlashDistribution { burn_bps, submitter_bps, treasury_bps }` per CIP‑2 v3 §6 and (forthcoming) CIP‑30 §"Distribution". Genesis defaults `(10000, 0, 0)` preserve this row's 100%‑burn commitment (C7); any non‑zero `submitter_bps` or `treasury_bps` requires a Tier‑3 governance proposal that amends C7 in lockstep with this row.
 
 The runner fee burn is the primary deflationary mechanism beyond basefee burns. As network usage grows, the burn rate increases proportionally, creating a reflexive supply‑reduction loop that offsets inflation (see §8.2). Governance MAY adjust the runner fee burn percentage via standard proposal + timelock.
 
@@ -740,7 +760,7 @@ The runner fee burn is the primary deflationary mechanism beyond basefee burns. 
 - **Best practices:** Reentrancy guards, capability-scoped handles, and idempotent message handling are encouraged via the SDK.
 
 ## 11\. Governance & Upgrades
-- **Model:** Foundation **5‑of‑9 multisig** sunsets after ~12 months to token‑weighted on‑chain governance.
+- **Model:** Token‑weighted on‑chain governance from genesis (bicameral: staked CBY + validator one‑vote per CIP‑12). A permanent **Security Council 7‑of‑9** holds narrow emergency authority (cancel queued proposals during timelock, fast‑track Tier‑3 upgrades, circuit‑break a system actor with mandatory retroactive ratification). See CIP‑12 for tier values, quorums, deposits, voting windows, and Council scope.
 - **Timelocks:** Standard actions **7 days**; emergency fast‑track **6 hours**.
 - **Upgrades:** **Hot‑code upgrades** coordinated by governance.
 
@@ -784,13 +804,15 @@ Prevents state bloat; eviction windows protect liveness.
 
 `system_lane_capacity` = 5%; `timer_lane_capacity` = 20%; `runner_lane_capacity` = 25%; `user_lane_capacity` = 50%.
 
+`lane_fee_multiplier_system` = 1.0; `lane_fee_multiplier_timer` = 1.0; `lane_fee_multiplier_runner` = 1.0; `lane_fee_multiplier_user` = 1.0. (All Tier‑0 tunable per CIP‑12; canonical spec in CIP‑3 §2.2.3.)
+
 **Off‑chain:**
 
-`committee M` = 5; `threshold N` = 3; `challenge_window` = 15 min; `challenge_bond` = 100 CBY; `runner_stake_floor` = 10,000 CBY; `dispute_window_blocks` = 75.
+`committee M`, `threshold N` = **adaptive** per CIP‑2 v3 §1: `M = clip(ceil(2 · log₂(N_active) / max(HHI, 0.01)), 3, 9)`, `N = ceil(2M/3)`; recomputed per 3,600‑block epoch with EMA smoothing of HHI. CIP‑2 v1 fixed values `M = 5, N = 3` remain the static fallback until CIP‑2 v3 activates. `challenge_window` = 15 min; `challenge_bond` = 100 CBY; `runner_stake_floor` = 10,000 CBY (CBY‑denominated; Decision Register #4 HOLD on CBY‑denominated, no oracle dependency at v1); `dispute_window_blocks` = 75. `reputation_half_life_blocks` = 1,209,600 (~14 days at 1s blocks; CIP‑2 v3 §3); `aggregator_eligibility_percentile` = 50 (p50 reputation; CIP‑2 v3 §4); `aggregator_bonus_bps` = 150 (1.5% of gross, paid from runner share; CIP‑2 v3 §4); `non_reveal_slash_bps` = 2500 (25% of effective stake on proven non‑reveal; CIP‑2 v3 §5–§6); `slash_distribution.{burn_bps, submitter_bps, treasury_bps}` = `(10000, 0, 0)` (HOLD per §8.4 C7; Tier‑3 to amend; CIP‑2 v3 §6).
 
-**State Rent:**
+**State Rent:** (canonical spec: CIP‑4 §12)
 
-`target_state_size` = governance-tunable; `grace_period` = 7 rent‑epochs; `warning_period` = 3 rent‑epochs; `catch_up_fee` = 10%; `reserve_multiplier` = 0.1.
+`target_state_size` = governance-tunable; `grace_period` = 7 rent‑epochs; `warning_period` = 3 rent‑epochs; `catch_up_fee` = 10% (Tier‑0 tunable as `rent_catchup_bps = 1000`); `reserve_multiplier` = 0.1; `rent_rate` = 0.001 CBY/byte/year (Tier‑0); `rent_epoch_length` = 86,400 blocks (~1 day at 1s blocks per WP §6.1); `eviction_threshold_epochs` = 10; `grace_threshold` = 10,240 bytes (10 KB).
 
 **Economics:**
 
@@ -929,23 +951,26 @@ Validation hooks add up to 50,000 cycles per transfer (capped).
 | Event emission | 0.5 cells/byte of event data |
 
 ### 17.5. State Rent
-Accounts exceeding the grace threshold pay ongoing rent:
+Accounts exceeding the grace threshold pay ongoing rent. The **canonical normative spec** lives in **CIP-4 §12**; this WP section provides the operational summary plus the governance monitoring cadence (Decision Register #4: HOLD on CBY-denominated).
 
 ```
 rent_per_rent_epoch = max(0, account_size - grace_threshold) × rent_rate
 
-Parameters:
-  grace_threshold = 10,240 bytes (10 KB)
-  rent_rate       = 0.001 CBY/byte/year (governance-adjustable)
-  rent_epoch_length = 1 day
-  eviction_threshold = 10 rent‑epochs unpaid rent
+Parameters (canonical in CIP-4 §12.5):
+  grace_threshold           = 10,240 bytes (10 KB)
+  rent_rate                 = 0.001 CBY/byte/year (Tier-0 tunable)
+  rent_epoch_length         = 86,400 blocks (~1 day at 1s blocks)
+  eviction_threshold_epochs = 10
+  rent_catchup_bps          = 1,000 (= 10% catch-up penalty)
 ```
 
 **Grace period behavior:**
 - Accounts ≤10 KB: No rent charged
 - Accounts >10 KB: Rent charged on excess bytes only
-- Unpaid rent accumulates as debt against the account
-- Eviction after 10 rent‑epochs of accumulated debt (state archived to blob storage, recoverable upon debt repayment)
+- Unpaid rent accumulates as debt against the account (rate-stamped to the epoch the debt was incurred; rate hikes apply prospectively only — see CIP-4 §12.2)
+- Eviction after 10 rent-epochs of accumulated debt (state archived; recoverable on debt repayment plus 10% catch-up fee — see CIP-4 §12.3)
+
+**CBY-denominated rent — governance monitoring (Decision Register #4 HOLD).** v1 keeps rent CBY-denominated to avoid introducing a consensus-layer CBY/USD oracle dependency. The Foundation publishes monthly the implied USD value of the rent at prevailing CBY/USD spot; target band `[$1, $10] / MiB / year`. If the implied USD value drifts outside the band for two consecutive monthly reviews, a Tier-0 governance proposal MUST be filed to adjust `rent_rate`. Re-pegging to USD via oracle is deferred to a future CIP (precondition: a battle-tested CBY/USD oracle module).
 
 ### 17.6. Off-Chain Blob Storage (CIP-7)
 Large data (images, datasets, AI inference traces) uses Retention Contracts:
@@ -960,6 +985,8 @@ Blob storage is **not cell-metered**. Provider payments are direct CBY transfers
 - Provider staking and availability commitments
 - Watchtower auditing and challenge mechanism
 - Payment schedules and slashing conditions
+
+(CBFS Relay Node economics — per-byte-per-epoch storage rate, the 10 / 2 / 88 burn / challenge-pool / Relay revenue split, the Relay challenge bond, and the slashing schedule — are specified in **CIP-9 §10.4 / §14** and **CIP-31**. CIP-7 retention contracts and CIP-9 / CIP-31 CBFS storage are distinct facilities; see each CIP for scope boundaries.)
 
 ### 17.7. Off-Chain Compute (Runner Marketplace)
 Off-chain job execution (LLM, HTTP, MCP, Custom, **Container** per **CIP-2** / **CIP-10**) is **not gas-metered** on the cycle/cell meters. Runners operate in a competitive marketplace:
@@ -1010,17 +1037,18 @@ This formula is consistent with §4.2 and the reference implementation.
 ### 17.9. Reserved Capacity (Execution Lanes)
 Block space is partitioned to guarantee execution for critical transaction types:
 
-| Lane | Cycle Budget | Percentage | Purpose |
-|------|--------------|------------|---------|
-| Timer | 2,000,000 | 20% | Scheduled actor execution |
-| Runner | 2,500,000 | 25% | Runner job results, attestations, callbacks (incl. **CIP-9** manifest anchors per **CIP-2**) |
-| System | 500,000 | 5% | Governance, upgrades |
-| User | 5,000,000 | 50% | Regular transactions |
+| Lane | Cycle Budget | Percentage | Fee Multiplier | Purpose |
+|------|--------------|------------|----------------|---------|
+| Timer | 2,000,000 | 20% | 1.0× | Scheduled actor execution |
+| Runner | 2,500,000 | 25% | 1.0× | Runner job results, attestations, callbacks (incl. **CIP-9** manifest anchors per **CIP-2**) |
+| System | 500,000 | 5% | 1.0× | Governance, upgrades |
+| User | 5,000,000 | 50% | 1.0× | Regular transactions |
 
 **Lane behavior:**
 - Unused capacity in reserved lanes spills to User lane
 - User lane cannot borrow from reserved lanes
 - Timer lane has highest priority within its reserved capacity; execution is still subject to GBA bidding and per‑block limits
+- Per‑lane `Fee Multiplier` scales the lane's effective basefee (`lane_basefee = global_basefee × lane_fee_multiplier`); all four lanes default to `1.0×` (no subsidy, no surcharge). Tier‑0 governance‑tunable per CIP‑3 §2.2.3.
 
 ### 17.10. Fee Estimation
 Wallets and applications SHOULD estimate fees as:

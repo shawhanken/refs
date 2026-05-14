@@ -123,7 +123,7 @@ The Governance actor is upgradeable **only** via a Tier 4 `MetaGovernance { op: 
 
 | Tier | Name | Scope |
 |---|---|---|
-| **0** | Parameter tuning | Scalar updates to any `governance-tunable` parameter (see genesis defaults and CIP-1/3/5/9/10) |
+| **0** | Parameter tuning | Scalar updates to any `governance-tunable` parameter (see genesis defaults and CIP-1/3/5/9/10/13/31) — includes e.g. CIP-3 lane fee multipliers, CIP-1 v3 priority-tier multipliers, CIP-31 CBFS rent rates and slashing magnitudes, CIP-13 unbonding & commission bounds |
 | **1** | Registry & whitelist | Python stdlib whitelist additions, approved runner images, model flags/bans, TEE attestation roots, relay operator allowlist |
 | **2** | Treasury & disbursement | Grants, liquidity incentives, audit payments, Foundation operating budgets, burns |
 | **3** | System actor upgrade | Hot-swap PVM bytecode for any `0x01`–`0x0B` actor, with optional migration (§7) |

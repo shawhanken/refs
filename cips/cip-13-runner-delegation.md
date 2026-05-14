@@ -589,8 +589,8 @@ All parameters are governance-tunable via CIP-12 Tier 0 proposals.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `UNBONDING_BLOCKS` | 7,200 (~24 hours at 12s blocks) | Blocks between undelegation initiation and claim eligibility |
-| `DELEGATION_COOLDOWN_BLOCKS` | 600 (~2 hours) | Minimum blocks between `RunnerUpdateDelegationConfig` calls by a runner |
+| `UNBONDING_BLOCKS` | 86,400 (~24 hours at 1s blocks per WP §6.1) | Blocks between undelegation initiation and claim eligibility |
+| `DELEGATION_COOLDOWN_BLOCKS` | 7,200 (~2 hours at 1s blocks) | Minimum blocks between `RunnerUpdateDelegationConfig` calls by a runner |
 
 ### 4.2 Stake limits
 

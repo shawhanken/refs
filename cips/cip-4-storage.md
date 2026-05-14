@@ -214,6 +214,85 @@ Key metrics: `block_apply_ms`, `proof_generation_ms`, `batch_commit_ms`, `specul
 - `DEFERRED_TX_MAX_AGE_BLOCKS = 1,000`
 - `SNAPSHOT_INTERVAL = 1024` (recommended)
 
+## 12. State Rent (canonical spec; migrated from WP §17.5)
+
+> This section is the **normative source** for actor-state rent mechanics. Whitepaper §17.5 now references this section. Rationale for the move: rent is a CIP-4 concern (it governs the lifecycle of state in the QMDB store); the WP retains a one-paragraph operational summary plus the governance monitoring cadence.
+
+### 12.1 Mechanism
+
+Actors exceeding the grace threshold pay ongoing rent measured in CBY:
+
+```
+rent_per_rent_epoch(actor) = max(0, account_size_bytes(actor) − grace_threshold) × rent_rate
+```
+
+where:
+
+- `account_size_bytes(actor)` = total bytes of actor code + actor storage + mailbox state at the start of the rent epoch.
+- `grace_threshold` = 10,240 bytes (10 KB) — no rent below this size.
+- `rent_rate` = 0.001 CBY/byte/year (governance-tunable, Tier-0 per CIP-12).
+- `rent_epoch_length` = 1 day at 1-second blocks per WP §6.1 (i.e., 86,400 blocks per epoch).
+
+Per-epoch settlement:
+
+1. At the start of each rent epoch, `0x09` Governance computes `rent_due[actor]` for every actor with size > grace threshold.
+2. The amount is debited from the actor's CBY balance.
+3. If the actor's balance is insufficient, the unpaid amount accumulates as `rent_debt[actor]` (system bytes at `0x09:system:cip4:rent_debt`).
+4. If `rent_debt[actor]` exceeds `eviction_threshold × rent_per_rent_epoch(actor)` (default `eviction_threshold = 10` rent epochs), the actor is **evicted** (state archived; recoverable on debt repayment per §12.3).
+
+### 12.2 Catch-up
+
+When an actor with `rent_debt > 0` next interacts on-chain (e.g., a transaction triggers the actor, or the owner deposits CBY), the catch-up settlement runs:
+
+```
+catch_up_fee = rent_debt[actor] × 1.10        # 10% penalty for using grace
+remaining_debt = rent_debt[actor] − amount_paid_by_actor
+```
+
+If `remaining_debt` reaches zero, the eviction countdown resets. The catch-up rate (10%) is `system:cip4:rent_catchup_bps = 1000` (Tier-0 tunable).
+
+**Rate-stamping for catch-up.** The catch-up fee uses the rent rate **at the epoch the debt was incurred** (`rent_rate_at_miss_epoch`), not the current rate. This prevents a "rate-hike catch-up trap" where a governance proposal that raises `rent_rate` would retroactively increase old debts; rate hikes apply prospectively only.
+
+Implementation: each rent-epoch's `rent_rate` is snapshotted alongside the `rent_debt` entry so historical rates persist with the debt.
+
+### 12.3 Eviction and Restoration
+
+- **Eviction (after 10 rent-epochs of unpaid rent — 7 grace + 3 warning):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are **preserved**. The actor enters a "dormant" state.
+- **Restoration:** anyone may repay the accumulated `rent_debt` (with `catch_up_fee` per §12.2) and provide the original storage data (verified against the recorded root hash). The actor returns to "active".
+
+### 12.4 Storage quotas
+
+Each actor has a base storage quota of **1 MiB**, extendable up to **8 MiB** via a storage bond. The bond is locked while the quota is in use, returned when reduced, and forfeited if the actor is evicted. Rent applies to the **full allocated quota**, not the current usage — actors that reserve quota they don't use pay rent on the reservation, deterring quota hoarding.
+
+### 12.5 Parameters
+
+All Tier-0 governance-tunable (CIP-12 §5.1):
+
+| Parameter | Default | Storage key |
+|---|---|---|
+| `grace_threshold` | 10,240 bytes (10 KB) | `0x09:system:cip4:rent_grace_threshold` |
+| `rent_rate` | 0.001 CBY/byte/year | `0x09:system:cip4:rent_rate` |
+| `rent_epoch_length` | 86,400 blocks (~1 day at 1s) | `0x09:system:cip4:rent_epoch_length` |
+| `eviction_threshold_epochs` | 10 | `0x09:system:cip4:eviction_threshold_epochs` |
+| `rent_catchup_bps` | 1,000 (= 10%) | `0x09:system:cip4:rent_catchup_bps` |
+
+### 12.6 CBY-denominated rent (Decision Register #4 — HOLD)
+
+The architecture review proposed re-pegging rent to USD via a 7-day TWAP oracle. The analysis Decision Register #4 selected **HOLD on CBY-denominated** for v1 to avoid introducing a consensus-layer oracle dependency. Operational mitigation:
+
+- **Monitoring cadence.** The Cowboy Foundation publishes monthly the implied USD value of `rent_rate × 1 MiB × 365 days`. Target band: `[$1, $10] / MiB / year` at the prevailing CBY/USD spot.
+- **Tier-0 adjustment trigger.** If the implied USD rent drifts outside the target band for two consecutive monthly reviews, a Tier-0 governance proposal MUST be filed to adjust `rent_rate`.
+- **No oracle dependency in v1.** A future CIP MAY introduce oracle-anchored rent; this CIP does not.
+
+Re-evaluation triggers for re-pegging: (a) availability of a battle-tested CBY/USD oracle module (precondition for any USD-pegged consensus parameter), or (b) sustained USD-rent drift outside the band beyond what Tier-0 cadence can manage.
+
+### 12.7 Relationship to other CIPs
+
+- **CIP-7 retention contracts:** separate facility (off-chain blob storage with provider negotiation). State rent in §12 above applies to *on-chain QMDB* state only.
+- **CIP-9 / CIP-31 CBFS:** separate facility (decentralized off-chain storage via Relay Nodes). CBFS storage fees and Relay economics live in CIP-9 §10.4 + CIP-31, not here.
+- **WP §17.5:** operational summary plus the monitoring cadence above; this CIP §12 is the normative spec.
+- **WP §13 parameter block:** the five Tier-0 parameters above appear in WP §13 as a one-line reference to this section.
+
 ---
 
 ## Appendix A: StateValue Variants

@@ -108,12 +108,14 @@ Unlike Cycles, Cells are not consumed on every instruction. They are consumed at
 
 The block cycle budget is partitioned into reserved lanes to prevent any single transaction type from monopolizing block space (see Whitepaper §17.9):
 
-| Lane | Budget | Share |
-|------|--------|-------|
-| User | 5,000,000 cycles | 50% |
-| Runner | 2,500,000 cycles | 25% |
-| Timer | 2,000,000 cycles | 20% |
-| System | 500,000 cycles | 5% |
+| Lane | Budget | Share | Fee Multiplier |
+|------|--------|-------|----------------|
+| User | 5,000,000 cycles | 50% | 1.0× |
+| Runner | 2,500,000 cycles | 25% | 1.0× |
+| Timer | 2,000,000 cycles | 20% | 1.0× |
+| System | 500,000 cycles | 5% | 1.0× |
+
+The **Fee Multiplier** column scales the global cycle/cell basefee for transactions submitted in that lane: `lane_basefee = global_basefee × lane_fee_multiplier`. All lanes default to `1.0×` at genesis (no subsidy, no surcharge). The four multipliers are governance-tunable via CIP-12 **Tier 0** and stored at `0x09` under keys `system:lane_fee_multiplier:{system|timer|runner|user}`. Changing a multiplier does not change lane capacity; it only re-weights the per-lane fee curve relative to the global EIP-1559 basefee adjustment.
 
 **2.2.4 Advanced Metering Challenges and Solutions**
 

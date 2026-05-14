@@ -14,12 +14,12 @@ icon: clock
 </Note>
 
 <Tip>
-  This document describes the timer mechanism **as currently implemented** in the Cowboy node. CIP-1 remains the authoritative specification for the broader Actor Message Scheduler (GBA bidding, tiered calendar queue). This CIP covers the concrete timer storage, scheduling, and end-of-block delivery that the node executes today.
+  This document describes the timer mechanism **as currently implemented** in the Cowboy node (FIFO within a block-height bucket, with the per-fire `fee_payer` model). **CIP-1 v3 Part III** specifies the target design (EIP-1559 timer-lane basefee + priority tip + per-actor fairness weight) and supersedes the original §9 auction sketch. CIP-5 §§1–8 remain canonical for FIFO behaviour until CIP-1 v3 activates; the activation block is a Tier-3 governance decision.
 </Tip>
 
 ## 1. Abstract
 
-This proposal defines Cowboy's **native Timer mechanism** — a height-triggered, one-shot scheduling primitive with an explicit fee payer and self-terminating lifecycle. Actors register timers for a future block height; each timer records **who pays** (`fee_payer`), **how much gas it may consume per fire** (`gas_limit_per_fire`), and **when it gives up** (`expires_at`). At the **End of Block (EOB)**, the protocol collects all timers whose `height` matches the current block, **pre-charges the fee payer**, executes the handler, refunds unused gas, and removes the timer. A timer that its fee payer can no longer fund, or that has passed its TTL, is destroyed on the next block without executing. Execution follows insertion order (FIFO within a height bucket) — no priority queue or bidding is involved (see §9 for the target auction layer).
+This proposal defines Cowboy's **native Timer mechanism** — a height-triggered, one-shot scheduling primitive with an explicit fee payer and self-terminating lifecycle. Actors register timers for a future block height; each timer records **who pays** (`fee_payer`), **how much gas it may consume per fire** (`gas_limit_per_fire`), and **when it gives up** (`expires_at`). At the **End of Block (EOB)**, the protocol collects all timers whose `height` matches the current block, **pre-charges the fee payer**, executes the handler, refunds unused gas, and removes the timer. A timer that its fee payer can no longer fund, or that has passed its TTL, is destroyed on the next block without executing. Execution follows insertion order (FIFO within a height bucket) — no priority queue or bidding is involved (see §9 / CIP-1 v3 Part III for the EIP-1559 target design).
 
 Metering follows **CIP-3**'s dual-metered model (Cycles/Cells). Protocol-level timer parameters (`max_ttl_blocks`, `max_cycles_per_fire`, `max_cells_per_fire`, `max_timers_per_actor`, `gc_cycles_per_block`) are held in a governed `TimerConfig`, updated through the same `SubmitProposal → CastVote → ExecuteProposal` path as `BasefeeConfig`.
 
@@ -33,7 +33,7 @@ On-chain actors need the ability to schedule future execution without relying on
 - **Deferred settlement:** After an off-chain computation (CIP-2), an actor schedules a follow-up action at a known future height.
 - **Time-locked operations:** Vesting, escrow release, or governance proposal execution at a predetermined height.
 
-This revision prioritizes **simplicity, determinism, correctness, and economic soundness** over the more advanced scheduling features described in CIP-1 (GBA bidding, tiered queues). The auction layer is sketched in §9 and is compatible with the economics defined here — it can be layered on without revising §§3–8.
+This revision prioritizes **simplicity, determinism, correctness, and economic soundness** over the more advanced scheduling features described in CIP-1 (GBA bidding, tiered queues). The target design layer is referenced in §9 (which points to CIP-1 v3 Part III) and is compatible with the economics defined here — it layers on without revising §§3–8.
 
 ---
 
@@ -368,137 +368,11 @@ The timer mechanism is fully deterministic:
 
 ---
 
-## 9. Future: Timer Auction Mechanism
+## 9. Target Design (Future) — see CIP-1 v3 Part III
 
-The current FIFO implementation is sufficient for devnet but lacks congestion management, economic prioritization, and latency guarantees. This section specifies the target auction design for mainnet. Implementation is ongoing; simulation results will inform final parameter choices.
+The previous §9 specified a first-price auction with exponential bias as the future target. That mechanism is **superseded by CIP-1 v3 Part III** (EIP-1559 timer-lane basefee + priority tip + per-actor fairness weight), which is the canonical target design for post-FIFO timer scheduling. CIP-5 retains §§1–8 as the canonical specification of the *currently implemented* FIFO behaviour until CIP-1 v3 activates.
 
-**Relationship to Model B (§§3–8):** The auction layer is **orthogonal** to the fee-payer/TTL/self-destruct economics specified above. Model B answers *"who pays per fire, and when does a timer stop existing"*; the auction answers *"which due timers get to fire this block when lane budget is scarce"*. The auction consumes an additional `bid` on each timer; the `fee_payer` path of §6.3 still debits the same account at execution time. No field from §3.1 is removed when §9 is implemented.
-
-### 9.1 Design Goals
-
-The timer auction SHOULD satisfy:
-
-- **Bounded worst-case latency:** Any timer executes within `N_max` blocks regardless of competition.
-- **Honest bidding incentives:** The optimal bidding strategy should be simple — ideally, bid your true valuation. This is critical for an agentic blockchain where autonomous actors (not humans) must bid programmatically.
-- **Surplus maximization:** Prioritize timers with higher urgency/value.
-- **Computational efficiency:** EOB auction resolution in O(n log n) or better.
-
-### 9.2 Exponential Bias Mechanism
-
-To prevent wealthy actors from permanently outbidding others, each timer accumulates an **exponential bias** based on how long it has waited:
-
-```
-Bias(n) = e^(n * λ)
-```
-
-Where:
-- `n` = number of blocks the timer has been deferred
-- `λ` = governance-tunable decay parameter
-
-The **effective priority score** for each timer is:
-
-```
-priority = (bid + Bias(n)) / total_cycles
-```
-
-This guarantees a **maximum wait time** against any competitor, no matter how rich:
-
-```
-N_max = ln(T / 3) / λ
-```
-
-Where `T` is the competing bidder's token balance. Beyond `N_max` blocks, the deferred timer's bias exceeds any economically rational bid.
-
-### 9.3 The Critical Constraint
-
-For the auction to function correctly, the following invariant MUST hold:
-
-```
-Average Value Decay Rate ≥ d/dt(Bias(t))
-```
-
-In discrete terms: `Y * Δn ≥ Bias(n + Δn) - Bias(n)` for the average bidder, where `Y` is the rate at which a timer's value decays per block.
-
-**Why this matters:** If bias grows faster than value decays, rational actors would underbid and let bias carry them to execution for free, collapsing the auction into a pure waiting game. The protocol MUST maintain a dynamic `λ` control loop that adjusts `λ` to enforce this constraint based on observed bidding behavior and congestion.
-
-### 9.4 Block Budget and Quota Caps
-
-When the auction is active, EOB timer execution is bounded by the existing Model B flow-control budget plus two new quota caps:
-
-- `LANE_TIMER_CYCLES` (existing, §6.5) — hard cap on total cycles consumed by fired timer handlers per block; the auction allocates within this budget.
-- `MAX_FIRES_PER_BLOCK` (new) — global cap on the *count* of timer executions per block, independent of cycles.
-- `MAX_FIRES_PER_ACTOR` (new) — per-actor cap to prevent monopolization.
-- Timers that don't make the cut are deferred to the next block with `n += 1`, increasing their bias.
-
-The GC lane (`TIMER_GC_CYCLES`, §6.5) remains separate from the auction — expired and insufficient-funds timers do not participate in bidding.
-
-### 9.5 Payment Rule: Greedy VCG (Target) vs First-Price (Fallback)
-
-**Target: Greedy VCG (second-price knapsack auction)**
-
-The Vickrey-Clarke-Groves mechanism makes honest bidding a weakly dominant strategy — actors bid their true valuation and pay based on the externality they impose:
-
-1. Sort eligible timers by `(bid + Bias(n)) / total_cycles` (descending).
-2. Select timers greedily until `TIMER_PROCESSING_BUDGET_CYCLES` is exhausted.
-3. For each selected timer, find the runner-up (first excluded timer).
-4. Winner pays: `bid(runner_up) - Bias(winner)` (floored at the reserve price).
-
-**Why VCG for Cowboy specifically:**
-- Cowboy actors are autonomous programs, not humans. Writing an optimal first-price bidding strategy requires estimating competition, which is hard to do programmatically. VCG reduces the optimal strategy to "bid what it's worth to you."
-- 1-second finality + VRF proposer selection significantly mitigate MEV / shill bidding attacks that plague second-price auctions on slower chains.
-- Price stability — VCG produces more predictable clearing prices than first-price, which matters for DeFi actors budgeting for timer costs.
-
-**Fallback: First-price auction**
-
-If simulation shows VCG revenue is insufficient for validator economics or MEV exploitation is viable despite mitigations, the protocol falls back to first-price (you pay your bid). The allocation rule (priority scoring with exponential bias) remains identical — only the payment rule changes.
-
-A **reserve price** (minimum bid floor) SHOULD be set regardless of payment rule to guarantee validators a baseline revenue per timer execution.
-
-### 9.6 Fairness Targets
-
-The auction should aim to minimize:
-
-- `var(utility_i / bid_i)` — every actor gets proportional utility per token spent.
-- `var(efficiency_i / bid_i)` — execution efficiency scales linearly with bid.
-
-Minimizing these variances reduces the **price of anarchy** (the gap between auction outcomes and an ideal centralized allocator). The exponential bias mechanism and dynamic `λ` are the primary levers for achieving this.
-
-### 9.7 `schedule_timer` API Extension
-
-When the auction is implemented, `schedule_timer` gains a single additional parameter (`gas_limit` and `fee_payer` are already present per §4.1):
-
-```python
-timer_id = pvm_host.schedule_timer(
-    height: int,
-    payload: bytes,
-    fee_payer: bytes = None,   # as §4.1
-    gas_limit: int = None,     # as §4.1
-    expires_at: int = None,    # as §4.1
-    bid: int = 0,              # NEW: CBY bid for execution priority
-)
-```
-
-The `bid` is locked at scheduling time and refunded (minus payment) or fully consumed depending on the payment rule, debited from the same `fee_payer` account used for per-fire gas. Timers scheduled without a `bid` (bid = 0) rely entirely on bias accumulation for eventual execution.
-
-### 9.8 Implementation Roadmap
-
-Phases already delivered by this revision (§§3–8) are marked ✓; remaining phases are auction-specific.
-
-| Phase | Change | Complexity |
-| :---- | :----- | :--------- |
-| ~~Actor gas budget~~ | ~~Let actors specify `gas_limit` on `schedule_timer`~~ ✓ — delivered in §4.1 | — |
-| 1. Count caps | Add `MAX_FIRES_PER_BLOCK`, `MAX_FIRES_PER_ACTOR` on top of existing `LANE_TIMER_CYCLES` | Low |
-| 2. Bidding + exponential bias | Implement priority scoring with `(bid + e^(nλ)) / cycles` | Medium |
-| 3. Payment rule | Greedy VCG (or first-price fallback based on simulation) | Medium |
-| 4. Dynamic λ control loop | Auto-tune λ to maintain value-decay constraint | Medium |
-| 5. State-triggered timers | Watch-key subscriptions (original CIP-5 concept) | High |
-
-### 9.9 Open Questions
-
-- **Calibration of λ:** Requires simulation against realistic workloads. Too high → bias dominates bids (auction becomes pure FIFO with delay). Too low → bounded latency guarantee weakens.
-- **Reserve price level:** Must balance validator revenue against accessibility for low-value timers.
-- **VCG revenue gap:** How much less do validators earn vs first-price under realistic congestion? Simulation needed.
-- **Interaction with CIP-1 GBA:** CIP-1 describes a Gas Bidding Agent model where a contract returns dynamic bids. The auction mechanism here is compatible — the GBA simply becomes the source of the `bid` parameter. Integration details TBD.
+When CIP-1 v3 ships, the `schedule_timer` host API gains `(max_fee_per_cycle, max_priority_fee_per_cycle)` parameters in lieu of the deprecated `bid` field; the per-fire `fee_payer` model in §6.3 remains binding (priority tip extends the `max_cost` formula but does not change pre-charge / refund mechanics). See CIP-1 v3 Part III §7 for the migration table.
 
 ---
 

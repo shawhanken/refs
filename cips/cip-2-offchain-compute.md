@@ -666,3 +666,308 @@ Runners that have not been upgraded to support DNS executors simply do not adver
 | AMEND 2-A — `DnsTxtRecordMatch` variant | CIP-16-aligned §5.3 | New enum variant; new runner capability |
 | AMEND 2-B — `DnsCnameMatch` variant | CIP-16-aligned §5.3 | New enum variant; reuses resolver pool |
 | §3 — `JobType::Custom` extension pattern (documentation) | Future built-in verifiers | No code change; pinning convention |
+
+---
+
+## Part III — v3 Mechanism Revisions (canonical; runner-marketplace reform)
+
+### 0. What this revision does
+
+v3 patches **seven** Part I mechanism specifications surfaced by the 2026-04 architecture review as P1/P2 gaps. The fix-set is internally coherent: each change either replaces an unspecified mechanism with a normative one (reputation formula, non-reveal classification, aggregator-bonus magnitude) or replaces a vulnerable mechanism with a hardened one (static committee → adaptive; pure-stake VRF → stake×reputation; aggregator lock-in → eligibility threshold). Distribution of slashed stake is intentionally held at **100% burn** (consistent with WP §8.4 commitment C7) — the field structure for fractional bounty payouts is introduced but defaults zero, awaiting an explicit Tier-3 governance proposal that pre-clears the C7 amendment.
+
+**What v3 changes:**
+
+1. **Adaptive committee sizing** (§1) replaces static `M = 5, N = 3`.
+2. **VRF weight** (§2) becomes `w = stake · sqrt(reputation)` instead of `floor(log2(stake / MIN_STAKE + 1)) + 1`. Stake-only weighting amplifies "rich-get-richer"; the square-root reputation term provides a graceful merit signal without enabling pure reputation-mining attacks.
+3. **EMA reputation** (§3) — closes the long-standing gap that Part I references reputation throughout but never defines decay or recovery. 14-day half-life at 1-second blocks = 1,209,600 blocks (Tier-0 tunable).
+4. **Aggregator reform** (§4): eligibility-threshold (≥ p50 reputation) + uniform-random selection + 1.5%-of-gross bonus. Replaces "highest reputation in committee" lock-in (Part I §8) which permanently locks out new runners.
+5. **Non-reveal classification** (§5): commit-without-reveal within an exemption window is treated as proven dishonesty by default, with a single `CrashAttestation`-gated grace path for legitimate crashes. Replaces the timeout-only reputation-penalty path in Part I §6 — which the reviewer correctly identified as a denial-of-verification attack vector (an adversary commits garbage, waits for other commits, then refuses to reveal if the consensus is unfavourable).
+6. **Slash distribution schema** (§6): introduces `SlashDistribution { burn_bps, submitter_bps, treasury_bps }` with HOLD-path defaults `(10000, 0, 0)`. The field structure makes a future Tier-3 governance amendment (50/30/20 challenger/burn/treasury) a flag flip rather than a CIP rewrite, but the WP §8.4 C7 commitment is **preserved** until that amendment lands.
+7. **SemanticSimilarity embedding pinning** (§7): the verification mode currently leaves the embedding model unspecified, allowing a runner to collude with embedding choice. v3 pins the model at `0x09` under `system:cip2:semantic_similarity_embedding_model`; changes require Tier-3 governance (consensus-criticality carve-out from the default Tier-1 model-registry path).
+
+**What v3 does NOT change:**
+
+- **Runner stake floor** remains `max(10,000 CBY, 1.5 × declared_max_job_value)` (CBY-denominated). The USD-pegged variant proposed by the architecture review is **deferred** per Decision #4 default — no consensus-layer oracle dependency is introduced in v3. A future CIP MAY re-peg once an oracle module exists.
+- **Fisher-Yates VRF mechanism** (Part I §5) — the *weight formula* changes (§2 above), but the selection algorithm is unchanged.
+- **Commit-reveal flow** (Part I §8) — only the aggregator-selection rule and the bonus formula change; commit/collect/reveal/verify stages are unchanged.
+- **Verification modes enum** (Part I §9) — six modes unchanged; only the SemanticSimilarity sub-rule on embedding model is added.
+- **VerifierCheck variants** (Part II) — unchanged.
+- **System-instruction opcodes** — unchanged.
+
+### 1. Adaptive committee sizing (supersedes Part I §5 fixed M/N)
+
+```
+M_target(N_active, HHI) = ceil(2 · log₂(N_active) / max(HHI, HHI_min))
+M       = clip(M_target, M_min, M_max)
+N_threshold = ceil(2 · M / 3)
+```
+
+Parameters (Tier-0 tunable, stored at `0x09` under `system:cip2:committee.*`):
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `M_min` | 3 | Floor for the committee size (matches BFT N≥3 minimum) |
+| `M_max` | 9 | Ceiling (caps verification cost per job) |
+| `HHI_min` | 0.01 | Numerical floor on the denominator — prevents division blow-up when HHI is computed over near-uniform stake distribution |
+| `HHI_smoothing_alpha` | 0.125 | EMA smoothing factor applied to HHI to prevent committee-size flapping on single-block stake shocks |
+| `committee_recompute_period` | 1 epoch (= 3,600 blocks at 1s, per WP §13) | Frequency of M recomputation; on each recompute boundary, jobs in flight retain their committee, new dispatches use the new M |
+
+**HHI computation.**
+
+```
+shares       = effective_stake[i] / Σ effective_stake[i]    over registered + healthy runners
+HHI_instant  = Σ shares[i]²                                  ∈ (0, 1]
+HHI          = HHI_smoothing_alpha · HHI_instant + (1 − HHI_smoothing_alpha) · HHI_prior_epoch
+```
+
+`effective_stake` per CIP-13 §3.2 is `registration.stake + delegation_totals.total_active`.
+
+**Worked example.**
+
+| `N_active` | `HHI` | `M_target` | `M` (after clip) | `N_threshold` |
+|---|---|---|---|---|
+| 20 | 0.40 | ceil(2·4.32 / 0.40) = 22 | 9 (clip @ M_max) | 6 |
+| 50 | 0.20 | ceil(2·5.64 / 0.20) = 57 | 9 (clip) | 6 |
+| 100 | 0.05 | ceil(2·6.64 / 0.05) = 266 | 9 (clip) | 6 |
+| 100 | 0.30 | ceil(2·6.64 / 0.30) = 45 | 9 (clip) | 6 |
+| 100 | 1.00 (1 runner monopoly) | ceil(2·6.64 / 1.00) = 14 | 9 (clip) | 6 |
+| 8 | 0.40 | ceil(2·3.00 / 0.40) = 15 | 9 (clip) | 6 |
+| 4 | 0.50 | ceil(2·2.00 / 0.50) = 8 | 8 | 6 |
+| 3 | 0.40 | ceil(2·1.58 / 0.40) = 8 | 8 (limited by N_active in dispatch) | 6 |
+
+Empirically: at low concentration (HHI ≤ 0.30), M saturates at `M_max = 9`; at very concentrated runner sets (HHI > 0.40) and small `N_active`, M scales back toward the floor. The clip bounds prevent both committee-size explosion (DoS via large committees) and undersized committees on small networks.
+
+**Migration from static M=5/N=3.** At activation block `H_v3`, the static spec in Part I §5 is replaced; jobs submitted at or after `H_v3` use the adaptive formula. Jobs in flight at `H_v3` retain their static committee. The committee size for the first epoch after `H_v3` is computed from the live `N_active` and `HHI` at the epoch boundary.
+
+### 2. VRF weight `w = stake · sqrt(reputation)` (supersedes Part I §5 stake-only)
+
+```
+w_i = effective_stake[i] · max(sqrt(reputation[i] / REPUTATION_NORMALIZER), w_min_floor)
+```
+
+Parameters (Tier-0 tunable):
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `REPUTATION_NORMALIZER` | 100 | Treats reputation as 0..100 score; sqrt(1) = 1 means a runner at the normalizer value gets the same weight as pure stake |
+| `w_min_floor` | 0.1 | Cold-start protection — a brand-new runner (zero reputation) still gets `weight = 0.1 · stake` rather than zero |
+
+Why `sqrt(r)` and not `r^1` or `log(r)`:
+- `r^0` (Part I) gives no reputation signal — vulnerable to pure stake-monopoly.
+- `r^1` rewards established runners too aggressively — locks out new entrants the way the old aggregator rule did.
+- `r^0.5` (= `sqrt(r)`) is the geometric-mean middle ground; a 4× reputation differential becomes a 2× selection-probability differential. Matches the heuristic Polkadot uses in NPoS phragmen and the staking-as-collateral literature.
+
+**Migration.** Old runner reputation values from Part I (which were never formally bounded) are mapped: `reputation_new = clip(reputation_old, 0, 200)`. New runners enter at `reputation = 50` (network-median-equivalent starting point).
+
+### 3. EMA reputation with 14-day half-life (NEW)
+
+Part I references reputation as a filter (≥ 50 floor), as a penalty target (`-= TIMEOUT_PENALTY`), and as the aggregator-selector key — but never defines decay, recovery, or update mechanics. v3 pins:
+
+```
+on each timer fire / job settlement, for runner i:
+    score_i_block = f(success, latency, slash_event)    in [0, 100]
+
+    α = ln(2) / HALF_LIFE_BLOCKS                          // = ln(2) / 1_209_600  ≈ 5.73e-7
+    reputation_i = reputation_i + α · (score_i_block − reputation_i)
+    reputation_i = clip(reputation_i, REPUTATION_FLOOR, REPUTATION_CEILING)
+```
+
+Score function (Tier-2 tunable):
+
+| Outcome | Score contribution |
+|---|---|
+| Successful settlement | 100 |
+| Successful settlement as aggregator (bonus) | 110 (clipped at REPUTATION_CEILING) |
+| Timeout (no commit) | 0 |
+| Commit-without-reveal (non-reveal) | 0 (+ slash per §5–§6 below) |
+| Invalid reveal (proof mismatch) | 0 (+ slash per §5–§6 below) |
+| Jail (multiple consecutive failures) | reputation reset to `JAIL_EXIT_FLOOR` |
+
+Parameters (stored at `0x09` under `system:cip2:reputation.*`):
+
+| Parameter | Default | Mutability |
+|---|---|---|
+| `HALF_LIFE_BLOCKS` | 1,209,600 (= 14 days at 1s blocks per WP §13) | Tier-2 |
+| `REPUTATION_FLOOR` | 0 | Tier-2 |
+| `REPUTATION_CEILING` | 200 | Tier-2 |
+| `JAIL_EXIT_FLOOR` | `max(round(0.1 · network_median_reputation), 50)` | Tier-2 |
+| `REPUTATION_NORMALIZER` | 100 (used by §2 VRF weight) | Tier-2 |
+
+**Reviewer's "250k blocks at 5s" arithmetic correction.** The architecture review proposed a 14-day half-life and computed it as "~250,000 blocks at 5-second slots". Cowboy runs **1-second blocks** per WP §13, so 14 days = **1,209,600 blocks**. This CIP uses the corrected value; the analysis at `refs/notion/cowboy-vm-shared/_analysis/03-runner-marketplace.md` captures the original error.
+
+**Reputation in flight at `H_v3`.** Existing `reputation` integers from Part I are interpreted as the initial value of the EMA at `H_v3`; the first decay tick fires on the next job settlement involving that runner.
+
+### 4. Aggregator reform (supersedes Part I §8 "highest reputation")
+
+```
+eligible = { runner in committee : reputation[runner] >= aggregator_eligibility_percentile_of(committee) }
+   where aggregator_eligibility_percentile = 50 (Tier-0 tunable; key `system:cip2:aggregator.eligibility_percentile`)
+
+if eligible == ∅:
+    eligible = committee     // fallback: no one meets p50; use full committee
+
+aggregator = uniform_random_from(eligible, seed = Keccak256(job_id || "agg-select-v3"))
+```
+
+**Bonus formula (replaces Part I §8 "a small bonus"):**
+
+```
+aggregator_bonus = gross_job_payment · aggregator_bonus_bps / 10000     // default bps = 150 = 1.5%
+```
+
+paid from the **runner share** (89% of gross under WP §8.4) — i.e. the bonus does not change the burn / treasury split. Conceptually: 89% runner share splits into `(89% − 1.5%) = 87.5%` divided across non-aggregator runners pro-rata to commit-reveal weight, plus `1.5%` aggregator bonus.
+
+| Parameter | Default | Mutability |
+|---|---|---|
+| `aggregator_eligibility_percentile` | 50 (p50 reputation) | Tier-0 |
+| `aggregator_bonus_bps` | 150 (1.5% of gross) | Tier-0 |
+| `aggregator_selection_seed_domain` | `"agg-select-v3"` | fixed (consensus-relevant domain separator) |
+
+**Why eligibility + uniform-random and not pure highest-reputation:**
+- "Highest reputation" gives new runners zero probability of aggregating — they cannot bootstrap their reputation by aggregating successfully.
+- Eligibility threshold (p50) ensures aggregators are competent without locking new runners out permanently — once a new runner crosses p50, they enter the eligibility pool.
+- Uniform random within the eligible set prevents any deterministic-tie-breaker from concentrating aggregator share at a single high-reputation runner.
+
+**Aggregator bonus paid only on successful settlement** (verification mode check passes, no slash event). Failed aggregations cost the aggregator the bonus; the §5 non-reveal classification handles outright dishonesty.
+
+### 5. Non-reveal classification (supersedes Part I §6 timeout-only path)
+
+The Part I §6 timeout protocol only penalizes reputation (with eventual stake slash after MAX_RETRIES consecutive failures). This creates a denial-of-verification attack: an adversary can commit `hash(garbage_result || sig)` in step 1, observe other commits' result hashes in step 2, then refuse to reveal in step 3 — costing the adversary only modest reputation but corrupting the verification outcome.
+
+**v3 classification:**
+
+```
+classify_non_reveal(runner, job, commit_block, reveal_window_blocks):
+    if reveal_received(runner, job) within commit_block + reveal_window_blocks:
+        → success path (no penalty)
+
+    if CrashAttestation(runner, sig, height ∈ [commit_block, commit_block + reveal_window_blocks])
+       was submitted before commit_block + reveal_window_blocks:
+        → "operational failure" path: reputation penalty per §3 (-= 0 deferred decay) + 
+           `CrashAttestation` event emitted; no stake slash; runner exempted from slash this round
+
+    otherwise:
+        → "proven dishonesty" path:
+           - reputation reset to 0
+           - stake slash per §6 below
+           - `NonRevealSlash` event emitted
+```
+
+**`CrashAttestation` mechanism.** A runner that legitimately crashes between commit and reveal can submit a signed attestation:
+
+```
+CrashAttestation {
+    runner:        Address
+    job_id:        bytes32
+    crash_signal:  enum { OOM, NetworkPartition, HardwareFault, TEEAttestationLost, Other }
+    timestamp:     Block
+    self_signature: Signature   // runner's own key signing the structure
+}
+```
+
+Submitted by the runner (or by an authorized off-chain watchdog with the runner's pre-issued signature) at or before `commit_block + crash_exemption_blocks` (Tier-2 tunable, default 50 blocks ≈ 50s at 1s blocks). The attestation does not get the runner the job payment, but it converts the non-reveal from "proven dishonesty" (slash) to "operational failure" (reputation hit only).
+
+**Why an exemption mechanism instead of pure slash:**
+- Without exemption, legitimate hardware faults cause runner stake destruction → discourages decentralised runner participation.
+- Without slash by default, a denial-of-verification attack costs only reputation.
+- With exemption: runners must take an explicit action to claim "crash" status, leaving an on-chain trail. Repeated CrashAttestations from the same runner trigger Tier-2 review (default: ≥ 5 attestations in 1,000-block window → automatic flag).
+
+**Reveal window:** `reveal_window_blocks` defaults to `commit_deadline_blocks + 60` (i.e. 60 blocks after commit deadline; ~1 minute at 1s blocks). Tier-2 tunable.
+
+| Parameter | Default | Mutability |
+|---|---|---|
+| `crash_exemption_blocks` | 50 (at 1s blocks ≈ 50 s) | Tier-2 |
+| `reveal_window_blocks` | commit_deadline_blocks + 60 | Tier-2 |
+| `crash_attestation_review_threshold` | 5 per 1,000 blocks | Tier-2 |
+
+### 6. Slash distribution schema (HOLD path = 100% burn; Tier-3 to amend)
+
+```
+SlashDistribution {
+    burn_bps:      u16,      // 0..10000; default 10000 (100% burn) — matches WP §8.4 C7
+    submitter_bps: u16,      // 0..10000; default 0           — challenger/submitter share, inactive at v3 launch
+    treasury_bps:  u16,      // 0..10000; default 0           — treasury share, inactive at v3 launch
+    // invariant: burn_bps + submitter_bps + treasury_bps == 10000
+}
+```
+
+Stored at `0x09` under `system:cip2:slash_distribution.{burn_bps, submitter_bps, treasury_bps}`. Genesis values `(10000, 0, 0)` — consistent with WP §8.4 commitment C7 ("Slashed stake | 100% | Burned"). Submitter and treasury shares are **inactive** at v3 launch; the schema exists so that a future amendment is a flag flip rather than a CIP rewrite.
+
+**Mutability.** Any non-trivial change (any `bps` shifted away from the `(10000, 0, 0)` default) requires a **Tier-3 governance proposal** that also amends WP §8.4 C7 in lockstep — the schema-level flexibility does **not** unilaterally override the C7 commitment. CIP-12 §5.1 Tier-3 row implicitly covers this because changing slash distribution is a substantive economic-mechanism change, not a scalar tweak.
+
+**Why a Tier-0 schema with Tier-3 mutability:** the field structure lives in code from v3 onward (no migration when the C7 amendment lands); only governance authority changes per-amendment. This avoids the "schema added later" trap that creates two competing code paths.
+
+**Non-reveal slash magnitude (used in §5 path 3):**
+
+```
+non_reveal_slash_amount = min(
+    runner_effective_stake · non_reveal_slash_bps / 10000,
+    max_non_reveal_slash_cby
+)
+```
+
+| Parameter | Default | Mutability |
+|---|---|---|
+| `non_reveal_slash_bps` | 2500 (25% of effective stake) | Tier-2 |
+| `max_non_reveal_slash_cby` | 100,000 CBY | Tier-2 |
+
+(The reviewer's recommended 25% fractional slash is adopted as the bps value; the absolute cap prevents catastrophic overshoot on extremely large stake positions.)
+
+### 7. SemanticSimilarity embedding pinning (supersedes Part I §9 unspecified)
+
+Part I §9 lists `SemanticSimilarity` as a verification mode (N ≥ 3; cosine similarity clustering; largest cluster wins). The embedding model used to compute similarity is unspecified — leaving it as a free parameter that any runner could collude with. v3 pins:
+
+```
+system:cip2:semantic_similarity_embedding_model = "sentence-transformers/all-mpnet-base-v2"
+                                                  (default; see model_registry below)
+```
+
+The value is a model identifier resolvable via the existing model registry (`model_id` field in CIP-2 v1 §2). Changes follow the **consensus-criticality carve-out**:
+
+- **Default routing.** Per CIP-12 §5.1, "model flags/bans" are Tier 1 (15% quorum / >55% approval). The general model-registry path remains Tier 1.
+- **Carve-out.** The specific entry `system:cip2:semantic_similarity_embedding_model` is flagged Tier-3 (15% quorum / >60% approval) because changes alter consensus-verification semantics — a runner colluding with the embedding-model choice could swing similarity clustering. The carve-out is documented here (CIP-2 §7) rather than in CIP-12; the registry path remains Tier 1 for non-consensus-critical entries.
+
+**Backwards compatibility.** Jobs scheduled before `H_v3` that use SemanticSimilarity verification used an undefined embedding model — the dispatcher at activation time MUST refuse to settle such jobs without an explicit re-submission specifying the canonical embedding model. This is a one-time migration cost; the analysis at `refs/notion/cowboy-vm-shared/_analysis/03-runner-marketplace.md` items #24/#65 capture the reasoning.
+
+### 8. Stake floor (Decision #4 default — keep CBY-denominated)
+
+Per the architecture-review Decision Register item #4, the analysis default is **CBY-denominated stake floor with documented Tier-0 monitoring cadence** rather than USD-pegged via TWAP oracle. v3 preserves Part I §4's `max(10,000 CBY, 1.5 × declared_max_job_value)` formula and adds:
+
+- **Monitoring cadence.** The Cowboy Foundation publishes monthly the implied USD value of the 10,000-CBY floor and the median runner's effective stake. If the implied USD floor drifts outside the target band `[$1,000, $10,000]` for two consecutive monthly reviews, a **Tier-0 governance proposal** MUST be filed to adjust `MIN_RUNNER_STAKE_CBY`.
+- **No oracle dependency.** v3 does NOT introduce a consensus-layer CBY/USD oracle. Re-pegging is a future option gated on a forthcoming oracle CIP.
+- **Failure mode.** If CBY appreciates 10×+ and the 10,000-CBY floor becomes punitive for small runners, the monitoring cadence above triggers a Tier-0 adjustment. The dispatcher continues to admit runners meeting the formula until that proposal lands.
+
+Decision Register item #4 status: **HOLD on CBY-denominated**. Re-evaluation triggers: (a) availability of a battle-tested oracle module (e.g., a CIP-31-style oracle parameter spec), or (b) sustained USD floor drift outside the target band beyond what Tier-0 cadence can address.
+
+### 9. Activation and migration
+
+v3 activates at a single block `H_v3` via Tier-3 governance proposal. At activation:
+
+| Subsystem | Pre-`H_v3` | Post-`H_v3` |
+|---|---|---|
+| Committee size | Static `M=5, N=3` | Adaptive (§1) |
+| VRF weight | `floor(log2(stake/MIN_STAKE+1))+1` | `stake · sqrt(reputation)` (§2) |
+| Reputation update | Unspecified | EMA, 14-day half-life (§3) |
+| Aggregator selection | "Highest reputation in committee" | Eligibility ≥ p50 + uniform random (§4) |
+| Aggregator bonus | "A small bonus" (unspecified) | 1.5% of gross from runner share (§4) |
+| Non-reveal handling | Reputation penalty only | Proven-dishonesty + `CrashAttestation` exemption (§5) |
+| Slash distribution | Implicit 100% burn | Explicit `SlashDistribution { 100/0/0 }` schema (§6) — Tier-3 to flip |
+| SemanticSimilarity embedding | Unspecified | Pinned at `system:cip2:semantic_similarity_embedding_model` (§7) |
+| Stake floor | `max(10k CBY, 1.5 × declared_max_job_value)` | Unchanged (Decision #4 HOLD; §8) |
+
+Jobs in flight at `H_v3` retain their committee, aggregator, and verification mode for completion; new jobs use v3 rules.
+
+### 10. Open questions deferred to Phase-5 simulation
+
+- **HHI-based committee shock.** If a single large runner exits/enters and HHI shifts 0.10 → 0.50 in one epoch, M halves. The smoothing factor `α = 0.125` damps this, but extreme cases may still cause perceptible per-job cost swings. Phase-5: simulate with realistic runner-set dynamics.
+- **Reputation half-life calibration.** 14 days is the launch default; longer is more stable but slower to recover from rare-event mistakes; shorter is more reactive but lets recent bad runners re-enter selection too fast.
+- **`crash_exemption_blocks = 50` default.** Long enough for hardware reboot signal propagation, short enough to deter "stall, observe, decide" tactical non-reveals. Phase-5: model attacker dwell time against block-time-to-attestation latency.
+- **VRF weight `sqrt(reputation)` calibration.** Whether `r^0.5` or `r^0.4` better matches empirical merit signals — sensitivity to the exponent is high in the upper tail.
+- **SlashDistribution `(10000, 0, 0)` HOLD vs `(5000, 2000, 3000)` AMEND** — gated on Decision Register #1 (WP §8.4 C7 amendment).
+
+### 11. Backwards compatibility
+
+- All Part II VerifierCheck variants and the `JobType::Custom` extension pattern remain in force.
+- Runners that haven't upgraded to v3 see no API breakage at the runner protocol layer; the changes are protocol-internal mechanisms in `0x01`/`0x02`/`0x03` system actors. Runners SHOULD watch for `CrashAttestation` event reception (a new event type at `0x03`) — operational tooling that does not emit `CrashAttestation` simply pays the slash cost on unexpected crashes.
+- Existing reputation integers carry forward at `H_v3` as the initial EMA value.
+- No syscall, opcode, or message-format changes at the actor boundary.

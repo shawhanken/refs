@@ -1,22 +1,41 @@
 ---
-title: "CIP-1: Actor Message Scheduler (v2)"
-description: Code-aligned v2 — aligns with CIP-5 revised 2026-04-20 (per-fire fee_payer model, three-path lifecycle, LANE_TIMER_CYCLES naming); unifies CIP-1 GBA with CIP-5 §9 auction
+title: "CIP-1: Actor Message Scheduler (v3)"
+description: v3 — replaces the first-price + exponential-bias auction (Part I / Part II §2) with an EIP-1559 timer basefee + priority tip + per-actor fairness weight; default GBA specified inline; CIP-5 retains the canonical current-implementation FIFO until v3 activation
 ---
 
-# CIP-1 v2
+# CIP-1 v3
 
-> **Versioning.** This is v2 of CIP-1. v1 is the canonical document `cip-1-actor-scheduler.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
+> **Versioning.** This is v3 of CIP-1. v1 is preserved verbatim as Part I; v2 (the CIP-5-alignment revision) as Part II; v3 (this revision, the EIP-1559 hybrid target design) is Part III.
 >
-> **Conflict rule:** Part II is canonical wherever it contradicts Part I. Part II also realigns with CIP-5 (revised 2026-04-20).
+> **Conflict rule:** Part III is canonical wherever it contradicts Part I or Part II §§2–3. Part II §§1, 4–9 (block ordering, lane naming, opcode mapping, CIP-5 fee-model alignment, migration impact, backwards compat) remain canonical — v3 does not change them. CIP-5 §§1–8 remain canonical for the currently-implemented FIFO behaviour until v3 activates.
 >
-> **Summary of v2 changes**
+> **Summary of v3 changes**
+>
+> - **Replaces the first-price-per-cycle + exponential-bias auction** (Part I §3 step 4–5 + §5; Part II §2 unified design + §3 priority semantics) with an **EIP-1559 timer-lane basefee + priority tip** mechanism on top of CIP-3's dual-meter basefee. Rationale: first-price-per-cycle is structurally unstable in repeated knapsack settings (well-documented literature), and the EIP-1559 design reuses six years of EVM mainnet patterns. The `bid: int` parameter on `schedule_timer` (Part II §2 / CIP-5 §9.7) is dropped; replaced by `(max_fee_per_cycle, max_priority_fee_per_cycle)` per Part III §3.
+> - **Replaces the per-timer exponential bias `e^(nλ)`** (Part I §3 step 6; CIP-5 §9.2) with a **per-actor fairness weight `W(actor) ∈ [1, 2]`** computed over a 1,000-block rolling window. Bias-on-deferred-timer was retrospective and gameable via timer-spam; per-actor weight is preventive and cannot be amplified by re-scheduling.
+> - **Closes Gap G7 (default GBA bidding strategy unspecified)** by spelling the default GBA inline (~2 lines) in Part III §5: `max_fee_per_cycle = 2 × current_basefee`, `max_priority_fee_per_cycle = previous_block_p50_priority_tip`.
+> - **Adds per-timer cycle cap** `MAX_CYCLES_PER_FIRE_AUCTION_PHASE = 250,000` (= 12.5% of `LANE_TIMER_CYCLES`) to prevent any single timer from monopolising the lane. CIP-5 §6.4's `max_cycles_per_fire = 550_000` remains in force during the FIFO phase; the tighter 250k cap activates with v3.
+> - **Pins Timer-lane fee multiplier at 1.0×** (per CIP-3 §2.2.3 amendment in batch B4): no subsidy at launch. Tier-0 tunable.
+> - **Closes CIP-5 §9 open questions** by either resolving them (G7 default GBA → spec'd; "Interaction with CIP-1 GBA" → see §2 below) or evaporating them (`λ` calibration → no longer relevant; VCG revenue gap → not applicable; reserve price → replaced by `MIN_BASEFEE` per CIP-3).
+> - **CIP-5 §9 is REMOVED** as a co-change in the same batch as v3 activation; CIP-5 retains §§1–8 (current FIFO + per-fire `fee_payer`) until v3 ships.
+>
+> **What v3 does NOT change**
+>
+> - **Block ordering:** Tx-then-Timer remains canonical (Part II §1 / CIP-5 §5.1).
+> - **Per-fire `fee_payer` model:** CIP-5 §6.3 remains binding. The EIP-1559 priority tip is *additional* to the per-fire `max_cost` pre-charge, not a replacement.
+> - **Three-path lifecycle:** natural fire / TTL expiry / insufficient-funds self-destruct (CIP-5 §5.4) is unchanged.
+> - **Lane separation:** `LANE_TIMER_CYCLES` (execution) vs `TIMER_GC_CYCLES` (cleanup) (CIP-5 §6.5) is unchanged.
+> - **System instruction opcodes** (`SYS_CANCEL_TIMER = 48`, `SYS_UPDATE_TIMER_CONFIG = 49`, `SYS_EXTEND_TIMER = 50`) are unchanged.
+> - **Same-block prohibition** (CIP-5 §5.3) remains in force.
+>
+> **Summary of v2 changes (retained for historical context)**
 >
 > - Aligns with CIP-5 (revised 2026-04-20) which now specifies **Tx-then-Timer** block ordering natively in §5.1. CIP-1 v1's 2026-04-15 amendment caveat is superseded — there is no discrepancy left to flag.
 > - Recognises CIP-5 §6.3's **per-fire `fee_payer` model**: timers are NOT free. Each fire pre-charges `fee_payer` for `max_cost = gas_limit_per_fire × basefee + cells × basefee`, then refunds the unused portion. CIP-5 v1's "system-triggered, no fee charged" claim is superseded.
 > - Recognises CIP-5 §5.4's **three-path lifecycle** (natural fire / TTL expiry / insufficient-funds self-destruct) plus explicit cancellation, and CIP-5 §6.5's **separation of `LANE_TIMER_CYCLES` (execution) from `TIMER_GC_CYCLES` (cleanup)** so a TTL-expiry storm cannot starve live timers.
-> - **Unifies** CIP-1's GBA contracts with CIP-5 §9's exponential-bias auction. They are NOT competing designs: GBA produces the bid; the auction selects winners. The auction layer adds **priority** on top of the basefee — it does not replace the per-fire fee model. Closes CIP-5 §9.9 open question.
+> - Unified CIP-1's GBA contracts with CIP-5 §9's exponential-bias auction (Part II §2). **Superseded by Part III** — the auction layer is replaced; GBA contracts remain a useful concept and are reframed in Part III §5.
 > - Renames v1's `TIMER_PROCESSING_BUDGET_CYCLES` → `LANE_TIMER_CYCLES` per CIP-5 §6.5.
-> - Acknowledges new CIP-5 system instructions (`SYS_CANCEL_TIMER` / `SYS_UPDATE_TIMER_CONFIG` / `SYS_EXTEND_TIMER`) which are **already in code at opcodes 48 / 49 / 50** — no new allocation needed. (Earlier draft recommended 70–72; that was based on a stale opcode map and is withdrawn — see §6.)
+> - Acknowledges new CIP-5 system instructions (`SYS_CANCEL_TIMER` / `SYS_UPDATE_TIMER_CONFIG` / `SYS_EXTEND_TIMER`) which are **already in code at opcodes 48 / 49 / 50** — no new allocation needed. (Earlier draft recommended 70–72; that was based on a stale opcode map and is withdrawn — see Part II §6.)
 
 ---
 
@@ -279,3 +298,198 @@ The CIP-5 revision (2026-04-20) introduces the per-fire fee model as a substanti
 
 Strictly additive over CIP-5 (revised). No syscall, opcode, or constant changes are introduced by CIP-1 v2 itself. The future auction (CIP-5 §9) and GBA contracts (CIP-1) remain Phase 2 / Phase 3 work and require separate governance activation. The CIP-5 fee model (§3 above) is binding from CIP-5's revision activation; all existing v2 docs that schedule CIP-5 timers (notably CIP-9 v2 PoR challenges, CIP-16 v2 external-domain reverify) MUST specify a `fee_payer` and handle the insufficient-funds self-destruct case.
 
+---
+
+## Part III — v3 Revision (canonical; EIP-1559 timer hybrid target design)
+
+### 0. What this revision does
+
+v3 replaces the first-price-per-cycle auction + exponential-bias mechanism (Part I §3 step 4–5 + §5; Part II §2 + §3; CIP-5 §9) with an **EIP-1559 timer-lane basefee + priority tip** mechanism augmented by a **per-actor fairness weight `W(actor) ∈ [1, 2]`** over a rolling 1,000-block window. Default GBA bidding strategy is specified inline (closing Gap G7 from the 2026-04-05 design review).
+
+The replacement preserves Part II's invariants — Tx-then-Timer block ordering, per-fire `fee_payer` pre-charge + refund, three-path lifecycle, lane separation, and same-block prohibition — and supersedes CIP-5 §9 (removed in the same activation batch).
+
+### 1. Why EIP-1559 over first-price auction
+
+Three structural advantages, all observable today on Ethereum mainnet:
+
+1. **First-price-per-cycle is unstable in repeated knapsack settings.** Bidders best-respond by underbidding the prior round's clearing price, leading to oscillation and revenue collapse when actors are *programmatic* (CIP-1 v1 §1's "autonomous actors" cannot easily run a complex bidding strategy, much less converge a Nash equilibrium against other agents). EIP-1559 eliminates the strategic-bidding component entirely: the basefee is deterministic from the prior block's utilisation, and the priority tip is a simple price-discovery channel for ordering within the lane.
+2. **Default GBA collapses to ~2 lines.** Under first-price + exponential bias the default GBA's optimal strategy is open-ended (Gap G7); under EIP-1559 it reduces to `max_fee = 2 × basefee`, `max_priority_fee = previous_block_p50_tip` — analogous to MetaMask's default estimator on EVM. Removes the centralisation pressure flagged in [03-runner-marketplace.md §-cross-ref item #23] where conservative defaults would systematically deprioritise unsophisticated actors.
+3. **Invalid-bid attack class disappears structurally.** Part II inherited an open question on what happens when a GBA returns an invalid or maliciously-high bid (Gap G7 / review item #13). Under EIP-1559 there is no `bid` field: `max_priority_fee_per_cycle` is bounded by `max_fee_per_cycle − basefee` (lossy clamping is structural), and the per-fire `max_cost` pre-charge (CIP-5 §6.3) already caps the worst-case debit per fire. No drain attack survives.
+
+### 2. Mechanism
+
+When the v3 auction phase is active, end-of-block timer execution proceeds:
+
+1. **Collect.** Take the timer bucket for `current_block_height` after Tx-phase completion (Part II §1 / CIP-5 §5.1). Apply lifecycle classification per CIP-5 §5.4 (TTL expiry / insufficient-funds → GC lane).
+2. **Compute lane basefee.** The Timer-lane basefee adjusts per block using EIP-1559 dynamics over the prior block's timer-lane utilisation:
+   ```
+   utilisation_{H} = cycles_consumed_in_lane_{H} / LANE_TIMER_CYCLES        // ∈ [0, 1]
+   basefee_{H+1}   = basefee_{H} × (1 + clip((utilisation_{H} − 0.5) / 0.5, −0.125, +0.125))
+   ```
+   - Target utilisation: 0.5 (50%) of the 2,000,000-cycle Timer lane.
+   - Max basefee adjustment per block: ±12.5%.
+   - 100% of the basefee is **burned** (consistent with CIP-3 §2.4 and WP §6 "100% basefee burn"); the lane basefee is *additional to* the cycle basefee charged under CIP-3 — implementations track the two separately to preserve per-lane burn telemetry. Per-lane fee multiplier is pinned at `1.0×` (CIP-3 §2.2.3 + WP §6 / §17.9; no subsidy at launch).
+3. **Compute priority for each due timer:**
+   ```
+   priority_per_cycle = min(max_priority_fee_per_cycle, max_fee_per_cycle − basefee_lane)
+   effective_priority = priority_per_cycle × W(actor)
+   ```
+   Where `W(actor) ∈ [1, 2]` is the per-actor fairness weight (§4 below).
+4. **Sort and select.** Order due timers by `effective_priority` descending; tie-break by `(timer_id, schedule_block)`. Greedily fill `LANE_TIMER_CYCLES` budget. Each selected timer is gated by `cycles_consumed_so_far + gas_limit_per_fire ≤ LANE_TIMER_CYCLES − cycles_already_used` AND `gas_limit_per_fire ≤ MAX_CYCLES_PER_FIRE_AUCTION_PHASE` (250k by default; §6 below). Timers exceeding the per-timer cap are deferred without an attempt.
+5. **Settle.** For each selected timer:
+   - Pre-charge `fee_payer` as per CIP-5 §6.3:
+     ```
+     max_cost = gas_limit_per_fire × (basefee_cycle + priority_per_cycle) + max_cells × basefee_cell
+     ```
+     (i.e. the `max_cost` formula gains a priority-tip term; cycle basefee + cell basefee per CIP-3 unchanged).
+   - Execute handler. On normal return refund unused cycles × `(basefee_cycle + priority_per_cycle)`. Tip portion goes to the **block proposer** (consistent with CIP-3 §2.4 tips routing).
+   - On insufficient funds at any step → CIP-5 §5.4 path 2 (self-destruct without firing).
+6. **Defer.** Timers not selected remain in the bucket; on the next block they fall through the same flow with the same `W(actor)`. The 1,000-block fairness window naturally raises `W(actor)` for actors whose timers are repeatedly deferred (§4 below).
+7. **Update fairness counters.** Increment per-actor `recent_executions[actor] += 1` for every timer fired; the 1,000-block rolling decay is applied at the start of the next EOB step (§4).
+
+### 3. Schedule-timer API extension
+
+The CIP-5 §4.1 / §9.7 `schedule_timer` host API gains two parameters under v3 (replacing the `bid: int = 0` parameter that v2 inherited from CIP-5 §9.7):
+
+```python
+timer_id = pvm_host.schedule_timer(
+    height: int,
+    payload: bytes,
+    fee_payer: bytes = None,                    # as CIP-5 §4.1
+    gas_limit: int = None,                      # as CIP-5 §4.1
+    expires_at: int = None,                     # as CIP-5 §4.1
+    max_fee_per_cycle: int = None,              # NEW v3: defaults to default-GBA value (§5)
+    max_priority_fee_per_cycle: int = None,     # NEW v3: defaults to default-GBA value (§5)
+)
+```
+
+Validation at scheduling time:
+
+- `max_fee_per_cycle ≥ current_lane_basefee` → else `TimerRejectedBelowBasefee` (immediate failure; nothing escrowed).
+- `max_priority_fee_per_cycle ≤ max_fee_per_cycle − current_lane_basefee` → else clamp at schedule time and emit `TimerPriorityClampedAtSchedule(stated, clamped)` for observability.
+- No new escrow: under EIP-1559 there is no bid to escrow. The per-fire `max_cost` (CIP-5 §6.3) is pre-charged at execution time only, not at scheduling. This eliminates the cancellation-refund accounting that CIP-5 §9.7 v1 required for the `bid` field.
+
+`bid` from the prior CIP-5 §9.7 surface is **withdrawn** under v3. Old callers passing `bid = 0` (i.e. all current callers) continue to work — `bid` is silently accepted and ignored during a one-release deprecation window, then rejected with `TimerArgDeprecated`.
+
+### 4. Per-actor fairness weight `W(actor)`
+
+Replaces Part I §3 step 6 ("per-actor priority weight via exponential decay") and CIP-5 §9.2 ("exponential bias on deferred timers"). The shift from per-*timer* exponential bias to per-*actor* weight is the central anti-monopolisation change of v3.
+
+**Formula:**
+
+```
+recent_executions[actor]  = sum of timer fires by `actor` over the most recent 1,000 blocks
+network_median            = median of recent_executions across actors with ≥1 fire in window
+                            (or 0 if no actor has fired in the window)
+ratio[actor]              = recent_executions[actor] / max(1, network_median)
+W(actor)                  = clip(2 − ratio[actor], 1, 2)
+```
+
+- An actor at or below the network median (`ratio ≤ 1`) gets `W = 2` (maximum boost). An actor at 2× the median or above (`ratio ≥ 2`) gets `W = 1` (no boost). Linear interpolation in between.
+- Window length `FAIRNESS_WINDOW_BLOCKS = 1_000` (~16.7 min at 1s blocks), Tier-2 governance-tunable. Stored at `0x09` under `system:cip1:fairness_window_blocks`.
+- `ratio` is **clipped** to `[0, 2]` before subtraction, so a brand-new actor with zero recent fires gets `W = 2` rather than infinity.
+
+**State.** Each `actor` carries a 1,000-element ring buffer of fire-counts per block in the Actor Scheduler state. Memory cost: ~8 KiB per actively-firing actor. Eviction: actors with zero fires in the entire 1,000-block window are pruned from the fairness map (next fire re-creates a fresh entry).
+
+**Mutability of formula structure.** Tier-2 (governance changes the inclusion ordering, which affects fee revenue distribution). The numeric `FAIRNESS_WINDOW_BLOCKS` and the `[1, 2]` clip bounds are Tier-0.
+
+**Known limitations (Phase-5 simulation deferred):**
+
+1. **Fragmentation attack.** A sophisticated developer can deploy 100 actor instances and treat each as a separate "quiet" actor to bypass per-actor weight. Mitigation candidate: per-deployer weight (using actor-creation trace) instead of per-actor — requires deeper actor metadata than CIP-2 currently exposes. Phase-5 simulation MUST size the attack magnitude before v3 ships; if material, per-deployer weight is added in v3.r2.
+2. **Median moves under shock.** When a large runner enters/exits and shifts the network median sharply, incumbents are briefly disadvantaged for ~1,000 blocks. EMA-smoothing the median (analogous to the HHI smoothing in CIP-2 §5 amend) is a candidate v3.r2 addition.
+
+### 5. Default GBA (closes Gap G7)
+
+GBA contracts as described in Part I §4.2 remain a useful abstraction for actors that need dynamic, context-sensitive bidding (DeFi liquidation actors, oracle-pushers, MEV-aware schedulers). v3 specifies the **protocol-default GBA** that the runtime supplies when an actor doesn't provide one.
+
+**Default GBA — normative:**
+
+```python
+def getGasBid(context: GBAContext) -> TxFeeParams:
+    # context fields per Part I §4.2 (unchanged):
+    #   trigger_block_height, current_block_height,
+    #   basefee_cycle, basefee_cell, basefee_lane_timer,
+    #   last_block_cycle_usage,
+    #   previous_block_p50_priority_tip_per_cycle,
+    #   owner_actor_balance
+    return TxFeeParams(
+        max_fee_per_cycle           = 2 * context.basefee_lane_timer,
+        max_priority_fee_per_cycle  = context.previous_block_p50_priority_tip_per_cycle,
+        # cell side: defaults to CIP-3 basefee_cell with no priority (timers are cycle-bound)
+        max_fee_per_cell            = context.basefee_cell,
+        max_priority_fee_per_cell   = 0,
+    )
+```
+
+- `2 × basefee` headroom absorbs up to ~5 blocks of basefee growth at the ±12.5% per-block clamp (`1.125^5 ≈ 1.80`) before hitting the cap — sufficient for normal congestion swings.
+- `p50 priority tip` is the prior-block median priority fee paid by *fired* timers; falls back to `0` if no timers fired in the prior block (avoids an undefined estimator on cold start).
+- The `basefee_lane_timer` context field is **new in v3** — added to `GBAContext` so default and custom GBAs can compute their bid against the lane-specific basefee rather than the global cycle basefee.
+
+**SDK convenience: `priority_tier_hint`.** The `cowboy-py` SDK MAY expose a high-level enum for callers who don't want to construct a GBA:
+
+```python
+class PriorityTier(Enum):
+    ECONOMY  = "economy"   # multiplier 0.8× on max_priority_fee_per_cycle
+    STANDARD = "standard"  # multiplier 1.0× (default)
+    FAST     = "fast"      # multiplier 1.5×
+    URGENT   = "urgent"    # multiplier 2.5×
+
+cowboy.schedule_timer(..., priority_tier_hint=PriorityTier.FAST)
+# expands to: max_priority_fee_per_cycle = 1.5 × p50_priority_tip
+```
+
+These four multipliers (0.8 / 1.0 / 1.5 / 2.5) are stored at `0x09` under
+`system:cip1:priority_tier_multipliers.{economy,standard,fast,urgent}` and are **Tier-0 governance-tunable** (consistent with the lane fee multipliers in CIP-3 §2.2.3 — both are multiplicative scalars on fee components, neither redirects revenue across recipient classes). CIP-12 §5.1 Tier 0 scope already references "any `governance-tunable` parameter (see genesis defaults and CIP-1/3/5/9/10)"; the priority-tier multipliers are picked up automatically by that clause, and CIP-12 §5.1's reference list is extended in the same activation batch to include **CIP-31** for completeness.
+
+### 6. Per-timer cycle cap during auction phase
+
+```
+MAX_CYCLES_PER_FIRE_AUCTION_PHASE = 250_000
+```
+
+= 12.5% of `LANE_TIMER_CYCLES = 2,000,000`. A single timer cannot consume more than 1/8th of the lane. CIP-5 §6.4's `max_cycles_per_fire = 550_000` remains in force during the FIFO phase (when there is no per-block scarcity competition); the tighter 250k cap activates with v3 to prevent single-timer monopolisation in the auction phase.
+
+Actors with handlers that legitimately need >250k cycles can split the work across multiple timer fires; the same-block prohibition (CIP-5 §5.3) prevents tail-end re-fires from compounding in a single block.
+
+**Mutability.** Tier-0, key `system:cip1:max_cycles_per_fire_auction_phase`.
+
+### 7. Migration from FIFO (CIP-5 §§3–8) to v3 hybrid
+
+Activation is a single governance proposal (Tier-3 by analogy with CIP-3 basefee curve changes; bicameral). At activation block `H_v3`:
+
+| Subsystem | Pre-`H_v3` | Post-`H_v3` |
+|---|---|---|
+| Inclusion order within bucket | FIFO by insertion | Sort by `effective_priority` (§2 step 4) |
+| `bid` field | Accepted, ignored (v2) | Rejected: `TimerArgDeprecated` |
+| Timer-lane basefee | Equal to global cycle basefee | EIP-1559 dynamics over prior-block lane utilisation |
+| Default GBA | "Bids conservatively" (Part II §5; underspecified) | Normative two-line estimator (§5 above) |
+| Per-timer cap | `max_cycles_per_fire = 550_000` (CIP-5 §6.4) | `MAX_CYCLES_PER_FIRE_AUCTION_PHASE = 250_000` |
+| Fairness | None | `W(actor) ∈ [1, 2]`, 1,000-block window |
+
+**Already-scheduled timers at `H_v3`:** stay in their buckets; gain `W(actor) = 2` (max boost) by default (zero recent fires in the freshly-initialised window); compete on `effective_priority` from `H_v3 + 1` onward.
+
+**Caller migration:** existing callers (`schedule_timer(height, payload)` with no fee fields) continue to work — they receive the default-GBA estimator under the hood. Callers that previously passed `bid` get a one-release deprecation warning, then a hard error.
+
+### 8. Open questions deferred to Phase-5 simulation
+
+- **`FAIRNESS_WINDOW_BLOCKS`** calibration. 1,000 blocks (~16.7 min) is the launch default; longer windows smooth more but lag more on actor identity changes.
+- **Per-deployer vs per-actor weight** (fragmentation-attack threat magnitude, §4 limitation 1).
+- **Median EMA-smoothing** (§4 limitation 2) — whether to ship in v3.r2 or wait for empirical shock evidence.
+- **Priority-tier multipliers** {0.8, 1.0, 1.5, 2.5} — empirical tuning against actual congestion patterns.
+- **Lane fee multiplier** — pinned at 1.0× at launch (CIP-3 §2.2.3); Phase-5 simulation MAY recommend a 0.8× Timer-lane subsidy if the lane is structurally under-utilised post-mainnet.
+
+### 9. v3 backwards compatibility
+
+- **CIP-5 §§1–8** unchanged for both FIFO and auction phases. **CIP-5 §9 is removed** in the v3 activation batch — its functionality is replaced by this Part III + the per-actor fairness weight.
+- **System instruction opcodes 48 / 49 / 50** unchanged.
+- **Per-fire `fee_payer` model (CIP-5 §6.3)** unchanged. The EIP-1559 priority tip extends the `max_cost` formula but does not change the pre-charge / refund mechanics.
+- **Block ordering** Tx-then-Timer (Part II §1 / CIP-5 §5.1) unchanged.
+- **Same-block prohibition** (CIP-5 §5.3) unchanged.
+- **Existing callers** of `schedule_timer(height, payload)` work without source change — they get the default GBA estimator implicitly.
+- **Callers passing `bid`** receive one release of deprecation warning, then hard error. v2 documentation that references `bid` (CIP-9 v2 §12 PoR challenge timer, CIP-16 v2 reverify) MUST be updated in the v3 activation batch to drop the `bid` field.
+
+### 10. Decision-register dependencies
+
+This Part III has **no Decision-Register gates** — every parameter and design choice in v3 is either a Tier-0 governance-tunable default or a structural recommendation. The activation block `H_v3` is itself a Tier-3 governance proposal; that is the only policy lever required.
+
+(Cross-ref: WP §5.1 is split into 5.1a "Currently Implemented (CIP-5 FIFO)" and 5.1b "Target Design (CIP-1 v3 EIP-1559 hybrid)" in the same activation batch; CIP-12 §5.2 Tier-2 list gains `priority_tier_multipliers`.)
