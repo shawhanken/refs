@@ -59,17 +59,22 @@ publish_sticky_comment() {
   [[ "$pr_number" == "0" || -z "$pr_number" ]] && { log "no PR number; skipping comment"; return 0; }
   [[ ! -f "$report_md" ]] && { log "no report md at $report_md"; return 0; }
 
-  local body
-  body="$(cat "$report_md")"
-
-  # Per-target marker. Without this every target in one PR would PATCH the
-  # same comment and the last one would win, hiding earlier targets.
+  # Per-target marker so multiple targets in one PR don't overwrite one another.
   local target_marker="${marker}:${target}"
 
-  if emit_dry "$(jq -nc --arg op sticky_comment --arg target "$target" \
-                       --arg repo "$repo" --argjson pr "$pr_number" \
-                       --arg marker "$target_marker" --arg body "$body" \
-                       '{op:$op, target:$target, repo:$repo, pr:$pr, marker:$marker, body_len:($body|length)}')"; then
+  # Body MUST never touch argv or env on the GitHub Actions runner: combined
+  # with the runner's large existing envp, even a 1KB body can blow E2BIG.
+  # Stage everything via tmpfiles + `gh api --input <file>` / `--rawfile`.
+  local body_file
+  body_file="$(mktemp)"
+  cp "$report_md" "$body_file"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    jq -nc --rawfile body "$body_file" --arg op sticky_comment --arg target "$target" \
+       --arg repo "$repo" --argjson pr "$pr_number" --arg marker "$target_marker" \
+       '{op:$op, target:$target, repo:$repo, pr:$pr, marker:$marker, body_len:($body|length)}' \
+       >> "$DRY_LOG"
+    rm -f "$body_file"
     return 0
   fi
 
@@ -78,25 +83,26 @@ publish_sticky_comment() {
   existing_id="$(gh api "repos/$repo/issues/$pr_number/comments" --paginate \
     --jq ".[] | select(.body | test(\"<!-- $target_marker -->\")) | .id" | head -1 || true)"
 
-  # Build the JSON payload via Python and pipe over stdin. Passing `--field
-  # body="$body"` puts the body on argv; combined with GitHub Actions runner's
-  # large envp it can exceed the kernel's E2BIG limit even for small bodies.
-  local payload
-  payload="$(BODY="$body" python3 -c "import json,os;print(json.dumps({'body': os.environ['BODY']}))")"
+  # Build {"body": "<file content>"} as a tmpfile; pass --input <path>.
+  local payload_file
+  payload_file="$(mktemp)"
+  jq -n --rawfile body "$body_file" '{body: $body}' > "$payload_file"
 
   if [[ -n "$existing_id" ]]; then
     log "updating sticky comment $existing_id"
-    if ! _err="$(printf '%s' "$payload" | gh api -X PATCH \
-                  "repos/$repo/issues/comments/$existing_id" --input - 2>&1 >/dev/null)"; then
+    if ! _err="$(gh api -X PATCH "repos/$repo/issues/comments/$existing_id" \
+                  --input "$payload_file" 2>&1 >/dev/null)"; then
       log "PATCH comment failed: $_err"
     fi
   else
     log "creating sticky comment"
-    if ! _err="$(printf '%s' "$payload" | gh api -X POST \
-                  "repos/$repo/issues/$pr_number/comments" --input - 2>&1 >/dev/null)"; then
+    if ! _err="$(gh api -X POST "repos/$repo/issues/$pr_number/comments" \
+                  --input "$payload_file" 2>&1 >/dev/null)"; then
       log "POST comment failed: $_err"
     fi
   fi
+
+  rm -f "$body_file" "$payload_file"
 }
 
 # --- Check Runs --------------------------------------------------------------
