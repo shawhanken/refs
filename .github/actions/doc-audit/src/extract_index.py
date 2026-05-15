@@ -113,7 +113,7 @@ def _parse_file(rel_path: str, text: str) -> dict[str, list[dict[str, Any]]]:
             if mh:
                 title = mh.group(2)
                 break
-        anchors = sorted(set(md.extract_anchors(text)))
+        anchors = sorted(set(md.extract_section_anchors(text)))
         out["cips"].append(
             {
                 "id": cip_id,
