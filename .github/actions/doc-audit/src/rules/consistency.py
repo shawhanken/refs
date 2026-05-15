@@ -173,8 +173,11 @@ def dangling_xref(ctx: RuleContext) -> Iterable[Finding]:
             )
             continue
         if rest:
-            anchor = rest[0].strip()
-            if anchor and anchor not in (cip.get("anchors") or []):
+            # xref stores anchors as "§9.7"; the index strips the § and stores
+            # bare numbers like "9.7". Normalize both sides before comparing.
+            anchor = rest[0].strip().lstrip("§").strip()
+            existing = {a.lstrip("§").strip() for a in (cip.get("anchors") or [])}
+            if anchor and anchor not in existing:
                 yield Finding(
                     rule_id="R004_dangling_xref",
                     source="rules",
@@ -182,8 +185,8 @@ def dangling_xref(ctx: RuleContext) -> Iterable[Finding]:
                     severity="block",
                     title=f"悬空锚点：{target}",
                     locations=[Location(file=x["file"], line_start=x["line"])],
-                    message=f"{target} 中的锚点 {anchor} 不存在于 CIP-{cip_num}。",
-                    suggestion="使用 CIP-{cip_num} 中实际存在的章节锚点。",
+                    message=f"{target} 中的锚点 §{anchor} 不存在于 CIP-{cip_num}。",
+                    suggestion=f"使用 CIP-{cip_num} 中实际存在的章节锚点。",
                 )
 
 
