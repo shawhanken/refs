@@ -79,6 +79,7 @@ def build_request(
             "rules_findings": list(rules_findings),
             "documents": documents,
             "related_code_excerpts": related_code_excerpts,
+            "related_code_mirrors": list(target.related_code_mirrors or []),
         },
         "budget_hint": {
             "max_usd": budget_max_usd,
