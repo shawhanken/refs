@@ -23,27 +23,27 @@ _DIM = "security"
 _SECRET_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     (
         "S001_aws_access_key_id",
-        "AWS Access Key ID 出现在文档代码块",
+        "AWS Access Key ID present in a documentation code block",
         re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     ),
     (
         "S002_anthropic_key",
-        "Anthropic API key 出现在文档",
+        "Anthropic API key present in documentation",
         re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}"),
     ),
     (
         "S003_openai_key",
-        "OpenAI API key 出现在文档",
+        "OpenAI API key present in documentation",
         re.compile(r"\bsk-[A-Za-z0-9]{20,}"),
     ),
     (
         "S004_private_key_block",
-        "私钥 PEM 块出现在文档",
+        "PEM private-key block present in documentation",
         re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     ),
     (
         "S005_generic_jwt",
-        "JWT 出现在文档代码块",
+        "JWT present in a documentation code block",
         re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"),
     ),
 ]
@@ -52,23 +52,23 @@ _SECRET_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
 _DANGEROUS_CMDS: list[tuple[str, str, re.Pattern[str]]] = [
     (
         "S010_rm_rf_root",
-        "示例代码包含 `rm -rf /` 模式",
+        "Example code contains a `rm -rf /` pattern",
         re.compile(r"rm\s+-rf?\s+/\s*(\$|\b|$)"),
     ),
     (
         "S011_chmod_777",
-        "示例代码包含 `chmod 777`",
+        "Example code contains `chmod 777`",
         re.compile(r"chmod\s+(?:-R\s+)?777\b"),
     ),
     (
         "S012_curl_pipe_bash",
-        "示例代码包含 `curl | bash` 模式",
+        "Example code contains a `curl | bash` pattern",
         re.compile(r"curl\s+[^\|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b"),
     ),
     (
         "S013_disable_auth_for_test",
-        "示例代码建议关闭鉴权",
-        re.compile(r"(?i)(?:disable|turn\s*off|skip|关闭|跳过)\s+(?:auth|authentication|鉴权)"),
+        "Example code suggests disabling authentication",
+        re.compile(r"(?i)(?:disable|turn\s*off|skip)\s+(?:auth|authentication)"),
     ),
 ]
 
@@ -96,8 +96,8 @@ def secret_in_doc(ctx: RuleContext) -> Iterable[Finding]:
                     title=title,
                     locations=[Location(file=cb["file"], line_start=line)],
                     evidence=m.group(0)[:64],
-                    message=f"{cb['file']}:{line} 的代码块包含疑似 secret。",
-                    suggestion="替换为占位符（例如 `<YOUR_API_KEY>`）。",
+                    message=f"The code block at {cb['file']}:{line} contains what looks like a real secret.",
+                    suggestion="Replace with a placeholder such as `<YOUR_API_KEY>`.",
                 )
 
 
@@ -117,6 +117,6 @@ def dangerous_command_in_doc(ctx: RuleContext) -> Iterable[Finding]:
                     title=title,
                     locations=[Location(file=cb["file"], line_start=line)],
                     evidence=m.group(0)[:80],
-                    message=f"{cb['file']}:{line} 文档代码块中出现潜在危险操作。",
-                    suggestion="在示例中明确警告读者，或改用更安全的等价命令。",
+                    message=f"A potentially destructive command appears in the code block at {cb['file']}:{line}.",
+                    suggestion="Warn the reader explicitly, or replace with a safer equivalent.",
                 )
