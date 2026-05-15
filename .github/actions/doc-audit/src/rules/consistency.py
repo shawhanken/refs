@@ -74,17 +74,18 @@ def _opcode_collision_finding(new: dict, other: dict) -> Finding:
         source="rules",
         dimension=_DIM,
         severity="block",
-        title=f"Opcode 0x{new['id']:02X} 与已有定义冲突",
+        title=f"Opcode 0x{new['id']:02X} collides with existing assignment",
         locations=[
             Location(file=new["file"], line_start=new["line"]),
             Location(file=other["file"], line_start=other["line"]),
         ],
         message=(
-            f"HEAD 新增 opcode 0x{new['id']:02X}（{new.get('name') or '匿名'}）"
-            f"，但 {other['file']}:{other['line']} 已分配该 opcode"
-            f"（{other.get('name') or '匿名'}）。"
+            f"HEAD introduces opcode 0x{new['id']:02X} "
+            f"({new.get('name') or 'anonymous'}), but "
+            f"{other['file']}:{other['line']} already assigns the same opcode "
+            f"({other.get('name') or 'anonymous'})."
         ),
-        suggestion="按白皮书 §9.2 注释取下一个空闲位。",
+        suggestion="Pick the next free slot per the Whitepaper §9.2 opcode registry.",
     )
 
 
@@ -102,16 +103,16 @@ def address_collision(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="block",
-                title=f"System actor 地址 {new['id']} 冲突",
+                title=f"System actor address {new['id']} collides",
                 locations=[
                     Location(file=new["file"], line_start=new["line"]),
                     Location(file=other["file"], line_start=other["line"]),
                 ],
                 message=(
-                    f"HEAD 给 {new.get('name')} 分配 {new['id']}，但 "
-                    f"{other['file']} 已把它分给 {other.get('name')}。"
+                    f"HEAD assigns {new['id']} to {new.get('name')}, but "
+                    f"{other['file']} already assigns it to {other.get('name')}."
                 ),
-                suggestion="选择未占用的地址。",
+                suggestion="Pick an unassigned address.",
             )
 
 
@@ -138,13 +139,14 @@ def opcode_without_wp_update(ctx: RuleContext) -> Iterable[Finding]:
         source="rules",
         dimension=_DIM,
         severity="block",
-        title="改动 opcode 但未同步白皮书 §9.2",
+        title="Opcode changed without updating Whitepaper §9.2",
         locations=[Location(file=sample_loc["file"], line_start=sample_loc["line"])],
         message=(
-            "本次 PR 触及 opcode 列表，但 changed_files 中没有白皮书条目。"
-            "按白皮书 §9.2 收尾注释要求，opcode 变更必须同 PR 内同步注册表。"
+            "This PR touches the opcode list, but no whitepaper file is in "
+            "changed_files. Per Whitepaper §9.2's trailing note, opcode "
+            "changes must update the registry in the same PR."
         ),
-        suggestion="在同一 PR 修改白皮书 §9.2 的 opcode 表。",
+        suggestion="Update the Whitepaper §9.2 opcode table in the same PR.",
     )
 
 
@@ -167,10 +169,10 @@ def dangling_xref(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="block",
-                title=f"悬空引用：{target}",
+                title=f"Dangling reference: {target}",
                 locations=[Location(file=x["file"], line_start=x["line"])],
-                message=f"{x['file']}:{x['line']} 引用 {target}，但该 CIP 在 HEAD 中不存在。",
-                suggestion="修正引用编号或落地缺失的 CIP。",
+                message=f"{x['file']}:{x['line']} references {target}, but that CIP does not exist in HEAD.",
+                suggestion="Fix the CIP number or land the missing CIP.",
             )
             continue
         if rest:
@@ -184,10 +186,10 @@ def dangling_xref(ctx: RuleContext) -> Iterable[Finding]:
                     source="rules",
                     dimension=_DIM,
                     severity="block",
-                    title=f"悬空锚点：{target}",
+                    title=f"Dangling anchor: {target}",
                     locations=[Location(file=x["file"], line_start=x["line"])],
-                    message=f"{target} 中的锚点 §{anchor} 不存在于 CIP-{cip_num}。",
-                    suggestion=f"使用 CIP-{cip_num} 中实际存在的章节锚点。",
+                    message=f"Anchor §{anchor} in {target} is not defined in CIP-{cip_num}.",
+                    suggestion=f"Use an actual section anchor defined in CIP-{cip_num}.",
                 )
 
 
@@ -213,10 +215,10 @@ def cip_number_collision(ctx: RuleContext) -> Iterable[Finding]:
             source="rules",
             dimension=_DIM,
             severity="block",
-            title=f"CIP-{cip_id} 编号被多个文件使用",
+            title=f"CIP number {cip_id} claimed by multiple files",
             locations=[Location(file=i["file"], line_start=1) for i in items],
-            message=", ".join(i["file"] for i in items) + f" 都自称 CIP-{cip_id}。",
-            suggestion="给冲突的 CIP 重新编号；翻译文件用相同基础名 + `-zh`/`-en` 后缀。",
+            message=", ".join(i["file"] for i in items) + f" all claim CIP-{cip_id}.",
+            suggestion="Renumber the conflicting CIPs. Translations should share the same base name with `-zh`/`-en` suffix.",
         )
 
 
@@ -236,10 +238,10 @@ def status_regression(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="block",
-                title=f"CIP-{h['id']} 状态倒退：{b['status']} → {h['status']}",
+                title=f"CIP-{h['id']} status regression: {b['status']} → {h['status']}",
                 locations=[Location(file=h["file"], line_start=1)],
-                message=f"{h['file']} 把 CIP-{h['id']} 从 {b['status']} 改为 {h['status']}。",
-                suggestion="只允许向 Withdrawn 倒退；其他变更需要在 PR 描述里说明理由。",
+                message=f"{h['file']} moves CIP-{h['id']} from {b['status']} back to {h['status']}.",
+                suggestion="Only regressing to Withdrawn is allowed; other moves need an explicit rationale in the PR description.",
             )
 
 
@@ -257,12 +259,12 @@ def terminology_drift(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="warn",
-                title=f"术语 '{term}' 在多个文档定义",
+                title=f"Term '{term}' defined in multiple documents",
                 locations=[
                     Location(file=d["definition_file"], line_start=d["line"]) for d in defs
                 ],
-                message=f"术语 {term!r} 在 {len(files)} 个文档中作为首次定义出现。",
-                suggestion="在术语表统一定义，其他文档改为引用。",
+                message=f"Term {term!r} appears as a first definition in {len(files)} documents.",
+                suggestion="Define it once in the glossary; have other documents reference it.",
             )
 
 
@@ -295,10 +297,10 @@ def link_rot(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="warn",
-                title=f"相对链接失效：{url}",
+                title=f"Broken relative link: {url}",
                 locations=[Location(file=rel, line_start=line)],
-                message=f"{rel}:{line} 指向不存在的相对路径 {url}。",
-                suggestion="修正链接或移除。",
+                message=f"{rel}:{line} points to relative path {url}, which does not exist.",
+                suggestion="Fix the link or remove it.",
             )
 
 
@@ -315,8 +317,8 @@ def constant_value_mismatch(ctx: RuleContext) -> Iterable[Finding]:
                 source="rules",
                 dimension=_DIM,
                 severity="block",
-                title=f"常量 {name} 在文档中出现多个值",
+                title=f"Constant {name} has conflicting values across documents",
                 locations=[Location(file=i["file"], line_start=i["line"]) for i in items],
-                message=f"{name} 取值 {sorted(values)} 在多个文档不一致。",
-                suggestion="选择权威定义并在其他文档统一。",
+                message=f"{name} appears with values {sorted(values)} in different documents.",
+                suggestion="Pick the canonical value and align the other documents.",
             )
