@@ -34,6 +34,10 @@ class TargetConfig:
     paths: list[str]
     glossary: str | None = None
     related_code: list[str] = field(default_factory=list)
+    # Names of server-side repo mirrors to consult (e.g. ["node", "runner",
+    # "cbfs"]). Server resolves these against its local mirror root; the
+    # action just forwards the names. Empty list = excerpts-only (legacy).
+    related_code_mirrors: list[str] = field(default_factory=list)
     dimensions: dict[str, DimensionConfig] = field(default_factory=dict)
 
 
@@ -83,6 +87,7 @@ def parse_config(raw: dict[str, Any]) -> AuditConfig:
                 paths=list(t.get("paths") or []),
                 glossary=t.get("glossary"),
                 related_code=list(t.get("related_code") or []),
+                related_code_mirrors=list(t.get("related_code_mirrors") or []),
                 dimensions=dims,
             )
         )
