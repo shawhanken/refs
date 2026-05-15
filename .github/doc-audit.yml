@@ -1,13 +1,22 @@
 # Audit config for shawhanken/refs.
+#
+# `related_code` paths resolve inside the consumer repo (refs/).
+# `related_code_mirrors` are names of server-side mirrors that the audit
+# server reads from its own filesystem (typically ~/workspace/<name>).
+# Mirrors are the right place to plug in node / runner / cbfs source code
+# the docs reference but don't ship.
 targets:
   - name: cips
     paths:
       - cips/**
       - whitepaper/**
     related_code:
-      - node/
-      - runner/
       - chain/
+    related_code_mirrors:
+      - node
+      - runner
+      - cbfs
+      - refs
     dimensions:
       consistency:  { enabled: true, severity_gate: warn }
       security:     { enabled: true, severity_gate: warn }
