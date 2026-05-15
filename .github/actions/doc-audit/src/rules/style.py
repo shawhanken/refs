@@ -19,7 +19,7 @@ _DIM = "style"
 
 @rule("W001_term_casing_drift", _DIM)
 def term_casing_drift(ctx: RuleContext) -> Iterable[Finding]:
-    """同一术语出现多个大小写形式（Actor / actor / ACTOR）。"""
+    """Same term used with inconsistent casing (Actor / actor / ACTOR)."""
     by_lc: dict[str, set[str]] = defaultdict(set)
     by_lc_locs: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for t in ctx.head_index.get("terms", []) or []:
@@ -36,10 +36,10 @@ def term_casing_drift(ctx: RuleContext) -> Iterable[Finding]:
             source="rules",
             dimension=_DIM,
             severity="warn",
-            title=f"术语 {sorted(variants)!r} 大小写不一致",
+            title=f"Term {sorted(variants)!r} appears with inconsistent casing",
             locations=locs,
-            message=f"以下变体并存：{sorted(variants)}。",
-            suggestion="选定一种写法在术语表中固化。",
+            message=f"Variants in use: {sorted(variants)}.",
+            suggestion="Pick one canonical form and lock it in the glossary.",
         )
 
 
@@ -62,8 +62,8 @@ def anchor_format(ctx: RuleContext) -> Iterable[Finding]:
                     source="rules",
                     dimension=_DIM,
                     severity="warn",
-                    title="锚点 `§` 与编号之间多余空格",
+                    title="Extra whitespace between `§` and section number",
                     locations=[Location(file=rel, line_start=i)],
-                    message=f"{rel}:{i} 中 `§` 与数字之间存在空格，与项目惯例不一致。",
-                    suggestion="改为 `§N.M` 形式。",
+                    message=f"At {rel}:{i} there is whitespace between `§` and the digits, which does not match the project convention.",
+                    suggestion="Use the `§N.M` form (no space).",
                 )
