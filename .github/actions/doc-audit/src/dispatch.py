@@ -97,11 +97,17 @@ def post_audit(
     headers = {"Content-Type": "application/json"}
     if server_token:
         headers["Authorization"] = f"Bearer {server_token}"
+    # Tolerate both forms of server_url: with or without a trailing /v1 segment.
+    base = server_url.rstrip("/")
+    if base.endswith("/v1"):
+        base = base[: -len("/v1")]
+    audit_url = f"{base}/v1/audit"
+
     last_err: Exception | None = None
     for attempt in range(MAX_RETRIES + 1):
         try:
             r = requests.post(
-                f"{server_url.rstrip('/')}/v1/audit",
+                audit_url,
                 json=request_body,
                 headers=headers,
                 timeout=REQUEST_TIMEOUT_S,
