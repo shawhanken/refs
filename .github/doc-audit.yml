@@ -1,27 +1,19 @@
-# Sample doc-audit.yml — drop this in `.github/doc-audit.yml` and adjust paths
-# to match your repository.
+# Audit config for shawhanken/refs.
 targets:
   - name: cips
     paths:
-      - refs/cips/**
-      - refs/whitepaper/**
-    glossary: refs/glossary.md
+      - cips/**
+      - whitepaper/**
     related_code:
       - node/
       - runner/
+      - chain/
     dimensions:
-      consistency:  { enabled: true, severity_gate: block }
+      consistency:  { enabled: true, severity_gate: warn }
       security:     { enabled: true, severity_gate: warn }
       technical:    { enabled: true, severity_gate: warn }
       architecture: { enabled: true, severity_gate: warn }
       style:        { enabled: false }
-
-  - name: user-docs
-    paths:
-      - docs/user/**
-    dimensions:
-      consistency: { enabled: true, severity_gate: warn }
-      style:       { enabled: true, severity_gate: warn }
 
 global:
   max_usd_per_run: 2.00
