@@ -28,12 +28,15 @@ from common.schema import Finding, load_findings
 
 _SEVERITY_RANK = {"block": 0, "warn": 1, "info": 2}
 _SEVERITY_EMOJI = {"block": "🔴", "warn": "🟡", "info": "🔵"}
+# Dimension labels are user-facing (Check Run names + sticky comment
+# section headers). Kept English so they render correctly across all
+# GitHub UIs and don't clash with branch-protection rule strings.
 _DIM_LABEL = {
-    "consistency": "一致性",
-    "security": "安全性",
-    "technical": "技术可行性",
-    "architecture": "架构可行性",
-    "style": "风格 / 术语",
+    "consistency": "Consistency",
+    "security": "Security",
+    "technical": "Technical Feasibility",
+    "architecture": "Architecture",
+    "style": "Style / Terminology",
 }
 
 # GitHub Issue Comments hard-cap at 65536 chars. We aim well below to leave
@@ -67,14 +70,14 @@ def render_markdown(
         # sticky comment instead of overwriting each other. publish.sh greps
         # for this same marker shape.
         f"<!-- {comment_marker}:{target.name} -->",
-        "## 📋 文档审计报告",
+        "## 📋 Doc Audit Report",
         "",
         f"**target:** `{target.name}`  ",
-        f"**总览：** {counts.get('block', 0)} block, {counts.get('warn', 0)} warn, {counts.get('info', 0)} info",
+        f"**Summary:** {counts.get('block', 0)} block, {counts.get('warn', 0)} warn, {counts.get('info', 0)} info",
         "",
     ]
     if view_url:
-        lines.append(f"[查看完整日志]({view_url})")
+        lines.append(f"[Full audit log]({view_url})")
         lines.append("")
 
     grouped = _by_dim(findings)
@@ -88,11 +91,11 @@ def render_markdown(
         label = _DIM_LABEL.get(dim_name, dim_name)
         quality_suffix = ""
         if dimension_quality.get(dim_name) == "low_confidence":
-            quality_suffix = "  ⚠️ 低置信度（>30% 语义发现位置校验失败）"
+            quality_suffix = "  ⚠️ low confidence (>30% of semantic findings failed location validation)"
         lines.append(f"<details><summary>{emoji} {label} — {block_n} block, {warn_n} warn{quality_suffix}</summary>")
         lines.append("")
         if not bucket:
-            lines.append("无发现。")
+            lines.append("No findings.")
         # Show worst-first; cap per-dim to avoid drowning the reader and
         # blowing the GitHub comment size limit.
         bucket_sorted = sorted(bucket, key=lambda f: _SEVERITY_RANK.get(f.severity, 99))
@@ -101,18 +104,18 @@ def render_markdown(
         for f in shown:
             lines.append(_render_finding(f))
         if hidden > 0:
-            lines.append(f"_…还有 {hidden} 条未展示——见完整工件 SARIF / 审计日志。_")
+            lines.append(f"_…{hidden} more not shown — see the full SARIF artifact / audit log._")
         lines.append("")
         lines.append("</details>")
         lines.append("")
 
     lines.extend([
         "---",
-        "**操作：**",
-        "- `/audit rerun` — 重跑审计",
-        "- `/audit rerun <dim>` — 仅重跑某维度",
-        "- `/audit ignore <finding-id>` — 永久忽略某条 finding",
-        "- `/audit explain <finding-id>` — 让 bot 详细解释",
+        "**Actions:**",
+        "- `/audit rerun` — re-run the full audit",
+        "- `/audit rerun <dim>` — re-run a single dimension",
+        "- `/audit ignore <finding-id>` — permanently ignore one finding",
+        "- `/audit explain <finding-id>` — ask the bot to elaborate",
     ])
     body = "\n".join(lines)
     # Belt-and-suspenders: even with the per-dim cap, prose / evidence text
@@ -120,7 +123,7 @@ def render_markdown(
     # clear footer if so.
     if len(body) > _MAX_COMMENT_CHARS:
         cut = _MAX_COMMENT_CHARS - 200
-        body = body[:cut].rstrip() + "\n\n_（评论超过 GitHub 上限，已截断；查看完整工件以获取全部 finding。）_"
+        body = body[:cut].rstrip() + "\n\n_(comment exceeded GitHub's size limit; truncated — see the full audit artifact for all findings.)_"
     return body
 
 
@@ -129,18 +132,18 @@ def _render_finding(f: Finding) -> str:
     locs = " ".join(f"`{l.file}:{l.line_start}`" for l in f.locations)
     body = [f"### {f.rule_id} — {f.title} — {sev}"]
     if locs:
-        body.append(f"**位置：** {locs}")
+        body.append(f"**Location:** {locs}")
     if f.history.historical_occurrences > 1:
         body.append(
-            f"⚠️ 该问题第 {f.history.historical_occurrences} 次出现"
-            + (f"（首次见于 PR #{f.history.first_seen_pr}）" if f.history.first_seen_pr else "")
+            f"⚠️ Occurrence #{f.history.historical_occurrences}"
+            + (f" (first seen in PR #{f.history.first_seen_pr})" if f.history.first_seen_pr else "")
         )
     if f.evidence:
-        body.append(f"**证据：** `{f.evidence}`")
+        body.append(f"**Evidence:** `{f.evidence}`")
     if f.message:
-        body.append(f"**说明：** {f.message}")
+        body.append(f"**Detail:** {f.message}")
     if f.suggestion:
-        body.append(f"**建议：** {f.suggestion}")
+        body.append(f"**Suggestion:** {f.suggestion}")
     body.append(f"<sub>finding_id: `{f.finding_id}` · source: {f.source}</sub>")
     return "\n".join(body)
 
