@@ -51,11 +51,8 @@ jobs:
       - uses: ./.github/actions/doc-audit
         with:
           config: .github/doc-audit.yml
-          # server_url: ${{ vars.DOC_AUDIT_SERVER_URL }}
-          # server_token: ${{ secrets.DOC_AUDIT_TOKEN }}
-          # anthropic_key_fallback: ${{ secrets.ANTHROPIC_API_KEY }}
-          server_url: ""
-          server_token: ""
+          server_url: ${{ vars.DOC_AUDIT_SERVER_URL }}
+          server_token: ${{ secrets.DOC_AUDIT_TOKEN }}
           enable_sarif: "false"
 
       # SARIF upload is intentionally separate from the bundled action so we
