@@ -78,16 +78,22 @@ publish_sticky_comment() {
   existing_id="$(gh api "repos/$repo/issues/$pr_number/comments" --paginate \
     --jq ".[] | select(.body | test(\"<!-- $target_marker -->\")) | .id" | head -1 || true)"
 
+  # Build the JSON payload via Python and pipe over stdin. Passing `--field
+  # body="$body"` puts the body on argv; combined with GitHub Actions runner's
+  # large envp it can exceed the kernel's E2BIG limit even for small bodies.
+  local payload
+  payload="$(BODY="$body" python3 -c "import json,os;print(json.dumps({'body': os.environ['BODY']}))")"
+
   if [[ -n "$existing_id" ]]; then
     log "updating sticky comment $existing_id"
-    if ! _err="$(gh api -X PATCH "repos/$repo/issues/comments/$existing_id" \
-                  --field body="$body" 2>&1 >/dev/null)"; then
+    if ! _err="$(printf '%s' "$payload" | gh api -X PATCH \
+                  "repos/$repo/issues/comments/$existing_id" --input - 2>&1 >/dev/null)"; then
       log "PATCH comment failed: $_err"
     fi
   else
     log "creating sticky comment"
-    if ! _err="$(gh api -X POST "repos/$repo/issues/$pr_number/comments" \
-                  --field body="$body" 2>&1 >/dev/null)"; then
+    if ! _err="$(printf '%s' "$payload" | gh api -X POST \
+                  "repos/$repo/issues/$pr_number/comments" --input - 2>&1 >/dev/null)"; then
       log "POST comment failed: $_err"
     fi
   fi
