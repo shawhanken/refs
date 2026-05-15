@@ -62,9 +62,13 @@ publish_sticky_comment() {
   local body
   body="$(cat "$report_md")"
 
+  # Per-target marker. Without this every target in one PR would PATCH the
+  # same comment and the last one would win, hiding earlier targets.
+  local target_marker="${marker}:${target}"
+
   if emit_dry "$(jq -nc --arg op sticky_comment --arg target "$target" \
                        --arg repo "$repo" --argjson pr "$pr_number" \
-                       --arg marker "$marker" --arg body "$body" \
+                       --arg marker "$target_marker" --arg body "$body" \
                        '{op:$op, target:$target, repo:$repo, pr:$pr, marker:$marker, body_len:($body|length)}')"; then
     return 0
   fi
@@ -72,7 +76,7 @@ publish_sticky_comment() {
   # Find existing comment by marker.
   local existing_id
   existing_id="$(gh api "repos/$repo/issues/$pr_number/comments" --paginate \
-    --jq ".[] | select(.body | test(\"<!-- $marker -->\")) | .id" | head -1 || true)"
+    --jq ".[] | select(.body | test(\"<!-- $target_marker -->\")) | .id" | head -1 || true)"
 
   if [[ -n "$existing_id" ]]; then
     log "updating sticky comment $existing_id"
