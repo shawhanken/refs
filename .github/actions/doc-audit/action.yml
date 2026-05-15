@@ -42,4 +42,8 @@ runs:
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        # `gh` reads GH_TOKEN for auth; without this every `gh api` call in
+        # publish.sh fails silently (publish.sh's `|| log ...` keeps the
+        # action green so the failure is invisible unless you grep the log).
+        GH_TOKEN: ${{ github.token }}
       run: bash "${{ github.action_path }}/entrypoint.sh"

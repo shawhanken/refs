@@ -76,12 +76,16 @@ publish_sticky_comment() {
 
   if [[ -n "$existing_id" ]]; then
     log "updating sticky comment $existing_id"
-    gh api -X PATCH "repos/$repo/issues/comments/$existing_id" \
-      --field body="$body" >/dev/null || log "PATCH comment failed"
+    if ! _err="$(gh api -X PATCH "repos/$repo/issues/comments/$existing_id" \
+                  --field body="$body" 2>&1 >/dev/null)"; then
+      log "PATCH comment failed: $_err"
+    fi
   else
     log "creating sticky comment"
-    gh api -X POST "repos/$repo/issues/$pr_number/comments" \
-      --field body="$body" >/dev/null || log "POST comment failed"
+    if ! _err="$(gh api -X POST "repos/$repo/issues/$pr_number/comments" \
+                  --field body="$body" 2>&1 >/dev/null)"; then
+      log "POST comment failed: $_err"
+    fi
   fi
 }
 
