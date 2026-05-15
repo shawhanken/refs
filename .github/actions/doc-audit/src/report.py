@@ -36,6 +36,12 @@ _DIM_LABEL = {
     "style": "风格 / 术语",
 }
 
+# GitHub Issue Comments hard-cap at 65536 chars. We aim well below to leave
+# room for the sticky marker and the trailing operations footer, and to keep
+# the rendered comment scannable rather than a wall of 700+ findings.
+_MAX_COMMENT_CHARS = 60_000
+_MAX_FINDINGS_PER_DIM = 25
+
 
 def _by_dim(findings: list[Finding]) -> dict[str, list[Finding]]:
     out: dict[str, list[Finding]] = defaultdict(list)
@@ -87,8 +93,15 @@ def render_markdown(
         lines.append("")
         if not bucket:
             lines.append("无发现。")
-        for f in bucket:
+        # Show worst-first; cap per-dim to avoid drowning the reader and
+        # blowing the GitHub comment size limit.
+        bucket_sorted = sorted(bucket, key=lambda f: _SEVERITY_RANK.get(f.severity, 99))
+        shown = bucket_sorted[:_MAX_FINDINGS_PER_DIM]
+        hidden = len(bucket_sorted) - len(shown)
+        for f in shown:
             lines.append(_render_finding(f))
+        if hidden > 0:
+            lines.append(f"_…还有 {hidden} 条未展示——见完整工件 SARIF / 审计日志。_")
         lines.append("")
         lines.append("</details>")
         lines.append("")
@@ -101,7 +114,14 @@ def render_markdown(
         "- `/audit ignore <finding-id>` — 永久忽略某条 finding",
         "- `/audit explain <finding-id>` — 让 bot 详细解释",
     ])
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    # Belt-and-suspenders: even with the per-dim cap, prose / evidence text
+    # can push us past GitHub's hard limit on issue comments. Truncate with a
+    # clear footer if so.
+    if len(body) > _MAX_COMMENT_CHARS:
+        cut = _MAX_COMMENT_CHARS - 200
+        body = body[:cut].rstrip() + "\n\n_（评论超过 GitHub 上限，已截断；查看完整工件以获取全部 finding。）_"
+    return body
 
 
 def _render_finding(f: Finding) -> str:
