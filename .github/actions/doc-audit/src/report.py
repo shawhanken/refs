@@ -57,7 +57,10 @@ def render_markdown(
         counts[f.severity] += 1
 
     lines = [
-        f"<!-- {comment_marker} -->",
+        # Per-target marker so multiple targets in one PR each get their own
+        # sticky comment instead of overwriting each other. publish.sh greps
+        # for this same marker shape.
+        f"<!-- {comment_marker}:{target.name} -->",
         "## 📋 文档审计报告",
         "",
         f"**target:** `{target.name}`  ",
