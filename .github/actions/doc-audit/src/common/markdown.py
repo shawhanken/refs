@@ -12,6 +12,12 @@ from dataclasses import dataclass
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 ANCHOR_RE = re.compile(r"§(\d+(?:\.\d+)*)")
+# A *defined* section anchor lives in a numbered heading. Tolerates `**bold**`
+# wrappers (`### **1.2 Title**`), optional `§` prefix (`### §1.2`), and any of
+# `.`, ` `, `-`, `—`, `*`, `:` as the separator between number and title.
+SECTION_HEADING_RE = re.compile(
+    r"^#+\s+\*{0,2}(?:§\s*)?(\d+(?:\.\d+)*)[\s.\-:—*]"
+)
 FENCED_RE = re.compile(r"^```([a-zA-Z0-9_+\-]*)\s*$")
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
@@ -64,6 +70,21 @@ def extract_code_blocks(file: str, text: str) -> list[CodeBlock]:
 def extract_anchors(text: str) -> list[str]:
     """Return ['3.1', '9.2.3', ...] for §3.1, §9.2.3 references in text."""
     return ANCHOR_RE.findall(text)
+
+
+def extract_section_anchors(text: str) -> list[str]:
+    """Section anchors DEFINED in this file (from numbered headings).
+
+    Distinct from `extract_anchors` which returns section *references* in
+    prose. The `cip.anchors` index field uses this so R004 can answer "does
+    CIP-N actually define §X.Y" rather than "does CIP-N mention §X.Y in prose".
+    """
+    out: list[str] = []
+    for line in iter_lines(text):
+        m = SECTION_HEADING_RE.match(line)
+        if m:
+            out.append(m.group(1))
+    return out
 
 
 def extract_headings(text: str) -> list[tuple[int, int, str]]:
