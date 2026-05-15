@@ -55,6 +55,13 @@ deltas directly to chain account balances via the off-chain
 verifier / state-engine layers into a single off-chain write, which
 significantly reduces latency for high-throughput settlement.
 
+### 2.6 New gas constant
+
+For the streamlined path described above, the per-block cycles budget is
+raised from its existing value to **5,000,000,000** (5 billion) cycles to
+accommodate the larger settlement batches. This MUST be wired into
+`BasefeeConfig` as the canonical target.
+
 ## 3. Backwards Compatibility
 
 This proposal modifies the meaning of CIP-2 §5.5's runner verification
