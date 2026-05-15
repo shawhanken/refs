@@ -7,6 +7,7 @@ doc-audit-service design §5.2.
 from __future__ import annotations
 
 import os
+import re
 from collections import defaultdict
 from typing import Iterable
 
@@ -192,11 +193,20 @@ def dangling_xref(ctx: RuleContext) -> Iterable[Finding]:
 
 @rule("R005_cip_number_collision", _DIM)
 def cip_number_collision(ctx: RuleContext) -> Iterable[Finding]:
+    """Same CIP id claimed by ≥2 files. Language variants (`-zh`, `-en`, `-cn`)
+    of the same base file name are treated as one — they're translations,
+    not collisions."""
     grouped: dict[int, list[dict]] = defaultdict(list)
     for c in ctx.head_index.get("cips", []) or []:
         grouped[c["id"]].append(c)
     for cip_id, items in grouped.items():
-        if len(items) <= 1:
+        # Collapse files that differ only in a trailing language tag.
+        base_names: set[str] = set()
+        for i in items:
+            fn = os.path.basename(i["file"])
+            base = re.sub(r"[-_](zh|cn|en)(?=\.\w+$)", "", fn, flags=re.IGNORECASE)
+            base_names.add(base)
+        if len(base_names) <= 1:
             continue
         yield Finding(
             rule_id="R005_cip_number_collision",
@@ -206,7 +216,7 @@ def cip_number_collision(ctx: RuleContext) -> Iterable[Finding]:
             title=f"CIP-{cip_id} 编号被多个文件使用",
             locations=[Location(file=i["file"], line_start=1) for i in items],
             message=", ".join(i["file"] for i in items) + f" 都自称 CIP-{cip_id}。",
-            suggestion="给冲突的 CIP 重新编号。",
+            suggestion="给冲突的 CIP 重新编号；翻译文件用相同基础名 + `-zh`/`-en` 后缀。",
         )
 
 
