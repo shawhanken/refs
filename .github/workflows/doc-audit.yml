@@ -14,8 +14,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - 'docs/**'
-      - 'refs/**'
+      - 'cips/**'
+      - 'whitepaper/**'
       - '.github/doc-audit.yml'
   # PR commands (/audit rerun, /audit ignore, /audit explain).
   issue_comment:
