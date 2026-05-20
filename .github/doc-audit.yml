@@ -1,0 +1,21 @@
+# Audit config for shawhanken/refs.
+targets:
+  - name: cips
+    paths:
+      - cips/**
+      - whitepaper/**
+    related_code:
+      - node/
+      - runner/
+      - chain/
+    dimensions:
+      consistency:  { enabled: true, severity_gate: warn }
+      security:     { enabled: true, severity_gate: warn }
+      technical:    { enabled: true, severity_gate: warn }
+      architecture: { enabled: true, severity_gate: warn }
+      style:        { enabled: false }
+
+global:
+  max_usd_per_run: 2.00
+  comment_marker: doc-audit-bot
+  ignore_file: .doc-audit-ignore
