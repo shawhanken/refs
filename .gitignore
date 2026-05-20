@@ -4,3 +4,8 @@ cips/.DS_Store
 .DS_Store
 wp&cips_latest@0421.zip
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
