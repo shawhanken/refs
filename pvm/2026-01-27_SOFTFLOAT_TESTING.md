@@ -241,8 +241,7 @@ cargo test --package pvm-runtime --test lib integration::softfloat -- --ignored
 
 ## 📚 相关文档
 
-- [PVM 实现计划](../refs/pvm/PVM_IMPLEMENTATION_PLAN.md)
-- [升级安全方案](../refs/pvm/_archive_/UPGRADE_SAFETY_PLAN.md)
+- [PVM 实现计划](../refs/pvm/2026-01-24_PVM_IMPLEMENTATION_PLAN.md)
 - [SoftFloat 源码](../crates/vm/src/softfloat.rs)
 
 ---

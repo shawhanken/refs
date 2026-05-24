@@ -32,7 +32,6 @@ refs/
 ├── analysis/     跨主题分析、会议纪要、问题修复计划、修正案
 ├── common/       通用基础设施（nginx、CI/CD、git 子模块）
 ├── dev_support/  开发工具（MCP server、模板）
-├── _archive_/    被替代或过时的历史文档
 └── LLM_Wiki.md   LLM Wiki 模式说明（wiki/ 的设计蓝本）
 ```
 
@@ -137,8 +136,6 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 - `2026-02-25_Cowboy_Node_Installation_Report.md`
 - `2026-04-11_Validator_Stall_Root_Cause_Analysis.md`
 
-`_archive_/` — 已整合到综合文档的旧文档。
-
 ---
 
 ## 🐍 pvm/ — Python 虚拟机
@@ -157,7 +154,7 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 - `2026-02-27_PVM_Runtime_Alias_Design_CN.md` — SDK alias 设计
 - `2026-03-04_pvm-call-actor-session-upgrade-summary.md` — 跨 Actor 调用链路改造
 
-`_archive_/` — 旧文档；`pvm_bytecode_design/` — 字节码设计专题。
+`pvm_bytecode_design/` — 字节码设计专题。
 
 ---
 
@@ -224,15 +221,6 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 
 ---
 
-## 🗄️ _archive_/ — 归档
-
-已被新版文档替代或内容完全过时的历史文档。仅供追溯参考。
-
-- `_archive_/202602/` — 2 月白皮书草稿及被替代的清单
-- 根 `_archive_/*.md` — 早期升级评估、集成测试状态等
-
----
-
 ## 📖 阅读路径建议
 
 **新人入门**
@@ -265,6 +253,6 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 2. **跨主题放 analysis/**：涉及多个子系统的综合分析、gap 报告、会议纪要进 `analysis/`
 3. **工程计划放 plans/**：可执行的实施方案 / 评估 / 路径图进 `plans/`（与 `analysis/` 区分：plans 偏「打算做什么」，analysis 偏「现状是什么」）
 4. **日期前缀**：新文档以 `YYYY-MM-DD_` 为前缀，日期为首次提交日（出生日，不随修订变更）
-5. **替代则归档**：文档被新版本完全替代时，移入 `_archive_/` 并在 PR 中标注替代者
+5. **替代则删除**：文档被新版本完全替代时，删除旧版（git 历史保留追溯能力），并在 PR 中标注替代者
 6. **whitepaper/ 受保护**：不改动
 7. **wiki/ 由 LLM 维护**：raw 文档新增/修订时按 [`wiki/AGENTS.md`](wiki/AGENTS.md) 的 Ingest 流程同步更新概念页 / 实体页 / 参数表 / 漂移看板 / 日志

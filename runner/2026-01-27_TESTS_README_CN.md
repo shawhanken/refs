@@ -311,8 +311,7 @@ cargo test -- --ignored
 
 ## 📚 相关文档
 
-- [PVM 测试体系参考](../refs/pvm/_archive_/TEST_SETUP_COMPLETE.md)
-- [PVM 测试覆盖率提升](../refs/pvm/_archive_/TEST_COVERAGE_IMPROVEMENT.md)
+- [PVM 测试评估与升级](../refs/pvm/05-测试评估与升级.md)
 
 ---
 
