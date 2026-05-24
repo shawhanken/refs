@@ -85,7 +85,6 @@
 - [`refs/chain/`](../chain/) — 跨系统集成
 - [`refs/devex/`](../devex/) — 开发者体验 / 客户反馈
 - [`refs/common/`](../common/) — 基础设施工具
-- [`refs/_archive_/`](../_archive_/) — 归档历史
 
 ---
 
