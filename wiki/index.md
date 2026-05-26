@@ -2,7 +2,7 @@
 
 本文件列出 `refs/wiki/` 所有页面与一句话摘要。按类型组织。
 
-**最后更新**: 2026-05-11（r2 alignment + 新 CIP-8 / 11 / 17 / 18 / 19 / 25；CIP-7 r2 解 0x06 drift；CIP-11 r1.1 锚定 effective_stake + 块时间 disclaimer）
+**最后更新**: 2026-05-26（spec ↔ code 大对齐：CIP-13 §1 master opcode 表按 `node/types/src/execution.rs` 现状重写；CIP-29 `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D` 写入 spec；CIP-28 BankActor 0x0D → 0x13；CIP-24 TEE keys 60-63 与代码一致；CIP-9 §13 补 DrainRelay / AutoDrainPolicy spec；块时间统一到 1s（CIP-11 r1.2 + CIP-23 r1）；WP-v2 §13 加状态列；drift.md C-1/C-2/C-3/C-4 已收口）
 
 ---
 
@@ -60,13 +60,13 @@
 
 | 页面 | 摘要 |
 |---|---|
-| [system-actors.md](entities/system-actors.md) | `0x01-0x0F` 系统 Actor 地址权威表（含 v2 提案 0x0C-0x0F precondition）|
+| [system-actors.md](entities/system-actors.md) | 系统 Actor 地址三段式权威表：代码已实装 0x01-0x0C 部署型 + 0x1D 虚拟（CIP-29）；spec-only 0x0D-0x13（含 CIP-28 BankActor 0x13） |
 | [runner-lifecycle.md](entities/runner-lifecycle.md) | Runner 从 register → 接单 → 结算 → 可能 slash 的全流程；含 CIP-13 v2 / CIP-23 v2 集成 |
 | [pvm.md](entities/pvm.md) | Python VM：API、确定性约束、Checkpoint、黑名单 + CIP-14 v2 read_handler RPC 只读模式 |
 | [node.md](entities/node.md) | 主链节点：chain/execution/storage/types/rpc 架构 |
 | [plans-inventory.md](entities/plans-inventory.md) | `refs/plans/` 23 份工程实施计划清单（按主题分组、slug → 标题映射）|
-| [gateway.md](entities/gateway.md) | Gateway 节点角色（第 4 个协议 role）：TLS/DNS/路由/静态 serving/速率限制（CIP-14 v2 / CIP-15 v2 Draft，地址 0x0D）|
-| [route-registry.md](entities/route-registry.md) | 系统 Actor `0x0C`：FQDN 注册 + 三类命名空间 + Binding 状态机（CIP-14 v2 / CIP-16 v2 Draft）|
+| [gateway.md](entities/gateway.md) | Gateway 节点角色（第 4 个协议 role）：TLS/DNS/路由/静态 serving/速率限制（CIP-14 v2.r2 / CIP-15 v2.r2 Draft；Gateway Registry `0x0E` spec-only）|
+| [route-registry.md](entities/route-registry.md) | 系统 Actor `0x0D`（v2.r2 spec-only）：FQDN 注册 + 三类命名空间 + Binding 状态机（CIP-14 v2.r2 / CIP-16 v2.r2 Draft）|
 
 ---
 
@@ -76,7 +76,9 @@
 
 - [`refs/whitepaper/`](../whitepaper/) — 核心白皮书（受保护）+ WP v2 deltas
 - [`refs/cips/`](../cips/) — CIP 规范（CIP-1 到 CIP-23）+ v2 alignment 系列（CIP-1/2/9/10/13/14/15/16/23 v2）
-- [`refs/analysis/`](../analysis/) — 分析、会议、**修正案**（`2026-04-15_documentation_amendments.md` 为权威）
+- [`refs/analysis/`](../analysis/) — 分析、会议、**修正案** + **代码实现进度审计**
+  - 修正案权威：`2026-04-15_documentation_amendments.md`
+  - 最新 audit baseline：[`2026-05-26_CIP_IMPLEMENTATION_AUDIT.md`](../analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md)（CIP-24 / CIP-29 大幅进展）
 - [`refs/plans/`](../plans/) — 工程实施计划 / 评估（27 份，详见 [entities/plans-inventory.md](entities/plans-inventory.md)）
 - [`refs/economics/`](../economics/) — 费用模型、Basefee、Tokenomics
 - [`refs/node/`](../node/) — 节点专题

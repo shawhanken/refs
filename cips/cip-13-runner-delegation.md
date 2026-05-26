@@ -11,7 +11,7 @@ description: Code-aligned v2 — opcode renumbering (44–48 to avoid collision)
 >
 > **Summary of v2 changes**
 >
-> - **Opcode renumbering** to 52–56 (was 40–44 in v1). v1 §3.3 admits the v1 collision with 40–43. An earlier CIP-13 v2 draft attempted 44–48 but that also collides with code (44 `UpdateBasefeeConfig` through 51 `DeployCode` are all taken). The canonical master allocation in §1 below pins 52–56 and lays out the full opcode map for all v2 CIPs.
+> - **Opcode renumbering (deferred to activation).** v1 §3.3's 40–44 collide with code (`UpdateSettlementConfig` through `UpgradeActor`); earlier v2 drafts proposed 44–48 (still in code's 44–51 band) and then 52–56 (now taken by CIP-8 Session). §1 below records the **code-authoritative** master table as of 2026-05-26 and lists CIP-13 delegation handlers as pending-renumber to the free `≥ 87` range. Concrete numbers will be pinned in the implementation PR that lands CIP-13 v2 handlers in `node/types/src/execution.rs`.
 > - **Explicit amendment to CIP-2 §5/§6** for VRF selection and max-job-value: both now use `effective_stake = registration.stake + delegation_totals.total_active`. v1 §3.2 implies this; v2 states it as a normative cross-CIP amendment.
 > - **Slashing routing** reuses CIP-3 `SettlementConfig.slash_*_percent` (governance-tunable) instead of hard-coding 50/50 treasury/burn. Per-tranche math is unchanged.
 > - **CIP-23 interaction**: TEE eligibility is categorical (`measurement_binding.status`), not stake-thresholded. Delegation increases VRF weight but does not confer or remove TEE eligibility.
@@ -665,11 +665,11 @@ The settlement config (`runner_percent`, `burn_percent`, `treasury_percent`) is 
 - Codec (Encode/Decode) implementations for new instructions
 
 **`node/execution/src/runner/registry.rs`:**
-- `handle_runner_update_delegation_config`: opcode 40; validate cooldown, commission bounds, min_delegation floor, cap non-regression
-- `handle_runner_delegate_stake`: opcode 41; validate preconditions (including `MAX_DELEGATORS_PER_RUNNER` check), lock CBY, allocate tranche_id, write tranche, update indices and totals
-- `handle_runner_increase_delegation`: opcode 42; same as delegate but skips `delegator_count` bump and the `MAX_DELEGATORS_PER_RUNNER` check
-- `handle_runner_undelegate_stake`: opcode 43; FIFO consume Active tranches, transition or split to Unbonding, schedule in unbonding queue
-- `handle_runner_claim_unbonded`: opcode 44; validate `tranche.status == Unbonding && block_height >= tranche.claimable_at` for every supplied `tranche_id`, release CBY, remove tranches from indices
+- `handle_runner_update_delegation_config`: opcode TBD (see §1 master table; v1 draft 40 collides with code's `UpdateSettlementConfig`, must take a free slot ≥ 87); validate cooldown, commission bounds, min_delegation floor, cap non-regression
+- `handle_runner_delegate_stake`: opcode TBD (v1 draft 41 collides with `FundActor`); validate preconditions (including `MAX_DELEGATORS_PER_RUNNER` check), lock CBY, allocate tranche_id, write tranche, update indices and totals
+- `handle_runner_increase_delegation`: opcode TBD (v1 draft 42 collides with `KeyDelivery`); same as delegate but skips `delegator_count` bump and the `MAX_DELEGATORS_PER_RUNNER` check
+- `handle_runner_undelegate_stake`: opcode TBD (v1 draft 43 collides with `UpgradeActor`); FIFO consume Active tranches, transition or split to Unbonding, schedule in unbonding queue
+- `handle_runner_claim_unbonded`: opcode TBD (v1 draft 44 collides with `UpdateBasefeeConfig`); validate `tranche.status == Unbonding && block_height >= tranche.claimable_at` for every supplied `tranche_id`, release CBY, remove tranches from indices
 - Modify `handle_runner_register` to initialize empty `DelegationTotals` and tranche counter namespace on registration
 - Implement `handle_runner_deregister` (currently `UnsupportedInstruction`) with force-unbonding of all Active tranches per §3.7
 
@@ -789,51 +789,52 @@ As noted in §6.1, runner-delegated CBY has zero governance vote weight in v1. A
 
 CIP-13 v1 §3.3 carries an explicit TODO admitting opcodes 40–44 collide with currently-assigned `SystemInstruction` opcodes (40 `UpdateSettlementConfig`, 41 `FundActor`, 42 `KeyDelivery`, 43 `UpgradeActor`). CIP-13 v1 also implicitly amends CIP-2 §5/§6 (VRF weight + max job value formulas) but does not state this as a normative cross-CIP amendment. v2 resolves both.
 
-### 1. Opcode renumbering: CIP-13 takes 52–56 (canonical master allocation table)
+### 1. Master opcode allocation table (rewritten 2026-05-26 against code reality)
 
-CIP-13 v1 §3.3 admitted opcodes 40–44 collide with `UpdateSettlementConfig` / `FundActor` / `KeyDelivery` / `UpgradeActor`. An earlier CIP-13 v2 draft proposed 44–48, but **that range is also taken in code**: `node/types/src/execution.rs:482-541` shows opcodes 0–51 are all allocated through `SYS_DEPLOY_CODE`. The first free slot is **52**.
+> **History note.** The original CIP-13 v1 / v2 drafts of this section described an aspirational table that did **not** match `node/types/src/execution.rs`. Earlier v2 drafts of CIP-13 / CIP-23 / CIP-10 / CIP-14 / CIP-16 each proposed overlapping slot ranges that none of them implemented. The table below is rewritten to be **the authoritative record of what the chain actually accepts on the wire** (as of `node/types/src/execution.rs:591-699` and the `Read<E>` impl at line ~1870), with the still-aspirational v2 allocations called out separately at the end.
 
-This table is the **canonical master allocation** for all CIP v2 work. Other v2 docs (CIP-10 v2, CIP-14 v2, CIP-16 v2, CIP-23 v2) reference it instead of declaring their own.
+**Live opcodes (in code):**
 
-| Opcode | Instruction | Source |
-|---:|---|---|
-| 0–9 | basic + Runner registry + Job dispatch | code |
-| 10–20 | Token operations (incl. batch) | code |
-| 21–29 | (reserved) | — |
-| 30–35 | Entitlement operations | code |
-| 36–39 | (reserved) | — |
-| 40 | `UpdateSettlementConfig` | code |
-| 41 | `FundActor` | code |
-| 42 | `KeyDelivery` | code |
-| 43 | `UpgradeActor` | code |
-| 44 | `UpdateBasefeeConfig` | code |
-| 45 | `SubmitProposal` | code |
-| 46 | `CastVote` | code |
-| 47 | `ExecuteProposal` | code |
-| 48 | `CancelTimer` | code (CIP-5 revised §5.4) |
-| 49 | `UpdateTimerConfig` | code (CIP-5 revised §6.4) |
-| 50 | `ExtendTimer` | code (CIP-5 revised §5.4) |
-| 51 | `DeployCode` | code |
-| **52** | **`RunnerUpdateDelegationConfig`** | **CIP-13 v2 (this CIP)** |
-| **53** | **`RunnerDelegateStake`** | **CIP-13 v2** |
-| **54** | **`RunnerIncreaseDelegation`** | **CIP-13 v2** |
-| **55** | **`RunnerUndelegateStake`** | **CIP-13 v2** |
-| **56** | **`RunnerClaimUnbonded`** | **CIP-13 v2** |
-| 57 | `VerifyCae` | CIP-23 v2 §4 (renumbered from v1 §3.6.2's 50) |
-| 58 | `UpdateCpuRoot` | CIP-23 v2 |
-| 59 | `UpdateNrasRoot` | CIP-23 v2 |
-| 60 | `GcNonces` | CIP-23 v2 |
-| 61 | `RegisterBaseImage` | CIP-10 v2 §5 (renumbered from earlier 60) |
-| 62 | `DeregisterBaseImage` | CIP-10 v2 |
-| 63 | `RegisterResourceClass` | CIP-10 v2 |
-| 64 | `DeregisterResourceClass` | CIP-10 v2 |
-| 65 | `IngressDispatch` | CIP-14 v2 §6.1 |
-| 66 | `CompleteReceipt` | CIP-14 v2 §8 |
-| 67 | `ExternalDomainCallback` | CIP-16 v2 §5.6 |
-| 68–69 | (reserved) | — |
-| 70+ | (reserved for future CIPs) | — |
+| Opcode | Instruction | Owning CIP | Status |
+|---:|---|---|---|
+| 0 | `CreateAccount` | core | ✅ in code |
+| 1 | `Transfer` | core | ✅ in code |
+| 2–5 | `RunnerRegister` / `UpdateRateCard` / `Heartbeat` / `Deregister` | CIP-2 | ✅ in code |
+| 6–9 | `JobSubmit` / `JobResultSubmit` / `JobCancel` / `JobResultCommit` | CIP-2 | ✅ in code |
+| 10–20 | Token ops (`TokenCreate`…`TokenTransferBatch`) | CIP-20 | ✅ in code |
+| 21–29 | — | — | (free) |
+| 30–35 | Entitlement (`Grant`/`Revoke`/`Delegate`/`CreateRole`/`AssignRole`/`RevokeRole`) | CIP-2 §7 | ✅ in code |
+| 36–39 | — | — | (free) |
+| 40 | `UpdateSettlementConfig` | CIP-2/CIP-3 | ✅ in code |
+| 41 | `FundActor` | core | ✅ in code |
+| 42 | `KeyDelivery` | core | ✅ in code |
+| 43 | `UpgradeActor` | CIP-12 §7 | ✅ in code |
+| 44 | `UpdateBasefeeConfig` | CIP-3 | ✅ in code |
+| 45–47 | `SubmitProposal` / `CastVote` / `ExecuteProposal` | CIP-12 | ✅ in code |
+| 48–50 | `CancelTimer` / `UpdateTimerConfig` / `ExtendTimer` | CIP-5 | ✅ in code |
+| 51 | `DeployCode` | core | ✅ in code |
+| **52–57** | **`SessionOpen` / `SessionDeposit` / `SessionSettle` / `SessionClose` / `SessionFinalize` / `SessionSlash`** | **CIP-8 (MPP Session)** | **✅ in code** |
+| 58–59 | — | — | (free) |
+| **60–63** | **`RegisterTeeTrustedKey` / `RevokeTeeTrustedKey` / `SubmitTeeAttestation` / `RevokeTeeAttestation`** | **CIP-24 §3.3 (TEE Verifier support)** | **✅ in code** |
+| 64–67 | — | — | (free) |
+| **68–84** | **`SetSecret` … `ForcedDeregisterCbssProxy`** (17 slots) | **CIP-24 §3.3 (CBSS main)** | **✅ in code** |
+| **85** | **`SubmitDrainRelayProposal`** | **CIP-9 §13.3** | **✅ in code** |
+| **86** | **`SubmitAutoDrainPolicyProposal`** | **CIP-9 §13.4** | **✅ in code** |
+| 87+ | — | — | (free; reserved for the still-pending v2 allocations below) |
 
-This resolves the v1 §3.3 TODO and the cascading collisions in earlier CIP v2 drafts. All v1 references to opcodes 40–44 are superseded by 52–56 here; the prior cross-references in CIP-10 v2 / CIP-23 v2 to "44–48 / 50–53 / 60–63" are obsolete and are superseded by this table.
+**Aspirational allocations (NOT in code; need renumbering against the table above before activation):**
+
+| Originally claimed | CIP | Current state |
+|---|---|---|
+| 52–56 → `RunnerUpdateDelegationConfig` / `DelegateStake` / `IncreaseDelegation` / `UndelegateStake` / `ClaimUnbonded` | CIP-13 v2 (this CIP) | Collides with CIP-8 Session 52–57. Must renumber to free slots ≥ 87 on activation. |
+| 57–60 → `VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces` | CIP-23 v2 | Collides with CIP-8 SessionSlash (57) + CIP-24 TEE keys (60). Must renumber to free slots ≥ 87 on activation. |
+| 61–64 → `RegisterBaseImage` / `DeregisterBaseImage` / `RegisterResourceClass` / `DeregisterResourceClass` | CIP-10 v2 | Collides with CIP-24 TEE keys (61–63). Must renumber to free slots ≥ 87 on activation. |
+| 65–67 → `IngressDispatch` / `CompleteReceipt` / `ExternalDomainCallback` | CIP-14 v2 / CIP-16 v2 | 64–67 currently free; these allocations can be accepted as-is when CIP-14/16 v2 reach code. |
+| (TBD) → BankActor handlers | CIP-28 r1.1 | Not yet enumerated by CIP-28. Will need fresh allocation in the ≥ 87 range. |
+
+**CIP-29 (Event Subscription)** uses neither a SystemInstruction opcode nor a deployed actor. Instead, `pvm_host::call_actor` intercepts calls targeting the dedicated address `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D` and dispatches to `event_sub_system_actor::dispatch_rpc`. No master-table allocation is required.
+
+**Note on this CIP's own opcodes.** CIP-13 v2's delegation handlers (originally numbered 52–56 in the v2 draft) are not yet in code. Activation work MUST pick fresh slots from the ≥ 87 free range and amend this table; the 52–56 numbering is **historical** and must not be cited as authoritative.
 
 ### 2. Explicit amendment to CIP-2 §5 (VRF selection)
 

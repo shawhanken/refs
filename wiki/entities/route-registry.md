@@ -2,17 +2,19 @@
 type: entity
 tags: [ingress, route-registry, system-actor, cip-14, cip-16]
 sources:
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-16-custom-domains-v2.md
-last_updated: 2026-04-21
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-16-custom-domains.md
+last_updated: 2026-05-26
 status: draft
 ---
 
-# Route Registry（系统 Actor `0x0C`）
+# Route Registry（系统 Actor `0x0D`，spec-only）
 
-CIP-14 v2 引入的 ingress 命名权威。维护 FQDN → actor 的规范映射；CIP-16 v2 扩展到三类命名空间（`cowboy.network` / `.cow|.cowboy` / external FQDN）。
+CIP-14 v2.r2 引入的 ingress 命名权威。维护 FQDN → actor 的规范映射；CIP-16 v2.r2 扩展到三类命名空间（`cowboy.network` / `.cow|.cowboy` / external FQDN）。
 
-> **地址变更（v1 → v2）**：CIP-14 v1 草案使用 `0x0011`；CIP-14 v2 §1 Preconditions 收回到 `0x0C`，紧跟代码现有 `0x01`–`0x0B` 序列。Gateway Registry 同批从 `0x0012` → `0x0D`，新增 Receipt Registry `0x0E` / Container Registry `0x0F` 见 [[system-actors]]。
+> **状态**：📋 spec-only —— `0x0D` 地址在 `node/runner/src/system_actors.rs` 尚未声明常量。激活时可选两种模式：扩 reserved band 到 `0x0D` + 注册 `Address` const，或采用 CIP-29 `0x1D` 那种 host-interception 模式。详见 [[system-actors]] §"两类激活模型"。
+
+> **地址变迁**：CIP-14 v1 草案使用双字节 `0x0011`；v2.r1 收回到 `0x0C`；v2.r2 (2026-05-11) 让位给代码已实装的 `0x0C = SESSION_ACTOR` (CIP-8)，Route Registry 后移到 `0x0D`。配套：Gateway Registry `0x0E`、Receipt Registry `0x0F`、Container Registry `0x10`、Payment Gate `0x11`。详见 [[system-actors]]。
 
 ---
 
@@ -55,7 +57,7 @@ DomainBinding {
 
 ---
 
-## 方法表（均为 ActorMessage 到 `0x0C`，不是新 SystemInstruction）
+## 方法表（均为 ActorMessage 到 `0x0D`，不是新 SystemInstruction）
 
 ### 协议自有命名（CIP-14 v2）
 
@@ -138,13 +140,13 @@ Route Registry 必须订阅 `TimerCancelledInsufficientFunds` 事件以触发二
 
 ## 相关
 
-- [[gateway]] — Gateway 节点（解析消费者 + command 系统中介，地址 `0x0D`）
-- [[system-actors]] — `0x0C` / `0x0D` / `0x0E` 表位
+- [[gateway]] — Gateway 节点（解析消费者 + command 系统中介，地址 `0x0E`）
+- [[system-actors]] — `0x0D` (Route) / `0x0E` (Gateway) / `0x0F` (Receipt) 三段 v2.r2 spec-only
 - [[../concepts/dns-addressable-actors]] — CIP-14 总览
 - [[../concepts/custom-domains]] — CIP-16 扩展
 
 ## Sources
 
-- `refs/cips/cip-14-dns-addressable-actors-v2.md` Part II §4 — Route Registry 定义 + 0x0C 地址 + OWNER_ONLY 默认
-- `refs/cips/cip-16-custom-domains-v2.md` Part II — DomainBinding schema + 三命名空间 + 系统中介 callback (opcode 67) + reverify fee chain
-- `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表（67 = `ExternalDomainCallback`）
+- `refs/cips/cip-14-dns-addressable-actors.md` Part II §4 — Route Registry 定义 + 0x0D 地址（v2.r2）+ OWNER_ONLY 默认
+- `refs/cips/cip-16-custom-domains.md` Part II — DomainBinding schema + 三命名空间 + 系统中介 callback (opcode 67) + reverify fee chain
+- `refs/cips/cip-13-runner-delegation.md` §1 — opcode 主分配表（67 = `ExternalDomainCallback`）

@@ -3,8 +3,8 @@ type: concept
 tags: [vrf, selection, algorithm, cip-2, cip-13, cip-23]
 sources:
   - refs/cips/cip-2-offchain-compute.mdx
-  - refs/cips/cip-13-runner-delegation-v2.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/runner/2026-03-05_deterministic_runner_selection.md
   - refs/runner/2026-03-05_deterministic_runner_selection_en.md
 last_updated: 2026-04-21

@@ -46,7 +46,7 @@
 
 ## Abstract
 
-Cowboy is a general-purpose Layer-1 blockchain that combines a **Python-based actor-model execution environment** with a **proof‑of‑stake consensus** and a **market for verifiable off‑chain computation**. Smart contracts on Cowboy are **actors**: Python programs with private state, a mailbox for messages, and chain‑native timers for autonomous scheduling. For heavy tasks like LLM inference, web requests, MCP tool calls, or **containerized** batch jobs, Cowboy integrates a decentralized network of **Runners** who execute jobs and attest to results under selectable trust models: N-of-M consensus, TEEs, and (in V2) ZK-proofs. Jobs MAY attach **CIP-9** encrypted volumes (client-side encryption, **Steamtrain** storage cluster); **CIP-10** governs OCI container execution against an on-chain image allowlist (**§9**, **0x0A**).
+Cowboy is a general-purpose Layer-1 blockchain that combines a **Python-based actor-model execution environment** with a **proof‑of‑stake consensus** and a **market for verifiable off‑chain computation**. Smart contracts on Cowboy are **actors**: Python programs with private state, a mailbox for messages, and chain‑native timers for autonomous scheduling. For heavy tasks like LLM inference, web requests, MCP tool calls, or **containerized** batch jobs, Cowboy integrates a decentralized network of **Runners** who execute jobs and attest to results under selectable trust models: N-of-M consensus, TEEs, and (in V2) ZK-proofs. Jobs MAY attach **CIP-9** encrypted volumes (client-side encryption, **Steamtrain** storage cluster); **CIP-10** governs OCI container execution against an on-chain image allowlist (**§9**, **0x10**).
 
 Cowboy introduces a **dual-metered gas model**, separating pricing for computation (**Cycles**) and data (**Cells**) into independent, EIP-1559-style fee markets. Security is provided by **Simplex BFT** consensus with **proof‑of‑stake**, fast finality, and mandatory proposer rotation.
 
@@ -86,7 +86,7 @@ Cowboy implements four core technical features:
 
 - **Native Timers & Scheduler.** Actors schedule their own future execution via `set_timer` and `set_interval` without external keeper infrastructure. The scheduler uses a tiered calendar queue and a Gas Bidding Agent (GBA) mechanism that dynamically bids for timer execution at block time. Anti‑DoS measures include progressive deposits, exponential same‑block surcharges, per‑actor timer caps, and a dynamic timer basefee.
 
-- **Verifiable Off‑Chain Compute.** A decentralized Runner marketplace executes jobs (LLM inference, HTTP fetches, MCP tools, custom compute, **CIP-10** container batch jobs) off‑chain. Jobs MAY mount **CIP-9** encrypted volumes backed by **Steamtrain**. Runners stake CBY and are selected via VRF. Results are verified under developer‑selected trust models: N‑of‑M quorum, economic bond, TEE attestation, structured matching, semantic similarity, or (in v2) ZK‑proofs. A commit‑reveal protocol with a 15‑minute challenge window and slashing enforces honesty. Container images MUST appear in the on-chain **Container Image Registry** (**0x0A**) unless a governed TEE exception applies (see **CIP-10**).
+- **Verifiable Off‑Chain Compute.** A decentralized Runner marketplace executes jobs (LLM inference, HTTP fetches, MCP tools, custom compute, **CIP-10** container batch jobs) off‑chain. Jobs MAY mount **CIP-9** encrypted volumes backed by **Steamtrain**. Runners stake CBY and are selected via VRF. Results are verified under developer‑selected trust models: N‑of‑M quorum, economic bond, TEE attestation, structured matching, semantic similarity, or (in v2) ZK‑proofs. A commit‑reveal protocol with a 15‑minute challenge window and slashing enforces honesty. Container images MUST appear in the on-chain **Container Registry** (**0x10**) unless a governed TEE exception applies (see **CIP-10**).
 
 - **Dual‑Metered Gas.** Two independent fee markets price computation (**Cycles**) and data (**Cells**) separately. Each meter uses a basefee that adjusts dynamically with demand and is burned; tips go to proposers. This prevents cross‑subsidization between compute‑heavy and storage‑heavy workloads.
 
@@ -585,7 +585,7 @@ where `x ∈ {cycle, cell}`, **alpha = 8**, **delta = 0.125**. Nodes MUST **burn
 
 Runners MUST stake `max(10,000 CBY, 1.5 × declared_max_job_value)` in the Runner Registry.
 
-Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts, _deferred_) and MAY specify **CIP-10** **Container** execution; the **Container Image Registry** lives at **0x0A** (§9); address **0x09** is assigned to the **Governance** actor. Field-level requirements (e.g. `volume_mounts`, image allowlists) are normative in **CIP-2**, **CIP-9**, and **CIP-10**.
+Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts, _deferred_) and MAY specify **CIP-10** **Container** execution; the **Container Registry** lives at **0x10** (§9, per CIP-10 v2.r2); address **0x09** is assigned to the **Governance** actor; **0x0A** is the **Storage Manager** (CIP-9). Field-level requirements (e.g. `volume_mounts`, image allowlists) are normative in **CIP-2**, **CIP-9**, and **CIP-10**.
 
 5.3 **Job lifecycle.**
 
@@ -739,20 +739,35 @@ The runner fee burn is the primary deflationary mechanism beyond basefee burns. 
 
 ## 9\. System Actors & Precompiles
 
-| Address | Name | Function |
-|---------|------|----------|
-| **0x01** | Runner Registry | Runner registration, staking, capabilities, health, reputation (CIP-2) |
-| **0x02** | Job Dispatcher | Job submission, VRF selection, lifecycle management (CIP-2) |
-| **0x03** | Result Verifier | Commit-reveal aggregation, verification, callback dispatch (CIP-2) |
-| **0x04** | Secrets Manager | Encrypted secret storage, TEE-gated release (CIP-2) |
-| **0x05** | TEE Verifier | Remote attestation and trusted measurement verification (CIP-2) |
-| **0x06** | DualBasefee | Protocol dual-metered basefee state storage (CIP-3); **not** used for off-chain runner operations |
-| **0x07** | Entitlement Registry | Runner Pool access control, general RBAC (CIP-2 §7) |
-| **0x08** | Treasury | Protocol fee collection and distribution; receives the 1% runner settlement fee and other protocol-directed payments |
-| **0x09** | Governance | On-chain protocol parameter governance; stores `SettlementConfig` (runner/burn/treasury split ratios) and future governable parameters |
-| **0x0A** | Container Image Registry | On-chain allowlist of authorized OCI image hashes; execution policy (CIP-10; CIP-2) |
+| Address | Name | Status | Function |
+|---------|------|---|----------|
+| **0x01** | Runner Registry | ✅ in code | Runner registration, staking, capabilities, health, reputation (CIP-2) |
+| **0x02** | Job Dispatcher | ✅ in code | Job submission, VRF selection, lifecycle management (CIP-2) |
+| **0x03** | Result Verifier | ✅ in code | Commit-reveal aggregation, verification, callback dispatch (CIP-2) |
+| **0x04** | Secrets Manager | ✅ in code | CBSS on-chain surface; per-secret records, release-key registry, proxy registry (CIP-24, supersedes the v1 "encrypted secret storage" framing) |
+| **0x05** | TEE Verifier | ✅ in code | Remote attestation and trusted measurement verification (CIP-2; activation per CIP-23 v2; TEE-trusted-key state per CIP-24 §3.3) |
+| **0x06** | DualBasefee | ✅ in code | Protocol dual-metered basefee state storage (CIP-3); **not** used for off-chain runner operations |
+| **0x07** | Entitlement Registry | ✅ in code | Runner Pool access control, general RBAC (CIP-2 §7) |
+| **0x08** | Treasury | ✅ in code | Protocol fee collection and distribution; receives the 1% runner settlement fee and other protocol-directed payments |
+| **0x09** | Governance | ✅ in code | On-chain protocol parameter governance; stores `SettlementConfig` (runner/burn/treasury split ratios) and future governable parameters |
+| **0x0A** | Storage Manager | ✅ in code | On-chain manifest / volume metadata, per-actor configuration (CIP-9; supersedes the v1 WP draft's "Container Image Registry" claim — see §9 amendment below) |
+| **0x0B** | Relay Registry | ✅ in code | Steamtrain relay node registration, staking, slashing (CIP-9) |
+| **0x0C** | Session Actor | ✅ in code | MPP Session escrow + voucher settlement (CIP-8) |
+| **0x0D** | Route Registry | 📋 spec-only | DNS-addressable route mapping (CIP-14 v2). Awaits code activation. |
+| **0x0E** | Gateway Registry | 📋 spec-only | HTTP ingress Gateway node registration (CIP-14 v2). Awaits code activation. |
+| **0x0F** | Receipt Registry | 📋 spec-only | Command-path HTTP result storage (CIP-14 v2). Awaits code activation. |
+| **0x10** | Container Registry | 📋 spec-only | On-chain allowlist of authorized OCI image hashes; resource classes; execution policy (CIP-10 v2.r2; supersedes the v1 WP draft's `0x0A` assignment). Awaits code activation. |
+| **0x11** | Payment Gate | 📋 spec-only | HTTP-native payment policy, budgets, passes, subscriptions (CIP-18 r2). Awaits code activation. |
+| **0x12** | Stream Key Manager | 📋 spec-only | VM-level payload encryption key escrow for streams (CIP-7 r2). Awaits code activation. |
+| **0x13** | Bank Actor | 📋 spec-only | Agent banking primitive (cards, gas-payment routing, policy enforcement) (CIP-28 r1.1). Activation requires extending the reserved band to ≥ 0x13 or using the `0x1D`-style interception pattern; address may be revised in the activation PR. |
+| **0x1D** | Event Subscription Actor | ✅ in code (virtual) | CIP-29 §2.6 read RPC surface for the on-chain event-hooks bidding market. Not a deployed actor — `pvm_host::call_actor` intercepts calls to `0x1D` and routes them to `execution::event_sub_system_actor::dispatch_rpc`. Defined at `node/types/src/constants.rs:156`. |
 
-> **Note (normative):** Runner / off-chain compute subsystem addresses **0x01–0x05** and **0x07** follow **CIP-2** together with **CIP-10**. **0x06** is fee-mechanism state only (CIP-3). **0x08** is the protocol Treasury. **0x09** is the on-chain Governance actor for settable protocol parameters. **0x0A** is the Container Image Registry (CIP-10). Additional system actors for general protocol infrastructure **MAY** be assigned from **0x0B** upward as formalized. **If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**
+> **Note (normative):** As of 2026-05-26 the system actor space splits in three:
+> - **In code, deployed (`0x01–0x0C`).** Twelve actors defined as `Address` constants in `node/runner/src/system_actors.rs`. Calls dispatch through standard `ActorMessage` routing; the protocol-reserved band `0x01..=0x0F` enforced by `pvm_host.rs` blocks actor deploys and `fee_payer_override` here.
+> - **In code, virtual (`0x1D`).** CIP-29 uses an interception pattern in `pvm_host::call_actor` — no deployed code, no entry in `system_actors.rs`. The reserved-band check does not apply because `0x1D` is outside `0x01..=0x0F`.
+> - **Spec-only (`0x0D–0x13`).** Six addresses proposed by CIP-9 / CIP-8 / CIP-14 v2 / CIP-10 v2 / CIP-18 r2 / CIP-7 r2 / CIP-28 r1.1. None are in code yet. Activation requires per-CIP work: either extending the reserved band and adding `system_actors.rs` consts (for actors that need full deploy semantics) or adopting the `0x1D`-style interception pattern (for thin RPC-only surfaces). Addresses are best-effort placeholders and may be revised in the activation PR.
+>
+> **Conflict rule:** If this whitepaper conflicts with the individual CIPs on these allocations, the CIPs are authoritative; if the CIPs conflict with code (`node/runner/src/system_actors.rs` + `node/types/src/constants.rs`), **code is authoritative**.
 
 ## 10\. Developer Experience (DX)
 - **SDKs:** A primary Python SDK (`cowboy-py`) is provided.

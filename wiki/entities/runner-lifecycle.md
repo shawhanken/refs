@@ -2,10 +2,9 @@
 type: entity
 tags: [runner, lifecycle, cip-2, cip-13, cip-23]
 sources:
-  - refs/cips/cip-2-offchain-compute.mdx
-  - refs/cips/cip-2-offchain-compute-v2.md
-  - refs/cips/cip-13-runner-delegation-v2.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-2-offchain-compute.md
+  - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/runner/2026-01-27_NODE_ACTOR_RUNNER_FLOW.md
   - refs/runner/2026-01-27_README_CN.md
   - refs/runner/2026-02-05_DOCUMENTATION.md

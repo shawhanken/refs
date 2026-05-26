@@ -3,8 +3,8 @@ type: concept
 tags: [payments, mpp, x402, gateway, paymentgate, cip-18, cip-14, cip-3, cip-20, draft]
 sources:
   - refs/cips/cip-18-payments.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-3-fee-model.md
   - refs/cips/cip-20-fungible-tokens.md

@@ -13,7 +13,7 @@ sources:
   - node/types/src/session.rs
   - node/execution/src/runner/session.rs
   - runner/crates/runner-common/src/voucher.rs
-last_updated: 2026-05-11
+last_updated: 2026-05-26
 status: draft
 ---
 
@@ -47,17 +47,25 @@ Cowboy 集成 Session 模式 —— 复用 wevm/mppx 客户端，仅替换 EIP-7
 
 ## Session 生命周期
 
-```
-[*] --> Open (OpenSession + deposit)
-Open --> Open (Deposit / Settle)
-Open --> Closing (CloseSession by payer | expires_at | escrow exhausted)
-Closing --> Closing (Settle within dispute window)
-Closing --> Disputed (Slash by payer)
-Closing --> Refunded (Finalize after DISPUTE_WINDOW_BLOCKS)
-Disputed --> Settled / Slashed (CIP-2 commit-reveal 复用)
+```mermaid
+stateDiagram-v2
+    [*] --> Open: OpenSession (opcode 52)<br/>payer deposits max_amount
+    Open --> Open: Deposit (opcode 53)<br/>追加 escrow
+    Open --> Open: Settle (opcode 54)<br/>voucher 校验 → 89/10/1 分账
+    Open --> Closing: CloseSession (opcode 55)<br/>payer 主动关 / expires_at 到 / escrow 耗尽
+    Closing --> Closing: Settle within dispute window<br/>(≤ DISPUTE_WINDOW_BLOCKS = 75)
+    Closing --> Disputed: Slash (opcode 57)<br/>payer 投诉
+    Closing --> Refunded: Finalize (opcode 56)<br/>block_height ≥ closed_at + 75
+    Disputed --> Settled: CIP-2 Verifier 0x03<br/>commit-reveal 复用
+    Disputed --> Slashed: CIP-2 Verifier 0x03<br/>判 Runner 失职
+    Refunded --> [*]
+    Settled --> [*]
+    Slashed --> [*]
 ```
 
-**4 个稳定状态**：`Open`（接受 voucher / Deposit / Settle）、`Closing`（dispute window 中）、`Settled` / `Refunded`（终态）。`Disputed` 是瞬态 —— 入口 `Slash`，出口走 CIP-2 既有共识（Result Verifier 0x03 + commit-reveal）。
+**4 个稳定状态**：`Open`（接受 voucher / Deposit / Settle）、`Closing`（dispute window 中）、`Settled` / `Refunded`（终态）。`Disputed` 是瞬态 —— 入口 `Slash`，出口走 CIP-2 既有共识（Result Verifier `0x03` + commit-reveal）。
+
+opcode 52-57 在代码 `node/types/src/execution.rs:683-693` 已实装（`SYS_SESSION_OPEN`...`SYS_SESSION_SLASH`），CIP-8 为追认 CIP。
 
 ---
 
@@ -85,6 +93,51 @@ Disputed --> Settled / Slashed (CIP-2 commit-reveal 复用)
 ---
 
 ## 链下：Voucher 与 Runner 端
+
+### 端到端调用序列
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Payer (client)
+    participant R as Runner (HTTP daemon)
+    participant SA as SESSION_ACTOR (0x0C)
+    participant SC as SettlementConfig (0x09)
+
+    Note over P,SA: 链上 — 单笔 OpenSession
+    P->>SA: OpenSession (runner, max_amount, expires_at)
+    SA->>SA: 扣 payer 余额 max_amount → escrow<br/>写 Session{status: Open}
+    SA-->>R: emit SessionOpened 事件
+
+    rect rgb(255, 250, 235)
+        Note over P,R: 链下 — N 次微调用 + voucher 累积（不上链）
+        loop 每次微调用
+            P->>R: HTTP request + EIP-712 voucher_k<br/>(cumulative_amount, nonce++, expires_at)
+            R->>R: 校验 voucher：签名 / nonce 单调 /<br/>cumulative ≤ deposit / expires_at OK
+            R->>P: 200 OK + Payment-Receipt<br/>(or 402 if voucher 不合规)
+        end
+    end
+
+    Note over R,SC: 链上 — 周期/阈值/临近过期触发 Settle
+    R->>SA: Settle (session_id, voucher_v_max)
+    SA->>SA: 5 项校验 → increment = voucher.cumulative - session.spent
+    SA->>SC: 读 SettlementConfig (89/10/1 默认)
+    SA->>SA: increment × 89% → runner<br/>× 10% → burn 0x00<br/>× 1% → treasury 0x08
+    SA->>SA: 更新 session.spent / last_voucher_nonce
+
+    alt payer 主动关闭 或 expires_at 到
+        P->>SA: CloseSession → status: Closing<br/>closed_at = block_height
+        Note over SA: 进入 dispute window<br/>(DISPUTE_WINDOW_BLOCKS = 75)
+        opt 窗内继续结算
+            R->>SA: 最后一张 Settle
+        end
+        opt payer 投诉
+            P->>SA: Slash → 走 CIP-2 Verifier 0x03
+        end
+        Note over SA: window 过后
+        SA->>SA: Finalize → 剩余 deposit - spent 退 payer<br/>status: Refunded
+    end
+```
 
 **Voucher（EIP-712 类型化数据，145 bytes）**：
 

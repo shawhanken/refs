@@ -1,6 +1,6 @@
 ---
-title: "CIP-11: Runner Connectivity and Push Job Delivery (r1.1)"
-description: Persistent runner↔validator connections, vote-piggybacked presence attestation, and push-based job dispatch. r1.1 anchors weight base to CIP-13 v2 `effective_stake` and adds a block-time-assumption disclaimer.
+title: "CIP-11: Runner Connectivity and Push Job Delivery (r1.2)"
+description: Persistent runner↔validator connections, vote-piggybacked presence attestation, and push-based job dispatch. r1.2 rescales all block-count constants to the canonical 1 s block target (×5 from the previous 5 s draft) and removes the cross-CIP block-time disclaimer.
 icon: plug
 ---
 
@@ -9,15 +9,16 @@ icon: plug
   **Type:** Standards Track<br/>
   **Category:** Core<br/>
   **Created:** 2026-04-14<br/>
-  **Revised:** 2026-05-11 (r1.1 — align with CIP-13 v2 `effective_stake`; block-time disclaimer)<br/>
+  **Revised:** 2026-05-26 (r1.2 — block-count constants rescaled ×5 to the canonical 1 s block target; r1.1 disclaimer removed)<br/>
   **Requires:** CIP-2, CIP-13 v2 (`effective_stake` is normative on the VRF / Fisher-Yates weight base used by §9)<br/>
 </Note>
 
 > **Revision history**
 >
+> - **r1.2 (2026-05-26)** — **Block-time alignment to 1 s.** Per WP-v2 §6.1 / §13, the canonical Cowboy block time is ~1 s. All `_BLOCKS` constants in §13 (and the prose references in §6, §9, §10 derived from them) were calibrated for a 5 s target in r1.1; r1.2 rescales them ×5 to preserve the original wall-clock intent under 1 s blocks: `SUBSET_EPOCH_BLOCKS` 8192 → 40,960 (~12 h), `STALE_HEARTBEAT_BLOCKS` 1024 → 5,120 (~85 min), `MRU_TTL_BLOCKS` 256 → 1,280 (~21 min), `OVERLAP_BLOCKS` 32 → 160, `PRESENCE_TIMEOUT_BLOCKS` 3 → 15, `ACK_TIMEOUT_BLOCKS` 3 → 15. `HEARTBEAT_BLOCKS` (1 ping/block) and the structural constants (`MIN_SUBSET`, `MAX_SUBSET`, `presence_threshold(n)` formula, `MRU_WEIGHT_MULTIPLIER`) are dimensionless and unchanged. The r1.1 cross-CIP block-time disclaimer is **removed** — all v2 CIPs (CIP-14 v1, CIP-23 r1, CIP-11 r1.2, WP-v2) now share the 1 s assumption (`wiki/drift.md` L-5 closed).
 > - **r1.1 (2026-05-11)** — Two corrections after cross-CIP audit:
 >   1. **§9.3 weight base anchored to CIP-13 v2 `effective_stake`.** The original v0.2 algorithm in §9.3 read `candidate[i].stake` (lines 397 / 404), while §9.3 prose (line 415) referenced "effective stake on iteration 0". CIP-13 v2 §3 (Updated 2026-04-21) makes `effective_stake = registration.stake + delegation_totals.total_active` the normative VRF / Fisher-Yates weight base. r1.1 changes the algorithm in §9.3 to `base[i] = stake_to_weight(effective_stake(candidate[i]), MIN_STAKE_CBY_WEI)` accordingly; the MRU multiplier semantics are unchanged. Internal inconsistency closed; cross-CIP alignment achieved.
->   2. **§13 block-time disclaimer.** All block-count defaults in the constants table were expressed "at 5 s blocks". Other v2 CIPs assume 1 s (CIP-14 v1) or 500 ms (CIP-23 v2). r1.1 adds an explicit disclaimer in §13 noting that the block-count defaults assume a 5 s block target; under any other block-time policy the corresponding wall-clock targets (12h subset epoch, 21min MRU TTL, 85min stale-heartbeat ceiling) take precedence over the raw block counts, and the constants MUST be rescaled by governance before activation. Tracked alongside CIP-14 / CIP-23 block-time inconsistency in `wiki/drift.md` L-5.
+>   2. **§13 block-time disclaimer.** (Superseded by r1.2.) Original r1.1 added a disclaimer noting that block-count defaults assume a 5 s block target and that governance MUST rescale them under any other policy. With r1.2 rescaling to 1 s, the disclaimer is no longer needed.
 > - **v0.2 (2026-04-14)** — addresses canonicalization, MRU, dispatch-outcome review findings.
 
 ## 1. Abstract
@@ -177,7 +178,7 @@ with default constants `MIN_SUBSET = 3`, `MAX_SUBSET = 8`. For the early-network
 
 ### 5.3 Subset Rotation
 
-The connectivity subset is recomputed once per **subset epoch**, defined as a fixed number of blocks `SUBSET_EPOCH_BLOCKS` (default 8192, ~12h at 5 s blocks) or whenever the validator set changes by more than `VALIDATOR_CHURN_THRESHOLD` (default 10%) since the last rotation, whichever comes first. Rotation events are signaled in-block via a `subset_epoch` counter.
+The connectivity subset is recomputed once per **subset epoch**, defined as a fixed number of blocks `SUBSET_EPOCH_BLOCKS` (default 40,960, ~12 h at 1 s blocks) or whenever the validator set changes by more than `VALIDATOR_CHURN_THRESHOLD` (default 10%) since the last rotation, whichever comes first. Rotation events are signaled in-block via a `subset_epoch` counter.
 
 When `subset_epoch` advances, runners SHOULD overlap connections — keep the previous-epoch subset open for `OVERLAP_BLOCKS` (default 32) before tearing them down — to avoid a step function in presence bitmap coverage at the rotation boundary.
 
@@ -383,7 +384,7 @@ Existing dispatcher filters (unchanged numbering):
 
 `P(H-1)` is the canonical presence bitmap from the parent block (§8). The Presence filter is the load-bearing liveness gate.
 
-The Health filter remains for defense in depth: a runner whose on-chain `last_heartbeat` is more than `STALE_HEARTBEAT_BLOCKS` (default 1024, ~85 min at 5 s blocks) old is excluded even if its presence bit is set, on the assumption that something pathological is going on (e.g., a runner that QUIC-connected but then somehow stopped submitting on-chain heartbeats over a very long window).
+The Health filter remains for defense in depth: a runner whose on-chain `last_heartbeat` is more than `STALE_HEARTBEAT_BLOCKS` (default 5,120, ~85 min at 1 s blocks) old is excluded even if its presence bit is set, on the assumption that something pathological is going on (e.g., a runner that QUIC-connected but then somehow stopped submitting on-chain heartbeats over a very long window).
 
 `runner_idx` is the runner's index in the Runner Registry as of the parent block — the same indexing rule used by `P(H-1)`.
 
@@ -425,7 +426,7 @@ for i in candidates:
 
 For iteration 1 and later, `weights = base` (unchanged). This preserves committee diversity: the MRU runner is favored to be picked first, but subsequent committee slots are drawn at the unbiased stake-weighted distribution.
 
-Defaults: `MRU_TTL_BLOCKS = 256` (~21 min at 5 s blocks; see §13 block-time disclaimer), `MRU_WEIGHT_MULTIPLIER = 4` (~four times the runner's effective stake on iteration 0). Both governance-adjustable.
+Defaults: `MRU_TTL_BLOCKS = 1,280` (~21 min at 1 s blocks), `MRU_WEIGHT_MULTIPLIER = 4` (~four times the runner's effective stake on iteration 0). Both governance-adjustable.
 
 If the MRU runner is not in the candidate set (e.g., because the presence filter cleared its bit, or because it's at concurrency limit), no bias is applied — the standard fallback behavior takes over without any special-casing.
 
@@ -644,21 +645,21 @@ The vote signature MUST cover this field. No separate gossip kind is registered;
 |---|:---:|---|
 | `MIN_SUBSET` | 3 | Floor on `k` |
 | `MAX_SUBSET` | 8 | Ceiling on `k` |
-| `SUBSET_EPOCH_BLOCKS` | 8192 | ~12h at 5 s blocks |
+| `SUBSET_EPOCH_BLOCKS` | 40,960 | ~12 h at 1 s blocks |
 | `VALIDATOR_CHURN_THRESHOLD` | 10% | Triggers off-cycle subset rotation |
-| `OVERLAP_BLOCKS` | 32 | Old subset retained after rotation |
+| `OVERLAP_BLOCKS` | 160 | Old subset retained after rotation (~160 s at 1 s blocks) |
 | `HEARTBEAT_BLOCKS` | 1 | One ping per block |
-| `PRESENCE_TIMEOUT_BLOCKS` | 3 | Drop runner from local presence after |
+| `PRESENCE_TIMEOUT_BLOCKS` | 15 | Drop runner from local presence after (~15 s at 1 s blocks) |
 | `presence_threshold(n)` | `floor((n-1)/3) + 1` | f+1 of finalization quorum (§8.2) |
-| `STALE_HEARTBEAT_BLOCKS` | 1024 | On-chain heartbeat staleness ceiling (defense in depth) |
-| `MRU_TTL_BLOCKS` | 256 | MRU bias decay |
+| `STALE_HEARTBEAT_BLOCKS` | 5,120 | On-chain heartbeat staleness ceiling (~85 min at 1 s blocks; defense in depth) |
+| `MRU_TTL_BLOCKS` | 1,280 | MRU bias decay (~21 min at 1 s blocks) |
 | `MRU_WEIGHT_MULTIPLIER` | 4 | First-iteration stake weight multiplier (§9.3) |
-| `ACK_TIMEOUT_BLOCKS` | 3 | HardFailure threshold (§10.6) |
+| `ACK_TIMEOUT_BLOCKS` | 15 | HardFailure threshold (~15 s at 1 s blocks; §10.6) |
 | `JOB_TIMEOUT_BLOCKS` | (CIP-2) | Use existing per-JobSpec value |
 
 All constants SHOULD be governance-adjustable (CIP-12).
 
-> **Block-time disclaimer (r1.1).** All block-count defaults above are calibrated for a **5 s block target**. Other v2 CIPs assume different block times — CIP-14 v1 (1 s) and CIP-23 v2 (500 ms). The wall-clock targets in the rightmost column (~12h subset epoch, ~21min MRU TTL, ~85min stale-heartbeat ceiling) are the **normative** intent; the raw block counts are derived. Under any block-time policy other than 5 s, governance MUST rescale the constants to preserve the wall-clock targets before activation. This inconsistency is tracked alongside CIP-14 v1 (1 s) and CIP-23 v2 (500 ms) in `wiki/drift.md` L-5 (block-time assumption divergence across CIPs).
+> **Block-time basis (r1.2).** All `_BLOCKS` defaults above are calibrated for the canonical **1 s block target** (WP-v2 §6.1 / §13). The previous r1.1 defaults were ×0.2 of these values (calibrated for a 5 s draft target); r1.2 rescaled them ×5 to preserve the same wall-clock intent. Should the protocol's block time change in the future, governance MUST rescale these constants to maintain the wall-clock targets shown in the rightmost column.
 
 ---
 

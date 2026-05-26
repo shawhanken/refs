@@ -6,7 +6,7 @@ sources:
   - node/storage/src/speculative.rs
   - node/types/src/execution.rs
   - refs/cips/cip-5-timers.md
-  - refs/cips/cip-1-actor-scheduler-v2.md
+  - refs/cips/cip-1-actor-scheduler.md
   - refs/cips/cip-1-actor-scheduler.md
 last_updated: 2026-04-21
 status: authoritative
@@ -182,7 +182,7 @@ CIP-1 v1 的 GBA bidding agent 与 CIP-5 §9 的 auction 不是竞争，而是�
 ## Sources
 
 - `refs/cips/cip-5-timers.md` — revised 2026-04-20（fee_payer §6.3、三路退出 §5.4、双预算 §6.5、TimerConfig §6.4）
-- `refs/cips/cip-1-actor-scheduler-v2.md` — v2 alignment（Tx-then-Timer codified、撤销 70-72 推荐、unified GBA + auction）
+- `refs/cips/cip-1-actor-scheduler.md` — v2 alignment（Tx-then-Timer codified、撤销 70-72 推荐、unified GBA + auction）
 - `refs/cips/cip-1-actor-scheduler.md` — v1 原文保留参考
 - `node/execution/src/pvm_host.rs:1489-1652` — schedule_timer / schedule_timer_ex / extend_timer / cancel_timer 实装
 - `node/types/src/execution.rs:525-534` — opcodes 48/49/50 已实装

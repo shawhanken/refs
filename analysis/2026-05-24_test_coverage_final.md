@@ -275,3 +275,130 @@ pvm_host.rs / registry.rs / dispatcher.rs / system_instruction.rs / cbss.rs 共 
 - `runner-agent/fs_tools.rs` 79.81%,可继续补
 - `runner-agent/executor.rs` 61.24%,需要 LLM mock(回到 C)
 - node 的 ras crate (不是 rpc/handlers/ras.rs)72.55% 还有空间
+
+---
+
+## 十二、2026-05-25 增量复盘(post-final, +1 天)
+
+**追加日期**:2026-05-25
+**触发**:本次会话又落 12 个 PR(7 node + 5 runner),需要把数字、洞察、roadmap 与 5-24 终评估对齐。
+**节点位置**:
+- `node` @ `f6c74105`(devnet HEAD,含 5-24 终评估后 7 个新 merged PR)
+- `runner` @ `c136802`(devnet HEAD,含 5-24 终评估后 5 个新 merged PR)
+- 还有 1 个 in-flight:**PR #522**(`rpc/drain_audit_sampler.rs` +16.67pp)
+
+### 12.1 新增 PR 12 个(5-24 终评估 → 5-25)
+
+| # | repo | 主题 | 影响 |
+|---|------|------|------|
+| #515 | node | cli/commands.rs 33 个 pure helper 契约 | cli +1.39pp |
+| #516 | node | ras/storage_keys 22 个 wire-format 契约(37%→100%) | ras crate +6.90pp |
+| #517 | node | types/cbss 12 个 codec wire-format 契约 | types +0.54pp |
+| #518 | node | chain/ApiError 20 个 factory(68%→100%)| chain +2.22pp |
+| #519 | node | runner system actor accessors + agent defaults | runner +1.96pp |
+| #520 | node | rpc/handlers/cbss.rs 12 个 endpoint 输入验证(40.95%→55.56%)| rpc +0.95pp |
+| #521 | node | execution/entitlement/role.rs idempotency + multi-assignee(58.81%→73.30%)| execution +0.18pp |
+| #522 | node | **in-flight** — rpc/drain_audit_sampler.rs(44.55%→61.22%,16 tests) | rpc 待计入 |
+| #80 | runner | runner-agent/fs_tools.rs 17 helper 路径(+9.31pp on file) | runner-agent 微涨 |
+| #81 | runner | runner-node session validators(needs_commit_reveal + render_job_with_secrets)| runner-node 微涨 |
+| #82 | runner | chain-client SessionSnapshot serde(0%→100%)| chain-client 微涨 |
+| #83 | runner | runner-tee P-384 attestation path + 曲线 mismatch | runner-tee 微涨 |
+| #84 | runner | job-dispatcher VRF race fix(`#[serial_test::serial]`)| 修 CI flake |
+
+### 12.2 数字刷新(5-24 终 → 5-25)
+
+| Workspace | 指标 | 5-24 终 | **5-25** | Δ |
+|-----------|------|--------|----------|----|
+| **node/** | Lines 覆盖 | 74.06% | **74.74%** | **+0.68pp** |
+| | 缺失 lines | 27,975 | **27,568** | **−407** |
+| | Regions 覆盖 | 74.77% | **75.42%** | +0.65pp |
+| | 总 lines | 109,152(基本平) | 109,152 | — |
+| **runner/** | Lines 覆盖 | 86.37% | **87.36%** | **+0.99pp** |
+| | 缺失 lines | 1,911 | **1,830** | **−81** |
+| | Regions 覆盖 | 86.14% | **87.35%** | +1.21pp |
+
+**判读**:1 天内 7 个 node PR 推 +0.68pp,5 个 runner PR 推 +0.99pp。代码量几乎没增长,delta 全是真覆盖收益。
+
+### 12.3 Per-Crate 变化(node)
+
+按 Δ 排序:
+
+| Crate | 5-24 终 | **5-25** | Δ | 来源 |
+|-------|--------|----------|----|------|
+| **ras** | 72.55% | **79.45%** | **+6.90pp** | PR #516 storage_keys 单 PR |
+| **chain** | 87.06% | **89.28%** | **+2.22pp** | PR #518 ApiError factories |
+| **runner**(node 内) | 93.66% | **95.62%** | **+1.96pp** | PR #519 system actors + agent defaults |
+| **cli** | 51.67% | **53.06%** | **+1.39pp** | PR #515 commands.rs helpers |
+| **rpc** | 53.59% | **54.54%** | **+0.95pp** | PR #520 cbss handlers(#522 未计入)|
+| **types** | 92.30% | **92.84%** | **+0.54pp** | PR #517 cbss codecs |
+| **execution** | 78.40% | **78.58%** | +0.18pp | PR #521 role.rs |
+| indexer | 80.06% | 80.06% | 0 | — |
+| storage | 91.46% | 91.46% | 0 | — |
+| client | 93.75% | 93.75% | 0 | — |
+| proof-verifier | 98.60% | 98.60% | 0 | — |
+| token | 99.60% | 99.60% | 0 | — |
+
+**关键观察**:
+- **ras crate 跨过 75% 桶**(72.55% → 79.45%) — 单 PR #516 推进 6.90pp,是本日最大单 crate 涨幅
+- **chain 进入 90% 区**(87.06% → 89.28%)
+- **node runner crate 接近饱和**(95.62%)— C-1 类型 gap 已基本闭合
+- **execution 仍受 mock 死代码污染**(见 12.5)— PR #521 +14.49pp on file 仅推 crate +0.18pp
+
+### 12.4 Per-Crate 变化(runner)
+
+按 Δ 排序:
+
+| Crate | 5-24 终 | **5-25** | Δ | 来源 |
+|-------|--------|----------|----|------|
+| **runner-agent** | 70.46% | **75.93%** | **+5.47pp** | PR #80 fs_tools 17 helper 路径 |
+| **runner-tee** | 86.61% | **89.20%** | **+2.59pp** | PR #83 P-384 attestation 路径 |
+| **runner-node** | 82.24% | **84.22%** | **+1.98pp** | PR #81 session validators |
+| **chain-client** | 86.68% | **87.48%** | **+0.80pp** | PR #82 SessionSnapshot serde |
+| runner-storage | 77.89% | 77.89% | 0 | — |
+| runner-common | 90.15% | 90.15% | 0 | — |
+| job-dispatcher | 91.34% | 91.32% | ≈0 | PR #84(仅 race fix,无新测试)|
+| runner-http | 91.90% | 91.90% | 0 | — |
+| runner-mcp | 92.57% | 92.57% | 0 | — |
+| tee-verifier | 95.00% | 95.00% | 0 | — |
+| runner-llm | 95.42% | 95.42% | 0 | — |
+| runner-registry | 97.92% | 97.92% | 0 | — |
+| result-verifier | 98.21% | 98.21% | 0 | — |
+| runner-consensus | 100% | 100% | 0 | 已饱和 |
+| workspace-root(`src/main.rs`)| 34.98% | 34.98% | 0 | 二进制入口 |
+
+**关键观察**:
+- **runner-agent 跨过 75% 桶**(70.46% → 75.93%)— PR #80 单 PR 17 测试是本日 runner 最大涨幅
+- **runner-tee 进入 89% 区**(从 86.61%)— PR #83 把 P-384 椭圆曲线 attestation 路径全 pin
+- **runner-node 进入 84% 区**(从 82.24%)— PR #81 把 session validator 边界 case 全覆盖
+- **chain-client 单文件 0→100%**(SessionSnapshot,PR #82)推动整 crate +0.80pp
+- **8 个 crate 仍在 90%+**(包括 100% 的 runner-consensus)
+
+### 12.5 方法学深化:Mock pollution 发现 ⚠️
+
+**最值得记的方法论洞察**:execution crate 内 `library_instruction.rs`(209 missed)与 `token/admin.rs`(213 missed)看似 L0 红区(63.84% / 62.83%),实际缺失行**大头**(库:170/209 ≈ 81%;admin:160/213 ≈ 75%)是 **module-internal `TestStore` mock 的 dummy trait impl 代码**。
+
+**具体证据**:
+- `library_instruction.rs` 行 184-380:`TestStore` impl 了 `StateStore` trait 的 ~26 个 async 方法,平均 3-6 行/方法
+- 现有 7 个测试只调用了其中的 `set_code` / `get_code` / `set_library` / `get_library` / `delete_library` 等 5-6 个方法
+- 其余 20+ 个方法(`get_account` / `set_actor` / `set_timer` / `set_event_sub` ……)被 llvm-cov 标记为 "未覆盖产线",但实质是 dev-only fixture 死代码
+- `token/admin.rs` 模式完全相同
+
+**结论 / 教训**:
+1. **单文件 cov 数字误导**:这两个文件的"真实产线 cov" 实际 > 95%,加测试不能有意义地提升真 cov,只能给已饱和的产线再做 spec 重复 pin
+2. **execution crate 整体被低估**:由于多个 module 都内联了大型 `TestStore` mock,crate cov 78.58% 中可能有 ~3-5pp 是 mock 死代码污染(需精确剥离)
+3. **L0 候选筛选必须看文件结构**:仅按 `missed > 200` 排序会反复踩雷。下一轮筛选要先排除"mock impl 占主体"的文件
+4. **改造方向**:把 `TestStore` 抽出到共享 dev-dep crate(如 `cowboy-execution-test-helpers`),所有 execution 子 module 复用一份;这样 mock 代码只贡献一次未覆盖统计,而非 N 份
+
+### 12.6 短期 sprint 候选(更新排序)
+
+| 优先级 | 候选 | 上手 | 收益 | 备注 |
+|--------|------|------|------|------|
+| **P0** | tokio bridge 基建 | 高(L2 infra)| rpc +2-3pp,5-7 PR 连锁 | 解锁 ras.rs / chain.rs / cbss.rs / governance.rs ~30 个 handler 的 scan_actor_storage |
+| **P0** | CLI Client mock | 高(L2 infra)| cli +20pp | 解锁 commands.rs(3,705 missed)完整突破 |
+| **P1** | Mock 剥离 cleanup PR | 低 | execution crate 真 cov +2-3pp 显形 | 把 TestStore 抽到 execution-test-helpers crate;单 PR 可控 |
+| **P1** | runner-agent executor LLM mock | 中(L1.5)| agent_loop / handle_chat 完整突破 | 同 5-24 终评估的 sprint C |
+| **P2** | execution 深层(剥离 mock 后)| 高 | pvm_host / registry / dispatcher / system_instruction / cbss 共 ~5k 真缺失 | 等 mock 剥离再评估真 baseline |
+
+### 12.7 一句话总结(本日)
+
+> **1 天 12 个 PR**(7 node + 5 runner),node 行覆盖 74.06% → **74.74%**(+0.68pp),runner 行覆盖 86.37% → **87.36%**(+0.99pp)。ras crate 单 PR 跨过 75% 桶(+6.90pp,#516),chain 进入 90% 区。**新发现 mock pollution 风险**:execution 内多个 module 内联大型 TestStore mock,导致单文件 cov 数字偏低、误导 L0 候选筛选;下一步应优先做 mock 剥离 cleanup PR,再评估 execution 真实 baseline。in-flight PR #522 落地后 rpc crate 还可再 +0.5-0.8pp。

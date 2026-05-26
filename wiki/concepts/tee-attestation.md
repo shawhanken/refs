@@ -1,14 +1,14 @@
 ---
 type: concept
-tags: [tee, attestation, cae, deterministic, cip-23, cip-2, cip-10]
+tags: [tee, attestation, cae, deterministic, cip-23, cip-2, cip-10, cip-24]
 sources:
-  - refs/cips/cip-23-tee-execution-v2.md
   - refs/cips/cip-23-tee-execution.md
-  - refs/cips/cip-23-tee-execution-zh.md
+  - refs/cips/cip-24-secrets-manager.md
   - refs/plans/cowboy-tee-execution-design.md
-  - refs/cips/cip-2-offchain-compute-v2.md
-  - refs/cips/cip-10-runner-containers-v2.md
-last_updated: 2026-04-21
+  - refs/cips/cip-2-offchain-compute.md
+  - refs/cips/cip-10-runner-containers.md
+  - node/types/src/execution.rs
+last_updated: 2026-05-26
 status: draft
 ---
 
@@ -16,7 +16,11 @@ status: draft
 
 Hardware-rooted attestation pipeline that turns CIP-2 `VerificationMode::Deterministic + tee_required` from a field-presence flag into a cryptographically enforced guarantee. Introduces the **Composite Attestation Envelope (CAE)** binding a CPU TEE quote (TDX / SEV-SNP / Nitro) + NVIDIA NCC GPU report + service signature into one receipt, and turns TEE Verifier `0x05` from a stub into a real verification actor.
 
-> **v1 → v2 主要变更**：opcodes 从 v1 §3.6.2 的 50-53 → **57-60**（v1 50-53 和代码 `SYS_EXTEND_TIMER=50` / `SYS_DEPLOY_CODE=51` 冲突）；显式三层 chain (`sec.tee_required` entitlement → `VerificationConfig.tee_required` 字段 → `MeasurementBinding`)；`nitro` 加入 `CANONICAL_TEE_TYPES`（v1 §3.3 列了但 registry.rs:211 未加）；与 CIP-13 v2 委托正交（TEE 资格是分类能力，非 stake 阈值）；`BillingAttestation.tee_signature` CAE 是**每次 billing event 临时生成**（不缓存 measurement_binding 时的 quote）。
+> **⚠️ 2026-05-26 opcode + 块时间修正**：
+> - **CIP-23 v2 §4 提议的 opcodes 57-60**（`VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces`）**与代码冲突**：`node/types/src/execution.rs` 中 57 = `SessionSlash`（CIP-8）、60-63 = `RegisterTeeTrustedKey` 等（CIP-24 §3.3，TEE Verifier 支持指令，**已在代码**）。CIP-23 v2 自身的 4 个 attestation handler 未实装，需激活时落到 ≥87 free range；详见 CIP-13 §1 主表与 [[../drift]] V-3。
+> - **块时间统一到 1s**（CIP-23 r1, 2026-05-26）：`MAX_QUOTE_AGE` 150 blocks @ 500ms → **75 blocks @ 1s**（≈75s wall-clock 保持不变）；`BINDING_RENEWAL_PERIOD` 12,096 blocks → **604,800 blocks @ 1s**（≈7 days；原 12,096 算术错误已勘正）。
+
+> **v1 → v2 主要变更**：显式三层 chain (`sec.tee_required` entitlement → `VerificationConfig.tee_required` 字段 → `MeasurementBinding`)；`nitro` 加入 `CANONICAL_TEE_TYPES`（v1 §3.3 列了但 registry.rs:211 未加）；与 CIP-13 v2 委托正交（TEE 资格是分类能力，非 stake 阈值）；`BillingAttestation.tee_signature` CAE 是**每次 billing event 临时生成**（不缓存 measurement_binding 时的 quote）。
 
 ---
 
@@ -30,18 +34,38 @@ Hardware-rooted attestation pipeline that turns CIP-2 `VerificationMode::Determi
 
 每个 TEE-required job 触及三个独立的 layer，分布在生命周期的不同时刻：
 
+```mermaid
+flowchart LR
+    subgraph L1["① Actor manifest"]
+        A1[sec.tee_required<br/>entitlement<br/>registry.rs:158]
+        A2[Actor owner 在部署时设]
+    end
+    subgraph L2["② Job spec"]
+        B1[VerificationConfig.tee_required: bool<br/>runner/src/types.rs:171]
+        B2[Submitter 在 submit_task 时设]
+    end
+    subgraph L3["③ Runner record"]
+        C1[MeasurementBinding<br/>CIP-23 §3.7]
+        C2[Runner 在注册 / 续约时设]
+    end
+
+    L1 -->|声明该 actor MUST<br/>用 tee_required job| L2
+    L2 -->|Dispatcher 过滤：<br/>MeasurementBinding.status == Active<br/>&& expires_at > submission_block| L3
+    L3 -->|结果阶段：Result Verifier MUST<br/>对每个 Deterministic+tee_required 结果<br/>调 0x05::VerifyCae| Verify[(0x05 TEE Verifier<br/>7 步验证流水线)]
+
+    style L1 fill:#e7f3ff
+    style L2 fill:#fff4e0
+    style L3 fill:#e8ffe8
+    style Verify fill:#ffe0e0
+```
+
 | Layer | 字段 / 记录 | 何时设置 | 权威方 |
 |---|---|---|---|
 | **Actor manifest** | `sec.tee_required` entitlement (`registry.rs:158`) | Actor 部署时 | Actor owner |
 | **Job spec** | `VerificationConfig.tee_required: bool` (`runner/src/types.rs:171`) | `submit_task` 时 | Submitter |
 | **Runner record** | `MeasurementBinding` (CIP-23 §3.7) | Runner 注册 / 续约时 | Runner |
 
-解析规则：
-- Actor manifest 声明 `sec.tee_required` → 该 actor 提交的所有 job MUST 设 `tee_required = true`
-- Dispatcher（CIP-23 §3.8 amends CIP-2 §5.4）只选 `MeasurementBinding.status == Active && expires_at > submission_block` 的 runner
-- Result Verifier（CIP-23 §3.9 amends CIP-2 §9）对每个 `Deterministic + tee_required` 结果 MUST 调 `0x05::VerifyCae`
-
-三层在三个不同时刻独立校验，构成纵深防御。
+三层在三个不同时刻独立校验，构成纵深防御 —— 攻击者必须同时控制 actor owner / submitter / runner 三方才能绕过 TEE 资格。
 
 ---
 
@@ -63,13 +87,61 @@ CompositeAttestation {
 quote.REPORTDATA  ==  keccak256(nonce ‖ service_pubkey ‖ gpu_measurement_if_any)
 ```
 
-CPU quote ↔ 服务签名密钥 ↔ GPU NCC 报告 ↔ 任务 nonce 四者互相绑定，任何一个被替换都使整包失效。
+```mermaid
+flowchart LR
+    Nonce[freshness.nonce<br/>每次 task 唯一] --> Hash
+    Pub[service_sig.service_pubkey<br/>该 runner 的服务签名公钥] --> Hash
+    GpuM[gpu_measurement<br/>NRAS report 中的 GPU 状态] --> Hash
+    Hash[keccak256<br/>= REPORTDATA] --> CPU[CPU quote<br/>TDX/SEV-SNP/Nitro<br/>REPORTDATA 字段]
+    CPU -.绑定.- ServiceSig[service_sig.sig<br/>签 task_id ‖ req_hash ‖<br/>H(result) ‖ attest_digest]
+    GpuM -.绑定.- Gpu[GPU NCC report<br/>nras_token + bound_cpu_pubkey]
+    Gpu -.bound_cpu_pubkey ==.- Pub
+
+    style Hash fill:#fff4cc
+    style CPU fill:#ffe0e0
+    style Gpu fill:#e0ffe0
+    style ServiceSig fill:#e0e0ff
+```
+
+CPU quote ↔ 服务签名密钥 ↔ GPU NCC 报告 ↔ 任务 nonce 四者互相绑定，任何一个被替换都使整包失效。`bound_cpu_pubkey` 字段把 GPU NRAS 报告锚回 CPU 签名公钥，防止"拼接"攻击（取 A 节点的 CPU quote + B 节点的 GPU report）。
 
 ---
 
 ## TEE Verifier 系统 Actor (0x05) 验证流水线
 
 7 步：**Freshness → Replay → Cert chain → Measurement → Binding → Service sig → NRAS**。
+
+```mermaid
+flowchart TD
+    In([VerifyCae 入参<br/>cae, job_id, req_hash, result_hash]) --> S1
+    S1{① Freshness<br/>now - generated_at ≤ MAX_QUOTE_AGE = 75 blocks?<br/>now ≤ deadline?}
+    S1 -->|fail| Reject1([Reject: QuoteStale])
+    S1 -->|pass| S2{② Replay<br/>nonce 是否在 seen_nonces task_id?}
+    S2 -->|hit| Reject2([Reject: ReplayDetected])
+    S2 -->|miss| S3{③ Cert chain<br/>quote 的证书链能否回溯到<br/>governance 信任根?}
+    S3 -->|fail| Reject3([Reject: UntrustedRoot])
+    S3 -->|pass| S4{④ Measurement<br/>quote.measurement 在<br/>runner 的 allowed_cpu_measurements?}
+    S4 -->|fail| Reject4([Reject: UnknownMeasurement])
+    S4 -->|pass| S5{⑤ Binding<br/>quote.REPORTDATA == keccak256<br/>nonce ‖ service_pubkey ‖ gpu_measurement_if_any?}
+    S5 -->|fail| Reject5([Reject: BindingMismatch])
+    S5 -->|pass| S6{⑥ Service sig<br/>service_sig 用 service_pubkey 验签<br/>task_id ‖ req_hash ‖ result_hash ‖ attest_digest?}
+    S6 -->|fail| Reject6([Reject: BadServiceSig])
+    S6 -->|pass + GPU 存在| S7{⑦ NRAS<br/>nras_token 用 governance-pinned<br/>NRAS root pubkey JWT 验证?}
+    S6 -->|pass + 无 GPU| Ok([Accept<br/>写入 seen_nonces task_id])
+    S7 -->|fail| Reject7([Reject: BadNrasToken])
+    S7 -->|pass| Ok
+
+    style Ok fill:#d6ffd6
+    style Reject1 fill:#ffd6d6
+    style Reject2 fill:#ffd6d6
+    style Reject3 fill:#ffd6d6
+    style Reject4 fill:#ffd6d6
+    style Reject5 fill:#ffd6d6
+    style Reject6 fill:#ffd6d6
+    style Reject7 fill:#ffd6d6
+```
+
+Gas 预算：TDX + NCC 全验证 ≈ 200k cycles（远低于 `BLOCK_CYCLES_TARGET = 10M`），每块可验证 ~50 个 CAE。
 
 | 根信任 | 链 |
 |---|---|
@@ -168,7 +240,7 @@ CIP-10 v1 `BillingAttestation.tee_signature: Option<Vec<u8>>` Ed25519 签名 →
 **数据源（v2 §5.1 新明确）**：CAE 是**每次 billing event 临时生成**，不缓存 measurement_binding 时的 quote：
 - `freshness.nonce` MUST = `keccak(billing_attestation_fields_excluding_signature ‖ submission_block_hash)`
 - `REPORTDATA` MUST = `keccak(nonce ‖ service_pubkey ‖ keccak(billing_fields_rlp))`
-- `MAX_QUOTE_AGE = 150 blocks`（≈75s）应用 freshness anchor
+- `MAX_QUOTE_AGE = 75 blocks`（≈75s @ 1s 块；CIP-23 r1 2026-05-26 从原 150 blocks @ 500ms 重算）应用 freshness anchor
 
 cert chain 可以缓存（同平台不变）；quote 必须新鲜。措施 binding 时的 attestation 用于 binding 校验，是另一份独立 CAE。
 
@@ -223,7 +295,7 @@ CVM 基础镜像：`cowboy/runner-tee-base:v1`，CIP-10 §5.5 扩展；Yocto / b
 
 - **System Actor 地址权威**: CIP-23 v1 §3.2 明确 supersede `CLAUDE.md` 与 `node/types/README.md` 中 `0x91-0x95` 老列表。已在 [[../drift]] 记录；workspace CLAUDE.md 待更新
 - **opcode 50-53 v1 错配 → 57-60 v2 修正**：详见 [[../drift]] 与 CIP-13 v2 §1 主表
-- **块时间假设**: `MAX_QUOTE_AGE = 150 blocks`（CIP-23 注 "≈75s @ 500ms"），但现有协议文档多处假设 1s / block。与 `refs/plans/block-time-500ms-to-1000ms.md` 的未决决策耦合，记入 drift 监控
+- **块时间统一到 1s**（CIP-23 r1, 2026-05-26）：原 v2 草案"@ 500ms"假设已废，`MAX_QUOTE_AGE` 75 blocks ≈ 75s @ 1s（wall-clock 不变）；`BINDING_RENEWAL_PERIOD` 604,800 blocks ≈ 7d @ 1s（修正原 12,096 算术错误）。[[../drift]] L-5 已收口
 - **CANONICAL_TEE_TYPES 缺 nitro**：v2 §2 要求追加；属于 precondition
 
 ---
@@ -238,9 +310,9 @@ CVM 基础镜像：`cowboy/runner-tee-base:v1`，CIP-10 §5.5 扩展；Yocto / b
 
 ## Sources
 
-- `refs/cips/cip-23-tee-execution-v2.md` — v2 spec（Draft, 2026-04-21）：三层 chain + opcodes 57-60 + nitro + BillingAttestation 数据源 + CIP-13 正交
+- `refs/cips/cip-23-tee-execution.md` — v2 spec（Draft, 2026-04-21）：三层 chain + opcodes 57-60 + nitro + BillingAttestation 数据源 + CIP-13 正交
 - `refs/cips/cip-23-tee-execution.md` — v1 EN（Part I）保留参考
-- `refs/cips/cip-2-offchain-compute-v2.md` — DNS verifier check 兼容上下文
-- `refs/cips/cip-10-runner-containers-v2.md` — BillingAttestation 接入 0x0F
-- `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表
+- `refs/cips/cip-2-offchain-compute.md` — DNS verifier check 兼容上下文
+- `refs/cips/cip-10-runner-containers.md` — BillingAttestation 接入 0x0F
+- `refs/cips/cip-13-runner-delegation.md` §1 — opcode 主分配表
 - `refs/plans/cowboy-tee-execution-design.md` — 实施设计

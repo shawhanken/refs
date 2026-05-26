@@ -2,16 +2,15 @@
 type: concept
 tags: [runner, delegation, staking, cip-13, draft]
 sources:
-  - refs/cips/cip-13-runner-delegation-v2.md
   - refs/cips/cip-13-runner-delegation.md
-  - refs/cips/cip-2-offchain-compute-v2.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-2-offchain-compute.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/plans/runner-economics-and-delegation-cip13.md
   - node/runner/src/system_actors.rs
   - node/execution/src/runner/dispatcher.rs
   - node/execution/src/runner/verifier.rs
   - node/types/src/execution.rs
-last_updated: 2026-04-21
+last_updated: 2026-05-26
 status: draft
 ---
 
@@ -19,7 +18,9 @@ status: draft
 
 CBY 持有人可将代币**锁定委托**给某 Runner，提升其有效质押（VRF 权重与最大 Job 价值），换取 Runner 配置的 89% 结算分成的一部分。协议只实现**最小 hook**（注册、分账、slash 级联、解绑）；流动性质押池、收益代币、舰队管理金库等由三方 Actor 在此之上构建。
 
-**状态**：CIP-13 v1 创建于 2026-04-12，CIP-13 v2 alignment 于 2026-04-21；`Requires: CIP-12`；协议尚未实现。**v1 提议的 opcodes 40–44 与代码 `node/types/src/execution.rs:509-541` 已分配的 40–51 全段冲突**（v1 §3.3 自带 TODO；CIP-13 v2 §1 重排到 **52–56**，并把全 v2 系列的 opcode 主分配表落地于此 —— 详见下文 §"新增 SystemInstruction"）。
+> **⚠️ 2026-05-26 opcode 修正**：本页早期版本（含下文 §"新增 SystemInstruction"）声称 CIP-13 v2 delegation handlers 占 **opcodes 52–56**。代码权威核查（`node/types/src/execution.rs:683-693`）显示 **52–57 已被 CIP-8 MPP Session（`SessionOpen`–`SessionSlash`）占用**。CIP-13 v2 §1 主表已重写为代码权威视角，CIP-13 delegation handlers 的 opcode 标记为 **TBD（待激活时落到 ≥87 free range）**。本页下文涉及 opcode 编号的段落以 CIP-13 §1 主表与 [[../entities/system-actors]] 为准；保留下文叙述只为追溯设计意图。
+
+**状态**：CIP-13 v1 创建于 2026-04-12，CIP-13 v2 alignment 于 2026-04-21；`Requires: CIP-12`；协议尚未实现。v1 §3.3 提议 opcodes 40–44 与代码冲突（v1 自带 TODO），v2 早期改 44–48 仍冲突，再改 52–56 又撞 CIP-8 Session（已 ✅ in code）；最终 opcode 待激活时确定。
 
 **配套设计指南**：`refs/plans/runner-economics-and-delegation-cip13.md` 提供了超出 CIP-13 文本的**框架性解读**（见 §"核心框架：Compute as a Segmented Yield Primitive"）。
 
@@ -111,6 +112,29 @@ is_slashable(T, now) := T.status == Active
 is_claimable(T, now) := T.status == Unbonding AND now >= T.claimable_at
 ```
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Active: RunnerDelegateStake<br/>(or RunnerIncreaseDelegation)
+    Active --> Active: 收到结算分账<br/>(amount 不变；payout 进 delegator 余额)
+    Active --> Unbonding: RunnerUndelegateStake<br/>set claimable_at = block + UNBONDING_BLOCKS
+    state Unbonding {
+        direction LR
+        [*] --> Slashable: now < claimable_at<br/>(仍可 slash, 不可 claim)
+        Slashable --> Mature: 块边界 now == claimable_at<br/>(隐式原子翻转, 无 sweep)
+        Mature --> [*]: RunnerClaimUnbonded<br/>(可 claim, 不可 slash)
+    }
+    Unbonding --> [*]: claim 完成 → tranche 删除
+    Active --> Slashed: slash_runner() 命中 active<br/>(amount 按 delegated_slashable 比例下减)
+    note right of Slashed
+        被 slash 的 tranche 不进单独终态：
+        amount 部分下减后仍在 Active；
+        全额 slash 时才删除
+    end note
+```
+
+**关键转换点**：`claimable_at` 是唯一的状态切换信号，无全局 unbonding_queue / 块末 sweep —— 翻转在块边界**隐式原子**发生（[[#Unbonding 成熟模型§3.8 关键设计]]）。
+
 每次 top-up 总是**新建**一个 Tranche（已有的不改），这样金额、时间戳、状态始终各归各。
 
 ### 缓存聚合
@@ -181,6 +205,30 @@ for each Active tranche T:
 ---
 
 ## Slash 级联（修改 `slash_runner()`）
+
+```mermaid
+flowchart TD
+    A[slash_runner request<br/>requested amount] --> B[扫描 Tranche：构造 slashable<br/>= Active ∪ {Unbonding | now < claimable_at}]
+    B --> C[base = self_stake + Σ slashable.amount]
+    C --> D[self_slash = floor requested × self_stake / base<br/><b>自质押永不受 cap</b>]
+    C --> E[要从 delegation 切的部分<br/>= requested - self_slash]
+    E --> F{epoch 内已 slash 累计<br/>+ 本次 ≤ MAX_DELEGATION_SLASH_PER_EPOCH_BPS<br/>= 500 bps = 5%?}
+    F -->|是, 不超 cap| G[delegation_slash = requested - self_slash]
+    F -->|否, 超 cap| H[delegation_slash = cap 剩余额度<br/>差额丢弃, emit DelegationSlashCapped<br/><b>不延后, 避免跨 epoch 级联</b>]
+    G --> I[按比例切分 slashable Tranche<br/>T.amount -= floor delegation_slash × T.amount / Σ slashable]
+    H --> I
+    D --> J[total_slashed = self_slash + delegation_slash]
+    I --> J
+    J --> K[路由：50% Treasury 0x08 / 50% Burn 0x00<br/>与自质押 slash 相同]
+    K --> L[更新 epoch_slashed_so_far<br/>(per-runner per-epoch 计数)]
+
+    style D fill:#ffd6d6
+    style F fill:#fff4cc
+    style H fill:#fff4cc
+    style K fill:#d6ffd6
+```
+
+代码草案：
 
 ```
 slashable = Active tranches ∪ {Unbonding | now < claimable_at}
@@ -275,10 +323,10 @@ CIP-12 §6.2 定义 Stake 院权重为**质押给 Validator 的 CBY**。Runner �
 
 ## Sources
 
-- `refs/cips/cip-13-runner-delegation-v2.md` — v2 alignment（Draft, 2026-04-21）：opcode 52-56 + 主分配表 + CIP-2 §5/§6 显式 amendment + CIP-23 v2 正交说明 + slash routing 走 SettlementConfig
+- `refs/cips/cip-13-runner-delegation.md` — v2 alignment（Draft, 2026-04-21）：opcode 52-56 + 主分配表 + CIP-2 §5/§6 显式 amendment + CIP-23 v2 正交说明 + slash routing 走 SettlementConfig
 - `refs/cips/cip-13-runner-delegation.md` — v1 原文（Draft, 2026-04-12）保留参考
-- `refs/cips/cip-2-offchain-compute-v2.md` / `cip-2-offchain-compute.mdx` — Runner 框架与自质押基线
-- `refs/cips/cip-23-tee-execution-v2.md` §3 — 与 TEE 资格的正交关系
+- `refs/cips/cip-2-offchain-compute.md` / `cip-2-offchain-compute.mdx` — Runner 框架与自质押基线
+- `refs/cips/cip-23-tee-execution.md` §3 — 与 TEE 资格的正交关系
 - `refs/plans/runner-economics-and-delegation-cip13.md` — 配套设计指南（"Compute as Segmented Yield Primitive"、两种 tip 辨析、双重通缩、架构总览图）
 - `node/runner/src/system_actors.rs:13-21` — `0x01`–`0x05` 地址
 - `node/execution/src/runner/{registry,dispatcher,verifier}.rs` — 实装位置（需改动）

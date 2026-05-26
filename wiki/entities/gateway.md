@@ -2,18 +2,20 @@
 type: entity
 tags: [gateway, ingress, node-role, cip-14, cip-15]
 sources:
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
-  - refs/cips/cip-16-custom-domains-v2.md
-last_updated: 2026-04-21
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
+  - refs/cips/cip-16-custom-domains.md
+last_updated: 2026-05-26
 status: draft
 ---
 
-# Gateway 节点角色
+# Gateway 节点角色（Gateway Registry `0x0E`，spec-only）
 
 CIP-14 v2 引入的**第一个** ingress 节点角色，与 Runner / Validator / Relay Node 并列的 4 个独立协议角色之一。单物理节点可并行多角色；协议层每个角色独立 staking、心跳、激励。
 
-> **地址变更（v1 → v2）**：CIP-14 v1 把 Gateway Registry 放在 `0x0012`；v2 §1 Preconditions 收回到 `0x0D`（紧跟代码现有 `0x01`–`0x0B` 序列）。
+> **状态**：📋 spec-only —— Gateway Registry 地址 `0x0E` 在 `node/runner/src/system_actors.rs` 尚未实装；CIP-14 v2.r2 提案。激活模型见 [[system-actors]] §"两类激活模型"。
+
+> **地址变迁**：CIP-14 v1 把 Gateway Registry 放在 `0x0012`；v2.r1 收回到 `0x0D`；v2.r2 (2026-05-11) 让位给代码已实装的 `0x0C = SESSION_ACTOR` 后整段 +1，Gateway Registry 落到 **`0x0E`**。配套 Route Registry `0x0D`、Receipt Registry `0x0F`。
 
 ---
 
@@ -22,7 +24,7 @@ CIP-14 v2 引入的**第一个** ingress 节点角色，与 Runner / Validator /
 | 类别 | 做 | 不做 |
 |---|---|---|
 | TLS & DNS | 终止 TLS（ACME DNS-01）；响应 `*.cowboy.network` 解析 | 不做 anycast / geo-DNS 的网络层选路（由 BGP/权威 DNS 配置）|
-| 路由 | 查 Route Registry (`0x0D`) 把 `name → actor_address`；区分 query / command 路径 | 不参与共识 |
+| 路由 | 查 Route Registry (`0x0D`, v2.r2) 把 `name → actor_address`；区分 query / command 路径 | 不参与共识 |
 | Read-only 执行 | Query 路径：本地节点 `read_handler` RPC（CIP-14 v2 §5 + Part III §5）跑 Actor handler，PVM 在已提交状态上只读、所有 mutating syscall trap | 不跑 CIP-2 off-chain 任务（Runner 职能）|
 | 提交 | Command 路径：签名 TX → `IngressDispatch` (opcode 65) → `GATEWAY_REGISTRY=0x0E` 验证 sender 是 active Gateway → 转发到目标 Actor | 不存 CIP-9 shard（Relay Node 职能）|
 | Entitlement 强制 | `max_request_bytes` / `max_response_bytes` / `max_query_cycles` / `allowlist_methods` | 不在 PVM 内强制（Gateway 侧预检）|
@@ -58,15 +60,15 @@ Unstake  → 等 GATEWAY_UNSTAKE_DELAY (604,800 blocks ≈ 7d)
 
 > **v2 selector 设计修订**：CIP-14 v2 早期草案曾提议 PVM 路由层把 `"http.request"` 设为系统保留 selector（任何非系统 sender 用此 selector 发消息 → `ERR_RESERVED_SELECTOR`）。该提案在 CIP-14 v2 §6.2 Note 被**撤销**，因为它阻断了合法的 router actor 转发模式。改为依赖 `ctx.sender` 检查 —— 由协议消息路由器从 tx 签名者填入，不可被调用者代码伪造。
 
-**Stake vs operating balance**（CIP-14 v2 §6.3 / WP-v2 Delta 1）：Gateway 的 stake 锁在 `0x0D` 中是 slashable 抵押；gas 由 Gateway 的 operating account 单独支付。两者**禁止混用**。Actor 想替 Gateway 付费时用现成的 `Action::UseOwnerBalance` 委派（`node/types/src/entitlement.rs:94`）。
+**Stake vs operating balance**（CIP-14 v2 §6.3 / WP-v2 Delta 1）：Gateway 的 stake 锁在 Gateway Registry `0x0E` 中是 slashable 抵押；gas 由 Gateway 的 operating account 单独支付。两者**禁止混用**。Actor 想替 Gateway 付费时用现成的 `Action::UseOwnerBalance` 委派（`node/types/src/entitlement.rs:94`）。
 
 ---
 
-## Receipt Registry `0x0E`（Command 路径异步结果）
+## Receipt Registry `0x0F`（Command 路径异步结果）
 
 CIP-14 v2 §8 引入。Command 路径 Gateway 返回 `202 Accepted` + `X-Cowboy-Request-Id`；客户端轮询 `/_cowboy/requests/{id}` 拿结果。
 
-**为什么不复用 actor KV**：v1 §8.4 让 Actor 在自己的 KV 存 `_http/results/{request_id}` + 每个 request 一个 cleanup timer —— 热门 actor 1k 个 pending request 即撞 `MAX_TIMERS_PER_ACTOR=1024`。v2 把 receipts 移到 `0x0E`，单一全局 prune 循环按 `expires_at` 清理；actor timer 预算不被消耗。`receipt_ttl_blocks` 是 `ingress.http` 的可选参数（默认 3600，上限 86400）。
+**为什么不复用 actor KV**：v1 §8.4 让 Actor 在自己的 KV 存 `_http/results/{request_id}` + 每个 request 一个 cleanup timer —— 热门 actor 1k 个 pending request 即撞 `MAX_TIMERS_PER_ACTOR=1024`。v2 把 receipts 移到 `0x0F`（v2.r2 从 v2.r1 的 `0x0E` 后移），单一全局 prune 循环按 `expires_at` 清理；actor timer 预算不被消耗。`receipt_ttl_blocks` 是 `ingress.http` 的可选参数（默认 3600，上限 86400）。
 
 `CompleteReceipt` 是 **opcode 66**（CIP-13 v2 §1 主表），sender 必须是 receipt 的 `target_actor`。
 
@@ -114,7 +116,7 @@ CIP-14 v2 §8 引入。Command 路径 Gateway 返回 `202 Accepted` + `X-Cowboy-
 
 ## 相关
 
-- [[system-actors]] — `0x0C` Route Registry / `0x0D` Gateway Registry / `0x0F` Receipt Registry
+- [[system-actors]] — `0x0D` Route Registry / `0x0E` Gateway Registry / `0x0F` Receipt Registry（均 spec-only）
 - [[route-registry]] — `0x0C` 实体页
 - [[../concepts/dns-addressable-actors]] — CIP-14 v2 基础
 - [[../concepts/public-asset-hosting]] — CIP-15 v2 静态 serving
@@ -123,8 +125,8 @@ CIP-14 v2 §8 引入。Command 路径 Gateway 返回 `202 Accepted` + `X-Cowboy-
 
 ## Sources
 
-- `refs/cips/cip-14-dns-addressable-actors-v2.md` — Gateway 角色 §7 + read_handler RPC §5 + IngressDispatch §6.1 + Receipt Registry §8 + sender authenticity §6.2 + target_pool 枚举 Part III §6
-- `refs/cips/cip-15-public-asset-hosting-v2.md` — 静态 serving / Storage 状态映射 / CORS 优先级修订 / X-Cowboy-Manifest-Root 双版本头
-- `refs/cips/cip-16-custom-domains-v2.md` — 外部域 serving 策略
-- `refs/cips/cip-9-runner-storage-v2.md` — `GET_MANIFEST` (AMEND 9-G) + `ManifestCommitted` 事件 (AMEND 9-H) + Status 映射 §5
-- `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表（65 IngressDispatch / 66 CompleteReceipt）
+- `refs/cips/cip-14-dns-addressable-actors.md` — Gateway 角色 §7 + read_handler RPC §5 + IngressDispatch §6.1 + Receipt Registry §8 + sender authenticity §6.2 + target_pool 枚举 Part III §6
+- `refs/cips/cip-15-public-asset-hosting.md` — 静态 serving / Storage 状态映射 / CORS 优先级修订 / X-Cowboy-Manifest-Root 双版本头
+- `refs/cips/cip-16-custom-domains.md` — 外部域 serving 策略
+- `refs/cips/cip-9-runner-storage.md` — `GET_MANIFEST` (AMEND 9-G) + `ManifestCommitted` 事件 (AMEND 9-H) + Status 映射 §5
+- `refs/cips/cip-13-runner-delegation.md` §1 — opcode 主分配表（65 IngressDispatch / 66 CompleteReceipt）

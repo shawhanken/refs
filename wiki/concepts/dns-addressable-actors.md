@@ -2,7 +2,7 @@
 type: concept
 tags: [ingress, gateway, dns, routing, cip-14]
 sources:
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
+  - refs/cips/cip-14-dns-addressable-actors.md
 last_updated: 2026-04-21
 status: draft
 ---
@@ -116,6 +116,6 @@ CIP-10 明确 Runner 容器是 "egress only"；CIP-9 Relay Node 是哑分片存�
 
 ## Sources
 
-- `refs/cips/cip-14-dns-addressable-actors-v2.md` — v2 spec（Draft, 2026-04-21）：read_handler RPC + IngressDispatch 65 + CompleteReceipt 66 + selector reservation 撤销 + stake/operating balance + receipt registry + target_pool enum + subdomain_policy 默认改 OWNER_ONLY
+- `refs/cips/cip-14-dns-addressable-actors.md` — v2 spec（Draft, 2026-04-21）：read_handler RPC + IngressDispatch 65 + CompleteReceipt 66 + selector reservation 撤销 + stake/operating balance + receipt registry + target_pool enum + subdomain_policy 默认改 OWNER_ONLY
 - `refs/cips/cip-14-dns-addressable-actors.md` (Part I) — v1 原文（2026-03-07）保留参考
-- `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表
+- `refs/cips/cip-13-runner-delegation.md` §1 — opcode 主分配表

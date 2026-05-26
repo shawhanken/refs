@@ -3,7 +3,7 @@ type: concept
 tags: [rpc, merkle, light-client, gateway, cip-17, cip-15, cip-19, cip-4, draft]
 sources:
   - refs/cips/cip-17-verifiable-state-read.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-15-gateway-implementation.md
   - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-4-storage.md

@@ -3,8 +3,8 @@ type: concept
 tags: [mcp, ingress, gateway, jsonrpc, agents, cip-19, cip-14, cip-15, cip-18, draft]
 sources:
   - refs/cips/cip-19-gateway-mcp-ingress.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-18-payments.md
 last_updated: 2026-05-11
 status: draft
@@ -202,4 +202,4 @@ Gateway 翻译为合成 `HttpRequestEnvelope`：
 
 - `refs/cips/cip-19-gateway-mcp-ingress.md` — Draft 2026-04-28；20 sections（entitlement / endpoint / initialize / tools/list / tools/call / payment / security / rationale / future / backwards-compat）
 - `refs/cips/cip-18-payments.md` §13 — MCP JSON-RPC 付款 transport
-- `refs/cips/cip-15-public-asset-hosting-v2.md` §6 / §8.12 — routes table + Gateway-Runner state fetch
+- `refs/cips/cip-15-public-asset-hosting.md` §6 / §8.12 — routes table + Gateway-Runner state fetch

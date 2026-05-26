@@ -5,7 +5,7 @@ sources:
   - node/storage/src/speculative.rs
   - node/storage/src/process_block.rs
   - refs/node/02-实施与技术实现.md
-last_updated: 2026-04-15
+last_updated: 2026-05-26
 status: authoritative
 ---
 
@@ -17,20 +17,47 @@ Cowboy 基于 Simplex BFT：Leader `propose` 块、验证者 `verify`、多数�
 
 ## 三阶段
 
-```
-propose / verify:
-  begin_batch
-  → execute_txs              # 用户交易 + 消息递送
-  → fire_timers              # 过期 Timer 作为 deferred tx
-  → sweep_deferred           # 已到时的 deferred tx
-  → compute_roots            # accounts / actors / mailboxes Merkle root
-  → cache                    # 写缓冲保存
-  → rollback                 # 回到执行前状态
+```mermaid
+sequenceDiagram
+    autonumber
+    participant L as Leader (propose)
+    participant V as Validators (verify)
+    participant E as ExecutionEngine
+    participant W as WriteBuffer (cache)
+    participant DB as QMDB (persistent)
+    participant M as Mempool
 
-report:
-  apply_cached_batch         # 将缓冲持久化到 QMDB
-  → deferred tx back to mempool  # 延后执行的项重新入队
+    rect rgb(235, 245, 255)
+        Note over L,W: propose / verify 阶段 — 投机执行（可回滚）
+        L->>E: begin_batch
+        E->>E: execute_txs (用户交易 + 消息递送)
+        E->>E: fire_timers (过期 Timer → deferred tx)
+        E->>E: sweep_deferred (到时 deferred tx)
+        E->>E: compute_roots (accounts / actors / mailboxes / receipts)
+        E->>W: cache writes
+        E-->>L: rollback in-memory (回到执行前)
+        L->>V: 广播块 + Merkle roots
+        V->>V: 独立重放上述 7 步，比对 roots
+    end
+
+    alt 投票通过（多数 verify 成功）
+        rect rgb(230, 255, 230)
+            Note over L,M: report 阶段 — 真正持久化
+            L->>DB: apply_cached_batch (W → QMDB)
+            L->>M: deferred tx back to mempool (延后项重新入队)
+        end
+    else 投票失败
+        rect rgb(255, 235, 235)
+            Note over L,M: 缓冲整体丢弃；下个 leader 重新 propose
+            W-->>W: 丢弃缓冲
+        end
+    end
 ```
+
+**关键转换点**：
+- 步骤 ⑥ `cache` + 步骤 ⑦ `rollback` 是配对的 —— propose/verify 阶段所有写入都进 WriteBuffer，链上状态保持执行前的样子。这是"投机"的本质。
+- 步骤 ⑩（report）才是不可逆的：`apply_cached_batch` 把 WriteBuffer 整体落盘 QMDB。
+- 步骤 ⑪ 把 deferred tx 重新喂回 mempool，是跨块 Continuation 的入口（见 [[continuation]]）。
 
 源：`node/storage/src/speculative.rs:152-475`
 

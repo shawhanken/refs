@@ -13,7 +13,7 @@ icon: gavel
 
 ## 1. Abstract
 
-This CIP specifies Cowboy's on-chain governance system and the mechanism by which **system actors** (`0x01`–`0x0B`) and governance-tunable parameters are upgraded. Governance is implemented as the `0x09 Governance` system actor and supports:
+This CIP specifies Cowboy's on-chain governance system and the mechanism by which **system actors** and governance-tunable parameters are upgraded. The system-actor space comprises (a) the in-code deployed range `0x01`–`0x0C` (`node/runner/src/system_actors.rs`); (b) the in-code virtual address `0x1D` for CIP-29's event-subscription RPC (intercepted in `pvm_host::call_actor`, not a deployed actor); and (c) the spec-proposed extension `0x0D`–`0x13` (CIP-9 / CIP-8 / CIP-14 v2 / CIP-10 v2 / CIP-18 r2 / CIP-7 r2 / CIP-28 r1.1) which is **not yet in code** and may be revised on activation. Governance is implemented as the `0x09 Governance` system actor and supports:
 
 - **Bicameral voting** from day one: a proposal must pass both a staked-CBY chamber (economic weight) and a validator chamber (one-validator-one-vote operational weight).
 - **Tiered proposals** (Tier 0–4) with thresholds, quorums, and timelocks scaled to blast radius.
@@ -126,7 +126,7 @@ The Governance actor is upgradeable **only** via a Tier 4 `MetaGovernance { op: 
 | **0** | Parameter tuning | Scalar updates to any `governance-tunable` parameter (see genesis defaults and CIP-1/3/5/9/10/13/31) — includes e.g. CIP-3 lane fee multipliers, CIP-1 v3 priority-tier multipliers, CIP-31 CBFS rent rates and slashing magnitudes, CIP-13 unbonding & commission bounds |
 | **1** | Registry & whitelist | Python stdlib whitelist additions, approved runner images, model flags/bans, TEE attestation roots, relay operator allowlist |
 | **2** | Treasury & disbursement | Grants, liquidity incentives, audit payments, Foundation operating budgets, burns |
-| **3** | System actor upgrade | Hot-swap PVM bytecode for any `0x01`–`0x0B` actor, with optional migration (§7) |
+| **3** | System actor upgrade | Hot-swap PVM bytecode for any deployed system actor (currently `0x01`–`0x0C` in code; future `0x0D`–`0x13` once activated). Excludes virtual / intercepted actors such as `0x1D` (CIP-29), which are upgraded via protocol-level code changes, not bytecode swap. With optional migration (§7) |
 | **4** | Constitutional / meta | Upgrade `0x09` itself, modify Security Council membership, change tier parameters, pause an actor **permanently**, or extend a Tier 3 pause **past the consecutive-renewal cap** (default 3 extensions ≈ 90 days; see §7.7) |
 
 ### 5.2 Tiered parameters
@@ -312,7 +312,7 @@ This avoids the chicken-and-egg problem of validating absolute times at submissi
 
 Before accepting the proposal, `0x09` verifies:
 
-1. `target` is a system actor in the range `0x01`–`0x0B` and is **not** `0x09` (governance self-upgrade goes through Tier 4, §7.3).
+1. `target` is a **deployed** system actor (currently `0x01`–`0x0C` in code; future `0x0D`–`0x13` once activated; the virtual `0x1D` is excluded — see §1) and is **not** `0x09` (governance self-upgrade goes through Tier 4, §7.3).
 2. `code_ref` resolves to bytecode whose hash matches `new_code_hash`.
 3. Bytecode passes the PVM determinism whitelist (no forbidden imports, no non-deterministic ops).
 4. Bytecode size is within `max_system_actor_bytecode_size` (Tier 0 param, default 512 KiB).

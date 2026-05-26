@@ -3,24 +3,31 @@ type: comparison
 tags: [drift, consistency, audit]
 sources:
   - refs/analysis/2026-04-15_documentation_amendments.md
-  - refs/cips/cip-13-runner-delegation-v2.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/analysis/2026-05-15_CIP_IMPLEMENTATION_AUDIT.md
+  - refs/analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md
+  - refs/cips/cip-9-runner-storage.md
+  - refs/cips/cip-10-runner-containers.md
+  - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-15-gateway-implementation.md
-  - refs/cips/cip-16-custom-domains-v2.md
+  - refs/cips/cip-16-custom-domains.md
   - refs/cips/cip-18-payments.md
   - refs/cips/cip-19-gateway-mcp-ingress.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-23-tee-execution.md
+  - refs/cips/cip-24-secrets-manager.md
   - refs/cips/cip-25-cross-chain-architecture.md
-  - refs/cips/cip-9-runner-storage-v2.md
-  - refs/cips/cip-10-runner-containers-v2.md
+  - refs/cips/cip-28-cowboy-agent-banking.md
+  - refs/cips/cip-29-on-chain-event-hooks-en.md
   - refs/runner/2026-04-28_MPP_Session_Research.md
   - refs/plans/2026-05-06_mpp_session_implementation.md
-last_updated: 2026-05-11 (r2 sync)
+last_updated: 2026-05-26 (v2.r2 merged into main cip-*.md; cross-CIP consistency audit; block time unified to 1 s; CIP-29/24/8/9 §13 spec ↔ code aligned; new implementation audit 2026-05-26)
 status: authoritative
 ---
 
 # 文档-代码漂移看板
+
+> **2026-05-26 implementation audit** — 新一轮 CIP + WP 代码完成度审计已完成（见 [`refs/analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md`](../analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md)，作为新 baseline 取代 5/15 audit）。**最显著两项进展**：CIP-24（CBSS）从未列入 audit → 🟢 ~80%（41K 行代码 + 21 handlers）；CIP-29（事件钩子）从 ❌ <5% → 🟢 ~55%（`0x1D` 虚拟 actor + Phase 1/2 框架）。整体平均完成度 ~40% → ~45%。
 
 > **2026-05-11 r2 sync + 后续补 CIP** — 第一轮跨 CIP 文档 v2.r2 修订完成（CIP-9 / CIP-10 / CIP-14 / CIP-15 / CIP-16 / CIP-18 / CIP-19 / CIP-15-gateway-implementation / WP-v2 全部 r2）。第二轮起草两份新 CIP 收口剩余文档空白：
 >
@@ -55,6 +62,10 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 | **N-2** | CIP-15 §8.5 manifest Merkle 算法 vs CIP-9 无 normative 描述 | ✅ **CIP-9 v2 §3 pin 为 `cbfs/manifest/src/merkle.rs`**（RFC-6962-style，**非** Bitcoin-style duplicate-last-leaf）；CIP-15 v2 §6.2 引用而非重新定义 |
 | **TEE-1** | CIP-23 amends CIP-2 §5.4/§9 但 CIP-2 源文未并入 | ✅ **CIP-23 v2 §3.8/§3.9 仍为 amendment 形式**（CIP-2 source 未改），但 **CIP-2 v2 §2 配套加入 DnsTxtRecordMatch / DnsCnameMatch verifier check**（AMEND 2-A/B），三层 chain（manifest entitlement / job spec / measurement_binding）由 CIP-23 v2 §1 显式说明 |
 | **L-6** | CIP-14 `RouteRegistration` vs CIP-16 `DomainBinding` schema 差异 | ✅ **CIP-16 v2 §3.1 给出显式迁移规则**：legacy records 默认 `namespace_kind=COWBOY_NETWORK, status=ACTIVE` 等，一次性 schema upgrade |
+| **C-1 (2026-05-26)** | CIP-28 BankActor `0x0D` ↔ CIP-14 v2.r2 `ROUTE_REGISTRY = 0x0D` 双占 | ✅ **CIP-28 r1.1 把 BankActor 移到 `0x13`**（CIP-7 r2 `STREAM_KEY_MANAGER = 0x12` 之后首个空位，仍属 spec-only 段）；WP-v2 §13 系统 actor 表同步加状态列；CIP-12 / CIP-2 范围声明改为"代码 0x01-0x0C + 虚拟 0x1D + spec 0x0D-0x13"三段式 |
+| **C-2 (2026-05-26)** | CIP-29 spec §2.6 声称 `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x0A` ↔ 代码实际 `0x1D`（且 `0x0A` 在代码里是 `STORAGE_MANAGER`）| ✅ **CIP-29 中英版本 §2.6 同步代码权威 `0x1D`**（`node/types/src/constants.rs:156`），并加 host-interception pattern 说明：`0x1D` 是虚拟系统 actor，由 `pvm_host::call_actor` 拦截路由到 `event_sub_system_actor::dispatch_rpc`，不部署 actor 代码 |
+| **C-3 (2026-05-26)** | CIP-13 v2 §1 master opcode 表与代码完全 drift（master 表声称 52-56=CIP-13 delegation / 57-60=CIP-23 / 61-64=CIP-10 v2 容器，**代码里 52-57=CIP-8 Session / 60-63=CIP-24 TEE keys / 85-86=CIP-9 DrainRelay**）| ✅ **CIP-13 v2 §1 主表整体重写为代码权威视角**：明确标出已在代码的所有 SYS_* opcode（0-51 / 52-57 Session / 60-63 TEE keys / 68-84 CBSS / 85-86 DrainRelay），把 CIP-13 / CIP-23 v2 / CIP-10 v2 / CIP-14 v2 / CIP-28 等未实装的 v2 提案统一列入"aspirational allocations, pending renumber to ≥87"段；CIP-24 §3.3 末段恢复成"60-63 in code"|
+| **C-4 (2026-05-26)** | "Code ahead of spec"：代码已实装 `SubmitDrainRelayProposal=85` / `SubmitAutoDrainPolicyProposal=86`（治理-触发的 relay 排水 + 自动排水策略），但 CIP-9 文档无对应规范 | ✅ **CIP-9 Part II 新增 §13 (AMEND 9-J)**：§13.2 列出 `ProposalPayloadKind` 扩展；§13.3 / §13.4 分别规范两条指令的 wire 格式、前置条件、submit-time effect、execute-time effect（通过 `ExecuteProposal=47` 路由）；§13.4 完整列出 `AutoDrainPolicyConfig` 10 个字段语义 + 5 条 validator 规则；§13.5 标出与 CIP-12 / CIP-13 / CIP-9 §5.7 / CIP-31 的 cross-reference |
 
 ---
 
@@ -67,7 +78,7 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 | A-1 | `BLOCK_CYCLES_TARGET` 10M vs 20M | ✅ 修正案已发布；CIP-3 顶部 banner |
 | A-2 | `BLOCK_CELLS_TARGET` 500K vs 4M | ✅ 同上 |
 | A-3 | Basefee 公式（α=8 / 简化线性 / ALPHA=96）| ✅ 同上 |
-| B | System Actor 地址表 0x01-0x0B | ✅ CIP-2 顶部 banner；workspace CLAUDE.md 待更新 |
+| B | System Actor 地址表 0x01-0x0B | ✅ CIP-2 顶部 banner（2026-05-26 扩至 `0x01-0x13`，同步 CIP-12 / WP-v2 §13）；workspace CLAUDE.md 待更新 |
 | C | Runner stake 公式（1.5× vs 10×）| ✅ CIP-2 顶部 banner |
 
 ### 中严重性（9）
@@ -92,7 +103,7 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 | L-2 | 默认端口表缺失（RPC 4000 / indexer 8080）| 修正案记录 |
 | L-3 | pvm/01 过时警告缺权威源链接 | 修正案记录 |
 | L-4 | CIP-12 `SystemActorUpgrade` Payload vs opcode 43 `UpgradeActor` 关系未明确 | ⚠️ 实现阶段裁决 |
-| L-5 | 块时间假设不一致（CIP-14 v1 = 1s / CIP-23 v2 = 500ms / **CIP-11 r1.1 = 5s**）| ⚠️ 三方 spec 假设不同；与 `refs/plans/block-time-500ms-to-1000ms.md` 耦合。**CIP-11 r1.1 (2026-05-11)** §13 已加块时间 disclaimer：wall-clock 数值（~12h / ~21min / ~85min）权威，raw block counts 是导出；governance 激活前需按实际块时间 rescale|
+| L-5 | 块时间假设不一致（CIP-14 v1 = 1 s / CIP-23 v2 = 500 ms / CIP-11 r1.1 = 5 s）| ✅ **2026-05-26 全部统一到 1 s** — CIP-11 r1.2 §13 常量按 ×5 rescale 并移除 5 s disclaimer；CIP-23 r1 §3.13 块数按 ×0.5 rescale（`MAX_QUOTE_AGE` 150→75 blocks ≈75 s @ 1 s；`BINDING_RENEWAL_PERIOD` 7 天 = 604,800 blocks @ 1 s，原 12,096 ≈ 7 days @ 500 ms 已勘正为算术错误）；CIP-14 v1 / WP-v2 §6.1 本就为 1 s 无需改 |
 
 ---
 
@@ -104,9 +115,9 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 
 | ID | 主题 | 状态 |
 |---|---|---|
-| **V-1** | System actor `0x0D` / `0x0E` / `0x0F` (CIP-14 v2.r2) / `0x10` (CIP-10 v2.r2) / `0x11` (CIP-18 r2) 在 `node/runner/src/system_actors.rs` 尚未存在 | ⚠️ v2 协议 precondition；激活前需 5 个 const + 同步 workspace CLAUDE.md。**2026-05-11 r2 重排已落 doc**：代码已实装到 `0x0C = SESSION_ACTOR`；v2 CIP 系列后移 +1 到 `0x0D-0x11` |
+| **V-1** | System actor `0x0D` / `0x0E` / `0x0F` (CIP-14 v2.r2) / `0x10` (CIP-10 v2.r2) / `0x11` (CIP-18 r2) / `0x12` (CIP-7 r2) / `0x13` (CIP-28 r1.1) 在 `node/runner/src/system_actors.rs` 尚未存在 | ⚠️ v2 协议 precondition；激活前需 7 个 const + 同步 workspace CLAUDE.md，**或**采用 CIP-29 `0x1D` 那种 `pvm_host::call_actor` 拦截模式。代码已实装：`0x01-0x0C` 部署型 + `0x1D = EVENT_SUBSCRIPTION_SYSTEM_ACTOR`（虚拟，`node/types/src/constants.rs:156`）|
 | **V-2** | Entitlement registry 缺 `ingress.http` (CIP-14 v2) / `ingress.static` (CIP-15 v2) / `dns.attach_external` (CIP-16 v2) | ⚠️ `node/types/src/registry.rs:35-219` 实际 **15 entries**（之前 wiki 写 14 错）；需变 18 entries 才能激活；与 V-15 合并计累计需 +6 entries（加 `ingress.mcp` / `payment.gate` / `bridge.facilitate.evm`）|
-| **V-3** | Opcodes 52–67 (CIP-13/14/15/16/23 v2) 在 `node/types/src/execution.rs` 尚未存在 | ⚠️ 代码 0–51 已分配；52+ 是 v2 主分配表的 free range；激活前补 16 个 const + Encode/Decode 实现 |
+| **V-3** | CIP-13 v2 delegation handlers / CIP-23 v2 attestation handlers (`VerifyCae` 等) / CIP-10 v2 容器治理 / CIP-14 v2 `IngressDispatch` / CIP-16 v2 `ExternalDomainCallback` 等在 `node/types/src/execution.rs` 尚未存在 | ⚠️ **2026-05-26 复核**：代码已实装 0-51（core） + **52-57 CIP-8 Session** + **60-63 CIP-24 TEE keys** + **68-84 CIP-24 主分配** + **85-86 CIP-9 DrainRelay**。原 master table 把 52-67 全划给上述 v2 提案是 spec 单方面 wishful，与代码实际占用冲突；激活时这批未实装提案必须改到 ≥ 87 free range。CIP-13 §1 主表已重写为代码权威视角并明确列出 aspirational allocations |
 | **V-4** | Receipt Registry (`0x0F`，r2 后移) 单全局 prune 循环未在 storage layer 实装 | ⚠️ CIP-14 v2.r2 §8 spec；替代 v1 SDK-conventional `_http/results/{id}` 模式 |
 
 ### 中严重性（4）
@@ -115,7 +126,7 @@ CIP v2 系列（CIP-1 / 2 / 9 / 10 / 13 / 14 / 15 / 16 / 23 + WP v2）发布后�
 |---|---|---|
 | **V-5** | WP §9 line 704 `0x0A = Container Image Registry` 与代码 `STORAGE_MANAGER (CIP-9)` 冲突 | ⚠️ WP-v2.r2 §13 / Delta 6 修正：0x0A 归 STORAGE_MANAGER，**0x10** 归 Container Registry（CIP-10 v2.r2 后移）|
 | **V-6** | `CANONICAL_TEE_TYPES` 缺 `nitro`（`registry.rs:211` 当前 `["sgx", "sev", "tdx"]`）| ⚠️ CIP-23 v2 §2 precondition；一行代码改动 |
-| **V-7** | CIP-23 Part I §3.6.2 仍说 opcodes 50-53 | ⚠️ 设计内（Part I 原文逐字）；Part II §4 已显式 supersede 到 57-60；阅读时按冲突规则取 Part II |
+| **V-7** | CIP-23 Part I §3.6.2 仍说 opcodes 50-53；Part II §4 把它改为 57-60 也仍与代码冲突 | ⚠️ **2026-05-26 复核**：代码 57 = `SessionSlash`（CIP-8），60-63 = `RegisterTeeTrustedKey` 等（CIP-24 TEE keys）。CIP-23 v2 自己的 `VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces` 一概**未实装**，激活时需重新落到 ≥ 87 free range（与 V-3 合并跟踪）|
 | **V-8** | CIP-5 timer per-fire fee_payer 模型 (`max_cost` 预扣 + 退还) 是否已在代码实装 | ⚠️ CIP-5 revised 2026-04-20 spec 明确；代码侧需核 `pvm_host.rs` 的 schedule_timer_ex 是否已含 fee_payer 字段；如未实装是 V-8 工作项 |
 
 ### 低严重性（2）

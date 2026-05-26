@@ -410,8 +410,11 @@ These mirror the existing `TimerConfig` pattern and are governance-tunable. **`M
 A dedicated system actor handles the subscription-bidding market's query and write surface. **A separate address was chosen rather than co-locating under `0x09` (Governance)**: `0x09` already owns `SettlementConfig` and other governance duties, and bolting on the bidding market would bloat its responsibilities and conflict with the "system-level stable parameters" semantics of settlement — bidding is high-frequency user behavior and must stand alone.
 
 ```rust
-EVENT_SUBSCRIPTION_SYSTEM_ACTOR = Address::from_low_u64(0x0A)
+// node/types/src/constants.rs:156 (in code as of 2026-05-26)
+EVENT_SUBSCRIPTION_SYSTEM_ACTOR = Address::from_low_u64(0x1D)
 ```
+
+> **Address rationale.** `0x1D` is **outside** the protocol-reserved system-actor band `0x01..=0x0F` (enforced in `pvm_host.rs` against actor deploy and `fee_payer_override`). Calls to `0x1D` are intercepted in `pvm_host::call_actor` and routed to `execution::event_sub_system_actor::dispatch_rpc` — no code-bearing actor exists at this address; the slot is a "virtual" system actor managed by the host. An earlier draft of this CIP claimed `0x0A`, which collides with `STORAGE_MANAGER` (CIP-9) in code; `0x1D` is the activated value.
 
 #### Endpoints
 
