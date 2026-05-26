@@ -1,6 +1,6 @@
 ---
-title: "CIP-23: TEE Execution and Composite Attestation (v2)"
-description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec / measurement binding) explicit, CIP-13 delegation interaction, opcode space confirmation, nitro added to canonical TEE types
+title: "CIP-23: TEE Execution and Composite Attestation (v2.r1)"
+description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec / measurement binding) explicit, CIP-13 delegation interaction, opcode space confirmation, nitro added to canonical TEE types. r1 (2026-05-26) rescales block-count constants from 500 ms to 1 s.
 ---
 
 # CIP-23 v2
@@ -8,6 +8,10 @@ description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec /
 > **Versioning.** This is v2 of CIP-23. v1 is the canonical document `cip-23-tee-execution.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I. CIP-23 v1 is mature (Created 2026-04-20); v2 is a tightly-scoped clarification layer.
+>
+> **Revision history**
+>
+> - **r1 (2026-05-26)** — **Block-time alignment to 1 s.** The v2 draft expressed §3.13's block-count constants "at 500 ms" — inconsistent with the canonical 1 s block target (WP-v2 §6.1 / §13). r1 rescales them to 1 s blocks while preserving the wall-clock intent: `MAX_QUOTE_AGE` 150 → **75** blocks (≈75 s @ 1 s), and `BINDING_RENEWAL_PERIOD` corrected from the arithmetically-broken `12,096 ≈ 7 days at 500 ms` (which actually computes to ~1.7 h) to **604,800** blocks (≈7 days at 1 s). All v2 CIPs (CIP-11 r1.2, CIP-14 v1, WP-v2) now share the 1 s assumption; `wiki/drift.md` L-5 closed.
 >
 > **Summary of v2 changes**
 >
@@ -189,7 +193,7 @@ pub struct TeeVerifierState {
 ```text
 fn verify_cae(cae, job_id, req_hash, result_hash, registry) -> Result<(), TeeVerifyError>:
     1. Freshness:   now ≤ cae.freshness.deadline
-                 AND (now − cae.freshness.generated_at) ≤ MAX_QUOTE_AGE       (= 150 blocks)
+                 AND (now − cae.freshness.generated_at) ≤ MAX_QUOTE_AGE       (= 75 blocks)
     2. Replay:      cae.freshness.nonce ∉ seen_nonces[job_id]
     3. Cert chain:  verify(cae.cpu.quote) against cpu_roots[cae.cpu.tee_type]
                     — TDX  : PCS root → TD Module → TD
@@ -260,7 +264,7 @@ Registration flow (replaces current flag-only logic):
 5. On failure: reject; stake untouched.
 ```
 
-**Renewal.** A binding MUST be renewed every `BINDING_RENEWAL_PERIOD` blocks (default 12,096 ≈ 7 days at 500 ms). Expired bindings transition to `Deprecated` and are no longer eligible for the TEE candidate pool, though historical results they signed remain verifiable.
+**Renewal.** A binding MUST be renewed every `BINDING_RENEWAL_PERIOD` blocks (default 604,800 ≈ 7 days at 1 s). Expired bindings transition to `Deprecated` and are no longer eligible for the TEE candidate pool, though historical results they signed remain verifiable.
 
 ### 3.8 Dispatcher Filter Change (CIP-2 §5.4 amendment)
 
@@ -317,8 +321,8 @@ Billing-path CAE verification uses the same `0x05::VerifyCae` pipeline, with `re
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `MAX_QUOTE_AGE` | 150 blocks (≈75 s @ 500 ms) | Quote freshness window |
-| `BINDING_RENEWAL_PERIOD` | 12,096 blocks (≈7 days) | Measurement binding re-attestation |
+| `MAX_QUOTE_AGE` | 75 blocks (≈75 s @ 1 s) | Quote freshness window |
+| `BINDING_RENEWAL_PERIOD` | 604,800 blocks (≈7 days @ 1 s) | Measurement binding re-attestation |
 | `ROOT_UPDATE_DELAY` | 1 week | Governance delay for `UpdateCpuRoot` / `UpdateNrasRoot` |
 | `SEEN_NONCE_GC_WINDOW` | = `DISPUTE_WINDOW_BLOCKS` (75) | When nonces can be GC'd |
 | `MAX_CAE_ON_CHAIN_BYTES` | 64 (digest only) | Full CAE stored off-chain (CIP-9) |
@@ -518,7 +522,7 @@ Specifically, per the §3.4 binding rule:
 
 - The CAE's `freshness.nonce` MUST be `keccak(billing_attestation_fields_excluding_signature ‖ submission_block_hash)`.
 - The CPU quote's `REPORTDATA` MUST equal `keccak(nonce ‖ service_pubkey ‖ keccak(billing_fields_rlp))`.
-- The CAE's `freshness.deadline` and `generated_at` MUST satisfy `MAX_QUOTE_AGE = 150 blocks` (§3.13) — i.e., the quote MUST have been generated within ~75 s of the billing event.
+- The CAE's `freshness.deadline` and `generated_at` MUST satisfy `MAX_QUOTE_AGE = 75 blocks` (§3.13) — i.e., the quote MUST have been generated within ~75 s of the billing event.
 
 A cached `measurement_binding`-time CAE would reuse a stale nonce / REPORTDATA and would fail the per-billing-event integrity check. Runners therefore generate one CAE per billing event, not per `measurement_binding` lifecycle. The `measurement_binding` is verified separately at registration / renewal time per §3.7 — that's a distinct CAE with a distinct nonce binding.
 

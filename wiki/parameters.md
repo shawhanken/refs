@@ -8,18 +8,26 @@ sources:
   - node/execution/src/gas.rs
   - refs/analysis/2026-04-15_documentation_amendments.md
   - refs/cips/cip-3-fee-model.mdx
-  - refs/cips/cip-2-offchain-compute-v2.md
+  - refs/cips/cip-2-offchain-compute.md
   - refs/cips/cip-5-timers.md
+  - refs/cips/cip-7-simple-stream-protocol.md
+  - refs/cips/cip-8-mpp-session.md
+  - refs/cips/cip-9-runner-storage.md
+  - refs/cips/cip-10-runner-containers.md
+  - refs/cips/cip-11-runner-connectivity.md
   - refs/cips/cip-12-governance.md
-  - refs/cips/cip-13-runner-delegation-v2.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-15-public-asset-hosting-v2.md
-  - refs/cips/cip-16-custom-domains-v2.md
+  - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-15-public-asset-hosting.md
+  - refs/cips/cip-16-custom-domains.md
   - refs/cips/cip-18-payments.md
   - refs/cips/cip-19-gateway-mcp-ingress.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-23-tee-execution.md
+  - refs/cips/cip-24-secrets-manager.md
   - refs/cips/cip-25-cross-chain-architecture.md
-last_updated: 2026-05-11
+  - refs/cips/cip-28-cowboy-agent-banking.md
+  - refs/cips/cip-29-on-chain-event-hooks-en.md
+last_updated: 2026-05-26
 status: authoritative
 ---
 
@@ -190,7 +198,7 @@ status: authoritative
 | `DELEGATION_EVENT_BATCH_THRESHOLD` | 20 | `DelegatorPayout` 批发阈值 |
 | Opcodes | **52–56** | CIP-13 v2 §1 主分配表；v1 40-44 与 v1 草稿 44-48 均与代码冲突，已修正 |
 
-**源**: `refs/cips/cip-13-runner-delegation-v2.md` §1（opcode 主表）+ §4（参数）。
+**源**: `refs/cips/cip-13-runner-delegation.md` §1（opcode 主表）+ §4（参数）。
 
 ---
 
@@ -204,7 +212,7 @@ status: authoritative
 | `MIN_NAME_LENGTH` / `MAX_NAME_LENGTH` | 3 / 64 | 名称长度约束 |
 | `NAME_GRACE_PERIOD` | 2,592,000 blocks（≈30d @ 1 block/sec）| 过期后宽限期 |
 | `NAME_AUCTION_DURATION` | 604,800 blocks（≈7d）| Dutch 拍卖释放窗口 |
-| `BLOCKS_PER_YEAR` | 31,536,000 | ⚠️ 假设 1 block/sec；CIP-23 用 500ms 假设，见 [[drift]] |
+| `BLOCKS_PER_YEAR` | 31,536,000 | 1 block/sec（WP-v2 §6.1 canonical；2026-05-26 起 CIP-11 / CIP-23 也对齐到 1s）|
 | `MIN_GATEWAY_STAKE` | governance-set | Gateway 注册最低 stake |
 | `MAX_GATEWAY_HEALTH` | 3,600 blocks（≈1h）| Heartbeat 重置值；每块 -1 |
 | `GATEWAY_UNSTAKE_DELAY` | 604,800 blocks（≈7d）| 解绑延迟 |
@@ -222,7 +230,7 @@ status: authoritative
 
 **Subdomain policy 默认**: `OWNER_ONLY`（v1 默认 `ACTOR_MANAGED` 已修正，避免 DoS）。
 
-**源**: `refs/cips/cip-14-dns-addressable-actors-v2.md` Part II §10（v2 常量），Part II §3 / §4 / §6 / §7 / §8（其他细节）。
+**源**: `refs/cips/cip-14-dns-addressable-actors.md` Part II §10（v2 常量），Part II §3 / §4 / §6 / §7 / §8（其他细节）。
 
 ---
 
@@ -248,7 +256,7 @@ status: authoritative
 
 **route_manifest / cors_config 存储**: 在 `STORAGE_MANAGER (0x0A)` 下按 `actor_address` 索引；通过普通 ActorMessage `update_route_manifest` / `update_cors_config` 更新（**不**消耗 SystemInstruction opcode）。
 
-**源**: `refs/cips/cip-15-public-asset-hosting-v2.md` Part II §3-§8 + `refs/cips/cip-9-runner-storage-v2.md` §2-§5（GET_MANIFEST RPC、ManifestCommitted 事件、CBFS Merkle、status 映射）。
+**源**: `refs/cips/cip-15-public-asset-hosting.md` Part II §3-§8 + `refs/cips/cip-9-runner-storage.md` §2-§5（GET_MANIFEST RPC、ManifestCommitted 事件、CBFS Merkle、status 映射）。
 
 ---
 
@@ -275,7 +283,7 @@ status: authoritative
 
 **HTTP 状态映射**（v2 §7.2 修正 v1 错用 421）: PENDING/SUSPENDED → 503；EXPIRED/DETACHED → 404。
 
-**源**: `refs/cips/cip-16-custom-domains-v2.md` Part II §3-§10。
+**源**: `refs/cips/cip-16-custom-domains.md` Part II §3-§10。
 
 ---
 
@@ -283,8 +291,8 @@ status: authoritative
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `MAX_QUOTE_AGE` | 150 blocks（≈75s @ 500ms；≈150s @ 1s）| Quote 新鲜度窗口 |
-| `BINDING_RENEWAL_PERIOD` | 12,096 blocks（≈7d @ 500ms）| Measurement binding 续约 |
+| `MAX_QUOTE_AGE` | 75 blocks（≈75s @ 1s）| Quote 新鲜度窗口（CIP-23 r1 2026-05-26 从 150 blocks @ 500ms 重算到 75 @ 1s） |
+| `BINDING_RENEWAL_PERIOD` | 604,800 blocks（≈7d @ 1s）| Measurement binding 续约（CIP-23 r1 2026-05-26 修正原 12,096 算术错误 / 500ms 假设） |
 | `ROOT_UPDATE_DELAY` | 1 week | `UpdateCpuRoot` / `UpdateNrasRoot` 延迟生效 |
 | `SEEN_NONCE_GC_WINDOW` | = `DISPUTE_WINDOW_BLOCKS` (75) | Nonce 回收与争议窗口对齐 |
 | `MAX_CAE_ON_CHAIN_BYTES` | 64（仅 digest）| 完整 CAE 走 CIP-9 存 CID |
@@ -297,43 +305,56 @@ status: authoritative
 
 **Gas 预算**: `VerifyCae` (TDX + NCC) ≈ 200k cycles + 64 cells，每块 `BLOCK_CYCLES_TARGET = 20M` 下可验 ~100 个 CAE。
 
-**源**: `refs/cips/cip-23-tee-execution-v2.md` Part II §1-§5。
+**源**: `refs/cips/cip-23-tee-execution.md` Part II §1-§5。
 
 ---
 
-## SystemInstruction Opcode 主分配表（CIP-13 v2 §1 canonical）
+## SystemInstruction Opcode 主分配表（2026-05-26 代码权威视角）
 
-| Opcode | Name | Source |
-|---:|---|---|
-| 0–9 | basic + Runner registry + Job dispatch | code |
-| 10–20 | Token operations (incl. batch) | code |
-| 21–29 | (reserved) | — |
-| 30–35 | Entitlement operations | code |
-| 36–39 | (reserved) | — |
-| **40** | `UpdateSettlementConfig` | code (CIP-3) |
-| 41 | `FundActor` | code |
-| 42 | `KeyDelivery` | code |
-| 43 | `UpgradeActor` | code |
-| 44 | `UpdateBasefeeConfig` | code (CIP-3) |
-| 45 | `SubmitProposal` | code (CIP-12 占位) |
-| 46 | `CastVote` | code |
-| 47 | `ExecuteProposal` | code |
-| **48** | `CancelTimer` | code (CIP-5 §5.4) |
-| **49** | `UpdateTimerConfig` | code (CIP-5 §6.4) |
-| **50** | `ExtendTimer` | code (CIP-5 §5.4) |
-| 51 | `DeployCode` | code |
-| **52–56** | CIP-13 v2 委托：`RunnerUpdateDelegationConfig` / `RunnerDelegateStake` / `RunnerIncreaseDelegation` / `RunnerUndelegateStake` / `RunnerClaimUnbonded` | CIP-13 v2 §1 |
-| **57–60** | CIP-23 v2 TEE：`VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces` | CIP-23 v2 §4 |
-| **61–64** | CIP-10 v2 容器：`RegisterBaseImage` / `DeregisterBaseImage` / `RegisterResourceClass` / `DeregisterResourceClass` | CIP-10 v2 §5 |
-| **65** | `IngressDispatch` | CIP-14 v2 §6.1 |
-| **66** | `CompleteReceipt` | CIP-14 v2 §8 |
-| **67** | `ExternalDomainCallback` | CIP-16 v2 §5.6 |
-| 68–69 | (reserved) | — |
-| 70+ | (reserved for future CIPs) | — |
+> **2026-05-26 重写**：原 wiki 表本节复用了 CIP-13 v2 §1 早期 "canonical master allocation"，但实际 `node/types/src/execution.rs` 与该表全面 drift。本节按 `node/types/src/execution.rs:591-699` 的 `SYS_*` 常量 + Decode dispatch 重写。CIP-13 §1 主表已同步重写。
 
-代码现状 0–51 已分配。v2 系列 52–67 是 precondition。
+**Live opcodes（在代码）：**
 
-⚠️ **MPP Session 研究 / 计划提案与 v2 主表冲突**：`refs/runner/2026-04-28_MPP_Session_Research.md` §5.3 + `refs/plans/2026-05-06_mpp_session_implementation.md` §3.2 提议 `OpenSession`/`Deposit`/`Settle`/`Close`/`Finalize`/`Slash` 占 52-57，**与 CIP-13 v2 (52-56) + CIP-23 v2 (57) 全段冲突**。研究阶段未对齐 v2 alignment round 6；激活前必须重排到 ≥68 free range（drift V-12）。
+| Opcode | Name | Owning CIP | Status |
+|---:|---|---|---|
+| 0 | `CreateAccount` | core | ✅ in code |
+| 1 | `Transfer` | core | ✅ in code |
+| 2–5 | `RunnerRegister` / `UpdateRateCard` / `Heartbeat` / `Deregister` | CIP-2 | ✅ in code |
+| 6–9 | `JobSubmit` / `JobResultSubmit` / `JobCancel` / `JobResultCommit` | CIP-2 | ✅ in code |
+| 10–20 | Token ops (`TokenCreate`…`TokenTransferBatch`) | CIP-20 | ✅ in code |
+| 21–29 | — | — | (free) |
+| 30–35 | Entitlement ops (`Grant`/`Revoke`/`Delegate`/`CreateRole`/`AssignRole`/`RevokeRole`) | CIP-2 §7 | ✅ in code |
+| 36–39 | — | — | (free) |
+| 40 | `UpdateSettlementConfig` | CIP-2 / CIP-3 | ✅ in code |
+| 41 | `FundActor` | core | ✅ in code |
+| 42 | `KeyDelivery` | core | ✅ in code |
+| 43 | `UpgradeActor` | CIP-12 §7 | ✅ in code |
+| 44 | `UpdateBasefeeConfig` | CIP-3 | ✅ in code |
+| 45–47 | `SubmitProposal` / `CastVote` / `ExecuteProposal` | CIP-12 | ✅ in code |
+| 48–50 | `CancelTimer` / `UpdateTimerConfig` / `ExtendTimer` | CIP-5 | ✅ in code |
+| 51 | `DeployCode` | core | ✅ in code |
+| **52–57** | **`SessionOpen` / `SessionDeposit` / `SessionSettle` / `SessionClose` / `SessionFinalize` / `SessionSlash`** | **CIP-8 (MPP Session)** | **✅ in code** |
+| 58–59 | — | — | (free) |
+| **60–63** | **`RegisterTeeTrustedKey` / `RevokeTeeTrustedKey` / `SubmitTeeAttestation` / `RevokeTeeAttestation`** | **CIP-24 §3.3 (TEE Verifier support)** | **✅ in code** |
+| 64–67 | — | — | (free) |
+| **68–84** | **`SetSecret` … `ForcedDeregisterCbssProxy`** (17 slots) | **CIP-24 §3.3 (CBSS main)** | **✅ in code** |
+| **85** | **`SubmitDrainRelayProposal`** | **CIP-9 §13.3** | **✅ in code** |
+| **86** | **`SubmitAutoDrainPolicyProposal`** | **CIP-9 §13.4** | **✅ in code** |
+| 87+ | — | — | (free; 给以下 spec-only 提案预留) |
+
+**Aspirational allocations（spec-only，尚未实装；激活时必须重号到 ≥87）：**
+
+| 原 claim | CIP | 现状 |
+|---|---|---|
+| 52–56 → CIP-13 delegation handlers | CIP-13 v2 §1 | 与 CIP-8 Session 撞号；必须重号 |
+| 57–60 → CIP-23 v2 `VerifyCae` / `UpdateCpuRoot` / `UpdateNrasRoot` / `GcNonces` | CIP-23 v2 §4 | 与 CIP-8 SessionSlash (57) + CIP-24 TEE keys (60) 撞号 |
+| 61–64 → CIP-10 v2 容器 ops | CIP-10 v2 §5 | 与 CIP-24 TEE keys (61-63) 撞号 |
+| 65–67 → `IngressDispatch` / `CompleteReceipt` / `ExternalDomainCallback` | CIP-14 v2 §6.1 / §8 / CIP-16 v2 §5.6 | 64-67 当前 free；这一组可如期落地 |
+| (TBD) → CIP-28 BankActor handlers | CIP-28 r1.1 | 未在 CIP-28 列出；预留 ≥87 |
+
+**CIP-29（事件订阅）** 不消耗 SystemInstruction opcode：`pvm_host::call_actor` 拦截 `0x1D` 路由到 `event_sub_system_actor::dispatch_rpc`，所有 RPC 走 host-side 函数。
+
+详见 [`refs/cips/cip-13-runner-delegation.md` §1](../cips/cip-13-runner-delegation.md) 主表与 [[entities/system-actors]]。
 
 ---
 
@@ -389,7 +410,7 @@ AssetConfig  { asset: Address, network: string, method: string,
 
 **Wire 格式 fallback 链**（PaymentGate 评估顺序）：1) free → 2) active subscription → 3) valid pass → 4) actor budget → 5) per-request credential (MPP/x402) → 6) 402 challenge。
 
-**Opcode**：无新 SystemInstruction（所有调用为 ActorMessage to `0x0013`）。
+**Opcode**：无新 SystemInstruction（所有调用为 ActorMessage to `PAYMENT_GATE_ADDRESS = 0x11`）。
 
 **源**: `refs/cips/cip-18-payments.md` §6-§22 + [[concepts/payments]]。
 
@@ -490,7 +511,7 @@ L1 / L2 / L3 三层架构常量。具体后端 / TVL 阈值 / TTL 由治理细�
 
 **BillingAttestation TEE 路径**：`tee_signature: Option<CompositeAttestation>` 由 `0x0F` 调 `0x05::VerifyCae` (opcode 57) 校验。
 
-**源**: `refs/cips/cip-10-runner-containers-v2.md` Part II §1-§5。
+**源**: `refs/cips/cip-10-runner-containers.md` Part II §1-§5。
 
 ---
 

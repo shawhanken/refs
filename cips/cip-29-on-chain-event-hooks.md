@@ -396,8 +396,11 @@ def on_liquidation(self, position_id):
 新分配一个独立的系统 actor，专门承担订阅者竞价市场的查询与操作。**选择独立地址而非挂在 `0x09 (Governance)` 之下**：`0x09` 已承担 `SettlementConfig` 等治理职责，叠加竞价市场会让其职责膨胀且与 settlement 的"系统级稳定参数"语义错位——竞价是高频用户行为，必须独立。
 
 ```rust
-EVENT_SUBSCRIPTION_SYSTEM_ACTOR = Address::from_low_u64(0x0A)
+// node/types/src/constants.rs:156（2026-05-26 起代码已实装）
+EVENT_SUBSCRIPTION_SYSTEM_ACTOR = Address::from_low_u64(0x1D)
 ```
+
+> **地址决定理由。** `0x1D` 位于保留系统 actor 段 `0x01..=0x0F` **之外**（保留段在 `pvm_host.rs` 中对 actor 部署和 `fee_payer_override` 做拦截）。对 `0x1D` 的调用由 `pvm_host::call_actor` 截获并路由到 `execution::event_sub_system_actor::dispatch_rpc`——该地址不部署 actor 代码，是一个 host 托管的"虚拟"系统 actor。本 CIP 早期草案声称 `0x0A`，与代码里的 `STORAGE_MANAGER (CIP-9)` 撞址；`0x1D` 是已激活的最终值。
 
 #### 提供的端点
 

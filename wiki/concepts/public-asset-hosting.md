@@ -2,10 +2,10 @@
 type: concept
 tags: [ingress, gateway, static-assets, cip-15, cip-9, cors]
 sources:
-  - refs/cips/cip-15-public-asset-hosting-v2.md
+  - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-15-gateway-implementation.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-9-runner-storage-v2.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-9-runner-storage.md
   - refs/cips/cip-18-payments.md
 last_updated: 2026-05-11
 status: draft
@@ -167,8 +167,8 @@ Gateway 按量读取 shard 但**不**向 Relay Node 付 per-read 费用；Relay 
 
 ## Sources
 
-- `refs/cips/cip-15-public-asset-hosting-v2.md` — v2 spec（Draft, 2026-04-21）
+- `refs/cips/cip-15-public-asset-hosting.md` — v2 spec（Draft, 2026-04-21）
 - `refs/cips/cip-15-gateway-implementation.md` — 6-phase implementation handbook（Living, 2026-05-11）
 - `refs/cips/cip-18-payments.md` §6.6 / §15 — `pays` 字段与 Gateway 付款 enforce
-- `refs/cips/cip-9-runner-storage-v2.md` — v2 amendments（GET_MANIFEST §2 AMEND 9-G + ManifestCommitted §4 AMEND 9-H + canonical Merkle §3 + status mapping §5 + CIP-11 ref errata §10 + STORAGE_MANAGER 0x0A 落锁 §11）
-- `refs/cips/cip-14-dns-addressable-actors-v2.md` — read_handler / IngressDispatch / target_pool enum 上下文
+- `refs/cips/cip-9-runner-storage.md` — v2 amendments（GET_MANIFEST §2 AMEND 9-G + ManifestCommitted §4 AMEND 9-H + canonical Merkle §3 + status mapping §5 + CIP-11 ref errata §10 + STORAGE_MANAGER 0x0A 落锁 §11）
+- `refs/cips/cip-14-dns-addressable-actors.md` — read_handler / IngressDispatch / target_pool enum 上下文

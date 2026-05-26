@@ -3,7 +3,7 @@ type: concept
 tags: [cross-chain, bridge, anchoring, messaging, runners, cip-25, cip-2, cip-4, cip-7, draft]
 sources:
   - refs/cips/cip-25-cross-chain-architecture.md
-  - refs/cips/cip-2-offchain-compute-v2.md
+  - refs/cips/cip-2-offchain-compute.md
   - refs/cips/cip-7-simple-stream-protocol.md
 last_updated: 2026-05-11
 status: draft

@@ -1,897 +1,1069 @@
 ---
-title: "CIP-6: Python SDK & Actor API"
-description: High-level abstractions for deterministic actor development
+title: "CIP-6: In-PVM Actor SDK (cowboy_sdk)"
+description: Normative specification of the cowboy_sdk Python package — actor lifecycle, handler permissions, runtime syscalls, ownership model, and CLI surface for Cowboy actor development
 icon: code
 ---
 
 <Note>
-  **Status:** Draft
-  **Type:** Standards Track
-  **Category:** SDK
+  **Status:** Draft<br/>
+  **Type:** Standards Track<br/>
+  **Category:** SDK<br/>
+  **Created:** 2025-10-20<br/>
+  **Revised:** 2026-05-19 (split SDK layers; add permissions §7, ownership §12.10, deployment-semantics fix §6.3, handler-signature clarification §2.3, compatibility matrix §2.4)<br/>
+  **Requires:** CIP-1 (Actor Message Scheduler), CIP-2 (Off-Chain Compute), CIP-3 (Fee Model), CIP-5 (Timers)<br/>
 </Note>
 
-## Overview
+## 1. Abstract
 
-This improvement proposal aims to hide underlying mechanisms (message passing, Timer, Gas) through high-level abstractions while strictly adhering to the PVM determinism constraints defined by the Cowboy mainchain (no JIT, soft-float, fixed hash seed, CBOR serialization).
+This CIP specifies **`cowboy_sdk`**, the Python SDK embedded in the Cowboy PVM and imported by actor code executing on-chain. It is normative for the PVM's actor model, call primitives, handler permissions, continuation semantics, type system, verification builder, error hierarchy, ownership runtime, and the `cowboy` CLI surface.
 
-### Design Principles
+There are two Python-facing layers for Cowboy development. **This CIP is normative for `cowboy_sdk` only.** The standalone installable package (`cowboy-sdk`, imported as `cowboy`) is described in §2 and is non-normative for this CIP.
 
-1. **Determinism First**: All SDK abstractions must compile to deterministic on-chain operations
-2. **Explicit Over Implicit**: State crossing block boundaries must be explicitly declared
-3. **Secure by Default**: Prevent developers from inadvertently writing code that breaks consensus
-4. **Progressive Complexity**: Simple APIs for simple scenarios, full control for complex scenarios
+Any Cowboy node that runs Python actors MUST expose the module layout and syscalls defined here. Any CLI that names itself `cowboy` SHOULD implement the subcommands in §16 with compatible flag semantics.
+
+Key properties:
+
+- **Deterministic by construction.** Non-deterministic Python primitives (wall-clock time, hardware FPU, unseeded randomness, filesystem, network, `set()`, `pickle`) are trapped or replaced by SDK equivalents.
+- **Two-dimensional metering.** Every syscall is metered in Cycles (compute) or Cells (state IO) per CIP-3.
+- **Handler-mode purity.** Every actor method declares whether it may issue async side effects (`@pure` vs `@deferred`); the runtime enforces this distinction.
+- **Deny-by-default access control.** Handlers are unreachable from external callers unless explicitly decorated with `@public` or `@callable_by(...)`.
+- **Continuations compiled at decoration time.** `async` methods decorated with `@runner.continuation` or `@actor.continuation` are lowered to a finite-state machine at class-load time, not dynamically at runtime.
+- **Entitlements gate all external-effect syscalls.** Entitlements are declared in a deploy-time manifest and enforced at the Host API boundary.
 
 ---
 
-## Chapter 1: Call Primitives and Delivery Timing
+## 2. SDK Layers
 
-### 1.1 Three Call Primitives
+There are two Python-facing packages for Cowboy development. They are distinct and serve different purposes.
 
-The Cowboy SDK provides three call primitives for different scenarios:
+### 2.1 `cowboy_sdk` — In-PVM Actor SDK (this CIP)
 
-| Primitive | Delivery Timing | Return Value | Atomicity | Rollback Propagation | Typical Use Cases |
-|-----------|-----------------|--------------|-----------|----------------------|-------------------|
-| `call()` | T+0 (same transaction) | ✅ Direct return | ✅ Shared context | ✅ Cascading rollback | Atomic operations, state queries |
-| `send()` | T+N (next block) | ❌ None | ❌ Independent transaction | ❌ Irrevocable | Notifications, triggering tasks |
-| `await continuation` | T+N (after off-chain execution) | ✅ Resume return | ❌ Independent transaction | ❌ Irrevocable | LLM, HTTP, cross-Actor async |
+| | |
+|---|---|
+| **Repo** | `node/pvm/Lib/cowboy_sdk/` |
+| **Import** | `from cowboy_sdk import actor, runtime, ...` |
+| **Where it runs** | Inside the PVM when actor code executes on-chain or in a local PVM sandbox |
+| **Version** | 0.1.1, Python ≥ 3.11 |
 
-### 1.2 Execution Sequence Diagram
+Actor code that will run on-chain imports from `cowboy_sdk`. This is the package this CIP specifies.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant TX as Transaction (Block N)
-    participant A as ActorA
-    participant B as ActorB
-    participant C as ActorC
-    participant D as ActorD
-    participant R as Runner
+### 2.2 `cowboy` — Standalone Developer SDK
 
-    rect rgb(230, 245, 255)
-        Note over TX,R: Block N (Current Transaction)
-        TX->>A: TX Start
-        A->>B: call(ActorB, ...)
-        activate B
-        B->>C: call(ActorC, ...) [depth+1]
-        activate C
-        C-->>B: Return result
-        deactivate C
-        B-->>A: Return result
-        deactivate B
-        A--)D: send(ActorD, ...) [Queue to Block N+1]
-        A--)R: await runner.llm() [Suspend]
-        Note over TX: TX End (State Commit)
-    end
+| | |
+|---|---|
+| **Repo** | `python-sdk/` (PyPI: `cowboy-sdk`) |
+| **Import** | `from cowboy import actor, CowboyClient, runtime, ...` |
+| **Where it runs** | Off-chain, in developer environments and CI |
+| **Version** | 0.1.0, Python ≥ 3.10 |
 
-    rect rgb(255, 245, 230)
-        Note over D: Block N+1
-        D->>D: handler(msg) ← Message from send()
-    end
+The standalone package provides:
 
-    rect rgb(230, 255, 230)
-        Note over A,R: Block N+K (K determined by Runner latency)
-        R-->>A: resume(result) ← Result from Runner
-    end
+- **Actor authoring helpers** — `@actor`, `@public`, `@callable_by`, `@pure`, `@deferred`, `@init_handler`, `OWNER`, `SELF`, local `runtime` stubs for unit testing
+- **Source generation** — `actor_instance.to_source()` emits deployable Python source that imports from `cowboy_sdk`
+- **Chain client** — `CowboyClient`, `AsyncCowboyClient` for RPC queries and transactions
+- **Deployment** — `client.deploy_actor(code, salt, init_handler, ...)`, `client.execute_actor(...)`
+- **Wallets and signing** — `Wallet`, `generate_private_key`, `sign_payload`
+- **Jobs** — `JobSpec`, `client.submit_job()`
+- **CBSS** — secrets management helpers
+
+The `cowboy` local SDK mirrors enough of the `cowboy_sdk` actor authoring API to write and unit-test actors locally. It does not implement continuations, `ActorRef`, `runner`, `Verify`, `CowboyModel`, `SoftFloat`, `ordered_set`, `BlockHeight`, or storage raw/guard helpers. Actors that use those features must be tested against a live PVM sandbox.
+
+### 2.3 Handler Signature Difference
+
+The most important practical difference for actor authors:
+
+| Layer | Handler signature | Payload |
+|---|---|---|
+| **`cowboy_sdk`** (PVM) | `def handler(self, msg)` — single positional arg | Whatever the host delivers; no mandatory pre-decode at the Python layer |
+| **`cowboy`** (standalone) | `def handler(self, payload: bytes)` — enforced by `validate_for_deployment` | Raw CBOR bytes; author decodes (e.g. `cbor2.loads(payload)`) |
+
+`to_source()` generates module-level wrappers with the `payload: bytes` signature. Actors deployed via `to_source()` therefore receive raw CBOR bytes on-chain; decoding is the author's responsibility. CBOR encode/decode is a wire-format concern for `call()`, `send()`, and storage — see §9 and §11.5.
+
+### 2.4 Compatibility Matrix
+
+| Feature | `cowboy_sdk` (PVM) | `cowboy` (standalone) |
+|---|:---:|:---:|
+| Import name | `cowboy_sdk` | `cowboy` |
+| Execution environment | On-chain PVM | Local / CI |
+| `@actor` decorator | ✓ | ✓ |
+| `self.address` injection | ✓ | — |
+| `self.storage` injection | ✓ | ✓ (in-memory) |
+| `Storage.get_raw()` / `set_raw()` | ✓ | — |
+| `Storage.guard()` / `GuardedValue` | ✓ | — |
+| `@public` / `@callable_by` / `OWNER` / `SELF` | ✓ | ✓ |
+| `@init_handler` | — | ✓ |
+| Handler signature | `(self, msg)` | `(self, payload: bytes)` |
+| `call()` / `send()` top-level | ✓ | — |
+| `runtime.call_actor()` / `runtime.send_message()` | ✓ | ✓ (stubs) |
+| `ActorRef` | ✓ | — |
+| `runner` / `capture` / continuations | ✓ | — |
+| `Verify` / `VerifyBuilder` | ✓ | — |
+| `CowboyModel` / `SoftFloat` / `ordered_set` | ✓ | — |
+| `runtime` ownership helpers | ✓ | ✓ (stubs) |
+| `runtime.configure()` / `reset()` (test helpers) | — | ✓ |
+| `routes` / `Pays` / `mount` (CIP-15) | ✓ | ✓ |
+| `CowboyClient` / `Wallet` / `JobSpec` | — | ✓ |
+
+---
+
+## 3. Motivation
+
+Python is the surface that actor authors touch most often. For the protocol to be interoperable across implementations and for actors to remain portable across node versions, the SDK contract must be stable and normatively specified — not left as implementation-defined.
+
+A prior revision of this CIP was drafted before significant SDK consolidation landed (handler-mode purity, runtime module, error-code hierarchy, CREATE2 address derivation, entitlement manifest format, permissions system). This revision rebuilds against the shipping code and clarifies the two-package architecture so that the spec tracks implementation reality.
+
+Subsequent revisions will extend the SDK for CIP-9 volume mounts (currently runner-side only) and CIP-7 / CIP-17 streaming helpers. Both are noted as gaps in §19.
+
+---
+
+## 4. Definitions
+
+- **Actor**: A Python class whose public methods are invocable handlers. Identified by a 20-byte address.
+- **Handler**: A public method of an Actor. Accepts the payload the host delivers; returns a CBOR-encodable value or raises.
+- **Handler mode**: A per-method property, either `pure` (default) or `deferred`. Pure handlers MUST NOT issue async side effects.
+- **Permission**: A per-method access control tag (`@public`, `@callable_by`, or absent). Absent means deny-by-default from external callers.
+- **Syscall**: A call from the PVM into the Host API (implemented in Rust) to perform a privileged operation. The SDK wraps syscalls.
+- **Continuation**: A compiled FSM representation of an `async def` handler that `await`s a runner job or an async actor call. State survives block boundaries.
+- **Manifest**: A JSON document declaring the entitlements a deployed actor requests. Attached to the deploy transaction.
+- **PVM**: The Python Virtual Machine executing actor bytecode under determinism constraints (CIP-3 §4).
+
+---
+
+## 5. SDK Module Layout
+
+The canonical package is `cowboy_sdk`, shipped with the PVM at `node/pvm/Lib/cowboy_sdk/`. Version 0.1.1 targets Python ≥ 3.11.
+
+**Required actor-facing API** — every symbol below MUST be importable from the `cowboy_sdk` package root. An implementation MUST NOT remove, rename, or change the semantics of any of these:
+
+| Category | Exports |
+|---|---|
+| **Actor core** | `actor`, `ActorRef`, `derive_actor_address` |
+| **Handler modes** | `pure`, `deferred` |
+| **Permissions** | `public`, `callable_by`, `OWNER`, `SELF` |
+| **Call primitives** | `call`, `send` |
+| **Continuations** | `capture`, `Capture`, `bounded_loop` |
+| **Security guards** | `reentrancy_guard`, `storage_guard`, `GuardedValue`, `GuardSet` |
+| **Runner integration** | `runner` (module), `Retry`, `TaskGroup` |
+| **Types** | `Address`, `BlockHeight`, `SoftFloat`, `ordered_set`, `CowboyModel` |
+| **Verification** | `Verify` |
+| **Runtime surface** | `runtime` (module) |
+| **Errors** | See §15 |
+
+**Currently exported helpers and extension surfaces** — present in the shipping implementation but not mandated by this CIP. An implementation MAY omit or rename these; actor authors SHOULD prefer the required API above:
+
+| Category | Exports | Notes |
+|---|---|---|
+| **HTTP routes (CIP-15)** | `routes` (module), `Pays`, `mount` | Defined by CIP-15, not CIP-6 |
+| **Continuation internals** | `save_cont`, `load_cont`, `delete_cont` | FSM plumbing; use `capture()` instead |
+| **Guard helpers** | `BoundedRange`, `check_iteration` | Implementation conveniences for `bounded_loop` |
+| **Verification builder** | `VerifyBuilder` | Returned by `Verify.builder()`; rarely imported directly |
+
+Private submodules (`cowboy_sdk.codec`, `cowboy_sdk.pvm_sys`, `cowboy_sdk.pvm_time`, `cowboy_sdk.pvm_random`) are implementation details and SHOULD NOT be imported by actor code. They MAY be imported by SDK extensions that understand the PVM boundary.
+
+---
+
+## 6. Actor Model
+
+### 6.1 Declaration
+
+An Actor is a Python class decorated with `@actor`. The examples below use `cowboy_sdk` import style (on-chain). The standalone `cowboy` package uses the same decorator names but requires `(self, payload: bytes)` handler signatures — see §2.3.
+
+```python
+from cowboy_sdk import actor, public, callable_by, pure, deferred, OWNER, runtime
+
+@actor
+class Counter:
+    def init(self, payload):
+        runtime.assume_ownership_if_unowned()
+        self.storage["count"] = 0
+
+    @pure
+    @public
+    def get_count(self, payload) -> int:
+        return self.storage.get("count", 0)
+
+    @deferred
+    @public
+    def increment(self, payload) -> int:
+        self.storage["count"] = (self.storage.get("count") or 0) + 1
+        return self.storage["count"]
+
+    @callable_by(OWNER)
+    def reset(self, payload) -> None:
+        self.storage["count"] = 0
 ```
 
-### 1.3 Synchronous Call (call) - T+0
+The `@actor` decorator:
 
-Synchronous calls execute immediately within the current transaction, sharing atomic context.
+1. Injects `self.address` (read-only `Address`, the actor's own 20-byte address). **`cowboy_sdk` only** — the standalone `cowboy` SDK does not inject `self.address`.
+2. Injects `self.storage` (a dict-like proxy over actor private state — see §6.5).
+3. Wraps every public method in permission enforcement (deny-by-default; see §7) and handler-mode enforcement (see §8).
+4. Scans for `@runner.continuation` and `@actor.continuation` methods and installs the corresponding `__resume` callbacks. **`cowboy_sdk` only.**
+5. Registers the class as the handler entry point for the deployed actor.
 
-**PVM Determinism Constraints**:
-- Call depth accumulates to reentrancy limit (32), each `call()` consumes 1 depth level
-- Must explicitly pass `cycles_limit` to prevent infinite recursion
-- Return values must be CBOR serializable types
+The decorator form is canonical. Whether a bare class named `Actor` is accepted without the decorator depends on the PVM loader's module-scanning logic, which is non-normative at this layer; actor authors SHOULD always use `@actor`.
+
+### 6.2 Address Derivation
+
+Actor addresses are derived via Ethereum-style CREATE2:
+
+```
+address = keccak256(0xff || deployer_address || salt || code_hash)[12:]
+```
+
+- `deployer_address`: 20 bytes, the sender of the deploy transaction.
+- `salt`: 32 bytes, caller-supplied (zero-padded if shorter).
+- `code_hash`: 32-byte hash of the actor source. The CLI's `cowboy actor address` is authoritative for the exact hash algorithm used.
+- Output: 20-byte `Address`.
+
+`derive_actor_address(deployer, salt, code_hash)` computes this locally. The CLI helper `cowboy actor address` computes it without submitting a transaction (§16).
+
+### 6.3 Deployment
+
+**Wire fields (`DeployActor` transaction):**
+
+| Field | Wire type | Notes |
+|---|---|---|
+| `code` | `bytes` | UTF-8 Python source |
+| `salt` | `bytes` (≤ 32) | zero-padded to 32 bytes for CREATE2 |
+| `init_handler` | `Option<string>` | handler to invoke atomically; absent = no init call |
+| `init_payload` | `Option<bytes>` | payload passed to `init_handler`; absent = no payload |
+| `manifest` | `Option<bytes>` | commonware-codec-encoded `ActorManifest`; CLI accepts `--manifest-json <file.json>` (JSON) and converts |
+
+**CLI defaults (applied by `cowboy actor deploy` before building the transaction):**
+
+| Flag | Default when omitted |
+|---|---|
+| `--init-handler` | `"init"` |
+| `--init-payload` | `"{}"` (UTF-8 string) |
+
+Atomic initialization:
+
+- By default the CLI calls `"init"` atomically in the same transaction as the deploy, with `sender` set to the deployer's address.
+- Pass `--no-init` to deploy without an init call (only safe for actors that do not rely on `init` for ownership bootstrapping).
+- Pass `--init-handler <name>` to name a different handler.
+- Pass `--init-payload <json-string | @file>` to supply a custom payload.
+
+The entire `DeployActor` transaction reverts if `init_handler` raises.
+
+The deployment receipt carries the derived actor address.
+
+**Note on `__init__`:** Previous revisions of this CIP described deployment as invoking `__init__` with constructor args. This is incorrect. `__init__` may be used for local Python class initialization (without args), but the deploy-time initializer is always a handler named via `init_handler`, not the Python constructor.
+
+### 6.4 Message Handler Dispatch
+
+A message to an actor carries a `method_name` (UTF-8 string) and `payload` (raw bytes). Dispatch:
+
+1. The PVM loads the actor class and state.
+2. `method_name` is looked up; unknown methods raise `AttributeError` — converted to `ActorCallError`.
+3. The handler runs under its declared permission (§7) and handler mode (§8).
+4. Return value is CBOR-encoded and returned to the caller (for `call()`) or discarded (for `send()`).
+
+Actors deployed via `to_source()` receive `payload` as raw CBOR bytes in each module-level wrapper. The author is responsible for decoding (e.g. `cbor2.loads(payload)`).
+
+The reserved handler `on_timer(msg)` receives timer fires (CIP-5). Additional reserved handlers MAY be introduced by future CIPs.
+
+### 6.5 Storage
+
+Actor state is a private key-value store scoped to the actor's address. Access is exclusively through `self.storage`:
+
+```python
+self.storage[key] = value        # CBOR-encode value, write
+value = self.storage[key]        # read, CBOR-decode; None if absent
+del self.storage[key]            # delete
+key in self.storage              # membership test
+value = self.storage.get(key, default)
+```
+
+Raw-bytes escape hatches (**`cowboy_sdk` only**):
+
+```python
+self.storage.set_raw(key, data)  # data: bytes, stored verbatim
+data = self.storage.get_raw(key) # returns bytes | None
+```
+
+Guard-based state snapshot for continuations (**`cowboy_sdk` only**):
+
+```python
+balance = self.storage.guard("balance")  # returns GuardedValue; see §10.3
+```
+
+Keys MUST be UTF-8 strings. Values of `self.storage[key]` MUST be CBOR-encodable per §11.5.
+
+Storage writes and reads are metered in Cells per CIP-3. Cross-actor storage access is prohibited; actor B cannot read actor A's storage directly — it must call a method on A.
+
+A small set of dunder-style keys (`__OWNER__`, `__INITIALIZED__`) is reserved by the SDK. All access methods raise `ValueError` for those keys; use the sanctioned runtime APIs instead (see §12.10).
+
+---
+
+## 7. Handler Permissions
+
+Access control is **deny-by-default**: a non-underscore-prefixed handler with no permission decorator is unreachable from external callers. This applies in both `cowboy_sdk` and the standalone `cowboy` package.
+
+### 7.1 Decorators
+
+| Decorator | Who may call |
+|---|---|
+| `@public` | Any caller |
+| `@callable_by(addr, ...)` | Listed 20-byte addresses (bytes, hex string, or `Address` object) |
+| `@callable_by(OWNER)` | The actor's registered owner (see §12.10) |
+| `@callable_by(SELF)` | Intra-actor calls only (see §7.3) |
+| *(none)* | External callers denied; intra-actor calls always pass |
+
+```python
+from cowboy_sdk import actor, public, callable_by, OWNER, SELF, runtime
+
+@actor
+class Vault:
+    def init(self, payload):
+        runtime.assume_ownership_if_unowned()
+
+    @public
+    def balance_of(self, payload):
+        return self._compute_balance()        # calls underscore helper — no perm check
+
+    @callable_by(OWNER)
+    def withdraw(self, payload):
+        ...
+
+    @callable_by(b"\xaa" * 20, b"\xbb" * 20)
+    def admin_pause(self, payload):
+        ...
+
+    def _compute_balance(self):
+        ...    # underscore prefix — not wrapped, no permission check at all
+```
+
+### 7.2 Internal Helpers
+
+**Convention: name internal helpers with a leading underscore.** The `@actor` wrap pass skips underscore-prefixed names unless they carry an explicit `@public` / `@callable_by` tag, so `self._helper(payload)` runs without a permission check. A non-underscore method without a permission decorator is still treated as a handler and will raise `PermissionDeniedError` when reached from an external caller.
+
+### 7.3 `@callable_by(SELF)` Semantics
+
+`SELF` resolves via `caller == self.address` — i.e., the host has actively set `sender` to the actor's own address. This fires for timer self-fires and explicit self-submission flows. It does **not** fire for ordinary `self.method()` calls inside a handler, because `runtime.get_sender()` returns the outermost caller address (the EOA or upstream actor), not the executing actor's address.
+
+### 7.4 `init` Bootstrap Window
+
+A handler named `init` is implicitly callable by anyone while the actor has not yet recorded successful initialization (the `__INITIALIZED__` reserved slot is unset). The SDK sets this flag automatically after `init` returns without raising. After that, `init` follows the same deny-by-default rules as every other handler.
+
+The deploy machinery runs `init` in the same transaction as the deploy with `sender = deployer`, eliminating the front-run window.
+
+---
+
+## 8. Handler Modes
+
+Every handler runs under one of two modes, declared via decorator:
+
+| Mode | Decorator | Async side effects allowed? |
+|---|---|:---:|
+| **Pure** (default) | `@pure` (implicit) | No |
+| **Deferred** | `@deferred` | Yes |
+
+A **pure** handler MUST NOT issue any operation that produces an async effect: `send()`, `runtime.schedule_timer()`, `runtime.submit_job()`, emitting callbacks. Synchronous `call()` and local computation are allowed. Any prohibited operation inside a pure handler raises `PurityViolationError`.
+
+A **deferred** handler MAY issue any SDK operation subject to entitlement gates.
+
+```python
+from cowboy_sdk import actor, public, deferred, send
+
+@actor
+class Example:
+    @public
+    def balance_of(self, payload) -> int:          # @pure by default
+        addr = payload.get("addr") if isinstance(payload, dict) else payload
+        return self.storage.get(f"bal:{addr}", 0)
+
+    @deferred
+    @public
+    def transfer(self, payload) -> None:
+        to = payload["to"]
+        amount = payload["amount"]
+        self.storage[f"bal:sender"] -= amount
+        self.storage[f"bal:{to}"] = self.storage.get(f"bal:{to}", 0) + amount
+        send(to, {"kind": "received", "amount": amount})   # async side effect
+```
+
+The split exists because pure handlers are safe targets for read-only RPCs (CIP-14 query path, external introspection tools); the runtime can execute them without the overhead of a deferred effect queue. The enforcement is a runtime check at the Host API boundary, not a static check.
+
+---
+
+## 9. Call Primitives
+
+Three primitives for inter-actor and off-chain interaction:
+
+| Primitive | Timing | Return value | Atomic with caller? | Typical use |
+|---|---|:---:|:---:|---|
+| `call()` | same transaction (T+0) | yes | yes (shared rollback) | atomic cross-actor operations, reads |
+| `send()` | next block (T+1) | no | no (fire-and-forget) | notifications, triggering downstream work |
+| `await runner.<op>` | T+K, after off-chain execution | yes (resume value) | no | LLM, HTTP, MCP tool calls |
+| `await ActorRef.async_*` | T+K, after target actor responds | yes | no | actor-to-actor async request/response |
+
+**Standalone `cowboy` SDK note:** Top-level `call()` and `send()` are not exported by the standalone package. For local tests use `runtime.call_actor(target, method, payload, cycles_limit)` and `runtime.send_message(target, payload)` respectively.
+
+### 9.1 `call()` — Synchronous Cross-Actor Call
 
 ```python
 from cowboy_sdk import call
 
-def atomic_swap(self, user: str, amount_a: int, amount_b: int):
-    """
-    Synchronous call semantics:
-    - Immediate execution: call() jumps to target Actor immediately within current transaction
-    - Shared context: Caller and callee share the same transaction's read-write set
-    - Atomic rollback: raise at any point rolls back the entire call chain
-    """
-    
-    # Synchronous call: execute immediately and return result
-    balance_a = call(
-        target="0x1111...",
-        method="get_balance",
-        args={"user": user},
-        cycles_limit=5000  # Must explicitly specify
-    )
-    
-    if balance_a < amount_a:
-        raise InsufficientBalance()
-    
-    # These two transfers execute atomically within the same transaction
-    call(
-        target="0x1111...", 
-        method="transfer", 
-        args={"from_addr": user, "to_addr": self.address, "amount": amount_a},
-        cycles_limit=10000
-    )
-    
-    call(
-        target="0x2222...", 
-        method="transfer",
-        args={"from_addr": self.address, "to_addr": user, "amount": amount_b},
-        cycles_limit=10000
-    )
-    # If execution reaches here without exceptions, both transfers are committed
+result = call(
+    target="0x1111...",
+    method="get_balance",
+    args={"user": "0xABCD..."},
+    cycles_limit=5000,
+)
 ```
 
-**Syntactic Sugar: ActorRef**
+Arguments:
+- `target`: 20-byte address, as `Address`, hex string, or raw bytes.
+- `method`: UTF-8 handler name on the target.
+- `args`: CBOR-encodable dict of keyword arguments, or list of positional arguments.
+- `cycles_limit`: explicit cycle budget for the callee. Defaults to `100_000` if omitted; passing it explicitly is recommended for precise metering.
+
+Semantics:
+- Executes in the same transaction. Shared read-write set with the caller.
+- Callee exceptions propagate — uncaught, they roll back the entire transaction.
+- Call depth is capped at 32. Exceeding this raises `CallDepthExceeded`.
+- Return value is CBOR-decoded and returned to the caller.
+
+The `ActorRef` wrapper provides syntactic sugar:
 
 ```python
 from cowboy_sdk import ActorRef
 
-@actor
-class TradingBot:
-    def check_arbitrage(self):
-        # SDK syntactic sugar: automatically generates call() invocation
-        oracle = ActorRef("0x4444...")
-        price = oracle.get_price("ETH")  # Compiles to call(...)
-        
-        if price < 1000:
-            self.execute_buy()
+oracle = ActorRef("0x4444...", cycles_limit=5000)
+price = oracle.get_price("ETH")     # lowers to call("0x4444...", "get_price", ["ETH"])
 ```
 
-### 1.4 Asynchronous Message (send) - T+N
-
-Asynchronous messages are queued for delivery in the next block, with no return value and irrevocable.
-
-**PVM Determinism Constraints**:
-- Multiple `send()` calls within the same transaction queue messages in call order
-- Message ID: `keccak256(sender_addr + nonce + target + payload_hash)`
-- Messages are strictly delivered at the start of the next block
+### 9.2 `send()` — Fire-and-Forget Message
 
 ```python
 from cowboy_sdk import send
 
-def trigger_downstream(self, order_id: str):
-    """
-    Asynchronous message semantics:
-    - Delayed delivery: Messages queue to next block
-    - No return value: send() returns None immediately
-    - Irrevocable: Messages cannot be cancelled after sending
-    """
-    
-    # Send notification (fire and forget)
-    send(
-        target="0x3333...",
-        message={"action": "notify", "order_id": order_id}
-    )
-    
-    # Can send multiple messages consecutively, delivered in order
-    send(target="0x4444...", message={"action": "log", "order_id": order_id})
-    send(target="0x5555...", message={"action": "audit", "order_id": order_id})
+send(
+    target="0x3333...",
+    payload={"event": "order_created", "order_id": "abc"},
+)
 ```
 
-**⚠️ Fire-and-Forget Risks and Compensation Patterns**
+Semantics:
+- Enqueues a message for delivery at the start of the next block.
+- No return value; `send()` returns immediately.
+- Irrevocable: once a transaction commits, its sent messages are delivered even if later logic would want to cancel them.
+- Allowed only from `@deferred` handlers.
 
-```python
-# ❌ Anti-pattern: raise after send() causes inconsistency
-def risky_workflow(self, order_id: str):
-    send(target="0x3333...", message={"action": "order_created", ...})
-    
-    result = call(target="0x1111...", method="reserve_inventory", ...)
-    if not result.success:
-        # ⚠️ send() already dispatched, cannot be revoked
-        raise InventoryError()
+Authors SHOULD structure handlers so that all fallible synchronous calls complete before issuing `send()`. Raising after a `send()` does not unsend the message.
 
-# ✅ Recommended pattern: Complete potentially failing operations first, then send()
-def safe_workflow(self, order_id: str):
-    # Execute all potentially failing synchronous calls first
-    result = call(target="0x1111...", method="reserve_inventory", ...)
-    if not result.success:
-        raise InventoryError()
-    
-    call(target="0x2222...", method="charge_payment", ...)
-    
-    # Send notifications only after all critical operations succeed
-    send(target="0x3333...", message={"action": "order_created", ...})
-```
+### 9.3 `await runner.<op>` — Runner Continuation
 
-### 1.5 Reentrancy and Circular Calls
-
-```python
-from cowboy_sdk import call, reentrancy_guard
-
-@actor
-class ContractA:
-    def method_1(self, depth: int = 0):
-        if depth > 5:
-            return "max depth reached"
-        
-        # Call B, B will callback to A.method_2
-        # Legal reentrancy, as long as total depth ≤ 32
-        result = call(
-            target="0xBBBB...",
-            method="call_back_to_a",
-            args={"depth": depth},
-            cycles_limit=50000
-        )
-        return result
-
-@actor
-class SafeToken:
-    # SDK decorator automatically handles reentrancy protection
-    @reentrancy_guard
-    def transfer(self, to: str, amount: int):
-        # SDK automatically locks at entry, unlocks at exit
-        # Lock key is deterministically generated based on keccak256(method_name + caller_addr)
-        pass
-```
-
----
-
-## Chapter 2: Continuation Mechanism
-
-Continuation is the core mechanism for Cowboy to handle cross-block asynchronous operations. The SDK provides two Continuation decorators:
-
-| Decorator | Purpose | await Target |
-|-----------|---------|--------------|
-| `@runner.continuation` | Call off-chain Runner services | `runner.llm()`, `runner.http()`, etc. |
-| `@actor.continuation` | Inter-Actor async request-response | `ActorRef.async_*()` methods |
-
-**Both share the same compilation strategy and state machine mechanism**, differing only in the await target.
-
-### 2.1 Compilation Strategy: Explicit State Machine Transformation
-
-The SDK compiles async functions into Finite State Automata (FSM), with each `await` point defining a state.
-
-**PVM Determinism Constraints**:
-- State serialization uses Canonical CBOR
-- State ID: `keccak256(actor_addr + method_name + invocation_nonce)`
-- Each Continuation state occupies Actor storage quota
-- Captured variables must be CBOR serializable types (closures, function references, generators are prohibited)
-
-### 2.2 capture() - Explicit State Capture
-
-Developers must use `capture()` to explicitly declare variables that need to be preserved across await:
+Decorated `async def` methods can `await` off-chain operations. **`cowboy_sdk` (PVM) only** — not available in the standalone `cowboy` package.
 
 ```python
 from cowboy_sdk import runner, capture
 
 @runner.continuation
-async def sequential_workflow(self, msg):
-    # Declare variables to capture across await
+async def analyze(self, msg):
     ctx = capture()
-    
-    # Step 1: First await
-    ctx.step1 = await runner.http("https://api1.com/data")
-    # After compilation: send message + save {state: 1, ctx: {step1: ...}} + return
-    
-    # Step 2: Use step1 result
-    ctx.step2 = await runner.llm(f"Analyze: {ctx.step1}")
-    # After compilation: restore state + send message + save {state: 2, ctx: {...}} + return
-    
-    # Step 3: Final processing
-    self.storage.set("result", ctx.step2.summary)
-    # After compilation: restore state + execute + cleanup Continuation state
+    ctx.summary = await runner.llm(
+        prompt=f"Summarize: {msg['text']}",
+        max_tokens=200,
+    )
+    self.storage["last_summary"] = ctx.summary
 ```
 
-### 2.3 Supported Patterns and Limitations
+The decorator lowers the function into an FSM at class-load time (§10). Available awaitables under `runner`:
 
-| Pattern | Support Status | Notes |
-|---------|----------------|-------|
-| Sequential await | ✅ Supported (max 8) | Each await generates a state transition |
-| Conditional await | ✅ Supported | State machine includes branches |
-| await in loops | ⚠️ Limited support | **Must use `@bounded_loop` to declare upper bound** |
-| await in try/except | ✅ Supported | Exception states are also serialized |
-| await in nested function calls | ❌ Not supported | Must flatten to top-level function |
-| Recursive await | ❌ Not supported | Cannot serialize recursive stack |
+| Awaitable | Purpose | Required entitlement |
+|---|---|---|
+| `runner.llm(prompt, ...)` | LLM inference | `oracle.llm` |
+| `runner.http(url, method, ...)` | HTTP request | `http.fetch` |
+| `runner.mcp(server, tool, args)` | MCP tool call | varies by tool |
 
-### 2.4 Conditional Branch await
+### 9.4 `await ActorRef.async_*` — Actor Continuation
 
-```python
-@runner.continuation
-async def conditional_workflow(self, msg):
-    ctx = capture()
-    
-    ctx.analysis = await runner.llm("Initial analysis...")
-    
-    # Conditional branch: state machine includes two possible subsequent states
-    if ctx.analysis.confidence > 0.8:
-        # Branch A: State 2A
-        ctx.details = await runner.llm("Deep dive...")
-        self.execute_high_confidence(ctx.details)
-    else:
-        # Branch B: State 2B  
-        ctx.fallback = await runner.http("https://fallback-api.com")
-        self.execute_low_confidence(ctx.fallback)
-```
-
-### 2.5 Bounded Loop await
-
-**Using await in loops requires declaring iteration upper bound**:
+Actor-to-actor async calls use the `@actor.continuation` decorator. **`cowboy_sdk` (PVM) only.**
 
 ```python
-from cowboy_sdk import runner, capture, bounded_loop
-
-@runner.continuation
-async def loop_workflow(self, msg):
-    ctx = capture()
-    
-    ctx.items = await runner.http("https://api.com/items")
-    ctx.results = []
-    
-    # bounded_loop declares loop upper bound, compiler generates states accordingly
-    # If actual iterations exceed max_iterations, throws LoopBoundExceeded
-    @bounded_loop(max_iterations=10)
-    async def process_items():
-        for item in ctx.items[:10]:  # Must slice before loop
-            result = await runner.process(item)
-            ctx.results.append(result)
-    
-    await process_items()
-    
-    return aggregate(ctx.results)
-```
-
-### 2.6 Error Handling with await
-
-```python
-@runner.continuation
-async def error_handling_workflow(self, msg):
-    ctx = capture()
-    
-    try:
-        ctx.result = await runner.llm("...", timeout_blocks=50)
-        self.process(ctx.result)
-        
-    except RunnerTimeoutError:
-        # Timeout: SDK deterministically triggers this branch at block N+50
-        ctx.fallback = await runner.http("https://fallback.com")
-        self.process_fallback(ctx.fallback)
-        
-    except RunnerValidationError as e:
-        # Validation failure: Runner result doesn't conform to Schema
-        self.log_error(e)
-```
-
-### 2.7 @actor.continuation - Inter-Actor Async Calls
-
-For async request-response patterns between Actors (not Runner):
-
-```python
-from cowboy_sdk import actor, capture
+from cowboy_sdk import actor, ActorRef, capture
 
 @actor
-class TradingBot:
+class Aggregator:
     @actor.continuation(timeout_blocks=100)
-    async def query_multiple_oracles(self, assets: list[str]):
-        ctx = capture()  # Also requires capture()
-        
-        oracle = ActorRef("0x4444...")
-        ctx.results = []
-        
-        # Must use bounded_loop
-        @bounded_loop(max_iterations=5)
-        async def fetch_prices():
-            for asset in assets[:5]:
-                # await compiles to send() + callback handler
-                price = await oracle.async_get_price(asset)
-                ctx.results.append(price)
-        
-        await fetch_prices()
+    async def collect(self, assets: list[str]) -> dict:
+        ctx = capture()
+        ctx.results = {}
+        for asset in assets[:5]:
+            ctx.results[asset] = await ActorRef("0x4444...").async_get_price(asset)
         return ctx.results
 ```
 
-### 2.8 Continuation State Storage
-
-```python
-# Continuation state is stored under a special namespace in Actor storage
-# Key: __continuation:{correlation_id}
-# Value: CBOR({
-#     "state": int,           # Current state number
-#     "ctx": dict,            # Captured variables
-#     "created_block": int,   # Block height at creation
-#     "timeout_block": int,   # Timeout block height
-#     "checksum": bytes       # State integrity checksum
-# })
-
-# Storage limits
-CONTINUATION_MAX_SIZE = 64 * 1024  # Single Continuation max 64 KiB
-CONTINUATION_MAX_COUNT = 100        # Max 100 active Continuations per Actor
-```
-
-### 2.9 Compilation Output Example (Informative)
-
-Original code:
-```python
-@runner.continuation
-async def example(self, msg):
-    ctx = capture()
-    ctx.a = await runner.llm("step1")
-    ctx.b = await runner.llm(f"step2: {ctx.a}")
-    return ctx.b
-```
-
-Compiled equivalent:
-```python
-def example(self, msg):
-    cont_state = self._load_continuation(msg)
-    
-    if cont_state is None:
-        # Initial call: send first task
-        correlation_id = self._gen_correlation_id()
-        self._save_continuation(correlation_id, {"state": 0, "ctx": {}})
-        send(RUNNER, {
-            "job_type": "llm", "prompt": "step1",
-            "correlation_id": correlation_id,
-            "reply_handler": "example__resume"
-        })
-        return
-    
-def example__resume(self, msg):
-    cont_state = self._load_continuation(msg.correlation_id)
-    ctx = cont_state["ctx"]
-    
-    if cont_state["state"] == 0:
-        ctx["a"] = msg.result
-        self._save_continuation(msg.correlation_id, {"state": 1, "ctx": ctx})
-        send(RUNNER, {
-            "job_type": "llm", "prompt": f"step2: {ctx['a']}",
-            "correlation_id": msg.correlation_id,
-            "reply_handler": "example__resume"
-        })
-        return
-        
-    elif cont_state["state"] == 1:
-        ctx["b"] = msg.result
-        self._delete_continuation(msg.correlation_id)
-        return ctx["b"]
-```
+Semantics:
+- Each `await ActorRef.async_<method>(...)` is lowered to `send(target, {...})` plus a state save.
+- The target's handler is invoked in a future block; when it completes, it delivers a callback message that resumes the caller's continuation.
+- Requires both caller and callee to be `@deferred`.
 
 ---
 
-## Chapter 3: State Safety Mechanisms
+## 10. Continuations
 
-Cowboy provides two complementary state safety mechanisms:
+All continuation features in this section are **`cowboy_sdk` (PVM) only**.
 
-| Mechanism | Purpose | Timing |
-|-----------|---------|--------|
-| `guard` | **Verify** state unchanged during cross-block period | On Continuation resume |
-| `capture` | **Save** local variables across blocks | Before and after await points |
+### 10.1 FSM Compilation
 
-### 3.1 Guard Mechanism - State Protection
+Both `@runner.continuation` and `@actor.continuation` compile at class-load time into a pair of functions:
 
-Guard prevents stale state vulnerabilities caused by cross-block execution.
+- `<name>`: the initial handler; starts the FSM, persists state 0, issues the first async effect, returns.
+- `<name>__resume`: the resume handler; called by the runtime on callback delivery, loads state, advances the FSM, issues the next async effect (or returns final value).
 
-**PVM Determinism Constraints**:
-- Object identity comparison (`id()` or `is`) is prohibited
-- State fingerprint uses Canonical CBOR + `keccak256`
-- Cannot use `pickle` or unstable JSON
+The generated code is never observed by actor authors. Its shape is non-normative.
 
-#### Method A: Decorator-Level Guard
+### 10.2 `capture()` — Explicit Local State
+
+Local variables that must survive an `await` MUST be attached to a `capture()` object:
 
 ```python
-# Declaration: Before resuming execution, specified storage keys must be unchanged
+ctx = capture()
+ctx.first = await runner.llm("...")       # first-await state
+ctx.second = await runner.http("...")     # second-await state
+return ctx.first + ctx.second
+```
+
+Captured values MUST be of CBOR-encodable types (see §11.5). Attempting to capture a closure, generator, file handle, thread, or custom object raises `CaptureTypeError` at the `await` point.
+
+Continuation state is stored at key `__continuation:<correlation_id>` within the actor's own storage. Limits:
+
+| Constant | Value | Meaning |
+|---|---:|---|
+| `CONTINUATION_MAX_SIZE` | 64 KiB | per-continuation serialized state |
+| `CONTINUATION_MAX_COUNT` | 100 | active continuations per actor |
+
+Exceeding either limit raises `ContinuationSizeLimitError` or `ContinuationCountLimitError`.
+
+### 10.3 Guards
+
+Continuations can assert that specific storage keys were not modified during the async wait:
+
+Method A — decorator-level:
+```python
 @runner.continuation(guard_unchanged=["price", "config"])
-async def execute_strategy(self, msg):
-    # SDK internal logic:
-    # 1. Capture current value: v1 = keccak256(cbor(storage.get("price")))
-    # 2. Write v1 to continuation state
-    # 3. Send task...
-    # 4. (Cross-block wait) ...
-    # 5. On resume, recalculate: v2 = keccak256(cbor(storage.get("price")))
-    # 6. If v1 != v2, throw StateConflictError
-    
-    result = await runner.llm("Analyze market...")
-    self.buy()
+async def act_on_price(self, msg):
+    decision = await runner.llm(f"Given price {self.storage['price']}, ...")
+    # On resume: if storage["price"] or storage["config"] was modified by any
+    # intervening transaction, raise StateConflictError BEFORE running the body.
+    ...
 ```
 
-#### Method B: Object-Level Fine-Grained Guard
+Method B — object-level via `GuardedValue`:
+```python
+balance = self.storage.guard("balance")          # GuardedValue
+result = await runner.llm("...")
+new_balance = balance.value - 100                # raises StateConflictError if changed
+self.storage["balance"] = new_balance
+```
+
+Guard fingerprints are `keccak256(cbor(value_at_snapshot))`. The fingerprint is stored in the continuation state and re-checked on resume.
+
+### 10.4 Bounded Loops
+
+`await` inside a Python loop requires an explicit upper bound:
 
 ```python
-async def flexible_trade(self, msg):
-    # .guard() returns a GuardedValue object
-    # Internal storage: {'key': 'balance', 'snapshot_hash': '0x123...', 'value': 1000}
-    balance = self.storage.guard("balance") 
-    
-    try:
-        # SDK automatically injects balance's snapshot_hash into continuation state
-        result = await runner.llm(...)
-        
-        # Explicitly accessing .value triggers validation
-        # If current storage["balance"] hash doesn't match snapshot, throws exception
-        new_balance = balance.value - 100
-        self.storage.set("balance", new_balance)
-        
-    except StateConflictError:
-        # Deterministic exception: all nodes throw exception at the same instruction
-        self.log("Balance changed, aborting.")
+from cowboy_sdk import bounded_loop, capture
+
+@runner.continuation
+async def fan_out(self, items: list):
+    ctx = capture()
+    ctx.results = []
+
+    @bounded_loop(max_iterations=10)
+    async def run():
+        for item in items[:10]:
+            ctx.results.append(await runner.process(item))
+
+    await run()
 ```
 
-### 3.2 Collaboration Between Guard and Capture
+A `bounded_loop` with `max_iterations = N` generates `N` FSM states at compile time. Exceeding `N` at runtime raises `LoopBoundExceeded`. Unbounded iteration with `await` is rejected at class-load time.
 
-`guard` and `capture` solve different problems and can be used together:
+### 10.5 Sequential Await Limit
 
-```python
-@runner.continuation(guard_unchanged=["user_balance"])  # Verify balance unchanged
-async def complex_workflow(self, msg):
-    ctx = capture()  # Save local variables
-    
-    # ctx saves intermediate computation results
-    ctx.analysis = await runner.llm("...")
-    
-    # guard_unchanged ensures user_balance wasn't modified by other transactions during wait
-    # If modified, throws StateConflictError on resume
-    
-    ctx.decision = await runner.llm(f"Based on {ctx.analysis}...")
-    
-    # user_balance is guaranteed to be consistent with start time during execution
-    self.execute_trade(ctx.decision)
-```
-
-**Summary of Differences**:
-- `capture()` saves **local variables** (temporary values within the function)
-- `guard_unchanged` verifies **storage state** (Actor's persistent data)
+A single continuation function MAY contain at most **8 sequential await points** (not counting awaits inside `bounded_loop`). This is a compile-time limit; violations are rejected at class-load. Authors needing more should split into multiple continuations.
 
 ---
 
-## Chapter 4: Async Tools
+## 11. Type System
 
-### 4.1 Timeout and Retry
+The SDK replaces or constrains Python built-ins whose semantics are non-deterministic or ambiguous across platforms.
 
-**PVM Determinism Constraints**:
-- Time units must be **block height**, using seconds or `time.time()` is prohibited
-- Retry jitter must use on-chain VRF, `random.random()` is prohibited
+**All types in this section are `cowboy_sdk` (PVM) only** unless otherwise noted. The standalone `cowboy` package exports `Address` as two separate forms (a Pydantic hex-string model for chain interactions, and a 20-byte stub for local actor testing) but does not export `BlockHeight`, `SoftFloat`, `ordered_set`, or `CowboyModel`.
 
-```python
-from cowboy_sdk import Retry
+### 11.1 `Address`
 
-async def fetch_data(self):
-    try:
-        result = await runner.http(
-            url="https://api.example.com",
-            # PVM constraint: timeout must be integer (block count)
-            timeout_blocks=20,  
-            
-            # Retry policy: delay sequence is fixed [1, 2, 4, 8] blocks
-            # If jitter is needed, SDK internally uses HKDF(VRF_Beacon, actor_addr)
-            retry_policy=Retry(max_attempts=3, backoff="exponential") 
-        )
-    except RunnerTimeoutError:
-        # Deterministic error, all nodes trigger at block N+20
-        self.cleanup()
-```
-
-**SDK Internal Implementation**:
-- Timer ID generation: `keccak256(current_msg_id + "timer")`, ensures consistency across all nodes
-- Automatic cleanup: When Runner result is received or Timeout triggers, SDK automatically cancels the other resource
-
-### 4.2 TaskGroup - Structured Concurrency
-
-Allows developers to write parallel tasks with synchronous code thinking.
-
-**PVM Determinism Constraints**:
-- Task creation order within `TaskGroup` must be strictly consistent, determining message Nonce and hash
-- When aggregating results, SDK returns results in **deterministic order** (by task creation order)
+20-byte Ethereum-compatible address.
 
 ```python
-async with runner.TaskGroup() as tg:
-    # Task 1: consumes nonce N at creation
-    t1 = tg.create_task(runner.llm(prompt="A"))
-    # Task 2: consumes nonce N+1 at creation
-    t2 = tg.create_task(runner.llm(prompt="B"))
+from cowboy_sdk import Address
 
-# Reaching here means all tasks are complete
-# PVM constraint: regardless of which returns first, result access order is deterministic
-if t1.result.score > t2.result.score:
-    self.action()
+a = Address.from_hex("0x7a3B6E...F92E")
+b = Address(raw_bytes_20)
+a.to_hex()       # checksummed (EIP-55)
+a.to_bytes()     # 20-byte payload
+Address.ZERO     # sentinel
+Address.JOB_DISPATCHER   # 0x0000…0002
 ```
+
+### 11.2 `BlockHeight`
+
+Semantic `int` wrapper for block heights. Identity-equal to `int` at the bytecode level; useful for type annotations.
+
+### 11.3 `SoftFloat`, `ordered_set`
+
+- `SoftFloat` is a software-floating-point type. Native Python `float` depends on the hardware FPU and is non-deterministic across platforms; authors MUST use `SoftFloat` instead. The SDK may alias `SoftFloat = float` when running under a PVM that enforces softfloat at the instruction layer; authors SHOULD still annotate with `SoftFloat` for clarity.
+- `ordered_set` is a dict-backed set with deterministic insertion-order iteration. Python's built-in `set()` is prohibited in actor code.
+
+### 11.4 `CowboyModel`
+
+A dataclass-like base class for structured data. Feature set:
+
+- Deterministic serialization via `to_cbor()` and `from_cbor(bytes)`.
+- JSON Schema export via `schema()` (for use with `Verify`).
+- Field validation on construction.
+- Forbids `set` / `frozenset` fields (non-deterministic iteration).
+- Forbids `float` fields (requires `SoftFloat`).
+
+```python
+from cowboy_sdk import CowboyModel, SoftFloat
+
+class Trade(CowboyModel):
+    asset: str
+    size: int
+    price: SoftFloat
+```
+
+### 11.5 CBOR Codec
+
+The SDK uses Canonical CBOR (RFC 8949 §4.2) everywhere encoding crosses a determinism boundary: storage values, message payloads, continuation state, call arguments, return values. Requirements:
+
+- Map keys sorted by byte-lexicographic order.
+- No duplicate keys.
+- Floats encoded as IEEE 754 double (when unavoidable).
+- Integers encoded in the shortest form.
+
+`cowboy_sdk.codec.encode(v) -> bytes` and `.decode(b) -> value` are the canonical entry points.
 
 ---
 
-## Chapter 5: Type System
+## 12. Runtime Module
 
-### 5.1 CowboyModel - PVM-Safe Data Model
+`cowboy_sdk.runtime` exposes the Host API. Actor code SHOULD prefer the higher-level primitives in `cowboy_sdk` (call, send, storage proxy); `runtime` is for cases where fine-grained control is needed (e.g., system actors, upgrade flows).
 
-Standard Pydantic `BaseModel` may use non-deterministic behavior. The SDK provides a customized `CowboyModel`:
+The standalone `cowboy` package provides a **partial** local stub of `runtime`. It covers context access (`get_sender`, `get_actor_address`, `get_block_height`, `get_timestamp_ms`), events, `send_message` / `call_actor`, low-level state no-ops, ownership helpers, and test utilities (`configure`, `reset`, `get_captured_events`, `get_captured_messages`). It does **not** implement token operations, timers, `upgrade_self`, `submit_job`, `keccak256`, `randomness`, `charge_gas`, or `scan_state_prefix` — those functions exist only in the on-chain `cowboy_sdk.runtime`.
 
-**PVM Determinism Constraints**:
-- Python native `float` depends on hardware FPU, is non-deterministic
-- Must use `SoftFloat` instead of `float`
-- `Decimal` must specify precision
+### 12.1 Context
+
+| Function | Returns | Notes |
+|---|---|---|
+| `runtime.get_sender()` | `bytes` (20) | Caller of the current handler |
+| `runtime.get_actor_address()` | `bytes` (20) | This actor's address |
+| `runtime.get_block_height()` | `int` | Current block height |
+| `runtime.get_timestamp_ms()` | `int` | Block timestamp, milliseconds since epoch |
+
+These are the ONLY authorized sources of time and identity. `time.time()`, `datetime.now()`, and similar are trapped.
+
+### 12.2 State
+
+Lower-level state access paralleling `self.storage`:
 
 ```python
-from cowboy_sdk import CowboyModel, Field
-from cowboy_sdk.types import SoftFloat
-
-class MarketAnalysis(CowboyModel):
-    # Must use SoftFloat instead of float
-    sentiment_score: SoftFloat = Field(..., ge=0, le=1)
-    tags: list[str]
-    # Use string for amounts to avoid floating-point precision issues
-    price_target: str  
-
-@actor
-class Trader:
-    async def analyze(self):
-        # response_model tells Runner to conform to this JSON Schema
-        result = await runner.llm(
-            prompt="Analyze...",
-            response_model=MarketAnalysis
-        )
-        
-        # SDK internal:
-        # 1. Receive JSON result
-        # 2. Validate using canonical CBOR rules
-        # 3. Instantiate MarketAnalysis (throws DeterministicValidationError if validation fails)
-        
-        if result.sentiment_score > SoftFloat("0.8"):
-            self.buy()
+runtime.get_state(key: bytes) -> bytes | None
+runtime.set_state(key: bytes, value: bytes) -> None
+runtime.delete_state(key: bytes) -> None
 ```
 
-### 5.2 PVM-Specific Types
+`set_state` and `delete_state` refuse writes to reserved keys (`__OWNER__`, `__INITIALIZED__`). See §12.10.
 
-| Type | Replaces | Description |
-|------|----------|-------------|
-| `SoftFloat` | `float` | Uses software floating-point library, cross-platform deterministic |
-| `ordered_set` | `set` | Insertion-ordered set, deterministic iteration order |
-| `BlockHeight` | `int` | Semantic block height type |
+### 12.3 Events
+
+```python
+runtime.emit_event(name: str, payload: dict | bytes | str) -> None
+```
+
+Emits a log entry visible in the transaction receipt. Metered in Cells per CIP-3.
+
+### 12.4 Tokens (CIP-20)
+
+The standard CIP-20 interface is exposed as runtime operations:
+
+```python
+runtime.token_create(name, symbol, decimals, initial_supply, max_supply, transfer_hook, metadata_uri) -> token_id
+runtime.token_transfer(token_id, to, amount)
+runtime.token_approve(token_id, spender, amount)
+runtime.token_transfer_from(token_id, from_addr, to, amount)
+runtime.token_mint(token_id, to, amount)
+runtime.token_burn(token_id, amount)
+runtime.token_balance_of(token_id, account) -> int | None
+runtime.token_allowance(token_id, owner, spender) -> int | None
+runtime.token_total_supply(token_id) -> int | None
+```
+
+Each requires the corresponding entitlement (`token.create`, `token.transfer`, etc.).
+
+### 12.5 Timers (CIP-5)
+
+```python
+runtime.schedule_timer(fire_at_block: int, payload: bytes) -> timer_id: bytes
+runtime.schedule_timer_ex(height, payload, fee_payer, gas_limit, expires_at) -> timer_id: bytes
+runtime.extend_timer(timer_id: bytes, new_expires_at: int) -> None
+runtime.cancel_timer(timer_id: bytes) -> None
+```
+
+At `fire_at_block`, the scheduler delivers `payload` to the actor's `on_timer` handler. Requires `timer.schedule` entitlement. `schedule_timer_ex` allows overriding fee payer, gas limit, and expiry per CIP-5 §4.1.
+
+### 12.6 Jobs (CIP-2)
+
+```python
+runtime.submit_job(payload: bytes) -> None
+```
+
+Low-level entry used by `@runner.continuation`; actor authors SHOULD prefer the continuation form.
+
+### 12.7 Upgrades
+
+```python
+runtime.upgrade_self(new_code: bytes, new_manifest: bytes | None = None) -> None
+```
+
+Replaces the running actor's code and optionally its entitlement manifest. The new manifest MUST be a subset of the current manifest (no privilege escalation); violation raises at the Host boundary. Requires `sys.upgrade` entitlement.
+
+### 12.8 Crypto
+
+```python
+runtime.keccak256(data: bytes) -> bytes                 # 32-byte hash
+runtime.randomness(domain: bytes) -> bytes              # deterministic VRF output
+```
+
+`randomness()` produces deterministic per-block VRF output keyed by `domain`. This is the only authorized source of randomness; `random.random()` and `secrets` are trapped.
+
+### 12.9 Metering
+
+```python
+runtime.charge_gas(amount: int) -> None
+```
+
+Explicitly consumes Cycles. Useful for implementations that want to front-load gas accounting for complex operations. Most actors do not need this; metering happens automatically at syscall boundaries.
+
+### 12.10 Ownership
+
+The ownership model tracks a single privileged address in the reserved `__OWNER__` storage slot. User code cannot read or write this slot via `self.storage[]` — the proxy raises `ValueError` for reserved keys. Use the runtime APIs:
+
+```python
+runtime.get_owner() -> bytes              # current owner (20 bytes), or b'' if unset
+runtime.transfer_ownership(new_owner: bytes) -> None
+runtime.renounce_ownership() -> None      # sets owner to zero address; irrevocable
+runtime.assume_ownership_if_unowned() -> bytes   # first-caller-wins bootstrap
+runtime.is_initialized() -> bool          # True after init returns successfully
+```
+
+Canonical bootstrap pattern:
+
+```python
+def init(self, payload):
+    runtime.assume_ownership_if_unowned()   # deployer becomes owner atomically
+```
+
+**Transfer rules:**
+- If no owner is set, any caller may set it (bootstrap window — safe only inside `init`).
+- Once set, only the current owner or an intra-actor call may transfer.
+- Passing the zero address to `transfer_ownership` raises `ValueError`; use `renounce_ownership()` explicitly.
+
+`@callable_by(OWNER)` handlers become permanently unreachable after `renounce_ownership()`.
+
+**Reserved storage keys:**
+
+| Key | Managed by |
+|---|---|
+| `__OWNER__` | `runtime.transfer_ownership`, `runtime.renounce_ownership`, `runtime.assume_ownership_if_unowned` |
+| `__INITIALIZED__` | Set automatically by the SDK after `init` returns without raising |
+
+The standalone `cowboy` package provides stub implementations of all ownership functions backed by module-level state. Call `runtime.reset()` between tests to clear ownership and initialization state.
+
+### 12.11 State Prefix Scan
+
+```python
+runtime.scan_state_prefix(prefix: bytes, limit: int = 100) -> list[tuple[bytes, bytes]]
+```
+
+Returns up to `limit` `(key, value)` pairs whose user-key starts with `prefix`, in ascending key order. Only verbatim-mode keys (≤ 32 bytes) are visible. `limit` is clamped to 1000 by the host.
 
 ---
 
-## Chapter 6: Declarative Verification Builder
+## 13. Verification Builder
 
-Use fluent chaining to replace hand-written complex `verification` JSON configuration.
-
-**PVM Determinism Constraints**:
-- Regardless of how code is called, the final generated Job Spec JSON must have ordered keys
-
-### 6.1 Basic API
-
-```python
-from cowboy_sdk import Verify
-from cowboy_sdk.types import SoftFloat
-
-await runner.llm(
-    prompt="...",
-    verification=Verify.builder()
-        .mode("structured_match")
-        .runners(5)
-        .threshold(3)
-        .check(Verify.numeric_tolerance("score", SoftFloat("0.05")))
-        .check(Verify.no_prompt_leak())
-        .check(Verify.custom(actor="0x123...", method="check_quality"))
-        .build() 
-)
-```
-
-### 6.2 Verification Modes
-
-| Mode | Method | Description |
-|------|--------|-------------|
-| `none` | `.mode("none")` | No verification, only guarantees non-delivery |
-| `economic_bond` | `.mode("economic_bond")` | Single Runner + bond |
-| `majority_vote` | `.mode("majority_vote")` | Majority vote on specified field |
-| `structured_match` | `.mode("structured_match")` | Validator function matching |
-| `deterministic` | `.mode("deterministic")` | Exact match + TEE |
-| `semantic_similarity` | `.mode("semantic_similarity")` | Embedding similarity |
-
-### 6.3 Built-in Checkers
-
-| Checker | Description |
-|---------|-------------|
-| `Verify.exact_match()` | Byte-for-byte equality |
-| `Verify.json_schema_valid(schema)` | JSON Schema validation |
-| `Verify.structured_match(fields)` | Specified fields must match |
-| `Verify.majority_vote(field)` | Field value >50% agreement |
-| `Verify.numeric_tolerance(field, tolerance)` | Number within ±tolerance |
-| `Verify.numeric_range(field, min, max)` | Number within bounds |
-| `Verify.set_equality(field)` | Unordered set equality |
-| `Verify.contains_all(substrings)` | Output contains required strings |
-| `Verify.contains_none(substrings)` | Output excludes strings |
-| `Verify.regex_match(pattern)` | Regular expression match |
-| `Verify.length_bounds(min, max)` | Output length within bounds |
-| `Verify.semantic_similarity(threshold)` | Embedding cosine similarity |
-| `Verify.no_prompt_leak()` | Output doesn't contain system prompt |
-| `Verify.entropy_check(min_entropy)` | Output is not repetitive/degenerate |
-| `Verify.custom(actor, method)` | Custom validator Actor |
-
-### 6.4 Complete Example
+`Verify` produces CIP-2 verification configurations using a fluent chain. **`cowboy_sdk` (PVM) only.**
 
 ```python
 from cowboy_sdk import Verify, runner
-from cowboy_sdk.types import SoftFloat
 
-# Scenario: Financial analysis, requiring high reliability
 await runner.llm(
-    prompt="Analyze BTC market trends...",
+    prompt="Analyze market...",
     response_model=MarketAnalysis,
     verification=Verify.builder()
-        .mode("structured_match")
+        .mode("consensus")
         .runners(5)
         .threshold(3)
-        # Must pass Schema validation
         .check(Verify.json_schema_valid(MarketAnalysis.schema()))
-        # sentiment_score error not exceeding 0.05
-        .check(Verify.numeric_tolerance("sentiment_score", SoftFloat("0.05")))
-        # tags field must match exactly
-        .check(Verify.structured_match(["tags"]))
-        # No system prompt leakage allowed
+        .check(Verify.numeric_tolerance("score", 0.05))
         .check(Verify.no_prompt_leak())
-        # Custom business logic validation
-        .check(Verify.custom(actor="0xABC...", method="validate_analysis"))
         .build(),
-    # Other options
-    timeout_blocks=100,
-    tee_required=True
 )
 ```
 
+`VerifyBuilder.mode()` validates against the following set and raises `ValueError` on unknown values:
+
+| Mode | Semantics |
+|---|---|
+| `none` | No verification; first runner result is used directly |
+| `consensus` | Multiple runners execute; majority result wins |
+| `deterministic` | All runners must return exactly the same result |
+| `tee` | Trusted Execution Environment verification |
+| `zk` | Zero-knowledge proof verification |
+| `optimistic` | Optimistic verification; challengeable within a dispute window |
+
+Checks are appended in the order `.check()` is called and passed to the Rust result-verifier in that order.
+
+Built-in checkers:
+
+| Checker | Purpose |
+|---|---|
+| `Verify.exact_match()` | Byte-for-byte equality across runners |
+| `Verify.json_schema_valid(schema)` | Output conforms to JSON Schema |
+| `Verify.structured_match(fields)` | Named fields match across runners |
+| `Verify.majority_vote(field, threshold)` | Field value meets consensus threshold (default 0.5) |
+| `Verify.supermajority_vote(field, threshold)` | Field value meets supermajority threshold (default 0.67) |
+| `Verify.numeric_tolerance(field, tolerance)` | Field within ±tolerance |
+| `Verify.numeric_range(field, min_val, max_val)` | Field within bounds |
+| `Verify.set_equality(field)` | Unordered set equality |
+| `Verify.contains_all(substrings)` | Output contains required strings |
+| `Verify.contains_none(substrings)` | Output excludes strings |
+| `Verify.regex_match(pattern)` | Regex match |
+| `Verify.length_bounds(min_len, max_len)` | Output length within bounds |
+| `Verify.semantic_similarity(reference, threshold)` | Embedding cosine similarity ≥ threshold |
+| `Verify.no_prompt_leak()` | Output does not echo the system prompt |
+| `Verify.entropy_check(min_entropy)` | Output is not degenerate/repetitive |
+| `Verify.custom(name, **kwargs)` | Named custom rule registered in the Rust result-verifier |
+| `Verify.custom_actor(actor_address, method, args)` | Delegates verification to an on-chain actor |
+
+Additional supplemental checkers (`not_empty`, `contains`, `length_limit`, `http_status`, `response_time`, `signature_valid`, `tee_attestation`, `deterministic_output`, `field_exists`, `format_check`) are exported by the implementation but are not mandated by this CIP.
+
 ---
 
-## Chapter 7: Mixed Usage Patterns
+## 14. Entitlements
 
-### 7.1 Comprehensive Example
+### 14.1 Manifest Format
 
-```python
-from cowboy_sdk import actor, runner, call, send, capture, Verify
-from cowboy_sdk.types import SoftFloat
+A manifest accompanies every deploy and upgrade. JSON shape:
 
-@actor
-class TradingAgent:
-    
-    @runner.continuation(guard_unchanged=["user_balance"])
-    async def hybrid_workflow(self, msg):
-        """Demonstrates mixed usage of three primitives"""
-        ctx = capture()
-        
-        # Step 1: Synchronous call to query state (T+0)
-        ctx.balance = call(
-            target="0x1111...",
-            method="get_balance",
-            args={"user": msg.user},
-            cycles_limit=5000
-        )
-        
-        # Step 2: Off-chain LLM analysis (T+N)
-        ctx.analysis = await runner.llm(
-            prompt=f"Should user with balance {ctx.balance} trade?",
-            timeout_blocks=100,
-            verification=Verify.builder()
-                .mode("structured_match")
-                .runners(3)
-                .threshold(2)
-                .check(Verify.json_schema_valid(TradeDecision.schema()))
-                .build()
-        )
-        
-        # Step 3: Decision based on analysis result
-        if ctx.analysis.recommendation == "trade":
-            # Synchronous call to execute trade (T+0, executes atomically in resumed transaction)
-            # guard_unchanged ensures user_balance is unchanged
-            call(
-                target="0x2222...",
-                method="execute_trade",
-                args={"user": msg.user, "amount": ctx.balance // 2},
-                cycles_limit=50000
-            )
-        
-        # Step 4: Send notification (T+N, next block)
-        send(
-            target="0x3333...",
-            message={
-                "action": "trade_completed",
-                "user": msg.user,
-                "analysis": ctx.analysis.summary
-            }
-        )
+```json
+{
+  "entitlements": [
+    {"id": "econ.hold_balance"},
+    {"id": "econ.transfer", "params": {"max_amount": "1000000000", "max_per_block": "10000"}},
+    {"id": "http.fetch", "params": {"allowlist_domains": ["api.example.com"], "max_requests": 100}},
+    {"id": "oracle.llm", "params": {"max_tokens": 4096, "max_requests": 50}}
+  ]
+}
 ```
 
+Rules:
+
+- `id` values MUST appear in the Entitlement Registry (`types/src/registry.rs`).
+- The `entitlements` array MUST be lexicographically sorted by `id`; a chain MUST reject deploy transactions with an unsorted manifest.
+- `params` contents are entitlement-specific and validated at deploy time against the registry's `ParamSchema`.
+- An upgrade's manifest MUST be a subset (in both ids and param-bound strength) of the prior manifest.
+
+### 14.2 Runtime Enforcement
+
+Entitlements are enforced at the Host API boundary, not in SDK Python:
+
+1. Actor invokes an SDK function.
+2. SDK issues the corresponding syscall.
+3. Host checks the actor's manifest for the required entitlement.
+4. If absent: Host returns `HostError::MissingEntitlement` → SDK raises the corresponding error.
+5. If present but quota-exceeded or param-restricted: Host returns the appropriate error.
+
+Actor authors do not check entitlements in Python; they rely on the runtime to enforce.
+
+### 14.3 Entitlement Registry (Informative Summary)
+
+| ID | Gates | Params |
+|---|---|---|
+| `econ.hold_balance` | CBY balance storage | — |
+| `econ.transfer` | Native CBY balance transfers (host-level; no direct Python SDK function) | `max_amount`, `max_per_block` |
+| `exec.spawn` | child actor deploy | `max_children` |
+| `http.fetch` | `runner.http()` | `allowlist_domains`, `max_requests` |
+| `oracle.llm` | `runner.llm()` | `max_tokens`, `max_requests` |
+| `secrets.read` | `runner.http(..., secrets=[...])`, `runner.mcp(...)`, `runner.llm(...)` | `keys` |
+| `storage.kv` | `self.storage.set_raw` beyond quota | `max_bytes` |
+| `sys.upgrade` | `runtime.upgrade_self()` | — |
+| `timer.schedule` | `runtime.schedule_timer()` | — |
+| `token.create`, `token.transfer`, `token.mint`, `token.burn` | corresponding `runtime.token_*` | varies |
+| `bridge.asset`, `bridge.subscribe_event` | CIP-19 bridge primitives | varies |
+| `accel.gpu` | GPU runner selection | `min_vram_gb` |
+| `sec.data_residency` | geofenced execution | (attested) |
+
+CIP-2 §7 is the normative source.
+
 ---
 
-## Appendix A: PVM Compatibility Iron Rules
+## 15. Error Hierarchy
 
-Developers must adhere to the following rules:
+All SDK exceptions derive from `cowboy_sdk.CowboyError`. Each exception exposes:
 
-| # | Rule | Alternative |
-|---|------|-------------|
-| 1 | Prohibit `import time` | Use **Block Height** |
-| 2 | Prohibit `import random` | Use **SDK-provided VRF interface** |
-| 3 | Prohibit `float` | Use **`cowboy_sdk.types.SoftFloat`** |
-| 4 | Prohibit `set()` | SDK automatically converts to **`ordered_set`** |
-| 5 | Prohibit `pickle` | Cross-block data must support **CBOR** |
-| 6 | `call()` depth limit | Cumulative max **32 levels**, must explicitly pass **cycles_limit** |
-| 7 | `await` point limit | Single Continuation function max **8 sequential awaits** |
-| 8 | await in loops | Must use **`@bounded_loop`** to declare iteration upper bound |
-| 9 | Continuation capture | Use **`capture()`** to explicitly declare variables preserved across await |
-| 10 | `send()` is irrevocable | Complete potentially failing `call()` first, then `send()` last |
+- `HOST_ERROR_CODE: int` — Host API error code (1–8)
+- `ERROR_SLUG: str` — short identifier, format `E1xxx`
+- `.why: str` — human explanation
+- `.fix: str` — suggested remediation
+
+Categories:
+
+Multiple exception classes may share a slug; the slug identifies the error category, not the specific class.
+
+| Class | Slug | When |
+|---|---|---|
+| `DeterminismError` | E1101 | Non-deterministic operation attempted |
+| `CycleLimitExceeded` | E1201 | Cycles budget exhausted |
+| `LoopBoundExceeded` | E1201 | `bounded_loop` iterated past declared max |
+| `RunnerTimeoutError` | E1201 | `timeout_blocks` expired |
+| `CaptureTypeError` | E1202 | Captured value is not CBOR-encodable |
+| `ContinuationLimitError` | E1202 | Continuation structural constraint violated (>8 awaits, nested await, recursive await) |
+| `AddressError` | E1202 | Invalid `Address` construction |
+| `ContinuationNotFoundError` | E1203 | Resume with unknown correlation id |
+| `CallDepthExceeded` | E1205 | Call stack depth > 32 |
+| `ReentrancyError` | E1205 | `@reentrancy_guard` tripped |
+| `PurityViolationError` | E1205 | Async side effect from `@pure` handler |
+| `StateConflictError` | E1206 | Guard snapshot mismatch on resume |
+| `ContinuationCorruptedError` | E1206 | State integrity check failed |
+| `ActorCallError` | E1206 | Callee raised or returned invalid payload |
+| `ContinuationSizeLimitError` | E1208 | Serialized state > 64 KiB |
+| `ContinuationCountLimitError` | E1208 | > 100 active continuations |
+| `CodecError` | E1213 | CBOR encode/decode failure |
+| `ActorNotFoundError` | E1220 | Target address is not a deployed actor |
+| `PermissionDeniedError` | E1230 | Caller not authorized for this handler |
+| `RunnerValidationError` | E1604 | Runner result failed `Verify` chain |
+| `DeterministicValidationError` | E1610 | Runners returned divergent results under deterministic verification |
+
+Exceptions are CBOR-encoded into the transaction receipt; clients use `ERROR_SLUG` for programmatic handling.
+
+The standalone `cowboy` package also exports client-side exceptions (`TransactionFailed`, `RpcError`, `AccountNotFound`, `NonceMismatch`, etc.) that are not part of this CIP.
 
 ---
 
-## Appendix B: Call Semantics Quick Reference
+## 16. CLI
 
-### B.1 Call Primitive Selection
+The canonical CLI is `cowboy`, implemented in `node/cli/`. Commands relevant to actor development:
 
-```mermaid
-flowchart TD
-    subgraph Requirements["I want to..."]
-        Q1["Query another Actor's state"]
-        Q2["Atomically execute multi-Actor operation"]
-        Q3["Send notification (don't care about result)"]
-        Q4["Trigger another Actor's background task"]
-        Q5["Call LLM/HTTP and other off-chain services"]
-        Q6["Inter-Actor async request-response"]
-    end
+### 16.1 Project bootstrap
 
-    subgraph Synchronous["T+0 Synchronous Call ✅Atomicity"]
-        CALL["call()"]
-    end
-
-    subgraph Asynchronous["T+N Asynchronous Call ❌Atomicity"]
-        SEND["send()"]
-        RUNNER["await runner.*"]
-        ACTOR_CONT["@actor.continuation"]
-    end
-
-    Q1 --> CALL
-    Q2 --> CALL
-    Q3 --> SEND
-    Q4 --> SEND
-    Q5 --> RUNNER
-    Q6 --> ACTOR_CONT
-
-    style Synchronous fill:#d4edda,stroke:#28a745
-    style Asynchronous fill:#fff3cd,stroke:#ffc107
+```
+cowboy init <network>                     # network: local | dev | summit
+cowboy wallet create [--output FILE]
+cowboy wallet create-mnemonic
 ```
 
-### B.2 Scenario Recommended Patterns
+Persists config at `.cowboy/config.json` (RPC URL, sender key, nonce cache).
 
-```mermaid
-flowchart LR
-    subgraph Scenarios
-        S1["DEX Atomic Swap"]
-        S2["Price Query"]
-        S3["Notify multiple parties after order creation"]
-        S4["AI Agent Decision"]
-        S5["Fetch data from external API"]
-        S6["Batch processing (known quantity)"]
-        S7["On-chain Governance Voting"]
-    end
+### 16.2 Actor lifecycle
 
-    subgraph RecommendedPatterns["Recommended Patterns"]
-        M1["call() + call()"]
-        M2["call()"]
-        M3["call() for core logic first<br/>then send() for notification"]
-        M4["await runner.llm()"]
-        M5["await runner.http()"]
-        M6["TaskGroup + multiple await"]
-        M7["call() for voting<br/>+ send() to broadcast result"]
-    end
-
-    S1 --> M1
-    S2 --> M2
-    S3 --> M3
-    S4 --> M4
-    S5 --> M5
-    S6 --> M6
-    S7 --> M7
-
-    style M1 fill:#d4edda
-    style M2 fill:#d4edda
-    style M3 fill:#fff3cd
-    style M4 fill:#cce5ff
-    style M5 fill:#cce5ff
-    style M6 fill:#cce5ff
-    style M7 fill:#fff3cd
 ```
+cowboy actor new <name>                   # scaffold actors/<name>/main.py
+cowboy actor deploy
+    --code <file.py>
+    --salt <hex>
+    [--manifest-json <file.json>]
+    [--no-init]                           # skip atomic init entirely
+    [--init-handler <name>]               # default: "init"
+    [--init-payload <json-string | @file>]  # default: "{}"
+    [--cycles-limit N] [--cells-limit N]
+cowboy actor address
+    --code <file.py>
+    --creator <addr>
+    --salt <hex>                          # compute CREATE2 address locally
+cowboy actor execute
+    --actor <addr>
+    --handler <name>
+    --payload <hex | @file>
+cowboy actor get --address <addr>
+cowboy actor logs --address <addr>
+```
+
+Fund and upgrade are top-level system commands (not subcommands of `actor`):
+
+```
+cowboy fund-actor --actor <addr> --amount <cby>
+cowboy upgrade-actor
+    --actor <addr>
+    --code <new.py>
+    [--manifest-json <new.json>]          # requires sys.upgrade entitlement
+```
+
+### 16.3 Ecosystem
+
+```
+cowboy account balance [--address <addr>]
+cowboy token create --name N --symbol S --decimals D --initial-supply X [--max-supply Y]
+cowboy token transfer --token-id T --to <addr> --amount A
+cowboy runner list
+cowboy runner register --stake <amount>
+cowboy job submit --job-spec <file.json>
+cowboy watchtower init
+cowboy watchtower new feed --name N [--description D]
+cowboy watchtower feed <id> publish --data <json>
+```
+
+### 16.4 Conformance
+
+Any implementation MAY extend the CLI with additional commands. Renaming any command in this section is a breaking change and requires a CIP revision.
 
 ---
 
-## Appendix C: Mechanism Comparison Table
+## 17. PVM Determinism Rules
 
-| Mechanism | Purpose | Scope | Timing |
-|-----------|---------|-------|--------|
-| `capture()` | Save local variables | Within function | Before and after await |
-| `guard_unchanged` | Verify storage state unchanged | storage keys | On Continuation resume |
-| `storage.guard()` | Fine-grained verification of single key | Single key | When accessing .value |
-| `@reentrancy_guard` | Prevent reentrancy attacks | Method level | Method entry/exit |
-| `@bounded_loop` | Limit loop iterations | Loop block | During loop execution |
+Actor code MUST conform to the following rules. Violations are detected at class-load time where statically decidable; otherwise they raise `DeterminismError` at runtime.
 
+| # | Rule | Replacement |
+|---|---|---|
+| 1 | No `import time`, `datetime.now()` | `runtime.get_block_height()`, `runtime.get_timestamp_ms()` |
+| 2 | No `import random`, no `secrets` | `runtime.randomness(domain)` |
+| 3 | No hardware `float` in actor state, message payloads, or CBOR | `SoftFloat` |
+| 4 | No `set()` / `frozenset()` | `ordered_set` |
+| 5 | No `pickle` | CBOR (`cowboy_sdk.codec`) |
+| 6 | Call depth ≤ 32; pass `cycles_limit` explicitly for precise metering (default: `100_000`) | — |
+| 7 | ≤ 8 sequential awaits per continuation | split into multiple continuations |
+| 8 | `await` in loops requires `@bounded_loop(max_iterations=N)` | — |
+| 9 | `capture()` required for locals spanning an `await` | — |
+| 10 | `send()` and other async side effects prohibited from `@pure` handlers | mark handler `@deferred` |
+| 11 | No filesystem, network, or subprocess access | `runner.http`, `runtime.*`, entitlement-gated |
+
+---
+
+## 18. Reference Implementation
+
+Canonical implementation:
+
+- **In-PVM SDK (`cowboy_sdk`):** `node/pvm/Lib/cowboy_sdk/` (version 0.1.1)
+- **Host API:** `node/execution/src/pvm_host.rs`
+- **CLI:** `node/cli/` (binary `cowboy`)
+- **Standalone developer SDK (`cowboy`):** `python-sdk/` (PyPI: `cowboy-sdk`, version 0.1.0)
+- **Examples:** `cowboy/examples/01-tokens`, `cowboy/examples/08-audio-transcription`, `cowboy/examples/09-image-generation`, `cowboy/examples/13-dao-copilot`, `cowboy/examples/14-compliance`, `cowboy/examples/18-ring-demo`
+
+---
+
+## 19. Open Questions / Gaps
+
+1. **CIP-9 volume mounts from the SDK.** Today, CBFS volumes are a runner-side concern. An actor-side API for `mount(volume_id, access_mode)` is not yet defined. Needed for first-class storage-attached actor workflows.
+2. **CIP-7 / CIP-17 stream helpers.** `cowboy watchtower` exists at the CLI level and as a system-actor pattern, but there is no actor-side `@on_stream(stream_id)` decorator or `stream_publish()` helper. Authors currently manage this via raw `call()` / `send()`.
+3. **Checkpoint mode deprecation.** `runtime.is_checkpoint_mode()` exists for local development but is marked for removal once FSM mode is production-stable across all targets.
+4. **Reentrancy semantics on `call()` cycles.** `@reentrancy_guard` is defined, but its key derivation (`keccak256(method_name ‖ caller_addr)`) may over-collide in contract-factory patterns. A CIP-6.1 revision may add an explicit `key` argument.
+5. **Address scheme forward compatibility.** `Address` is fixed at 20 bytes (Ethereum-compatible). A future migration to a larger scheme would break the type; no migration path is specified here.
+6. **Static loop-bound detection.** The compiler rejects unbounded `await`-in-loop at class-load, but edge cases (awaits inside comprehensions, awaits in helper functions called from loops) are under-specified. A future revision should enumerate accepted and rejected shapes.
+7. **Entitlement manifest upgrade semantics.** "Subset" is defined informally; the registry needs an `is_tighter_than` operator per entitlement, currently implemented ad-hoc.
+8. **Standalone `cowboy` SDK coverage gaps.** The standalone package does not yet mirror `runner`, `capture`, `ActorRef`, `Verify`, `CowboyModel`, `SoftFloat`, `ordered_set`, `BlockHeight`, or `Storage.get_raw()` / `set_raw()` / `guard()`. Actors that use those features must be tested against a live PVM sandbox.

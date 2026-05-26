@@ -1994,3 +1994,126 @@ v2 alignment:
 - The Storage Manager funds itself from the PoR challenge pool — 2% of every per-epoch storage-fee batch accrues there per `STORAGE_FEE_CHALLENGE_POOL_BPS` (§10.4 / §14 / CIP-31 §4; formerly `POR_CHALLENGE_FEE_SHARE` in CIP-9 v1 §5.7). Same source as today; only the routing through `fee_payer` is new.
 - If the Storage Manager balance is insufficient at fire time (highly unusual since the pool is replenished every epoch by storage rent), CIP-5 self-destructs the timer with `TimerCancelledInsufficientFunds`. The Storage Manager SHOULD subscribe to this event and emit `PorChallengePaused { reason: INSUFFICIENT_POOL }`; challenges resume on the next interval after the pool refills.
 - No change to PoR semantics, challenge generation, or shard validation. Only the timer's billing source is now explicit.
+
+---
+
+## 13. Relay drain governance — `SubmitDrainRelayProposal` & `SubmitAutoDrainPolicyProposal` (AMEND 9-J)
+
+> **Status:** spec retroactively documents what is already live in code (`node/execution/src/execution/system_instruction.rs:747-905`, `node/types/src/execution.rs:SYS_SUBMIT_DRAIN_RELAY_PROPOSAL=85` / `SYS_SUBMIT_AUTO_DRAIN_POLICY_PROPOSAL=86`, `node/ras/src/types.rs:AutoDrainPolicyConfig`). Added 2026-05-26 to close the "code ahead of spec" drift identified in `wiki/drift.md`.
+
+### 13.1 Motivation
+
+CIP-9 v1 §5.7 / §5.8 specify relay drain as a **manual, relay-initiated** operation: a relay operator submits a drain request, posts a drain bond, and is given a window to migrate shards to other relays. v1 covered the happy-path drain mechanics but left two governance affordances unspecified:
+
+1. **Forced governance-initiated drain.** A relay that has gone silent, is misbehaving, or whose operator has disappeared cannot be drained by the relay itself. Governance needs a path to mark such a relay for auto-drain without relying on the operator's cooperation.
+2. **Policy-level auto-drain knobs.** The block-level storage settlement code (`storage_settlement.rs`) already scans for over-capacity and stale-heartbeat relays each epoch and can auto-drain them, but the thresholds (high-water mark, consecutive-epoch counts, heartbeat staleness, bond sizing, drain window) need to be governance-tunable rather than hard-coded.
+
+Both affordances are governance proposals that ride on CIP-12's existing proposal pipeline (`SubmitProposal=45` / `CastVote=46` / `ExecuteProposal=47`). They are implemented as two **specialized submit-proposal opcodes** that share the existing `Proposal` storage schema at `GOVERNANCE_SYSTEM_ACTOR=0x09`, with the payload discriminator `ProposalPayloadKind` extended from one variant (`UpdateBasefeeConfig`) to three.
+
+### 13.2 `ProposalPayloadKind` extension
+
+`node/runner/src/types.rs:835`:
+
+```rust
+pub enum ProposalPayloadKind {
+    UpdateBasefeeConfig,    // existing (CIP-3)
+    DrainRelay,             // CIP-9 §13.3 (this section)
+    UpdateAutoDrainPolicy,  // CIP-9 §13.4 (this section)
+}
+```
+
+The existing `Proposal` record gains two payload-side fields:
+
+- `payload_relay_node_id: Option<[u8; 32]>` — populated only when `payload_kind == DrainRelay`
+- `payload_auto_drain_policy: Option<AutoDrainPolicyConfig>` — populated only when `payload_kind == UpdateAutoDrainPolicy`
+
+Both default to `None` for `UpdateBasefeeConfig` proposals (back-compat).
+
+### 13.3 `SubmitDrainRelayProposal` (opcode **85**)
+
+**Wire format.** `SystemInstruction::SubmitDrainRelayProposal { description_hash: [u8; 32], voting_blocks: u64, node_id: [u8; 32] }`.
+
+**Preconditions.**
+
+- `MIN_VOTING_BLOCKS ≤ voting_blocks ≤ MAX_VOTING_BLOCKS` (currently `5..=1_000_000` per `types/src/constants.rs:177,180`) — else `InvalidData`.
+- Gas: `gas_costs.base_cycles` cycles + `gas_costs.base_cells` cells.
+- No sender allowlist; any account may submit (consistent with `SubmitProposal=45`).
+- The targeted `node_id` is **not validated at submit time** — only when `ExecuteProposal=47` runs (the relay may have come and gone during the voting window). If `node_id` is unknown to the Relay Registry at execution, `ExecuteProposal` returns `InvalidData`.
+
+**Submit-time effect.**
+
+1. Ensure `GOVERNANCE_SYSTEM_ACTOR=0x09` exists (`ensure_gov_actor_exists`).
+2. Atomically bump the global `PROPOSAL_COUNTER_KEY` at `0x09`.
+3. Write a `Proposal` record at `Proposal::key_for(next_id)` under `0x09` with:
+   - `payload_kind = DrainRelay`
+   - `payload_relay_node_id = Some(node_id)`
+   - `payload_auto_drain_policy = None`
+   - `state = Active`
+   - `voting_deadline_block = block_height + voting_blocks`
+   - all other `payload_*` numeric fields set to `0` / `"0"`
+4. Emit system event `governance.proposal.submitted` with `{ id, proposer, deadline, payload: "DrainRelay" }`.
+
+**Execute-time effect** (when `ExecuteProposal=47` runs after the voting deadline with vote tally pass):
+
+- Resolves `node_id` from `proposal.payload_relay_node_id`.
+- Calls `enqueue_governance_auto_drain(store, &node_id)`:
+  1. Reads the relay's `RelayNodeProfile` from `RELAY_REGISTRY=0x0B` under `relay_node_key(node_id)`.
+  2. Writes `node_id` to the relay's `auto_drain_governance_scan_key(&profile.address)` slot under `RELAY_REGISTRY=0x0B`. The block-level storage settlement loop (`storage_settlement.rs`) picks the entry up on the next epoch boundary and triggers auto-drain.
+- Emits `governance.proposal.executed` with `{ id, payload: "DrainRelay" }`.
+
+**Interaction with the manual drain path (§5.7).** Governance-initiated drain bypasses the relay's own drain-request bond (the relay is not posting it), but otherwise reuses the same drain windowing, shard-absorption receipts, and stake-reservation logic. The relay's existing stake remains the slashable collateral source.
+
+### 13.4 `SubmitAutoDrainPolicyProposal` (opcode **86**)
+
+**Wire format.** `SystemInstruction::SubmitAutoDrainPolicyProposal { description_hash, voting_blocks, enabled, high_water_mark_bps, over_capacity_epochs, stale_heartbeat_epochs, heartbeat_stale_ms, min_active_stake, drain_bond_base, drain_bond_per_gib, drain_window_ms }`.
+
+**`AutoDrainPolicyConfig` schema** (`node/ras/src/types.rs:459-478`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `enabled` | `bool` | Master switch. If `false`, the per-epoch auto-drain scanner skips all relays unconditionally. |
+| `high_water_mark_bps` | `u16` | Capacity-utilization threshold expressed in basis points of `BPS_DENOMINATOR=10_000` (i.e., `5_000` = 50%). A relay above the high-water mark for `over_capacity_epochs` consecutive epochs becomes eligible for auto-drain. MUST satisfy `0 < x ≤ BPS_DENOMINATOR`. |
+| `over_capacity_epochs` | `u64` | Number of consecutive epochs over `high_water_mark_bps` required to trigger over-capacity auto-drain. MUST be `≥ 1`. |
+| `stale_heartbeat_epochs` | `u64` | Number of consecutive epochs of stale relay heartbeat (per `heartbeat_stale_ms`) required to trigger heartbeat-staleness auto-drain. MUST be `≥ 1`. |
+| `heartbeat_stale_ms` | `u64` | Wall-clock ms threshold separating "fresh" from "stale" relay heartbeat. MUST be `≥ 1`. |
+| `min_active_stake` | `u128` | Minimum active stake (in attoCBY) the relay must hold to be eligible to be a destination for shard absorption. Relays below this floor cannot receive drain-migrated shards. |
+| `drain_bond_base` | `u128` | Base drain bond required from the relay (in attoCBY). Used by the manual drain path; auto-drain reserves an equivalent amount from existing stake. |
+| `drain_bond_per_gib` | `u128` | Per-GiB adder to the drain bond, sized to the relay's currently stored data. Larger relays post proportionally larger bonds. |
+| `drain_window_ms` | `u64` | Wall-clock window the drain must complete in, after which uncopied shards are accounted as lost and the slashing/stake-forfeit path applies. MUST be `≥ 1`. |
+
+**Validation at submit time** (`validate_auto_drain_policy`, `system_instruction.rs:1617-1630`):
+
+```
+high_water_mark_bps ∈ (0, BPS_DENOMINATOR]
+over_capacity_epochs     ≥ 1
+stale_heartbeat_epochs   ≥ 1
+heartbeat_stale_ms       ≥ 1
+drain_window_ms          ≥ 1
+```
+
+`enabled` / `min_active_stake` / `drain_bond_base` / `drain_bond_per_gib` are unconstrained at the validator (zero is allowed; the master switch and bond-size knobs are deliberately permissive).
+
+Voting-blocks bounds are the same `[MIN_VOTING_BLOCKS, MAX_VOTING_BLOCKS]` as §13.3.
+
+**Submit-time effect.** Same proposal-record write pattern as §13.3, with:
+
+- `payload_kind = UpdateAutoDrainPolicy`
+- `payload_auto_drain_policy = Some(<the 10-field config>)`
+- `payload_relay_node_id = None`
+- System event `governance.proposal.submitted` with `payload: "UpdateAutoDrainPolicy"`.
+
+**Execute-time effect** (when `ExecuteProposal=47` runs after the voting deadline with vote tally pass):
+
+- Re-validates the policy via `validate_auto_drain_policy` (defense-in-depth against a malformed `Proposal` record).
+- Calls `apply_auto_drain_policy(store, policy)`:
+  1. Ensures `RELAY_REGISTRY=0x0B` exists.
+  2. Writes the JSON-serialized policy to `0x0B:AUTO_DRAIN_POLICY_KEY` (defined in `cowboy_ras::storage_keys::relay_registry`).
+- Subsequent epochs read the new policy and apply it to the per-epoch auto-drain scan.
+- Emits `governance.proposal.executed` with `{ id, payload: "UpdateAutoDrainPolicy" }`.
+
+### 13.5 Cross-references
+
+- **CIP-12 §5 (Tier 0 / Tier 1):** Drain-relay and auto-drain-policy proposals are Tier 1 (registry & whitelist) under CIP-12's taxonomy — they affect specific relay records or the relay-registry policy slot, not protocol-wide parameter scalars.
+- **CIP-13 v2 §1 master opcode allocation table:** opcodes **85** and **86** are pinned to `SubmitDrainRelayProposal` and `SubmitAutoDrainPolicyProposal` respectively (✅ in code).
+- **CIP-9 §5.7 / §5.8 (manual drain):** the manual relay-initiated drain path is untouched; auto-drain and governance-initiated drain are additive. The same shard-absorption-receipt and slashing infrastructure is reused.
+- **CIP-31 §4 (CBFS rent schedule):** the auto-drain policy's bond fields interact with CBFS rent accounting — a draining relay's outstanding rent obligations follow the migrating shards to the absorbing relay; CIP-31 owns the per-shard rent accrual that the drain window is sized against.

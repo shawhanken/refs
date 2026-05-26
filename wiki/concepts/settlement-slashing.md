@@ -5,9 +5,9 @@ sources:
   - node/execution/src/runner/verifier.rs
   - node/types/src/execution.rs
   - refs/cips/cip-2-offchain-compute.mdx
-  - refs/cips/cip-13-runner-delegation-v2.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-10-runner-containers-v2.md
+  - refs/cips/cip-13-runner-delegation.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-10-runner-containers.md
   - refs/economics/2026-04-13_fee-audit-report.md
 last_updated: 2026-04-21
 status: authoritative

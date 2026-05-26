@@ -35,7 +35,10 @@ description: Code-aligned v2 — adds DNS verification primitives required by CI
 
 <Warning>
   **修正案（2026-04-15）**: 以下条目以代码为准，本 CIP 文中相应表述以修正案为准。
-  - **System Actor 地址表**：`0x01-0x0B` 共 11 个槽位（包含 ENTITLEMENT_REGISTRY `0x07`、TREASURY `0x08`、GOVERNANCE `0x09`、STORAGE_MANAGER `0x0A`、RELAY_REGISTRY `0x0B`）
+  - **System Actor 地址表**（2026-05-26 现状）：
+    - **代码已实装 `0x01-0x0C`**（`node/runner/src/system_actors.rs`）：RUNNER_REGISTRY `0x01`、JOB_DISPATCHER `0x02`、RESULT_VERIFIER `0x03`、SECRETS_MANAGER `0x04`（CIP-24 CBSS 主体）、TEE_VERIFIER `0x05`、DUAL_BASEFEE `0x06`、ENTITLEMENT_REGISTRY `0x07`、TREASURY `0x08`、GOVERNANCE `0x09`、STORAGE_MANAGER `0x0A`、RELAY_REGISTRY `0x0B`、SESSION_ACTOR `0x0C`（CIP-8 MPP Session）
+    - **代码已实装 `0x1D`（虚拟）**：EVENT_SUBSCRIPTION_SYSTEM_ACTOR（CIP-29，host 拦截非部署 actor，`node/types/src/constants.rs:156`）
+    - **Spec-only `0x0D-0x13`**（尚未进代码，激活时地址可能修订）：ROUTE_REGISTRY `0x0D` / GATEWAY_REGISTRY `0x0E` / RECEIPT_REGISTRY `0x0F`（CIP-14 v2）、CONTAINER_REGISTRY `0x10`（CIP-10 v2）、PAYMENT_GATE `0x11`（CIP-18 r2）、STREAM_KEY_MANAGER `0x12`（CIP-7 r2）、BANK_ACTOR `0x13`（CIP-28 r1.1）
   - **Runner 质押公式**：`stake >= max(10,000 CBY, 1.5 × declared_max_job_value)`（非 10× average_job_value）
   - **VerificationMode**：6 variants — None / EconomicBond / MajorityVote / StructuredMatch / Deterministic / SemanticSimilarity（ZK-Proof 未实现）
 
@@ -501,7 +504,7 @@ The `pvm_host.rs` randomness API is designed for zero-Actor-code-change migratio
 
 ### **Backwards Compatibility**
 
-This CIP is fully backwards compatible with the core protocol. System Actor addresses are unchanged (`0x01`–`0x05`, `0x07`; `0x06` is reserved). The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
+This CIP is fully backwards compatible with the core protocol. CIP-2's directly-claimed System Actor addresses are unchanged: `0x01` (Runner Registry), `0x02` (Job Dispatcher), `0x03` (Result Verifier), `0x04` (Secrets Manager), `0x05` (TEE Verifier), `0x07` (Entitlement Registry). `0x06` is allocated to `DUAL_BASEFEE` (CIP-3); the post-2026-04 address space extends through `0x13` (see top-of-file Warning for the current full table). The `skip_task` interface is removed; existing task submissions that relied on skip behavior will rely on timeout re-selection instead, which provides equivalent liveness guarantees.
 
 ---
 

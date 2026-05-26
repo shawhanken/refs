@@ -523,3 +523,118 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 **第四轮 audit 完结。文档侧可修问题全部 ✅。剩余 11 项纯代码 precondition 状态不变**。
 
 ---
+
+## [2026-05-26] lint+ingest | spec ↔ code 大对齐（CIP-29 + CIP-24 + CIP-13 master table + CIP-9 §13 + 块时间统一）
+
+**触发**：用户要求结合 `node/`、`runner/`、`cbss/`、`cbfs/` 实际代码 ground-truth 复核 spec 一致性。
+
+**代码 ground-truth 扫描**
+- `node/runner/src/system_actors.rs`：12 个部署型 actor `0x01-0x0C`（停在 `SESSION_ACTOR = 0x0C`）
+- `node/types/src/constants.rs:156`：`EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D`（CIP-29 虚拟拦截 actor）
+- `node/execution/src/pvm_host.rs:1961, 4291`：保留段 `0x01..=0x0F` 禁部署 / 禁 fee_payer_override；`pvm_host.rs:1867-1881` 拦截 `0x1D` 转 `event_sub_system_actor::dispatch_rpc`
+- `node/types/src/execution.rs:591-699`：opcode 0-51 (core) + 52-57 CIP-8 Session + 60-63 CIP-24 TEE keys + 68-84 CIP-24 main + 85-86 CIP-9 DrainRelay
+- `cbss/`、`cbfs/`、`runner/`：无独立系统 actor / opcode 常量
+
+**修复的 spec 漂移**
+- **C-1**：CIP-28 BankActor `0x0D` ↔ CIP-14 v2.r2 ROUTE_REGISTRY `0x0D` 撞址 → CIP-28 r1.1 移到 `0x13`
+- **C-2**：CIP-29 spec 声称 `0x0A` ↔ 代码 `0x1D` → CIP-29 中英版 §2.6 改 `0x1D` + 加 host-interception pattern 说明
+- **C-3**：CIP-13 v2 §1 master opcode 表整张与代码 drift → 重写为代码权威视角，把 CIP-13/23/10/14/16 等未实装 v2 提案统一标为"aspirational, pending renumber to ≥87"
+- **C-4 (code ahead of spec)**：代码已有 `SubmitDrainRelayProposal=85` / `SubmitAutoDrainPolicyProposal=86` 但 CIP-9 文档没规范 → CIP-9 Part II 新增 §13 (AMEND 9-J)，完整规范两条指令的 wire 格式、preconditions、submit/execute 路径、`AutoDrainPolicyConfig` 10 字段语义 + 5 条 validator
+- **L-5 (块时间统一到 1s)**：CIP-11 r1.2 §13 常量 ×5 rescale + 移除 5s disclaimer；CIP-23 r1 §3.13 `MAX_QUOTE_AGE` 150 blocks @ 500ms → 75 blocks @ 1s；`BINDING_RENEWAL_PERIOD` 12,096 (算术错误) → 604,800 blocks @ 1s
+- **CIP-24 §3.3 末段**：从错误的 "85-88" 撤回到代码权威的 "60-63"
+- **CIP-12 / CIP-2 / WP-v2 §13**：系统 actor 范围声明从 `0x01-0x0B` 扩到三段式（代码 0x01-0x0C 部署 + 虚拟 0x1D + spec 0x0D-0x13），WP §13 表加状态列
+
+**Wiki 更新**
+- `entities/system-actors.md` —— **完全重写**：三段式权威表、新增 CIP-29 `0x1D` 行 + CIP-28 BankActor `0x13` 行 + CIP-7 r2 `0x12` 行；"两类激活模型"段（band-protected vs host-intercepted）；Storage Manager 段加 CIP-9 §13 关联；frontmatter sources 清理 -v2.md 路径
+- `parameters.md` —— SystemInstruction 主分配表按代码权威视角重写；`MAX_QUOTE_AGE` / `BINDING_RENEWAL_PERIOD` 块时间从 500ms 改 1s；PaymentGate 地址 `0x0013` 改 `0x11`；frontmatter sources 清理
+- `concepts/runner-delegation.md` —— 顶部加 "2026-05-26 opcode 修正" 框，说明 52-56 与代码 CIP-8 Session 撞号，opcode TBD ≥87
+- `concepts/tee-attestation.md` —— 顶部加 "opcode + 块时间修正" 框；§ "MAX_QUOTE_AGE" / drift 监控段同步更新
+- `concepts/governance.md` —— 状态段从"代码侧目前只有 SettlementConfig"扩展为完整治理代码现状（含 CIP-9 §13 两条新 proposal payload kind + opcodes 85/86）
+- `entities/route-registry.md` —— Route Registry 地址从 `0x0C` 改 `0x0D`（v2.r2 让位给代码已实装的 SESSION_ACTOR）；标 spec-only
+- `entities/gateway.md` —— Gateway Registry `0x0D` → `0x0E`、Receipt Registry `0x0E` → `0x0F`；标 spec-only
+- `drift.md` —— C-1/C-2/C-3/C-4/L-5 全部 ✅ 收口；V-1/V-3/V-7 按代码实际状态重写；frontmatter sources 清理
+- `index.md` —— "最后更新" 刷新到 2026-05-26；system-actors / route-registry / gateway 三个 entity 描述同步
+
+**改动总计** —— ~10 个 CIP/WP 文件 + ~10 个 wiki 文件，约 60 处独立 edit。
+
+**未触动**
+- 代码侧（按用户长期指令"代码不动"）
+- 未新建 `wiki/concepts/event-hooks.md` —— CIP-29 单文档自包含，wiki 综合层不必建专门页（按 AGENTS.md "宁少勿多" 规则；地址 `0x1D` 已在 [[entities/system-actors]] 详述）
+
+---
+
+## [2026-05-26] enhance | 给 5 个高价值 concept 页补 mermaid 图示
+
+**触发**：用户评估哪些 wiki 页面值得加图后选定 Top 5。
+
+**补图清单**（全部 mermaid，统一在 markdown 内嵌、Obsidian 兼容）：
+
+1. **`concepts/speculative-execution.md` (1 张 sequenceDiagram)** —— propose/verify → cache → rollback → report 三阶段时序，含"投票通过 / 失败"分支与 WriteBuffer ↔ QMDB 流向；每步用 autonumber + 关键转换点 callout
+
+2. **`concepts/mpp-session.md` (2 张图)** ——
+   - stateDiagram-v2: Session 4 稳定状态 (`Open / Closing / Settled / Refunded`) + 瞬态 `Disputed` 分支；每条转移标 opcode (52-57) 与触发条件 + DISPUTE_WINDOW_BLOCKS=75 注解
+   - sequenceDiagram: payer / runner / SESSION_ACTOR / SettlementConfig 四方端到端 —— 链上 Open → 链下 N 次 voucher 累积 → 链上 Settle 按 89/10/1 分账 → CloseSession + dispute window + Finalize；含 alt 块表示 Slash 分支
+
+3. **`concepts/runner-delegation.md` (2 张图)** ——
+   - stateDiagram-v2: `DelegationTranche` 生命周期，含嵌套 `Unbonding{Slashable, Mature}` 子状态 + `claimable_at` 隐式原子翻转标注
+   - flowchart TD: Slash cascade 决策流 —— self_stake（永不受 cap）→ delegation 部分按 `MAX_DELEGATION_SLASH_PER_EPOCH_BPS=500bps` 受 cap → 比例切分 → 50% Treasury / 50% Burn 路由；超 cap 差额 `DelegationSlashCapped` 事件丢弃不延后
+
+4. **`concepts/tee-attestation.md` (3 张图)** ——
+   - flowchart LR: 三层资格 chain（actor manifest entitlement → job spec field → runner MeasurementBinding）嵌套子图 + 三层独立校验时刻
+   - flowchart LR: CAE 四角绑定关系 —— `nonce + service_pubkey + gpu_measurement → keccak256 → REPORTDATA` 锚回 CPU quote；`bound_cpu_pubkey == service_pubkey` 防拼接攻击
+   - flowchart TD: 7 步验证流水线（Freshness → Replay → Cert chain → Measurement → Binding → Service sig → NRAS）+ 每步 reject 终态着色
+
+5. **`concepts/governance.md` (3 张图)** ——
+   - flowchart TD: Tier 0-4 决策树 ——"修改类型 → 哪个 Tier" + Tier 3 target=0x09 → 自动跳 Tier 4 + Fast-Track 30h 旁路标注
+   - sequenceDiagram: 提案生命周期 —— 三种入口 (`SubmitProposal` 45 / `SubmitDrainRelayProposal` 85 / `SubmitAutoDrainPolicyProposal` 86) → CastVote 46 → ExecuteProposal 47 → 按 `payload_kind` 路由到具体 apply；含 Council Cancel 分支
+   - stateDiagram-v2: Circuit-Breaker —— `Normal → Paused (含嵌套 AwaitRatify / Extended / Tier4Required 子状态) → AutoRevert 或 PermanentPause`；3 次续期上限标注
+
+**总计** 11 张 mermaid 图，约 250 行图源码 + 30 行 callout 说明。所有图都标注代码出处（如 `node/types/src/execution.rs:683-693`）便于反查。
+
+**未做**
+- 未给 Tier 2 推荐列表的页面（system-actors / dns-addressable-actors / payments / cross-chain / vrf-runner-selection / timer-mechanism / runner-lifecycle）加图 —— 待用户后续按需触发
+- 未拆图到独立 png/svg —— 保持 mermaid inline 便于 git diff 与 Obsidian 实时预览
+
+---
+
+## [2026-05-26] audit | 新一轮 CIP + WP 实现进度审计
+
+**触发**：用户要求以 WP / CIPs 为目标评估代码实现进度，复核 5/15 audit baseline。
+
+**产物**：[`refs/analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md`](../analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md)（约 240 行，作为新 baseline）
+
+**审计方法**：以 [`2026-05-15_CIP_IMPLEMENTATION_AUDIT.md`](../analysis/2026-05-15_CIP_IMPLEMENTATION_AUDIT.md) 为起点，叠加本会话累积的 spec ↔ code 探针发现 + 5/26 的新探针（CIP-24 / CIP-29 / CIP-8 Slash / CIP-23）。变更项给出精确证据；不变项标 "5/15 audit baseline"。
+
+**自 5/15 起最显著的两个变化**
+
+1. **CIP-24（CBSS）**：5/15 audit 未列入 → 5/26 **🟢 ~80%**
+   - 代码规模：`node/` 内 11,600 行 + 独立 `cbss/` workspace 29,448 行（cbssd / cbss-crypto / cbss-client / cbss-types）
+   - 21 个 SystemInstruction handlers 全在（60-63 TEE keys + 68-84 CBSS main）
+   - BLS12-381 阈值 IBE / DKG / proxy registry / release receipt / liveness challenge / reshare 全栈
+   - 仅留 Intel DCAP/TDX + AMD SEV-SNP 全证书链 vendor collateral 到 pre-mainnet milestone
+
+2. **CIP-29（事件钩子）**：❌ <5% → 🟢 **~55%**
+   - `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D` 虚拟 actor（拦截路由）
+   - 三文件 914 行实装（event_subs / event_fire / event_sub_system_actor）
+   - Phase 1 sync fire + Phase 2 bid-sorted async fire 框架
+   - 3 read RPCs（get_rank / get_topic_orderbook / get_min_bid_for_rank）
+
+**其他变更**：CIP-9 70 → 73%（§13 spec 对齐 code 已有 opcodes 85/86）；CIP-12 demo → 30%（3 种 `ProposalPayloadKind` 落地）；CIP-23 25 → 30%（TEE keys 60-63 入码，由 CIP-24 §3.3 推动）；CIP-8 90 → 92%（6 opcodes 全在；仅 Slash stub）。
+
+**状态分布**
+
+- ✅ ≥85%：6 个（CIP-2 / 5 / 6 / 8 / 20 / 26）
+- 🟢 60-85%：7 个（CIP-3 / 4 / 9 / 17 / 24 / 25 / 29）
+- 🟡 25-60%：2 个（CIP-12 / 23）
+- 🟠 5-25%：5 个（CIP-1 / 7 / 14 / 15 / 31）
+- ❌ <5%：9 个（CIP-10 / 11 / 13 / 16 / 18 / 19 / 21 / 22 / 28）
+
+**优先级**
+
+- P0（1-3 周）：CIP-8 Slash 收尾 / CIP-3 lane multiplier / CIP-9 GET_MANIFEST RPC / CIP-29 Phase 2 收尾
+- P1（1-2 月）：CIP-13 重号实装 / CIP-23 v2 CAE 流水线 / CIP-14 v2 三系统 actor / CIP-12 双院治理
+- P2 / P3：CIP-15 v2 / CIP-18 / CIP-10 / CIP-19 / CIP-7 / CIP-11 / CIP-21 / CIP-22 / CIP-28 / CIP-31
+
+下次建议 4-6 周后做下轮 baseline，重点核 CIP-13 / CIP-23 v2 / CIP-14 v2 三大未激活提案。
+
+---

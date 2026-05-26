@@ -3,10 +3,9 @@ type: concept
 tags: [runner, verification, cip-2, cip-16, cip-23]
 sources:
   - node/runner/src/types.rs
-  - refs/cips/cip-2-offchain-compute-v2.md
-  - refs/cips/cip-2-offchain-compute.mdx
-  - refs/cips/cip-16-custom-domains-v2.md
-  - refs/cips/cip-23-tee-execution-v2.md
+  - refs/cips/cip-2-offchain-compute.md
+  - refs/cips/cip-16-custom-domains.md
+  - refs/cips/cip-23-tee-execution.md
   - refs/runner/2026-02-05_DOCUMENTATION.md
 last_updated: 2026-04-21
 status: authoritative

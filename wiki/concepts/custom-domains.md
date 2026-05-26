@@ -2,16 +2,16 @@
 type: concept
 tags: [ingress, dns, tld, external-domain, cip-16]
 sources:
-  - refs/cips/cip-16-custom-domains-v2.md
-  - refs/cips/cip-14-dns-addressable-actors-v2.md
-  - refs/cips/cip-2-offchain-compute-v2.md
+  - refs/cips/cip-16-custom-domains.md
+  - refs/cips/cip-14-dns-addressable-actors.md
+  - refs/cips/cip-2-offchain-compute.md
 last_updated: 2026-04-21
 status: draft
 ---
 
 # Custom Domains & First-Party TLDs (CIP-16 v2)
 
-Extends CIP-14 v2's Route Registry (`0x0C`) with two more naming classes: protocol-owned TLD names under `.cow` / `.cowboy`, and externally owned FQDNs like `api.example.com` attached via DNS-based control proof.
+Extends CIP-14 v2's Route Registry (`0x0D`, v2.r2 spec-only) with two more naming classes: protocol-owned TLD names under `.cow` / `.cowboy`, and externally owned FQDNs like `api.example.com` attached via DNS-based control proof.
 
 > **v1 → v2 主要变更**：DNS 验证模式从 `Deterministic`（错配，非 byte-identical）改为 `MajorityVote` + 两个新 `VerifierCheck` 变体（`DnsTxtRecordMatch` / `DnsCnameMatch`，CIP-2 v2 §2 AMEND 2-A/B 提供）；`complete_attach_external` 改用 `SystemInstruction::ExternalDomainCallback`（**opcode 67**），sender allowlist `RESULT_VERIFIER=0x03`；新增 `EXTERNAL_REVERIFY_FEE`（owner 付）+ CIP-5 timer `fee_payer = binding.owner` 的双层费用模型；显式 `RouteRegistration → DomainBinding` 迁移规则（默认值列表）；`SUSPENDED` 状态返回 `503`（v1 错用 `421`）；`verified_fqdn` 注入到 `HttpRequestEnvelope`（actor 信任此而非可伪造的 `host` header）；`CANONICAL_EDGE_HOSTNAME` 显式区分 anycast / SRV 模式。
 
@@ -84,7 +84,7 @@ DomainBinding {
        ],
      }
      callback:  {
-       actor:    ROUTE_REGISTRY,                     // 0x0C
+       actor:    ROUTE_REGISTRY,                     // 0x0D (v2.r2)
        handler:  "_dns.callback",                    // → 协议 emit ExternalDomainCallback opcode 67
        ...
      }
@@ -145,7 +145,7 @@ HttpRequestEnvelope {
 
 | 依赖 | 角色 |
 |---|---|
-| CIP-14 v2 | Route Registry `0x0C` & Gateway dispatch 基础不变；绑定记录结构扩展 |
+| CIP-14 v2 | Route Registry `0x0D` (v2.r2) & Gateway dispatch 基础不变；绑定记录结构扩展 |
 | CIP-2 v2 | 外部验证作为 CIP-2 off-chain job（multi-verifier MajorityVote）+ 两个新 `VerifierCheck` 变体（v2 §2 AMEND 2-A/B）|
 | CIP-5 revised | reverify timer + `fee_payer = binding.owner` 模型 + `TimerCancelledInsufficientFunds` 监听 |
 | CIP-9 / CIP-15 | 不涉及；静态资产 serving 对外部域名同样适用，通过 CIP-14 → CIP-15 v2 延展 |
@@ -193,15 +193,15 @@ v2 加入这一章承认 v1 trust assumption：
 
 ## 相关
 
-- [[dns-addressable-actors]] — CIP-14 v2 基础（Route Registry `0x0C`、Gateway 路由、ingress.http）
-- [[../entities/route-registry]] — 系统 Actor `0x0C`
+- [[dns-addressable-actors]] — CIP-14 v2 基础（Route Registry `0x0D` (v2.r2)、Gateway 路由、ingress.http）
+- [[../entities/route-registry]] — 系统 Actor `0x0D` (v2.r2, spec-only)
 - [[runner-verification]] — CIP-2 v2 新 verifier check
 - [[tee-attestation]] — CIP-23 v2，DNS verifier 可叠加 TEE 但非必须
 - [[timer-mechanism]] — CIP-5 revised fee_payer 模型（reverify timer 依赖）
 
 ## Sources
 
-- `refs/cips/cip-16-custom-domains-v2.md` — v2 spec（Draft, 2026-04-21）：MajorityVote + ExternalDomainCallback opcode 67 + DomainBinding 迁移 + EXTERNAL_REVERIFY_FEE + verified_fqdn 注入 + 503 修正 + anycast/SRV 显式 + 中心化风险
-- `refs/cips/cip-2-offchain-compute-v2.md` §2 — DnsTxtRecordMatch / DnsCnameMatch verifier check 定义（AMEND 2-A/B）
-- `refs/cips/cip-14-dns-addressable-actors-v2.md` — Route Registry `0x0C` + IngressDispatch + verified_fqdn injection 上下文
-- `refs/cips/cip-13-runner-delegation-v2.md` §1 — opcode 主分配表（67 = ExternalDomainCallback）
+- `refs/cips/cip-16-custom-domains.md` — v2 spec（Draft, 2026-04-21）：MajorityVote + ExternalDomainCallback opcode 67 + DomainBinding 迁移 + EXTERNAL_REVERIFY_FEE + verified_fqdn 注入 + 503 修正 + anycast/SRV 显式 + 中心化风险
+- `refs/cips/cip-2-offchain-compute.md` §2 — DnsTxtRecordMatch / DnsCnameMatch verifier check 定义（AMEND 2-A/B）
+- `refs/cips/cip-14-dns-addressable-actors.md` — Route Registry `0x0D` (v2.r2) + IngressDispatch + verified_fqdn injection 上下文
+- `refs/cips/cip-13-runner-delegation.md` §1 — opcode 主分配表（67 = ExternalDomainCallback）

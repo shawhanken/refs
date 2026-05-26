@@ -1,7 +1,8 @@
 # CIP-28: Cowboy Agent Banking
 
-- **Status**: Draft
+- **Status**: Draft (spec-only; **not yet in code** as of 2026-05-26 — see "Code activation note" below)
 - **Date**: 2026-05-12
+- **Revised**: 2026-05-26 (r1.1 — BankActor address shifted `0x0D` → `0x13` to resolve collision with CIP-14 v2.r2 `ROUTE_REGISTRY = 0x0D`; `0x13` is the first free slot after CIP-7 r2 `STREAM_KEY_MANAGER = 0x12`. **Code activation note:** `node/runner/src/system_actors.rs` currently ends at `SESSION_ACTOR = 0x0C`; the protocol-reserved system-actor band enforced in `pvm_host.rs` is `0x01..=0x0F`. Activating BankActor at `0x13` requires either (a) extending the reserved band to `0x13` and registering a `BANK_ACTOR` constant, or (b) using the `pvm_host::call_actor` interception pattern that CIP-29 adopted for `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D`. The choice is deferred to the activation PR; `0x13` is the spec-pinned placeholder. Downstream BankActor handler opcodes are also TBD and must take free slots ≥ 87 per CIP-13 §1 master table.)
 - **In scope**: BankActor system actor, card data model, instruction set, gas charge path, the policy triad (limits / whitelist / freeze), multi-bank + fiat bridge, roadmap & compatibility
 - **Out of scope**: On-chain KYC, multi-holder cards, protocol-level paymaster abstraction, card-to-card transfer primitives, **UI design** (delivered separately — see `examples/cip28_agent_banking/index.html`)
 
@@ -9,7 +10,7 @@
 
 ## 0. Summary
 
-Decouple "gas funds + risk controls + compliance handle" from regular actor addresses, and lift them into a first-class **banking account** primitive. A new system actor `BankActor (0x0D)`:
+Decouple "gas funds + risk controls + compliance handle" from regular actor addresses, and lift them into a first-class **banking account** primitive. A new system actor `BankActor (0x13)`:
 
 - **Card = on-chain counterpart of a physical bank card**: deterministically derived 20-byte address, holds multi-token balances (vault model), supports expiry/renew, spending limits, whitelist, freeze, ownership transfer.
 - **agent = cardholder**, **owner = guardian** (initially a user; later may transfer to the agent itself). Separation of duty.
@@ -25,7 +26,7 @@ Seven main sections, scoped tightly enough to drop straight into an implementati
 
 ### 1.1 Positioning
 
-**Cowboy Agent Banking** is a new system actor `BankActor` at address `0x0000…000D`. It carries four responsibilities:
+**Cowboy Agent Banking** is a new system actor `BankActor` at address `0x0000…0013`. It carries four responsibilities:
 
 > **Protocol / Bank — two layers**: this CIP defines the **protocol** Cowboy Agent Banking (= the BankActor primitive + card derivation rules); the **first bank** deployed on top of it at genesis is **Cowboy Banking** (`bank_id = 1`). The latter is just the first instance of the former — analogous to Visa (network) vs. Chase (issuer).
 
@@ -44,7 +45,7 @@ Seven main sections, scoped tightly enough to drop straight into an implementati
      │ IssueCard / Deposit     │ SetPolicy / TransferOwnership
      ▼                         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  BankActor  (system actor, 0x0000…000D)                     │
+│  BankActor  (system actor, 0x0000…0013)                     │
 │  ─────────────────────────────────────────                  │
 │  · Card state (multi-token vault + policy + lifecycle)      │
 │  · Bank registry (Cowboy Banking + third-party banks)       │
@@ -83,14 +84,14 @@ Seven main sections, scoped tightly enough to drop straight into an implementati
 | **Card Holder Agent** | actor address | Spend gas via the card (subject to policy) | Modify rules, withdraw, freeze |
 | **Card Owner** | EOA or the agent itself | Deposit, SetPolicy, Renew, TransferOwnership, close the card | Touch other people's cards |
 | **BankOperator** (one per bank) | multisig | Freeze / Unfreeze cards under its bank; sign FiatMintVoucher | Modify card rules, seize funds (freeze only disables charges, doesn't confiscate) |
-| **BankActor protocol layer** | 0x0D | Enforce invariants; charge gas; record rolling windows | No independent power — every privileged action originates from one of the roles above |
+| **BankActor protocol layer** | 0x13 | Enforce invariants; charge gas; record rolling windows | No independent power — every privileged action originates from one of the roles above |
 | **Off-chain Compliance Gateway** | off-chain | KYC, Stripe collection, sign mint vouchers | No on-chain write rights; on-chain redemption requires BankOperator-recognized signature |
 
 ---
 
 ## 2. Data Model & Card Address Derivation
 
-### 2.1 Top-level state layout (under BankActor 0x0D)
+### 2.1 Top-level state layout (under BankActor 0x13)
 
 Following the `b"<tag>:"` ASCII prefix style used by other system actors (CBSS uses `b"secret:"`, SessionActor uses `b"session:"`, CIP-20 token uses `b"bal:"`):
 
@@ -747,7 +748,7 @@ All three coexist. New functionality is opt-in; no forced migration.
 
 | Stage | Contents | Demo highlight |
 |---|---|---|
-| **M1 BankActor skeleton** | 0x0D placement; genesis-write Cowboy Banking; `IssueCard` / `Deposit` / `Withdraw` / `CloseCard`; card address derivation; `card_by_owner/agent` indices | "Every agent has its own on-chain bank card" |
+| **M1 BankActor skeleton** | 0x13 placement; genesis-write Cowboy Banking; `IssueCard` / `Deposit` / `Withdraw` / `CloseCard`; card address derivation; `card_by_owner/agent` indices | "Every agent has its own on-chain bank card" |
 | **M2 Charge fork point** | Engine fee-settle adds the §4.1 fork; `charge_gas` Phase 1+2; `SetDefaultCard`; timer-deferred integration | "Pay gas with a card — balance is visible and auditable" |
 | **M3 Policy triad** | `SetPolicy`; `SpendWindow`; whitelist match; `Freeze`/`Unfreeze`; `PauseBank`; `locked_after_transfer` | "Limits, whitelist, freeze — all in place" |
 | **M4 Fiat bridge** | `MintFromFiatVoucher`; voucher replay protection; `SetBankFiatMintSigner`; off-chain gateway + Stripe | "Top up gas with a credit card" |
@@ -815,7 +816,7 @@ Testnet → mainnet can configure the height independently; rolling back is just
 
 | Term | Meaning |
 |---|---|
-| BankActor | The system actor at 0x0D that carries every on-chain responsibility defined in this CIP |
+| BankActor | The system actor at 0x13 that carries every on-chain responsibility defined in this CIP |
 | Bank | A registry entry inside BankActor — e.g. Cowboy Banking, or a third-party bank |
 | Card | One card; on chain represented as a CardEntry + derived address; analogous to a physical bank card |
 | Card Address | The 20-byte address derived from (bank_id, owner, agent, issue_nonce) via keccak256 |
