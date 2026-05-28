@@ -1,0 +1,1530 @@
+# Cowboy Technical Whitepaper (v2.r2)
+
+> **Versioning.** This is v2 of the technical whitepaper. v1 is the canonical document `2026-03-21_cowboy-technical-whitepaper-revised.md` (preserved verbatim as Part I). v2 = v1 + proposed deltas surfaced by the CIP-14/15/16 v2 alignment exercise (Part II) + the WP-vs-CIP-aligned audit brief (Part III).
+>
+> **Status of Part II.** The deltas are PROPOSALS, not adopted edits. The WP §-numbers each delta references are insertion targets, not existing sections.
+>
+> **Conflict rule.** Part I is the canonical WP today. Part II is forward-looking; if and when adopted, the deltas would supersede whatever Part I says about each surface. Part III is a one-time audit, not normative.
+>
+> **Revision history**
+>
+> - **r2 (2026-05-11)** — §13 / Delta 6 (system actor table) updated for the v2.r2 address shift: `0x0C = SESSION_ACTOR` (code at `system_actors.rs:35`); CIP-14 v2.r2 → `0x0D`/`0x0E`/`0x0F`; CIP-10 v2.r2 → `0x10`; CIP-18 r2 PaymentGate → `0x11`. Inline `GATEWAY_REGISTRY` / `RECEIPT_REGISTRY` references shifted to `0x0E` / `0x0F`.
+> - **r1 (2026-04-21)** — Initial v2 deltas (Parts II–III) introduced.
+>
+> **Summary of proposed deltas (Part II)**
+>
+> 1. **§17.x — Stake vs. operating balance** (CIP-14 v2 §6.3).
+> 2. **§6.x — Read-only handler execution** (CIP-14 v2 §5).
+> 3. **§9.x — Deferred result storage** (CIP-14 v2 §8).
+> 4. **§6.y — System-reserved selectors** (CIP-14 v2 §6.2, CIP-16 v2 §5.6).
+> 5. **§9.y — Owner-mutable per-actor configuration at `STORAGE_MANAGER`** (CIP-15 v2 §4.1, §7.1).
+> 6. **§13 (revised) — System actor table** (CIP-14 v2.r2 / CIP-10 v2.r2 / CIP-18 r2; `0x0C = SESSION_ACTOR` from code).
+> 7. **§17.y — Payment layer** (CIP-18 r2): PaymentGate `0x11`, four payment models, MPP+x402 dual wire, EVM bridge facilitator.
+> 8. **§6.z — MCP Ingress** (CIP-19): actor-as-MCP-server via Gateway, `tools/list` derived from CIP-15 routes, JSON-RPC `_meta.payment-authorization`.
+> 9. **§16.z — Cross-chain architecture** (CIP-25): three-layer (state-anchoring / mailbox / apps), pluggable trust backends; reconciles WP-v2 §16's "third-party-only" framing with CIP-25's runner-committee backend.
+
+---
+
+## Part I — v1 Whitepaper (verbatim from `2026-03-21_cowboy-technical-whitepaper-revised.md`)
+
+# Cowboy: Technical Whitepaper
+
+|               |                           |
+| ------------- | ------------------------- |
+| **Status**    | Draft for internal review |
+| **Type**      | Standards Track           |
+| **Category**  | Core                      |
+| **Author(s)** | Cowboy Foundation         |
+| **Created**   | 2025‑09‑17                |
+| **Updated**   | 2026‑03‑21                |
+| **Prior edition** | 2026‑02‑21 (`20260221_cowboy-technical-whitepaper.md`) |
+| **License**   | CC0‑1.0                   |
+
+> **Note:** This document provides complete technical specifications for Cowboy. For architectural rationale and design decisions, see the [Design Decisions Overview](./cowboy-design-decisions.md).
+>
+> **Revision file:** 本文件由 `20260221_cowboy-technical-whitepaper.md` 复制而来。累计修订：**§9** 系统 Actor 表与脚注；**§5.2** 卷/容器与 CIP 交叉引用；**§1.3** 与 **Accounts** 中系统地址交叉引用修正（误指 §10 处改为 **§9**）；**Abstract**、**Key Features**、**Runner Marketplace**、**§12.2**、**§14** 与 **CIP-9/10** 对齐；**Terminology** 增补 Steamtrain/卷；**§17** 链下计算与费用域表述泛化（不限于 LLM）。其余章节与 2026‑02‑21 版相同。若与 CIP 冲突，以对应 CIP 为准。
+
+## Abstract
+
+Cowboy is a general-purpose Layer-1 blockchain that combines a **Python-based actor-model execution environment** with a **proof‑of‑stake consensus** and a **market for verifiable off‑chain computation**. Smart contracts on Cowboy are **actors**: Python programs with private state, a mailbox for messages, and chain‑native timers for autonomous scheduling. For heavy tasks like LLM inference, web requests, MCP tool calls, or **containerized** batch jobs, Cowboy integrates a decentralized network of **Runners** who execute jobs and attest to results under selectable trust models: N-of-M consensus, TEEs, and (in V2) ZK-proofs. Jobs MAY attach **CIP-9** encrypted volumes (client-side encryption, **Steamtrain** storage cluster); **CIP-10** governs OCI container execution against an on-chain image allowlist (**§9**, **0x0A**).
+
+Cowboy introduces a **dual-metered gas model**, separating pricing for computation (**Cycles**) and data (**Cells**) into independent, EIP-1559-style fee markets. Security is provided by **Simplex BFT** consensus with **proof‑of‑stake**, fast finality, and mandatory proposer rotation.
+
+This document specifies Cowboy's complete technical architecture, state transition function, economic mechanisms, consensus protocol, and all implementation parameters.
+
+## Introduction
+
+Cowboy is designed to enable autonomous agents by providing a native blockchain execution environment optimized for asynchronous, Python-based applications. This document provides complete technical specifications for implementers, auditors, and protocol developers.
+
+Ethereum gave us programmable money, but its execution model is fundamentally reactive — smart contracts sit inert until an externally-controlled system calls them. Cowboy introduces a new unit of execution: the **actor**, an immortal, stateful program that schedules itself into the future, bids for its own blockspace, and runs indefinitely without a human in the loop. No amount of keeper networks or cron-job infrastructure on Ethereum provides a first-class primitive for autonomous, self-funding, self-scheduling programs. This new model requires a new protocol. 
+
+Cowboy further innovates by adopting Python as its execution language, replacing the domain-specific languages required by existing chains (Solidity on Ethereum, Rust on Solana). Python's ubiquity in AI and general-purpose development reduces the barrier to entry for both human developers and AI coding agents, which already generate Python more reliably than niche smart contract languages.
+
+For architectural rationale and design decisions, see the [Design Decisions Overview](./cowboy-design-decisions.md).
+
+
+## Architectural Overview
+
+This section is descriptive and non‑binding. Normative requirements are in §§1–17.
+
+### Terminology
+
+- **Actor:** A Python program with persistent key/value state and a mailbox.
+- **Message:** A datagram delivered to an actor handler.
+- **Cycle:** Unit of metered on‑chain compute.
+- **Cell:** Unit of metered bytes (1 cell = 1 byte).
+- **Runner:** Off‑chain worker that executes a job and returns an attested result.
+- **Steamtrain / attachable volume (CIP-9):** Distributed encrypted object storage: Runners read and write **volumes** via a client library (FUSE + QUIC); storage nodes see ciphertext only. **CapTokens** bind mount rights to a Runner address; **manifest roots** MAY be anchored on-chain via a dedicated registry (address TBD; **0x09** is now reserved for on-chain Governance).
+- **Entitlement:** A permission governing an actor's or runner's capabilities.
+- **GBA:** Gas Bidding Agent — an actor that dynamically bids for timer execution on behalf of another actor.
+
+### Key Features
+
+Cowboy implements four core technical features:
+
+- **Deterministic Python Actors.** Smart contracts on Cowboy are actors: Python programs with private state, a mailbox for asynchronous messages, and chain‑native timers. Actors execute in a sandboxed Python VM (PVM) pinned to Python 3.11.8 with deterministic floating‑point (softfloat), disabled GC, fixed hash seed, and a whitelisted module set. Reentrancy is depth‑capped to 32; per‑call memory is bounded at 10 MiB.
+
+- **Native Timers & Scheduler.** Actors schedule their own future execution via `set_timer` and `set_interval` without external keeper infrastructure. The scheduler uses a tiered calendar queue and a Gas Bidding Agent (GBA) mechanism that dynamically bids for timer execution at block time. Anti‑DoS measures include progressive deposits, exponential same‑block surcharges, per‑actor timer caps, and a dynamic timer basefee.
+
+- **Verifiable Off‑Chain Compute.** A decentralized Runner marketplace executes jobs (LLM inference, HTTP fetches, MCP tools, custom compute, **CIP-10** container batch jobs) off‑chain. Jobs MAY mount **CIP-9** encrypted volumes backed by **Steamtrain**. Runners stake CBY and are selected via VRF. Results are verified under developer‑selected trust models: N‑of‑M quorum, economic bond, TEE attestation, structured matching, semantic similarity, or (in v2) ZK‑proofs. A commit‑reveal protocol with a 15‑minute challenge window and slashing enforces honesty. Container images MUST appear in the on-chain **Container Image Registry** (**0x0A**) unless a governed TEE exception applies (see **CIP-10**).
+
+- **Dual‑Metered Gas.** Two independent fee markets price computation (**Cycles**) and data (**Cells**) separately. Each meter uses a basefee that adjusts dynamically with demand and is burned; tips go to proposers. This prevents cross‑subsidization between compute‑heavy and storage‑heavy workloads.
+
+### Differences vs. Ethereum
+
+| Aspect | Ethereum | Cowboy |
+|--------|----------|--------|
+| Execution | EVM bytecode (Solidity) | Python actors in sandboxed PVM |
+| Fees | Single gas scalar | Dual meters (Cycles + Cells) |
+| Scheduling | External keepers required | Native timers with GBA auction |
+| Off‑chain compute | External oracles | Verifiable Runner marketplace |
+| State management | Indefinite storage | Rent with eviction and restoration |
+
+## Accounts and State
+
+Cowboy distinguishes two object types:
+
+- **External Accounts (EOAs):** Controlled by private keys. They initiate transactions and hold balances of CBY and other assets. Key management may be abstracted via passkeys or other WebAuthn‑compatible mechanisms in future protocol versions.
+- **Actors:** Autonomous Python programs executed in the PVM. Actors own storage, receive messages, and can send messages to other actors.
+
+Each object has a 20‑byte address. Actor addresses are computed CREATE2‑style from the creator address, a salt, and the code hash. The **world state** is a mapping:
+
+`State : Address → { balance, nonce, code_hash?, storage?, metadata }`
+
+where actor storage is a key/value map subject to quotas and rent. System actors and precompiles occupy a reserved prefix of the address space (0x0000…0100); low-order allocations for the runner and fee subsystems are listed in **§9**.
+
+## Transactions and Message Passing
+
+A user interacts with Cowboy by sending a signed **transaction** specifying a destination, a payload, and resource limits: a **cycles limit** and a **cells limit** alongside maximum and tip prices for each.
+
+An actor interacts with other actors by sending **messages**. Messages carry a payload, may transfer value, and may trigger further messages. Delivery is **exactly‑once after finality**; before finality it is **at‑least‑once** and may be reverted. Handlers MUST be idempotent. Actors may schedule **timers** that insert messages at a future block height. To avoid denial‑of‑service through explosive fanout, a transaction (including all nested sends) MUST NOT enqueue more than **1,024** messages.
+
+### Native Timers and the Actor Scheduler
+
+Cowboy provides protocol‑native timers, eliminating the need for external keeper networks. Actors schedule messages to themselves or other actors at a future block height or on a recurring interval. The whitepaper specifies two layers — the **currently implemented** mechanism (FIFO with per-fire fee payer, §5.1a) and the **target design** (EIP-1559 timer-lane basefee + priority tip + per-actor fairness weight, §5.1b). The target activates by Tier-3 governance proposal; until then, §5.1a is canonical.
+
+#### 5.1a Currently Implemented (CIP-5)
+
+Per CIP-5 §§3–8 (revised 2026-04-20), the running node executes:
+
+- **Storage:** timers are indexed by `height`; same-height bucket is FIFO by insertion order (no priority queue, no tiered calendar).
+- **Per-fire `fee_payer` model.** Each timer records `who pays` (`fee_payer`), `how much gas per fire` (`gas_limit_per_fire`), and `when it gives up` (`expires_at`). At end-of-block the protocol pre-charges `max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee` from `fee_payer`, executes the handler, refunds unused gas, and removes the timer. Insufficient-funds or TTL-expired timers self-destruct without firing.
+- **Three-path lifecycle:** natural fire / TTL expiry / insufficient-funds self-destruct, plus explicit `cancel_timer` and validator-set `SYS_CANCEL_TIMER` (CIP-5 §5.4).
+- **Lane separation:** `LANE_TIMER_CYCLES = 2,000,000` (execution lane, 20% of block per CIP-3 §2.2.3) is separate from `TIMER_GC_CYCLES` (cleanup lane) so a TTL-expiry storm cannot starve live execution (CIP-5 §6.5).
+- **Per-actor limit:** `max_timers_per_actor = 1,024` active timers (CIP-5 §6.4 default, governance-tunable).
+- **Per-fire caps:** `max_cycles_per_fire = 550,000`, `max_cells_per_fire = 550,000` (CIP-5 §6.4).
+- **Same-block prohibition:** timers created in the current block MUST NOT fire in the same block (CIP-5 §5.3).
+
+The deferred-timer anti-starvation boost cited in earlier drafts ("exponential decay") is not implemented at the CIP-5 layer; the target design replaces it with the per-actor fairness weight in §5.1b below.
+
+#### 5.1b Target Design (CIP-1 v3 — EIP-1559 hybrid)
+
+Per CIP-1 v3 Part III (which supersedes CIP-1 v1's first-price auction and CIP-5 §9's exponential-bias mechanism), activated by Tier-3 governance proposal at a chosen block height:
+
+- **Timer-lane EIP-1559 basefee.** A per-block basefee is maintained against `LANE_TIMER_CYCLES` utilisation; target 50%, max change ±12.5% per block; 100% of the lane basefee is burned (consistent with CIP-3 §2.4).
+- **Priority tip.** Each `schedule_timer` call accepts `(max_fee_per_cycle, max_priority_fee_per_cycle)`. The effective priority is `min(max_priority_fee_per_cycle, max_fee_per_cycle − lane_basefee)`. Tips go to the **block proposer**.
+- **Per-actor fairness weight `W(actor) ∈ [1, 2]`** computed over a 1,000-block rolling window: actors at or below the network-median fire rate get `W = 2` (maximum boost); actors at 2× median or above get `W = 1`. Inclusion ordering: `priority_per_cycle × W(actor)`.
+- **Per-timer cycle cap during auction phase:** `MAX_CYCLES_PER_FIRE_AUCTION_PHASE = 250,000` (= 12.5% of the lane), preventing any single timer from monopolising. CIP-5's 550k cap remains in force during the FIFO phase.
+- **Default GBA (closes Gap G7):** `max_fee_per_cycle = 2 × lane_basefee`; `max_priority_fee_per_cycle = previous_block_p50_priority_tip_per_cycle`. SDKs expose a `priority_tier_hint ∈ {economy, standard, fast, urgent}` mapping to multipliers `{0.8×, 1.0×, 1.5×, 2.5×}` on the priority fee.
+- **Lane fee multiplier:** `1.0×` at genesis (no subsidy; pinned per CIP-3 §2.2.3 + §6.3 + §17.9), Tier-0 tunable.
+- **All Part II invariants retained:** Tx-then-Timer block ordering, per-fire `fee_payer` pre-charge + refund (the priority tip extends `max_cost` but does not change the mechanics), three-path lifecycle, lane separation, system-instruction opcodes 48/49/50, same-block prohibition.
+
+#### DoS Prevention (both phases)
+
+| Attack Vector | Mitigation |
+|--------------------------------------|---------------------------------------------------------------------------|
+| Schedule millions of timers | `max_timers_per_actor = 1,024` (CIP-5 §6.4) + per-fire `fee_payer` pre-charge |
+| Sybil attack across many actors | Per‑block execution budget caps total timer work (`LANE_TIMER_CYCLES`, 20% of block) |
+| Timer bomb (many timers, one block) | Exponential same‑block surcharge: `surcharge(k) = base_cost × 2^max(0, k - 16)` |
+| Fill queue far in advance | (FIFO phase) per-fire `max_cost` re-checked at each fire; (auction phase) lane basefee rises with utilisation |
+| Outbid everyone perpetually | (auction phase only) per-actor fairness weight `W(actor) ∈ [1, 2]` over 1,000-block window |
+| DoS then cancel for refund | Pre-charge happens at fire time, not at schedule time; scheduling cost (200 cycles, CIP-5 §6.1) is non-refundable |
+
+## Asynchronous Execution and Multi‑Block Semantics
+
+### Single‑Block Atomicity
+
+Cowboy provides **atomicity only within a single block**. All state reads, writes, and outbound messages within a handler are atomic — they either all commit or all revert. There is no cross‑block atomicity. Once a handler completes and the block is finalized, subsequent handlers execute in potentially different world state.
+
+### Why No Cross‑Block Transactions
+
+Cross‑block atomicity would require either global locks (destroying parallelism and creating deadlock vectors) or speculative execution with rollbacks (creating griefing opportunities and unpredictable costs). Cowboy explicitly rejects both approaches.
+
+The fundamental problems with suspending execution across blocks are: (1) stale state — values read before the yield may have changed; (2) invalid control flow — branches taken on pre‑yield state may no longer be appropriate; (3) composability explosion — nested yields create interleavings where each path depends on invalidated assumptions; (4) adversarial griefing — attackers can mutate state between yield points.
+
+### Message‑Passing Continuation Model
+
+Instead of implicit continuations, Cowboy uses **explicit message passing** for all asynchronous operations. When an actor dispatches an off‑chain job, the result arrives as a separate message in a later block. The actor must re‑read and re‑validate any state assumptions in the callback handler.
+
+This model requires **explicit context capture** — any state needed in the continuation must be included in the outbound message. Correlation IDs enable matching responses to requests. If an actor sends multiple requests, responses may arrive in any order.
+
+Actors MUST implement timeout handling for operations that depend on external responses. The recommended pattern combines correlation tracking with native timers: schedule a timeout timer alongside each outbound request, and cancel the timer when the response arrives.
+
+| Model | Atomicity | Developer Burden | Griefing Resistance |
+|-------------------------------|-----------------|------------------|--------------------------------|
+| Ethereum (sync calls) | Single TX | Low | High |
+| Cross‑block locks | Multi‑block | Low | Low (deadlocks, lock griefing) |
+| Optimistic + rollback | Multi‑block | Medium | Low (rollback spam) |
+| **Cowboy (message passing)** | **Single block** | **Medium** | **High** |
+
+## The Cowboy Actor VM (PVM)
+
+Cowboy uses Python as its execution language. The PVM executes Python bytecode in a deterministic sandbox pinned to Python 3.11.8, with restrictions to ensure identical results across all nodes.
+
+### Determinism Guarantees
+
+**Runtime Environment:**
+
+- No JIT compilation — pure interpretation mode only.
+- Deterministic memory management via reference counting. The cyclic garbage collector is disabled; creating reference cycles MUST raise `DeterminismError`.
+- Fixed recursion limit: **256** (integrated with cycle metering).
+
+**Numeric Determinism:**
+
+- All floating‑point operations use a cross‑platform software math library (softfloat), not the host FPU.
+- Transcendental functions (`sin`, `cos`, `log`, `exp`, etc.) use deterministic softfloat implementations.
+- If the `decimal` module is used, it MUST use fixed rounding mode (`ROUND_HALF_EVEN`) and fixed precision.
+
+**Collection Ordering:**
+
+- `PYTHONHASHSEED` fixed to `0`.
+- `dict` iteration is insertion‑ordered (deterministic per Python 3.7+).
+- Built‑in `set` and `frozenset` are replaced with `ordered_set` from `cowboy_sdk.collections` (transparent to user code).
+
+**Serialization:**
+
+- All data crossing trust boundaries MUST use canonical CBOR (RFC 8949, §4.2): sorted map keys, shortest integer encoding, no indefinite‑length containers, 64‑bit floats only.
+- `pickle` is forbidden. JSON output MUST use `sort_keys=True, separators=(',', ':')`.
+
+**Module Whitelist (v1):**
+
+`collections`, `dataclasses`, `enum`, `functools`, `itertools`, `json`, `re`, `struct`, `math`, `decimal`, `typing`, `abc`, `hashlib`, `cowboy_sdk`. No C extensions. No dynamic imports. Additional modules may be added via governance after determinism audit.
+
+**Forbidden Operations:**
+
+| Category | Forbidden |
+|---------------------|---------------------------------------------------------------------------|
+| **System** | `sys.exit()`, `os.environ`, `os.system()`, `subprocess.*` |
+| **Time** | `time.time()`, `datetime.now()`, `time.sleep()` |
+| **Randomness** | `random.*` (use `cowboy_sdk.vrf` instead) |
+| **Networking** | `socket.*`, `urllib.*`, `http.*`, `requests.*` |
+| **Filesystem** | All except `/tmp` scratch space (256 KiB limit, wiped post‑handler) |
+| **Reflection** | `eval()`, `exec()`, `compile()`, `globals()` modification |
+| **Introspection** | `sys._getframe()`, `inspect.currentframe()`, `gc.*` |
+| **Weak References** | `weakref.*` (non‑deterministic collection timing) |
+| **Threading** | `threading.*`, `multiprocessing.*`, `concurrent.*` |
+| **Identity** | `is` comparisons on strings or numbers (use `==`) |
+
+### Storage and State Persistence
+
+The storage architecture uses a three‑layer model:
+
+1. **The Ledger:** Append‑only log of blocks — the sequential, historical source of truth.
+2. **The Triedb:** Merkle‑Patricia Trie generating a verifiable `state_root` per block, holding all account, code, and storage state.
+3. **Auxiliary Indexes:** Rebuildable, read‑optimized tables for transaction hashes, event topics, etc. Not part of the consensus‑critical state root.
+
+**Cross‑VM Compatibility.** A `vm_ns` (VM namespace) flag in storage keys allows PVM and future EVM storage to coexist without collision at the same address. A standardized C‑ABI wrapper enables cross‑VM calls.
+
+All actor storage is subject to **state rent** (see §4.4 and the Data Availability section below).
+
+## Pricing: Cycles and Cells
+
+Ethereum uses a single gas scalar. Cowboy splits pricing into two independent meters:
+
+- **Cycles** measure compute: Python operations and host calls each have a fixed cost defined in a consensus‑critical cost table. Cycles resemble Erlang reductions — a budget of discrete steps bounding handler execution.
+- **Cells** measure bytes: calldata, return data, blobs, and storage writes all consume cells (1 cell = 1 byte).
+
+Each block adjusts two basefees (one per meter) dynamically based on demand. Users specify max prices and optional tips for each meter. Basefees are burned; tips go to proposers.
+
+The protocol does **not** meter off‑chain Runner execution. Runners set their own prices in a free market, and actors escrow CBY at submission. This separates deterministic on‑chain metering from non‑deterministic off‑chain resource pricing.
+
+## Off‑Chain Compute: The Runner Marketplace
+
+Actors can outsource computation — LLM inference, HTTP fetches, MCP tool invocation, heavy transforms, and **one-shot container jobs** (**CIP-10**) — to a decentralized network of **Runners** who stake CBY. The marketplace is verifiable: the chain accepts results under trust models chosen by the developer, and dishonest runners risk slashing.
+
+**Attachable storage (CIP-9).** Jobs MAY declare `volume_mounts`: Runners that declare storage capability mount encrypted volumes through **Steamtrain** (client-side encryption; manifest roots anchorable on-chain per **CIP-9**, deferred). This supports secrets, large artifacts, and multi-step tool chains without putting raw payloads in calldata.
+
+**Job Lifecycle:**
+
+1. **Post:** Actor submits a job with escrowed price, resource bounds, and trust model.
+2. **Assign:** A committee of M runners is selected via VRF from eligible (staked, healthy) runners.
+3. **Commit:** Runners return `commit = keccak256(output || salt)`.
+4. **Reveal:** Runners reveal `{output, salt, proof?}`.
+5. **Challenge:** A 15‑minute window opens; challengers post a 100 CBY bond.
+6. **Resolve:** Proven dishonesty triggers slashing; operational failures result in reputation penalties only.
+7. **Payout:** 89% of job payment to runner(s), 10% burned, 1% to Treasury.
+
+**Trust Models:**
+
+| Mode | Level of Trust |
+|-------------------------|--------------------------------------------------------------------------------------------------|
+| **N‑of‑M Quorum** | Committee executes; runtime accepts consensus result. |
+| **N‑of‑M with Dispute** | Runners stake a bond; disputers may prove incorrect results within a fixed window. |
+| **TEE Attestation** | Execution within a Trusted Execution Environment; attestation verified on‑chain. |
+| **ZK‑Proof (v2)** | Runners provide zk‑SNARKs for cryptographic verification. |
+
+Runners and actors are matched by **Entitlements** — a declarative permissions framework governing capabilities such as TEE requirements, data residency, supported models, **container network egress**, and domain allowlists for HTTP (see §15).
+
+### Runner Resource Accounting
+
+Every job submission includes explicit resource bounds (max tokens, max wall time, max memory, max price). Runners publish rate cards to an on‑chain registry. Job pricing follows: `actual_payment = min(reported_usage × rates, max_price)`. Tips incentivize priority during high demand.
+
+Runner‑reported usage is trusted by default, subject to reputation scoring and anomaly detection (>2× expected usage triggers automatic review). For stronger guarantees, actors can require TEE‑attested metering. Proven dishonesty (e.g., fabricated results, misreported usage) is subject to stake slashing via the challenge mechanism; operational failures (timeouts, crashes) result in reputation penalties only.
+
+**Payment and Failure Handling:**
+
+| Outcome | Runner Payment | Actor Refund |
+|---------------------------------------------------|------------------------------------------------|------------------------------|
+| **Success** | 89% of `min(reported_usage × rates, max_price) + tip` (10% burned, 1% Treasury) | `max_price - actual_payment` |
+| **Runner fault** (timeout, invalid result, crash) | 0 | 100% of escrow |
+| **Impossible job** (bounds too tight) | Pro‑rata based on progress | Remainder of escrow |
+| **Actor fault** (malformed input) | Minimum fee (gas cost recovery) | Remainder of escrow |
+| **External fault** (API down, model unavailable) | Pro‑rata based on progress | Remainder of escrow |
+
+### LLM Result Verification
+
+LLM outputs are inherently non‑deterministic — the same prompt can produce semantically equivalent but byte‑different outputs. Cowboy provides multiple verification modes:
+
+| Mode | Runners | Verification | Challenge Scope | Use Case |
+|-----------------------|---------|---------------------|-------------------|------------------------------|
+| `none` | 1 | None | Non‑delivery only | Prototyping, low‑stakes |
+| `economic_bond` | 1 | Objective checks | Objective failures | Subjective generation |
+| `majority_vote` | N‑of‑M | Vote on field value | Objective failures | Classification |
+| `structured_match` | N‑of‑M | Verifier functions | Objective failures | Structured extraction |
+| `deterministic` | N‑of‑M | Exact match + TEE | Full reproduction | Critical deterministic |
+| `semantic_similarity` | N‑of‑M | Embedding threshold | Objective failures | Subjective with similarity |
+
+These modes provide **economic assurance**, not cryptographic correctness, except where TEE or ZK verification is explicitly required. The protocol guarantees execution integrity, not output quality — quality is a market outcome.
+
+**Objective Failure Criteria** (automatically detected, no challenge required):
+
+| Failure | Detection | Consequence |
+|---------------------------|--------------------------------------------------|-------------------------------|
+| Schema violation | Output fails declared JSON schema | Reputation penalty, no payment |
+| Timeout | No result within `max_wall_time` | Reputation penalty, no payment |
+| Empty/garbage output | Output below `min_length` or fails entropy check | Reputation penalty, no payment |
+| Non‑delivery | Runner accepted job but never submitted | Reputation penalty, no payment |
+| Wrong model | TEE attestation shows different model hash | **Slash** (proven dishonesty) |
+| Prompt injection leak | Output contains system prompt markers | Reputation penalty, no payment |
+
+Only proven dishonesty (fabricated results, wrong model with TEE attestation) triggers stake slashing. Operational failures reduce the runner's reputation score, affecting future job selection, but do not destroy stake.
+
+### External Data and Oracle Semantics
+
+Actors frequently need external data: price feeds, web APIs, public datasets. External data is inherently mutable and non‑deterministic. Different sources require different verification strategies:
+
+| Source Type | Characteristics | Verification Strategy |
+|-----------------------------|---------------------------------------------------------------|------------------------------------------|
+| Deterministic API | Versioned, stable, structured (blockchain RPC, static files) | Exact match |
+| Semi‑stable API | Structured with variable metadata (REST APIs) | Structured match, ignore metadata |
+| Time‑series data | Values change over time (price feeds) | Median/majority with freshness bounds |
+| Web scraping | Unstructured, highly variable (HTML pages) | Extraction‑based matching |
+| Authenticated endpoints | Requires credentials | Single runner + TEE |
+
+**Freshness.** Actors specify freshness constraints with a reference mode (`block`, `submission`, or `absolute`) and a `max_age_seconds` parameter.
+
+**Snapshot Modes.** When multiple runners fetch mutable data, the protocol selects a canonical result via one of: `first_valid` (first runner's result is authoritative), `median` (for numeric data), `majority` (for categorical data), or `latest` (most recent by timestamp).
+
+**Extraction‑Based Verification.** For web scraping, runners apply extraction rules (CSS selectors, XPath, JSONPath, regex) and submit extracted data rather than raw HTML. Verification compares extracted fields, ignoring irrelevant page differences.
+
+HTTP access is governed by the Entitlements system. Actors declare required domains; runners advertise supported domains. The protocol provides curated domain sets (`price_feeds`, `government_us`, `social_apis`, `blockchain_rpc`).
+
+## Randomness
+
+Each block derives a random beacon from the previous quorum certificate using a threshold BLS VRF. Actors access sub‑randomness via `HKDF(R_n, label)` for fair committee sampling, lotteries, and games.
+
+## Consensus and Networking
+
+Cowboy uses **Simplex BFT** with proof‑of‑stake. Key parameters: ~1‑second blocks, ~2‑second finality, fault tolerance up to f < n/3 Byzantine validators.
+
+**Consensus Flow:**
+
+1. **Propose:** Current proposer (selected by VRF, weighted by stake) broadcasts a block.
+2. **Vote:** Validators vote; signatures are buffered and batch‑verified at quorum (2f+1).
+3. **Certify:** A Quorum Certificate (QC) is formed from 2f+1 votes.
+4. **Finalize:** A block is final when its direct child has a QC (two‑chain commit).
+
+Under partial synchrony, the protocol guarantees safety at all times and liveness when network delay is bounded. If a proposer fails, validators execute a view change: broadcast their highest QC, and the next VRF‑selected leader proposes extending the highest‑QC block.
+
+### Validator Set
+
+The validator set is open and permissionless. Requirements: stake ≥ `minimum_validator_stake` (governance‑tunable), self‑stake only (no delegation in v1), compliant validator software. No protocol cap on validator count.
+
+**Lifecycle:** Register (stake CBY, submit BLS12‑381 key) → Activate (next epoch boundary) → Operate (propose, vote, earn rewards) → Exit (signal unbonding) → Withdraw (after 7‑day unbonding period).
+
+**Epochs:** 3600 blocks (~1 hour). Validator set updates, slashing penalties, and epoch randomness derivation occur at epoch boundaries.
+
+### Staking and Rewards
+
+Block rewards (from inflation per §8.2) are distributed proportionally to stake. Proposers additionally receive **100% of cycle/cell tips on blocks they finalize**. No per‑transaction validator commission or surcharge is charged to users beyond tips; the entire user‑derived validator income is the tip stream. Staking is self‑bonded only; delegation is deferred to v2.
+
+### Slashing
+
+Cowboy uses a conservative slashing model — most offenses result in jailing (temporary removal) rather than stake destruction:
+
+| Offense | Penalty |
+|----------------------------|--------------------------|
+| Double signing | Jail + slash 1% of stake |
+| Proposer equivocation | Jail + slash 1% of stake |
+| Extended downtime (>50% of votes over 1000 blocks) | Jail (no slash) |
+| Invalid block proposal | Jail (no slash) |
+
+Jailed validators must wait 24 hours before unjailing. Repeated offenses increase jail duration exponentially.
+
+### Network Layer
+
+Transport: QUIC over TLS 1.3 (required). Gossip: transactions flood to all peers; blocks are relayed by validators; votes go directly to the proposer. Peer discovery: DHT‑based with bootstrap nodes.
+
+### Dedicated Lanes
+
+Block space is partitioned into dedicated lanes with reserved capacity and per‑lane fee multipliers:
+
+| Lane | Reserved Capacity | Fee Multiplier | Contents |
+|------------|-------------------|----------------|------------------------------------------|
+| **System** | 5% | 1.0× | Validator updates, governance, slashing |
+| **Timer** | 20% | 1.0× | Scheduled timer executions |
+| **Runner** | 25% | 1.0× | Runner job results, attestations, and related on-chain follow-ups (e.g. **CIP-9** anchors) |
+| **User** | 50% | 1.0× | User‑initiated transactions |
+
+Unused capacity in higher‑priority lanes cascades to lower‑priority lanes. Transactions are tagged by type at submission; the proposer cannot reassign lanes. Each lane's basefee is `lane_basefee = global_basefee × lane_fee_multiplier`; all four multipliers default to `1.0×` at genesis (no lane subsidy or surcharge). The multipliers are governance‑tunable via CIP‑12 Tier 0; see CIP‑3 §2.2.3 for normative spec and §17.9 for the canonical parameter table.
+
+### MEV Reduction
+
+Cowboy mitigates MEV through four mechanisms: (1) mandatory per‑block proposer rotation via VRF prevents multi‑block observation; (2) VRF‑based transaction ordering within blocks prevents strategic placement; (3) ~2‑second finality minimizes the observation window; (4) lane isolation prevents congestion attacks that delay victim transactions. No encrypted mempool is used — the marginal benefit does not justify the added latency given the already‑minimal MEV surface.
+
+**Out of scope.** This MEV-mitigation design explicitly does *not* prevent: (a) single‑block proposer inclusion or censorship (mitigated only by VRF rotation forcing the censoring validator out of the proposer slot on the next block); (b) private orderflow MEV (off‑chain bilateral order routing that bypasses the public mempool); (c) JIT (just‑in‑time) MEV against actor logic with predictable on‑chain state (e.g., a published reserve‑price actor invites JIT MEV at the moment its price clears). Applications that need stronger guarantees against these classes should layer commit‑reveal, slippage caps, or order‑flow‑auction mechanics in actor logic — see §6.5 for the same enumeration and SDK‑layer mitigation pointers.
+
+## Data Availability, State Rent, and Storage
+
+### Inline Data vs. Blobs
+
+Small outputs (≤ 64 KiB) are stored inline and paid for with cells. Larger artifacts MUST be stored as content‑addressed blobs (e.g., IPFS) with the multihash referenced on‑chain.
+
+### State Rent
+
+All persistent actor storage is subject to **state rent** — an ongoing fee for occupying space in the global state trie. Rent rates adjust dynamically based on total network state size:
+
+`rent_rate_{i+1} = rent_rate_i × (1 + clamp((S - T) / (T × alpha), -delta, +delta))`
+
+where S is the current total state size, T is the target (governance‑tunable), alpha = 8, and delta = 0.125.
+
+Rent is auto‑deducted from the actor's balance each rent epoch (default: 1 day). Actors may also prepay rent for cost certainty, and any account may sponsor rent on behalf of any actor. Each actor maintains a minimum balance reserve (~5 weeks of rent) as a buffer before entering grace period.
+
+### Grace Period and Eviction
+
+When an actor cannot pay rent (balance, reserve, and prepaid epochs exhausted):
+
+- **Grace period (7 rent‑epochs):** Actor remains fully functional; flagged as "rent overdue"; catch‑up fee accumulates (10% of missed rent).
+- **Warning period (3 rent‑epochs):** Actor flagged as "eviction imminent"; events emitted to alert dependent actors.
+- **Eviction (after 10 rent‑epochs of unpaid rent — 7 grace + 3 warning):** Actor storage and active timers are pruned. Code, address, balance, and storage root hash are preserved. The actor enters a "dormant" state.
+
+Evicted storage can be restored by anyone who provides the original data (verified against the recorded root hash) and pays back‑rent plus catch‑up fees.
+
+### Storage Quotas
+
+Each actor has a base storage quota of **1 MiB**, extendable up to **8 MiB** via a storage bond. The bond is locked while the quota is in use, returned when reduced, and forfeited if the actor is evicted. Rent applies to the full allocated quota.
+
+## The State Transition Function
+
+The state transition function takes a block and an input state and returns the next state. Let σ be the global state, B a block with transactions T_i, basefees (bf_c, bf_b), and randomness R.
+
+1. **Header/Proposer:** Determined by Simplex; R derives from the parent QC.
+2. **Execute Transactions:** Per‑lane selection, then VRF ordering. For each transaction: validate signature, nonce, and balance; initialize meters; dispatch to target (fanout ≤ 1,024, reentrancy depth ≤ 32); enforce memory (10 MiB), mailbox (≤ 1,000,000 bytes), and storage quotas; deduct fees and burn basefees.
+3. **Deliver Timers:** Inject due timers at height(B).
+4. **Resolve Jobs:** Process commitments, reveals, challenges, and payouts.
+5. **Adjust Basefees:** Update (bf_c, bf_b) based on block utilization.
+6. **Mint Rewards:** Distribute per‑block inflation to validators.
+
+## Normative Conventions
+This document uses **MUST/SHOULD/MAY** as defined in RFC 2119. Parameters marked **governance‑tunable** can be changed by on‑chain governance (see §11).
+
+## 1\. Accounts, Addresses, and Keys
+1.1 **Signatures.**
+
+External accounts MUST use **secp256k1** (ECDSA) with chain‑id separation.
+
+1.2 **Actor address derivation (CREATE2‑style).**
+
+New actor addresses MUST be:
+`addr = last_20_bytes(keccak256(creator || salt || code_hash))` where `code_hash = keccak256(python_source_bytes)`.
+
+`python_source_bytes` MUST be canonicalized as UTF‑8, NFC‑normalized, LF line endings, and no BOM. The canonical bytes are what are hashed and stored.
+
+1.3 **System address space.**
+
+The range 0x0000…0100 is reserved for **system actors and precompiles** (see **§9** for the normative allocation table of low-order system actors).
+
+## 2\. Transaction Types & Encoding
+2.1 **Typed tx (EIP‑1559 style, dual meters).**
+
+A transaction MUST include:
+`chain_id, nonce, to, value, cycles_limit, cells_limit, max_fee_per_cycle, max_fee_per_cell, tip_per_cycle, tip_per_cell, access_list?, payload, signature`.
+
+2.2 **Validity checks.**
+
+Nodes MUST reject a tx if: (a) limits exceed maxima (§12.1), (b) insufficient balance, (c) signature invalid, (d) access list invalid, or (e) payload decoding fails.
+
+2.3 **Fee accounting.**
+
+Let bc, bb be the block basefees for cycles/cells. Fees are:
+`fee = cycles_used * (bc + min(tip_per_cycle, max_fee_per_cycle - bc)) + cells_used * (bb + min(tip_per_cell, max_fee_per_cell - bb))`.
+Unused limits MUST be refunded at the user's `max_fee_*` rates.
+
+2.4 **EBNF (informative).**
+
+`Tx = Header Body Sig`
+`Header = chain_id nonce to value cycles_limit cells_limit max_fee_per_cycle max_fee_per_cell tip_per_cycle tip_per_cell [access_list]`
+`Body = payload`
+`Sig = secp256k1_signature_recoverable`
+
+2.5 **Encoding (normative).**
+
+Transactions MUST be encoded as canonical CBOR (RFC 8949, deterministic encoding) arrays in fixed field order:
+
+`Tx = [chain_id, nonce, to, value, cycles_limit, cells_limit, max_fee_per_cycle, max_fee_per_cell, tip_per_cycle, tip_per_cell, access_list, payload, signature]`
+
+- `to` is a 20‑byte address or `null` for actor creation.
+- `access_list` is either `null` or a list of `[address, storage_keys[]]` pairs.
+- `signature = [y_parity, r, s]` where `y_parity ∈ {0,1}` and `r,s` are 32‑byte big‑endian byte strings.
+- The signing hash MUST be `keccak256(CBOR(Tx_without_signature))`, where `Tx_without_signature` is the same array with the `signature` field set to `null`.
+
+## 3\. Execution Model (Actors)
+3.1 **Runtime & Determinism.**
+
+- Official SDKs: **Python SDK**. The runtime MUST enforce determinism:
+  - **Allowed operations:** Standard Python operations, file I/O limited to `/tmp`; `async/await` is syntax sugar only and does not suspend across blocks.
+  - **Forbidden:** `sys.exit()`, `random` module (except chain VRF), `time.time()/datetime.now()`, `os.environ` access, socket/network operations, subprocess calls, path traversal outside `/tmp`.
+  - **Floating point:** Permitted; Cowboy provides a deterministic math library.
+  - **Scratch space:** `/tmp` MUST be per‑invocation, capped at **256 KiB** (counts toward `cells_used`), wiped post‑handler.
+
+3.2 **Memory & Storage.**
+
+- **Per‑call memory limit:** **10 MiB** heap memory.
+- **Per‑actor persistent storage quota:** **1 MiB** (governance‑tunable) with **state rent** (§4.4).
+- **Quota extensions:** An actor MAY post a **storage bond** up to **8 MiB** total; rent applies to the full allocated quota.
+
+3.3 **Messaging, Reentrancy, Timers.**
+
+- **Delivery:** **Exactly‑once after finality** (before finality: **at‑least‑once**). Each message ID MUST be `keccak256(sender||nonce||msg_hash)` and recorded in a per‑actor dedup set (counts toward actor storage or a separate metered mailbox store). Dedup entries MUST be retained for at least `dedup_window` after finality.
+- **Mailbox:** Capacity **1,000,000 bytes** (or equivalent cell‑metered limit); enqueue beyond the limit MUST revert.
+- **Per‑tx fanout:** A transaction (including all nested sends) MUST NOT enqueue more than **1,024** messages.
+- **Reentrancy:** Allowed within a single block only; there is no synchronous call/return across blocks. **Recursion/await depth cap = 32**.
+- **Timers (chain‑native):** The following timer primitives are provided:
+  - `timer_id = set_timer(height, handler, data)` — Schedule a one-time timer for the specified block height. Returns a unique `timer_id`.
+  - `timer_id = set_interval(every_n_blocks, handler, data)` — Schedule a recurring timer. Returns a unique `timer_id`.
+  - `cancel_timer(timer_id)` — Cancel a pending timer by its ID. Returns the deposit if successful.
+  - Timer delivery is **best‑effort**; execution depends on the timer scheduler (see §5.1 for current rules and CIP-5 §5.3 for the same-block prohibition).
+
+3.4 **Randomness.**
+
+- Validators MUST generate a threshold‑BLS VRF per block:
+  `R_n = VRF_sk_epoch(QC_{n-1})`. Actors MAY call an API which returns `HKDF(R_n, label)`.
+
+3.5 **Partial cost table (informative).**
+
+- Exact metering is consensus‑critical; implementers MUST match the reference cost table.
+
+| Primitive                                  | Cycles |
+| :----------------------------------------- | -----: |
+| Python arithmetic ops                      |      1 |
+| Python function call                       |     10 |
+| Dictionary get/set                         |      3 |
+| List append/access                         |      2 |
+| String operations (per char)               |      1 |
+| host: mailbox send (per msg excl. payload) |     80 |
+| host: timer set/cancel                     |    200 |
+| host: blob commit (per KiB)                |     40 |
+
+**Note:** Cells meter bytes (payload, return data, inline blobs ≤ 64 KiB, /tmp).
+
+## 4\. Fees, Metering, and Basefee Adjustment
+4.1 **Meters.**
+
+- **Cycles:** Deterministic step count over Python operations + host calls.
+- **Cells:** Bytes used by calldata, return data, inline blobs (≤ 64 KiB), and /tmp.
+
+4.2 **Dual EIP‑1559 basefees.** Let `U_c`, `T_c` be cycles usage/target; `U_b`, `T_b` be cells usage/target. With elasticity `E=2` (hard cap `E*T_*`), adjustment uses:
+
+`basefee_{x,i+1} = max(1, basefee_{x,i} * (1 + clamp((U_x - T_x)/(T_x*alpha), -delta, +delta)))`
+
+where `x ∈ {cycle, cell}`, **alpha = 8**, **delta = 0.125**. Nodes MUST **burn 100%** of basefees; tips go to proposers/validators.
+
+4.3 **Targets (genesis defaults).**
+
+- `T_c` (cycles target): **10,000,000 cycles** (cap **20,000,000**).
+- `T_b` (cells target): **500,000 bytes** (cap **1,000,000**).
+
+4.4 **State rent.** Persistent storage incurs **rent** per byte per rent‑epoch, which is governance-tunable. If unpaid for **7 rent‑epochs**, an eviction warning begins; eviction is eligible after **10 rent‑epochs**.
+
+## 5\. Off‑Chain Compute
+5.1 **Model registry.**
+
+`model_id = keccak256(weights||arch||tokenizer||license)` MUST uniquely identify a model revision. Publishing is permissionless with a **refundable 1,000 CBY deposit**. Governance MAY flag/ban models.
+
+5.2 **Runner staking.**
+
+Runners MUST stake `max(10,000 CBY, 1.5 × declared_max_job_value)` in the Runner Registry.
+
+Jobs MAY attach **CIP-9** encrypted volumes (CapToken-authorized mounts, _deferred_) and MAY specify **CIP-10** **Container** execution; the **Container Image Registry** lives at **0x0A** (§9); address **0x09** is assigned to the **Governance** actor. Field-level requirements (e.g. `volume_mounts`, image allowlists) are normative in **CIP-2**, **CIP-9**, and **CIP-10**.
+
+5.3 **Job lifecycle.**
+
+1.  **Post:** Actor posts a job with escrowed price.
+2.  **Assign:** A committee of **M runners** is sampled per CIP‑2 (v1: fixed `M=5, N=3`; v3 once activated: adaptive `M = clip(ceil(2·log₂(N_active) / max(HHI, 0.01)), 3, 9)`, `N = ceil(2M/3)`, recomputed per epoch). LLM jobs MAY use committees or single-runner. Selection is stake‑weighted Fisher‑Yates VRF with weight `w = stake · sqrt(reputation)` (v3); v1 used `floor(log₂(stake/MIN_STAKE+1))+1`. Aggregator is uniformly drawn from committee members with reputation ≥ p50 (v3) — v1's "highest reputation" rule prevented new‑runner bootstrapping and is superseded. Aggregator receives 1.5% of gross job payment from the runner share on successful settlement.
+3.  **Commit:** Runner returns `commit = keccak256(output||salt)`.
+4.  **Reveal:** Runner reveals `{output, salt, proof?}`.
+5.  **Challenge:** A challenge window of **15 min** is opened, requiring a **100 CBY bond**.
+6.  **Resolve:** Proven dishonesty ⇒ stake slashing via challenge mechanism. Operational failures (timeouts, crashes) result in reputation penalties only.
+7.  **Payout:** On finalization, **89%** of job payment to runner(s), **10%** burned, **1%** to Treasury.
+
+5.4 **Determinism & bounds.**
+
+Jobs MUST pin `toolchain_digest` and `seed`. On‑chain return data MUST be ≤ **64 KiB**.
+
+5.5 **TEE option.**
+
+A job MAY set `tee_required=true`. A valid attestation MUST match accepted policies.
+
+## 6\. Consensus, Randomness, and Networking
+6.1 **Consensus.**
+
+**Simplex BFT PoS**; **~1s** target block time; **finality on commit** (~2s). Proposers rotate every block using the VRF beacon (mandatory rotation for MEV resistance). Votes aggregate via **BLS12‑381** with buffered batch verification.
+
+**Message types (normative):** `PROPOSE`, `VOTE`, `NEW_VIEW`.
+
+**Quorum certificate (QC):** `QC = {block_hash, height, round, aggregated_signature, signer_bitmap}` where `aggregated_signature` is BLS12‑381 over the `block_hash || height || round` domain.
+
+**VRF:** Each block header MUST include the proposer’s VRF output and proof for the current height; validators MUST verify it against the epoch seed.
+
+**Finality rule:** A block `B_h` is final when its direct child has a QC (two‑chain commit). Concretely, if `QC(B_{h+1})` exists and `B_h` is the parent of `B_{h+1}`, then `B_h` is finalized. Implementations MAY expose both “commit” and “finalized” states explicitly.
+
+**View change:** On timeout, validators broadcast `NEW_VIEW` containing their highest known QC. The next proposer MUST build on the highest‑QC block.
+
+6.2 **P2P transport.**
+
+Implementations MUST support QUIC over TLS 1.3.
+
+6.3 **Dedicated Lanes.**
+
+Block space is partitioned into **dedicated lanes** with reserved capacity and per‑lane fee multipliers:
+
+| Lane       | Reserved Capacity | Priority | Fee Multiplier | Contents                                |
+| ---------- | ----------------- | -------- | -------------- | --------------------------------------- |
+| **System** | 5%                | Highest  | 1.0×           | Validator updates, governance, slashing |
+| **Timer**  | 20%               | High     | 1.0×           | Scheduled timer executions              |
+| **Runner** | 25%               | High     | 1.0×           | Runner job results, attestations, **CIP-9** anchors     |
+| **User**   | 50%               | Normal   | 1.0×           | User transactions                       |
+
+Lane guarantees:
+
+- Timer and runner lanes prevent user transaction spam from blocking autonomous actor execution
+- Unused capacity in higher-priority lanes cascades to lower-priority lanes
+- Each lane's basefee is `lane_basefee = global_basefee × lane_fee_multiplier`. All four multipliers default to `1.0×` at genesis (no subsidy, no surcharge) and are governance‑tunable via CIP‑12 Tier 0; see CIP‑3 §2.2.3 for the normative parameter spec.
+
+6.4 **Gossip (mempool).**
+
+Public mempool prioritized by effective fee. Within each lane, proposers select transactions by highest effective fee up to lane capacity (ties broken by `tx_hash`), then apply VRF ordering within the selected set. For ordering, `effective_fee` is computed using **intrinsic** costs only:  
+`effective_fee = intrinsic_cycles × min(max_fee_per_cycle, basefee_cycle + tip_per_cycle) + intrinsic_cells × min(max_fee_per_cell, basefee_cell + tip_per_cell)`.  
+Transactions are tagged by lane type. No private builders or encrypted mempool in v1—MEV resistance relies on fast finality and mandatory proposer rotation.
+
+6.5 **MEV Reduction (Limitations Apply).**
+
+Cowboy's MEV mitigation strategy combines multiple mechanisms:
+
+**Mandatory proposer rotation:** Simplex consensus rotates proposers every block via VRF. Unlike stable-leader protocols, no single validator can observe transaction flow across multiple blocks, limiting MEV extraction windows.
+
+**VRF-based transaction ordering:** Within each block, transactions are ordered by:
+
+```
+order_key = VRF(proposer_key, tx_hash, block_height)
+```
+
+This deterministic-but-unpredictable ordering prevents proposers from strategically placing their own transactions.
+
+**Out of scope.** The MEV‑mitigation design above explicitly does *not* prevent: (a) **single‑block proposer inclusion / censorship** — VRF rotation forces the censoring validator out of the proposer slot on the next block, but a single‑block omission is unrecoverable on its own; (b) **private orderflow MEV** — off‑chain bilateral order routing that bypasses the public mempool is unobservable to the protocol; (c) **JIT (just‑in‑time) MEV against predictable actor logic** — actors that publish externally‑observable state transitions (price clearings, reserve prices, oracle pushes) invite JIT extraction at the moment of clearing. Applications that need stronger guarantees against these classes SHOULD layer commit‑reveal patterns, slippage caps, batch auctions, or order‑flow auctions in actor logic. The protocol provides the substrate (1‑second blocks, VRF ordering, lane isolation); application‑level MEV resistance is an SDK / actor concern, not a consensus concern.
+
+**Fast finality:** ~2 second finality (2 Simplex rounds) minimizes the window for:
+
+- Front-running (limited observation time)
+- Sandwich attacks (high risk of failed execution)
+- Time-bandit attacks (chain never reorgs past finality)
+
+**Dedicated lanes:** Reserved capacity for timers and runners ensures autonomous actors execute reliably regardless of user mempool congestion. Attackers cannot spam the user lane to delay victim transactions in other lanes.
+
+**No encrypted mempool:** Commit-reveal schemes add latency and complexity. Given ~1s blocks and ~2s finality, the observation window is already minimal. The combination of VRF ordering + rotation + fast finality provides sufficient MEV resistance without the latency cost of encryption.
+
+## 7\. Data Availability & Blobs
+7.1 **Inline cap.**
+
+Inline blob cap is **64 KiB** per output.
+
+7.2 **External blobs.**
+
+Larger data MUST be **content‑addressed** (e.g., IPFS). The on‑chain commitment MUST be a multihash.
+
+## 8\. Economics, Inflation, and Fees
+8.1 **Ticker & supply.** **CBY**. Genesis supply **1,000,000,000 CBY**.
+
+8.2 **Inflation.**
+A decreasing inflation schedule is used to bootstrap network security. Gross inflation is offset by protocol burn mechanisms (§8.4); net inflation depends on network usage.
+
+| Phase | Years | Gross Inflation | Rationale |
+|-------|-------|-----------------|-----------|
+| Bootstrap | 1–2 | 8% / 6% | Attract validators and runners while fee revenue is immature |
+| Glidepath | 3–4 | 4% / 3% | Reduce dilution as fee revenue and network stability improve |
+| Steady‑state | 5+ | 2% floor | Maintain security budget with low long‑run dilution |
+
+Governance MAY adjust the inflation rate within the following guardrails: (a) hard cap of 10% gross annual inflation, (b) maximum annual change of 2 percentage points, (c) timelock + supermajority for any change. A security‑floor trigger MAY temporarily increase inflation if the staked ratio falls below a governance‑defined threshold; the increase auto‑expires when the threshold is recovered.
+
+8.3 **Distribution at genesis.**
+
+Genesis supply is split into a **Company Reserve** and a **Network Distribution** pool.
+
+**Company Reserve (66.67% — 666,700,000 CBY).** Tokens held by or on behalf of the company, satisfying all outstanding token warrant obligations. Sub‑buckets:
+
+| Bucket | % of Total | CBY | Vesting |
+|--------|-----------|-----|---------|
+| Team & Core Contributors | 20.00% | 200,000,000 | 1‑year cliff, 4‑year linear monthly |
+| Investors (Warrants / Token Rights) | 20.00% | 200,000,000 | 10% at TGE, 6‑month cliff, 24‑month linear |
+| Advisors | 3.33% | 33,300,000 | 6‑month cliff, 24‑month linear, milestone gates |
+| Treasury / Governance | 13.34% | 133,400,000 | 5% seed liquidity at TGE, remainder governance‑voted |
+| Foundation / Ops Reserve | 10.00% | 100,000,000 | 5% at TGE, quarterly board‑approved releases over 36 months |
+
+**Network Distribution (33.33% — 333,300,000 CBY).** Tokens distributed to network participants via protocol emission. These sit outside the Company Reserve.
+
+| Bucket | % of Total | CBY | Emission Model |
+|--------|-----------|-----|----------------|
+| Validator Rewards | 18.00% | 180,000,000 | Decreasing emission over 60 months |
+| Runner Compute Incentives | 8.00% | 80,000,000 | Usage‑based; paid per runner‑hour |
+| Developer Grants | 3.00% | 30,000,000 | Milestone‑based, grant committee |
+| Liquidity Mining / DEX | 2.33% | 23,300,000 | Front‑loaded over 12 months |
+| Community / Airdrops | 2.00% | 20,000,000 | 2 drops (TGE + 6 months) |
+
+8.4 **Fee sinks & splits.**
+
+| Source | Split | Destination |
+|--------|-------|-------------|
+| Cycle & Cell basefees | 100% | Burned |
+| Cycle & Cell tips | 100% | Proposer / validators |
+| Runner job payments | 89% | Runner(s)¹ |
+| Runner job payments | 10% | Burned |
+| Runner job payments | 1% | Treasury |
+| Slashed stake | 100% | Burned² |
+
+¹ The aggregator (per CIP‑2 v3 §4) receives `aggregator_bonus_bps = 150` (= 1.5% of gross) of this 89% on successful settlement. The bonus is **carved out of the runner share**, not from the burn or treasury shares — so this row remains the literal 89% to runner‑side recipients.
+
+² Distribution governance lives in `SlashDistribution { burn_bps, submitter_bps, treasury_bps }` per CIP‑2 v3 §6 and (forthcoming) CIP‑30 §"Distribution". Genesis defaults `(10000, 0, 0)` preserve this row's 100%‑burn commitment (C7); any non‑zero `submitter_bps` or `treasury_bps` requires a Tier‑3 governance proposal that amends C7 in lockstep with this row.
+
+The runner fee burn is the primary deflationary mechanism beyond basefee burns. As network usage grows, the burn rate increases proportionally, creating a reflexive supply‑reduction loop that offsets inflation (see §8.2). Governance MAY adjust the runner fee burn percentage via standard proposal + timelock.
+
+## 9\. System Actors & Precompiles
+
+| Address | Name | Function |
+|---------|------|----------|
+| **0x01** | Runner Registry | Runner registration, staking, capabilities, health, reputation (CIP-2) |
+| **0x02** | Job Dispatcher | Job submission, VRF selection, lifecycle management (CIP-2) |
+| **0x03** | Result Verifier | Commit-reveal aggregation, verification, callback dispatch (CIP-2) |
+| **0x04** | Secrets Manager | Encrypted secret storage, TEE-gated release (CIP-2) |
+| **0x05** | TEE Verifier | Remote attestation and trusted measurement verification (CIP-2) |
+| **0x06** | DualBasefee | Protocol dual-metered basefee state storage (CIP-3); **not** used for off-chain runner operations |
+| **0x07** | Entitlement Registry | Runner Pool access control, general RBAC (CIP-2 §7) |
+| **0x08** | Treasury | Protocol fee collection and distribution; receives the 1% runner settlement fee and other protocol-directed payments |
+| **0x09** | Governance | On-chain protocol parameter governance; stores `SettlementConfig` (runner/burn/treasury split ratios) and future governable parameters |
+| **0x0A** | Container Image Registry | On-chain allowlist of authorized OCI image hashes; execution policy (CIP-10; CIP-2) |
+
+> **Note (normative):** Runner / off-chain compute subsystem addresses **0x01–0x05** and **0x07** follow **CIP-2** together with **CIP-10**. **0x06** is fee-mechanism state only (CIP-3). **0x08** is the protocol Treasury. **0x09** is the on-chain Governance actor for settable protocol parameters. **0x0A** is the Container Image Registry (CIP-10). Additional system actors for general protocol infrastructure **MAY** be assigned from **0x0B** upward as formalized. **If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**
+
+## 10\. Developer Experience (DX)
+- **SDKs:** A primary Python SDK (`cowboy-py`) is provided.
+- **Local dev:** A suite of tools including a single-node devnet (`cowboyd`), runner simulator, faucet, and explorer will be available.
+- **Best practices:** Reentrancy guards, capability-scoped handles, and idempotent message handling are encouraged via the SDK.
+
+## 11\. Governance & Upgrades
+- **Model:** Token‑weighted on‑chain governance from genesis (bicameral: staked CBY + validator one‑vote per CIP‑12). A permanent **Security Council 7‑of‑9** holds narrow emergency authority (cancel queued proposals during timelock, fast‑track Tier‑3 upgrades, circuit‑break a system actor with mandatory retroactive ratification). See CIP‑12 for tier values, quorums, deposits, voting windows, and Council scope.
+- **Timelocks:** Standard actions **7 days**; emergency fast‑track **6 hours**.
+- **Upgrades:** **Hot‑code upgrades** coordinated by governance.
+
+## 12\. Security Considerations
+12.1 **DoS limits (consensus‑enforced; governance‑tunable).**
+
+- `max_tx_size` = 128 KiB
+- `max_message_depth_per_tx` = 32
+- `per_actor_per_block_cycles` = 1,000,000 (burstable)
+
+12.2 **Runner safety.**
+
+Slashing for proven dishonesty (fabricated results, wrong model). Operational failures result in reputation penalties only. Committees mitigate single‑runner faults. **CIP-9** manifest anchoring (deferred) and **CIP-10** image allowlists reduce supply-chain and cross-runner integrity risk; default container network isolation preserves verifiability for N-of-M modes (**CIP-10**).
+
+12.3 **Reentrancy.**
+
+Allowed but depth‑capped; stdlib provides reentrancy guards.
+
+12.4 **Randomness bias.**
+
+Threshold‑BLS VRF with epoch keys; actors derive sub‑randomness via HKDF.
+
+12.5 **State rent & eviction.**
+
+Prevents state bloat; eviction windows protect liveness.
+
+## 13\. Parameters (Genesis Defaults)
+**Execution:**
+
+`memory_per_call` = 10 MiB; `storage_quota_per_actor` = 1 MiB; `reentrancy_depth` = 32; `fanout_per_tx` = 1024; `mailbox_capacity_bytes` = 1,000,000; `dedup_window` = 10,000 blocks.
+
+**Fees:**
+
+`T_c` = 10,000,000 cycles; `T_b` = 500,000 bytes; `alpha` = 8; `delta` = 0.125.
+
+**Consensus:**
+
+`minimum_validator_stake` = governance-tunable; `epoch` = 3600 blocks (~1 h); `block_time` = 1 s; `finality` = ~2 s; `unbonding_period` = 7 days; `jail_period` = 24 h; `double_sign_slash` = 1%; `consensus_protocol` = Simplex BFT.
+
+**Dedicated Lanes:**
+
+`system_lane_capacity` = 5%; `timer_lane_capacity` = 20%; `runner_lane_capacity` = 25%; `user_lane_capacity` = 50%.
+
+`lane_fee_multiplier_system` = 1.0; `lane_fee_multiplier_timer` = 1.0; `lane_fee_multiplier_runner` = 1.0; `lane_fee_multiplier_user` = 1.0. (All Tier‑0 tunable per CIP‑12; canonical spec in CIP‑3 §2.2.3.)
+
+**Off‑chain:**
+
+`committee M`, `threshold N` = **adaptive** per CIP‑2 v3 §1: `M = clip(ceil(2 · log₂(N_active) / max(HHI, 0.01)), 3, 9)`, `N = ceil(2M/3)`; recomputed per 3,600‑block epoch with EMA smoothing of HHI. CIP‑2 v1 fixed values `M = 5, N = 3` remain the static fallback until CIP‑2 v3 activates. `challenge_window` = 15 min; `challenge_bond` = 100 CBY; `runner_stake_floor` = 10,000 CBY (CBY‑denominated; Decision Register #4 HOLD on CBY‑denominated, no oracle dependency at v1); `dispute_window_blocks` = 75. `reputation_half_life_blocks` = 1,209,600 (~14 days at 1s blocks; CIP‑2 v3 §3); `aggregator_eligibility_percentile` = 50 (p50 reputation; CIP‑2 v3 §4); `aggregator_bonus_bps` = 150 (1.5% of gross, paid from runner share; CIP‑2 v3 §4); `non_reveal_slash_bps` = 2500 (25% of effective stake on proven non‑reveal; CIP‑2 v3 §5–§6); `slash_distribution.{burn_bps, submitter_bps, treasury_bps}` = `(10000, 0, 0)` (HOLD per §8.4 C7; Tier‑3 to amend; CIP‑2 v3 §6).
+
+**State Rent:** (canonical spec: CIP‑4 §12)
+
+`target_state_size` = governance-tunable; `grace_period` = 7 rent‑epochs; `warning_period` = 3 rent‑epochs; `catch_up_fee` = 10% (Tier‑0 tunable as `rent_catchup_bps = 1000`); `reserve_multiplier` = 0.1; `rent_rate` = 0.001 CBY/byte/year (Tier‑0); `rent_epoch_length` = 86,400 blocks (~1 day at 1s blocks per WP §6.1); `eviction_threshold_epochs` = 10; `grace_threshold` = 10,240 bytes (10 KB).
+
+**Economics:**
+
+`supply` = 1,000,000,000; `company_reserve` = 66.67%; inflation follows the schedule in §8.2; `basefee burn` = 100%; `runner_fee_burn` = 10%; `job_fee_to_treasury` = 1%; `runner_payout` = 89%.
+
+## 14\. Differences vs. Ethereum
+- **Execution:** Python actors vs. EVM contracts.
+- **Fees:** Dual meters (cycles/cells) vs. single gas scalar.
+- **Timers:** Native timers vs. external keepers.
+- **Off‑chain compute:** Native verifiable Runner market (**CIP-9** encrypted volumes (deferred), **CIP-10** container jobs) vs. external oracles only.
+- **State:** Rent with eviction vs. indefinite storage.
+
+## 15\. Entitlements
+A declarative, composable permissions system governs the capabilities of actors and runners. Entitlements control access to resources like networking, storage, and execution parameters, enforcing least-privilege by default. The system is enforced at deployment time, by the scheduler, and at the VM syscall gate.
+
+15.1 **Goals**
+
+- Least privilege by default.
+- Deterministic enforcement.
+- Declarative & composable.
+- Auditable on-chain.
+
+15.2 **Objects & lifecycle**
+
+- **Actor Entitlements:** Permissions the actor requires.
+- **Runner Entitlements:** Capabilities the runner provides.
+
+15.3 **Rules**
+
+1.  MUST: Actors `require` entitlements; runners `provide` them.
+2.  MUST: Scheduler matches only if `requires ⊆ provides`.
+3.  MUST: Syscalls fail if the corresponding entitlement is missing.
+4.  MUST: Child actors only inherit entitlements marked `inheritable:true`.
+
+(For a full list of entitlements, see the
+[Entitlements Specification](https://docs.cowboy.lat/architecture/entitlements/entitlements).)
+
+## 16\. Ethereum Interoperability
+Cowboy's interoperability with Ethereum is a primary design goal, enabling seamless asset transfer and cross-chain communication. This is achieved through a combination of shared cryptographic primitives, a canonical bridge, and event subscription mechanisms.
+
+### 16.1. Account Unification
+- Cowboy external accounts (EOAs) MUST use the same `secp256k1` elliptic curve for signatures as Ethereum. This allows a single private key to control accounts on both networks, simplifying key management for users and agents.
+- An actor, through a host call, MAY verify an EIP-712 signed data structure against a given Ethereum address, enabling actors to validate off-chain authorizations from Ethereum users.
+
+### 16.2. Bridge Infrastructure
+Cowboy relies on third‑party bridge infrastructure for asset transfers and cross‑chain message passing between Cowboy and Ethereum.
+
+**Requirements:**
+
+- The bridge MUST support the locking of native ETH and ERC-20 tokens on Ethereum to mint a corresponding wrapped representation on Cowboy (`wETH`, `wERC-20`), and the reverse burn‑to‑unlock flow.
+- The bridge MUST support generic message passing: a transaction on one chain triggering a message call to a designated recipient on the other.
+- Bridge selection and integration are determined by governance. The protocol does not implement its own bridge validator set.
+
+### 16.3. Event Subscription (Ethereum to Cowboy)
+- Cowboy actors MAY subscribe to event logs emitted by specific contracts on the Ethereum blockchain.
+- A system actor on Cowboy, `EventListener` (CIP-7, deferred; address TBD — **0x08** is currently assigned to Treasury), SHALL manage these subscriptions when implemented. This actor relies on the bridge validator set to act as a decentralized oracle, monitoring the Ethereum chain for specified events.
+- When a subscribed event is confirmed (i.e., finalized on Ethereum), the `EventListener` actor MUST enqueue a message to the subscribing Cowboy actor, delivering the event's topic and data as the message payload.
+- The cost of this subscription service SHALL be paid by the actor in CBY, covering the gas fees incurred by the oracle validators on Ethereum.
+
+### 16.4. Policy and Security
+- All interoperability functions available to an actor, such as `bridge_asset` or `subscribe_event`, MUST be governed by the Entitlements system (§15).
+- An actor's deployment manifest MUST declare the specific Ethereum contracts it is permitted to interact with and the types of assets it is allowed to bridge, enforcing the principle of least privilege.
+
+---
+
+## 17\. Fee Model Specification
+This section is authoritative; any conflicting values elsewhere are non‑normative.
+
+### 17.1. Overview
+Cowboy uses a **dual-metered fee system**:
+
+| Meter | Unit | Purpose |
+|-------|------|---------|
+| **Cycles** | Compute units | CPU time, opcode execution, actor API calls |
+| **Cells** | Data units (bytes) | Storage writes, calldata, bandwidth |
+
+Both meters use independent EIP-1559-style basefee adjustment. Fees are paid in CBY.
+
+**Three cost domains:**
+1. **On-chain execution** — Cycles consumed by transaction processing
+2. **On-chain storage** — Cells consumed by state writes + ongoing state rent
+3. **Off-chain services** — Direct CBY payments to Runners (LLM, HTTP, MCP, containers, etc.) and Providers (blob storage per **CIP-7**)
+
+### 17.2. Transaction Intrinsic Costs
+Every transaction pays a base cost before execution begins:
+
+| Transaction Type | Base Cycles | Base Cells | Notes |
+|-----------------|-------------|------------|-------|
+| Transfer | 21,000 | 0 | EOA-to-EOA value transfer |
+| Deploy | 100,000 | `code_size` | Actor deployment |
+| ActorMessage | 21,000 | `calldata_size` | Method invocation |
+| LlmRequest | 10,000 | `prompt_size` | Off-chain inference request |
+| TimerSchedule | 5,000 | 64 | Schedule future execution |
+
+> **Note:** Intrinsic costs for other runner-related txs (e.g. **JobSubmit** payloads for HTTP, MCP, **Container**, **VolumeAnchorManifest**) are **normative in CIP-2 / CIP-3**; extend this table as those specs enumerate types.
+
+### 17.3. Execution Costs (Cycles)
+#### Opcode Costs
+
+Python opcode costs are implementation-defined and not protocol-specified. The runtime MUST ensure deterministic cycle consumption across all validators.
+
+#### Actor API Costs
+
+> **Note**: The authoritative gas cost values for all host operations are defined in CIP-3. The values shown here must match CIP-3; in case of conflict, CIP-3 is normative.
+
+| Operation | Base Cost | Variable Cost | Reference |
+|-----------|-----------|---------------|-----------|
+| `send_message()` | 80 cycles | — | (See CIP-3 §2) |
+| `storage_read()` | 10 cycles | — | (See CIP-3 §2) |
+| `storage_write()` | 50 cycles | — | (See CIP-3 §2) |
+| `hash()` | 100 cycles | +1 cycle/byte hashed | |
+| `verify_signature()` | 3,000 cycles | — | |
+| `get_block_info()` | 100 cycles | — | |
+| `emit_event()` | 500 cycles | +5 cycles/byte | |
+
+#### Platform Token Costs (CIP-20)
+
+| Operation | Cycles | Cells |
+|-----------|--------|-------|
+| `token_transfer()` | 1,000 | 64 |
+| `token_transfer_from()` | 1,500 | 96 |
+| `token_approve()` | 500 | 32 |
+| `token_balance_of()` | 100 | 0 |
+| `token_mint()` | 1,000 | 64 |
+| `token_burn()` | 500 | 64 |
+| `token_create()` | 10,000 | 256 + name + symbol |
+
+Validation hooks add up to 50,000 cycles per transfer (capped).
+
+### 17.4. On-Chain Storage Costs (Cells)
+| Operation | Cell Cost |
+|-----------|-----------|
+| State write | 1 cell/byte written |
+| State read | 0.01 cells/byte (bandwidth metering) |
+| Calldata | 1 cell/byte of transaction data |
+| Event emission | 0.5 cells/byte of event data |
+
+### 17.5. State Rent
+Accounts exceeding the grace threshold pay ongoing rent. The **canonical normative spec** lives in **CIP-4 §12**; this WP section provides the operational summary plus the governance monitoring cadence (Decision Register #4: HOLD on CBY-denominated).
+
+```
+rent_per_rent_epoch = max(0, account_size - grace_threshold) × rent_rate
+
+Parameters (canonical in CIP-4 §12.5):
+  grace_threshold           = 10,240 bytes (10 KB)
+  rent_rate                 = 0.001 CBY/byte/year (Tier-0 tunable)
+  rent_epoch_length         = 86,400 blocks (~1 day at 1s blocks)
+  eviction_threshold_epochs = 10
+  rent_catchup_bps          = 1,000 (= 10% catch-up penalty)
+```
+
+**Grace period behavior:**
+- Accounts ≤10 KB: No rent charged
+- Accounts >10 KB: Rent charged on excess bytes only
+- Unpaid rent accumulates as debt against the account (rate-stamped to the epoch the debt was incurred; rate hikes apply prospectively only — see CIP-4 §12.2)
+- Eviction after 10 rent-epochs of accumulated debt (state archived; recoverable on debt repayment plus 10% catch-up fee — see CIP-4 §12.3)
+
+**CBY-denominated rent — governance monitoring (Decision Register #4 HOLD).** v1 keeps rent CBY-denominated to avoid introducing a consensus-layer CBY/USD oracle dependency. The Foundation publishes monthly the implied USD value of the rent at prevailing CBY/USD spot; target band `[$1, $10] / MiB / year`. If the implied USD value drifts outside the band for two consecutive monthly reviews, a Tier-0 governance proposal MUST be filed to adjust `rent_rate`. Re-pegging to USD via oracle is deferred to a future CIP (precondition: a battle-tested CBY/USD oracle module).
+
+### 17.6. Off-Chain Blob Storage (CIP-7)
+Large data (images, datasets, AI inference traces) uses Retention Contracts:
+
+| Cost Component | How Charged |
+|----------------|-------------|
+| BlobRef storage | ~64 bytes on-chain → Cell cost + state rent |
+| Provider payments | Direct CBY to Provider via escrow (market rate) |
+
+Blob storage is **not cell-metered**. Provider payments are direct CBY transfers negotiated off-chain. See CIP-7 for full specification of:
+- Retention policies and SLAs
+- Provider staking and availability commitments
+- Watchtower auditing and challenge mechanism
+- Payment schedules and slashing conditions
+
+(CBFS Relay Node economics — per-byte-per-epoch storage rate, the 10 / 2 / 88 burn / challenge-pool / Relay revenue split, the Relay challenge bond, and the slashing schedule — are specified in **CIP-9 §10.4 / §14** and **CIP-31**. CIP-7 retention contracts and CIP-9 / CIP-31 CBFS storage are distinct facilities; see each CIP for scope boundaries.)
+
+### 17.7. Off-Chain Compute (Runner Marketplace)
+Off-chain job execution (LLM, HTTP, MCP, Custom, **Container** per **CIP-2** / **CIP-10**) is **not gas-metered** on the cycle/cell meters. Runners operate in a competitive marketplace:
+
+| Aspect | Specification |
+|--------|---------------|
+| Pricing | Runners publish **rate cards** (e.g. CBY per token, per HTTP request, per compute second; **CIP-9** storage/volume capability and **CIP-10** container limits declared in registry metadata per **CIP-2**) |
+| Selection | Actors specify `max_price` (and optional tip) in **JobSpec**; dispatcher matches eligible runners (VRF sortition per **CIP-2**) |
+| Settlement | On verified delivery: 89% to runner, 10% burned, 1% to Treasury |
+| Collateral | `runner_stake >= max(10,000 CBY, 1.5 × declared_max_job_value)` |
+| Verification | Modes per **CIP-2** (N-of-M, TEE, etc.); attestation and challenges as specified there |
+
+The protocol does **not** mandate unit prices for LLM or other job types—terms are market-driven. **CIP-9** volume fees and **CIP-10** container policies are specified in those CIPs and runner registry fields.
+
+### 17.8. Fee Adjustment (EIP-1559 Style)
+Both Cycles and Cells use independent basefee adjustment:
+
+```
+basefee_{x,i+1} = max(MIN_BASEFEE, basefee_{x,i} × (1 + clamp((U_x - T_x) / (T_x × α), -δ, +δ)))
+```
+
+Where:
+- `α = 8` (BASEFEE_ALPHA — smoothing factor)
+- `δ = 0.125` (12.5% maximum change per block)
+- `MIN_BASEFEE = 1` (floor to prevent zero basefee)
+- `clamp(v, -δ, +δ)` caps the adjustment to ±12.5%
+
+This formula is consistent with §4.2 and the reference implementation.
+
+**Cycle parameters:**
+| Parameter | Value |
+|-----------|-------|
+| Target | 10,000,000 cycles/block |
+| Cap | 20,000,000 cycles/block |
+| δ (delta) | 0.125 (12.5% max change) |
+| α (smoothing) | 8 blocks |
+
+**Cell parameters:**
+| Parameter | Value |
+|-----------|-------|
+| Target | 500,000 bytes/block |
+| Cap | 1,000,000 bytes/block |
+| δ (delta) | 0.125 (12.5% max change) |
+| α (smoothing) | 8 blocks |
+
+**Basefee burning:** 100% of basefee revenue is burned, creating deflationary pressure proportional to network usage.
+
+### 17.9. Reserved Capacity (Execution Lanes)
+Block space is partitioned to guarantee execution for critical transaction types:
+
+| Lane | Cycle Budget | Percentage | Fee Multiplier | Purpose |
+|------|--------------|------------|----------------|---------|
+| Timer | 2,000,000 | 20% | 1.0× | Scheduled actor execution |
+| Runner | 2,500,000 | 25% | 1.0× | Runner job results, attestations, callbacks (incl. **CIP-9** manifest anchors per **CIP-2**) |
+| System | 500,000 | 5% | 1.0× | Governance, upgrades |
+| User | 5,000,000 | 50% | 1.0× | Regular transactions |
+
+**Lane behavior:**
+- Unused capacity in reserved lanes spills to User lane
+- User lane cannot borrow from reserved lanes
+- Timer lane has highest priority within its reserved capacity; execution is still subject to GBA bidding and per‑block limits
+- Per‑lane `Fee Multiplier` scales the lane's effective basefee (`lane_basefee = global_basefee × lane_fee_multiplier`); all four lanes default to `1.0×` (no subsidy, no surcharge). Tier‑0 governance‑tunable per CIP‑3 §2.2.3.
+
+### 17.10. Fee Estimation
+Wallets and applications SHOULD estimate fees as:
+
+```python
+def estimate_fee(tx):
+    intrinsic_cycles = INTRINSIC_COSTS[tx.type]
+    intrinsic_cells = len(tx.calldata)
+
+    # Estimate execution cost (via simulation or heuristics)
+    execution_cycles = simulate_execution(tx)
+    execution_cells = estimate_storage_writes(tx)
+
+    total_cycles = intrinsic_cycles + execution_cycles
+    total_cells = intrinsic_cells + execution_cells
+
+    # Apply current basefees
+    cycle_fee = total_cycles * cycle_basefee
+    cell_fee = total_cells * cell_basefee
+
+    # Add priority tip
+    priority_fee = (total_cycles * tip_per_cycle) + (total_cells * tip_per_cell)
+
+    return cycle_fee + cell_fee + priority_fee
+```
+
+---
+
+## Appendix A. Transaction Encoding Test Vectors (Informative)
+These vectors specify **canonical CBOR** encodings. Hex is lowercase, no `0x` prefix.
+
+**Vector 1: Unsigned transfer (signature = null)**
+
+Fields:
+
+- `chain_id=1`
+- `nonce=0`
+- `to=0x1111111111111111111111111111111111111111`
+- `value=1`
+- `cycles_limit=21000`
+- `cells_limit=0`
+- `max_fee_per_cycle=10`
+- `max_fee_per_cell=2`
+- `tip_per_cycle=1`
+- `tip_per_cell=0`
+- `access_list=null`
+- `payload=0x` (empty bytes)
+- `signature=null`
+
+CBOR hex:
+
+```
+8d010054111111111111111111111111111111111111111101195208000a020100f640f6
+```
+
+The signing hash is `keccak256(CBOR(Tx_without_signature))` where the `signature` field is `null` (as above).
+
+**Vector 2: Signed transfer**
+
+Same fields as Vector 1, with:
+
+- `signature=[y_parity=0, r=0x01*32, s=0x02*32]`
+
+CBOR hex:
+
+```
+8d010054111111111111111111111111111111111111111101195208000a020100f64083005820010101010101010101010101010101010101010101010101010101010101010158200202020202020202020202020202020202020202020202020202020202020202
+```
+
+_End of specification._
+
+---
+
+## Part II — v2 Proposed Deltas (forward-looking; verbatim from former `wp-aligned-deltas.md`)
+
+# Whitepaper Aligned Deltas — CIP-14 / CIP-15 / CIP-16 alignment exercise
+
+**Status:** Proposal (non-modifying companion to `refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised.md`)
+**Created:** 2026-04-21
+**Scope:** Five proposed additions to a future WP revision, surfaced by the `cip-14-dns-addressable-actors-v2.md` (Part II) / `cip-15-public-asset-hosting-v2.md` (Part II) / `cip-16-custom-domains-v2.md` (Part II) drafting exercise.
+
+This document does not modify the WP. It is a structured proposal for content additions when the WP is next revised.
+
+---
+
+## 0. Why deltas, not a full aligned WP
+
+The Cowboy technical WP (`2026-03-21_cowboy-technical-whitepaper-revised.md`, 1064 lines) is a stable architectural document. Producing a full "aligned WP" would mostly duplicate untouched material and add little.
+
+Instead, this document captures only the additions the alignment exercise surfaced. Each delta is framed as a proposed insertion into a specific WP section, with rationale grounded in the aligned drafts and the codebase positions they reference.
+
+When the WP is next revised, these deltas can be merged in directly. The five deltas correspond one-to-one with the open WP-level questions in Part III of this document §9.
+
+---
+
+## Delta 1 — Stake vs. operating balance separation
+
+### Proposed insertion: §17.x (Runner Marketplace)
+
+WP §17 discusses runner stake, slashing, and rate cards. It implicitly conflates stake with the runner's spendable balance. CIP-14-aligned makes the separation explicit for Gateways; the WP should generalize.
+
+#### Proposed text
+
+> **§17.x — Service-providing nodes: stake vs. operating balance**
+>
+> Every service-providing node (Runner per CIP-2, Gateway per CIP-14, Relay Node per CIP-9) maintains two distinct balance categories:
+>
+> - **Stake**: locked CBY held in the relevant registry — `RUNNER_REGISTRY=0x01` (CIP-2), `GATEWAY_REGISTRY=0x0E` (CIP-14), `RELAY_REGISTRY=0x0B` (CIP-9). Slashable per the registry's failure rules. Withdrawable only after an unstaking delay.
+> - **Operating balance**: spendable CBY held in the node's operating account. Pays gas for transactions the node submits — result submission, ingress dispatch, storage commitments, heartbeats. Refilled from earned fees and protocol rewards.
+>
+> These categories MUST NOT be conflated in protocol logic:
+>
+> - Gas-payment debits MUST come from operating balance only. A node whose operating balance is empty cannot transact regardless of stake size.
+> - Slashing MUST debit stake only. A node whose stake covers an operating shortfall is undercollateralized — its `is_active` predicate MUST return false until the shortfall is resolved.
+> - Stake is typically locked in the registry actor's state, not in a freely-spendable account; transferring out for fee payment is not a supported path.
+
+### Rationale
+
+CIP-14-aligned §6.3 invoked this separation explicitly when correcting the original CIP-14's "Gateway pays from stake" claim. The same constraint applies to runners (`RUNNER_REGISTRY` already enforces it) and relays (`RELAY_REGISTRY` already enforces it). Surfacing it at WP-level prevents future CIPs from making the same conflation.
+
+---
+
+## Delta 2 — Read-only handler execution as protocol primitive
+
+### Proposed insertion: §6.x (PVM Execution)
+
+WP §6 describes per-actor handler invocation under transaction execution. It does not establish that the same PVM contract supports a read-only invocation mode without a transaction.
+
+#### Proposed text
+
+> **§6.x — Read-only handler execution**
+>
+> The PVM defines two execution modes for actor handlers:
+>
+> - **Transactional**: invoked via `ActorMessage`; executes against speculative state; emits side effects (state writes, messages, events, jobs); consumes Cycles + Cells charged to the transaction's fee payer.
+> - **Read-only**: invoked via the `read_handler` RPC (CIP-14-aligned §5); executes against committed state; all mutating syscalls trap with `ERR_READONLY_VIOLATION`; consumes Cycles only (caller-absorbed); returns the handler's serialized response.
+>
+> The trap list is normative. Permitted syscalls in read-only mode: `state_get`, `state_scan_prefix`, plus ambient context (`block_height`, `block_timestamp`, `self_address`). `caller` returns the zero address; `ctx.sender` returns null. **All other syscalls trap immediately.** This includes `randomness` and `emit_event` — both are protocol-observable side effects that have no meaning outside transaction context.
+>
+> Read-only execution MUST be deterministic across nodes against the same committed state root: two nodes serving the same `read_handler` request at the same `block_height` MUST return byte-identical responses. This determinism property is what permits Gateways (CIP-14) and other future read-relay roles to serve responses without re-executing through consensus.
+
+### Rationale
+
+CIP-14-aligned depends on read-only PVM execution as a protocol-level safety property, not an RPC-layer convenience. Browsers calling `GET myagent.cowboy.network/api/profile` cross multiple Gateways; without protocol-defined determinism, those Gateways can return inconsistent results for the same height. This belongs in the WP execution chapter, alongside the transactional mode's spec.
+
+The original CIP-14 §11.3 omitted `randomness` from the trapped list — `randomness` is exposed at `pvm_host.rs:1372` and would have allowed read-path divergence. The aligned trap list closes this and the WP should reflect it.
+
+---
+
+## Delta 3 — Deferred result storage primitive
+
+### Proposed insertion: §9.x (System Actors)
+
+WP §9 lists Runner Registry, Job Dispatcher, Result Verifier, etc. The WP does not surface the "deferred result storage" pattern as a recurring primitive that future system actors will inherit.
+
+#### Proposed text
+
+> **§9.x — Deferred result storage**
+>
+> System actors that mediate third-party calls — `GATEWAY_REGISTRY=0x0E` for HTTP ingress (CIP-14), and future system actors for cross-chain bridges, oracle dispatch, sealed bid auctions — generate responses asynchronously. Result storage SHOULD follow a common pattern:
+>
+> - A dedicated registry actor (e.g., `RECEIPT_REGISTRY=0x0F` for HTTP) owns the result records. Keyed by `request_id`; records carry `target`, `status`, `payload` (when complete), `created_at`, `expires_at`.
+> - A single registry-wide pruning loop expires records via TTL. **Per-target timer budgets are NOT consumed.** This avoids the failure mode where a popular `target` exhausts its `MAX_TIMERS_PER_ACTOR=1024` budget within ~1k pending requests.
+> - Reads go through the standard `read_handler` RPC against the registry actor — no special "result polling" RPC needed.
+>
+> Privacy-sensitive results MAY restrict reads to the original mediating gateway (e.g., the dispatching `Gateway` for HTTP receipts).
+
+### Rationale
+
+CIP-14-aligned §8 introduced this as a one-off for HTTP receipts. The constraint generalizes: any future system actor mediating fan-in / fan-out from external sources will hit the same `MAX_TIMERS_PER_ACTOR` ceiling if it pushes receipt management onto target actors. Documenting the pattern at WP level makes "use a registry" the obvious default for new mediating system actors.
+
+---
+
+## Delta 4 — System-mediated message authenticity (revised; selector reservation withdrawn)
+
+> **Note.** An earlier WP-v2 draft of this delta proposed adding a "system-reserved selectors" mechanism (the PVM router would reject non-system senders for reserved selectors like `"http.request"`). That proposal was withdrawn in CIP-14 v2 §6.2 because it broke router-actor forwarding patterns. The revised delta below describes the actually-canonical approach: handler-side `ctx.sender` checks against the canonical sender table.
+
+### Proposed insertion: §6.y (PVM Execution)
+
+WP §6 describes message routing but does not establish that selectors can be system-reserved at the routing layer.
+
+#### Proposed text
+
+> **§6.y — System-reserved selectors**
+>
+> The PVM message router supports **selector reservation**: a method name (e.g., `"http.request"`) is reserved at the protocol layer such that only specified system actors may emit messages with that selector. Non-system attempts to send a reserved selector are rejected at routing time with `ERR_RESERVED_SELECTOR`.
+>
+> When an actor receives a message with a reserved selector, the message necessarily originated from a permitted system actor — verifiable by the receiver via `ctx.sender`. This makes the receiver-side identity check a protocol invariant rather than an SDK convention.
+>
+> Reserved selectors and their permitted senders form a registry analogous to the entitlement registry — append-only, governance-managed, normative.
+>
+> Initial reservations:
+>
+> - `"http.request"` — permitted senders: `GATEWAY_REGISTRY=0x0E` (CIP-14-aligned §6.2). Used for system-mediated HTTP command-path dispatch.
+> - `"_dns.callback"` — permitted senders: `RESULT_VERIFIER=0x03` (CIP-16-aligned §5.6). Used for system-mediated external-domain verification callbacks.
+>
+> Reserving a selector is a protocol-level action. New reservations require governance approval and are added to the canonical reservation registry (analogous to adding entries to the entitlement registry).
+
+### Rationale
+
+CIP-14-aligned §6.2 and CIP-16-aligned §5.6 both depend on this pattern. Without it, ingress authenticity and verifier callback authenticity rely on SDK-side `ctx.sender` checks that custom-bytecode actors can ignore. Lifting selector reservation to a normative WP construct removes the SDK-vs-protocol gap and gives future system actors a canonical mechanism for trusted callbacks.
+
+---
+
+## Delta 5 — Owner-mutable per-actor configuration at STORAGE_MANAGER
+
+### Proposed insertion: §9.y (System Actors)
+
+WP §9 covers `STORAGE_MANAGER`'s role as the owner of `StorageCommitment` records. CIP-15-aligned uses `STORAGE_MANAGER` as the home for additional actor-owned configuration (route manifest, CORS config) that updates atomically with deploys. This pattern generalizes.
+
+#### Proposed text
+
+> **§9.y — Owner-mutable per-actor configuration at STORAGE_MANAGER**
+>
+> `STORAGE_MANAGER=0x0A` hosts per-actor configuration records that the actor's owner mutates by transaction. These records are NOT actor KV — they live in a separate keyspace under `STORAGE_MANAGER`, addressable by `(actor_address, config_kind)`.
+>
+> Initial config kinds:
+>
+> - `route_manifest` (CIP-15-aligned §4.1) — HTTP path → static / dynamic routing.
+> - `cors_config` (CIP-15-aligned §7.1) — per-path CORS rules.
+>
+> Properties:
+>
+> - Mutated only by the actor's owner. Sender check enforced in `STORAGE_MANAGER` instruction handlers, not by SDK.
+> - Atomically updatable in the same transaction as `commit_manifest` for the actor's volumes.
+> - Read by Gateways and other consumers via the standard `read_handler` RPC against `STORAGE_MANAGER`.
+>
+> This pattern is a deliberate alternative to storing the same data in actor KV, which would force a `read_handler` call into the *actor* on every Gateway request just to discover routing — defeating the static-serving goal in CIP-15. Future configuration that fits the "deployment-scoped, owner-mutable, infrequently-changed, frequently-read" profile SHOULD follow the same pattern.
+
+### Rationale
+
+CIP-15-aligned moves route manifests out of CBFS volumes (where the original CIP-15 placed them) and into `STORAGE_MANAGER`. This generalizes to any "deployment-scoped, owner-mutable, infrequently-changed" configuration that Gateways or other system actors need to read frequently without invoking the actor itself.
+
+---
+
+## Delta 6 — System actor address allocation correction (WP §9)
+
+### Proposed insertion: §9 amendment (replace existing 0x0A entry)
+
+WP §9 (line 704) currently asserts `0x0A = Container Image Registry (CIP-10)`. This conflicts with the canonical code allocation in `node/runner/src/system_actors.rs:31`, which assigns `0x0A = STORAGE_MANAGER (CIP-9)`. The CIP-9 allocation is implemented and shipping; the WP §9 entry is stale.
+
+WP §9 normative text already says "**If this whitepaper conflicts with CIP-2 on these allocations, CIP-2 is authoritative.**" — but it does not extend the same deference to CIP-9 / CIP-10. This delta does so.
+
+#### Proposed text
+
+> **§9.* — Corrected system actor allocation**
+>
+> The canonical low-byte system actor allocation, authoritative as `node/runner/src/system_actors.rs` and the CIP v2 series:
+>
+> | Address | Actor | Source |
+> |---:|---|---|
+> | `0x01` | Runner Registry | CIP-2 |
+> | `0x02` | Job Dispatcher | CIP-2 |
+> | `0x03` | Result Verifier | CIP-2 |
+> | `0x04` | Secrets Manager | CIP-2 |
+> | `0x05` | TEE Verifier | CIP-2 / CIP-23 v2 |
+> | `0x06` | DualBasefee | CIP-3 |
+> | `0x07` | Entitlement Registry | CIP-2 |
+> | `0x08` | Treasury | CIP-2 |
+> | `0x09` | Governance | CIP-12 |
+> | `0x0A` | **Storage Manager (CIP-9)** — supersedes WP §9's prior "Container Image Registry" claim | CIP-9 |
+> | `0x0B` | Relay Registry | CIP-9 |
+> | `0x0C` | **Session Actor** (MPP session model; `system_actors.rs:35`) | CIP-8 (retroactive) |
+> | `0x0D` | Route Registry | CIP-14 v2.r2 |
+> | `0x0E` | Gateway Registry | CIP-14 v2.r2 |
+> | `0x0F` | Receipt Registry | CIP-14 v2.r2 |
+> | `0x10` | Container Registry | CIP-10 v2.r2 |
+> | `0x11` | Payment Gate | CIP-18 r2 |
+> | `0x12` | Stream Key Manager | CIP-7 r2 (was 0x06 in v1; conflicted with DUAL_BASEFEE — resolved 2026-05-11) |
+>
+> **Container Registry** (CIP-10 v2.r2 §1) is at `0x10`, NOT `0x0A`. WP §9 readers should treat the v1 WP table's `0x0A = Container Image Registry` entry as obsolete — code chose `0x0A` for `STORAGE_MANAGER` (CIP-9) because CIP-9 was implemented first and the conflict was resolved in code's favor.
+>
+> **2026-05-11 r2 shift:** `SESSION_ACTOR = 0x0C` was committed in code at `system_actors.rs:35` after the v2.r1 alignment round (which had drafted `0x0C` = `ROUTE_REGISTRY`). The v2 sequence shifted +1: CIP-14 v2.r2 (`0x0D`/`0x0E`/`0x0F`), CIP-10 v2.r2 (`0x10`), CIP-18 r2 (`0x11`). All four CIP files carry matching r2 revision notes.
+>
+> **Conflict resolution rule (revised):** If this WP conflicts with any deployed CIP on system actor allocations, the deployed CIP is authoritative; if no CIP is deployed for a contested address, the lowest-numbered CIP claiming the address wins.
+
+### Rationale
+
+WP §9's "0x0A = Container Image Registry" predates the CIP-9 implementation. Code took 0x0A for STORAGE_MANAGER because CIP-9 was further along. CIP-10 v2.r2 §1 reallocated Container Registry to `0x10` to resolve the collision, after CIP-14 v2.r2's `0x0D`/`0x0E`/`0x0F` block which itself shifted +1 around the code-committed `SESSION_ACTOR = 0x0C`. The WP needs to reflect what code did and how the v2 CIP family adapted.
+
+---
+
+## Delta 7 — Payment Layer (CIP-18 r2)
+
+**Proposed WP section:** new §17.y after fee model
+
+WP-v2 does not currently describe a payment layer. All `payment` references in Part I refer to **runner job settlement** (the 89/10/1 split inside CIP-2). Per-request external payment from non-Cowboy clients into actor endpoints — the entire CIP-18 r2 model — has no anchor in Part I.
+
+Proposed §17.y:
+
+> ### 17.y. Payment layer
+>
+> A dedicated payment layer (CIP-18 r2) makes HTTP-addressable actors monetizable. A new system actor **PaymentGate** at `0x11` holds per-actor `PaymentPolicy` records, escrowed budgets, prepaid passes, and epoch-subscription entitlements. Gateways enforce payment at the network edge under one or both wire formats — **MPP** (IETF `draft-ryan-httpauth-payment`, primary) and **x402** (Coinbase compatibility) — and normalize both into a wire-agnostic `PaymentIntent` before invoking `PaymentGate.settle_payment`.
+>
+> Four payment models compose orthogonally:
+> 1. **Per-request** (client pays at the edge with each call)
+> 2. **Actor-funded** (actor pre-deposits a serving budget; clients pay nothing)
+> 3. **Prepaid pass** (client purchases N call credits, redeems with each request)
+> 4. **Epoch subscription** (rolling time-window unlimited access, reusing CIP-7 epoch primitives)
+>
+> Default protocol fee: **5%** (`PROTOCOL_PAYMENT_FEE_BPS = 500`). The remainder accrues to the actor's treasury. Inbound EVM-to-Cowboy bridge for ERC-20 stablecoin payments is specified by CIP-18 r2 §12 (deferred implementation; needs a new `bridge.facilitate.evm` runner entitlement).
+>
+> The MCP transport (CIP-19) reuses the same `PaymentIntent` over JSON-RPC `_meta.payment-authorization` with error code `-32402`.
+
+### Rationale
+
+The payment layer is now a load-bearing concern for actor monetization and agent-to-agent commerce. WP-v2 should acknowledge it at the architecture-overview level even though Parts II/III adopt-or-defer it via CIPs. Without this delta, the WP system-actor table (§9 / Delta 6) lists `PAYMENT_GATE = 0x11` without explaining why it exists.
+
+---
+
+## Delta 8 — MCP Ingress (CIP-19)
+
+**Proposed WP section:** new §6.z after HTTP ingress
+
+WP-v2 mentions "MCP tool calls" only as **outbound** (actors consuming external MCP servers via Runner). The reverse — actor-as-MCP-server, exposing Cowboy actors to every MCP-aware agent runtime as a native peer — is a new ingress pattern introduced by CIP-19 and unrepresented in Part I.
+
+Proposed §6.z:
+
+> ### 6.z. MCP Ingress (CIP-19)
+>
+> Every actor holding both `ingress.http` (CIP-14 v2.r2) and `ingress.mcp` (CIP-19) entitlements is automatically exposed as a Model Context Protocol (MCP) server at `https://<actor>.cowboy.network/_cowboy/mcp`. The Gateway terminates the MCP streamable HTTP transport (spec version `2025-11-25`), derives the `tools/list` deterministically from the actor's CIP-15 v2.r2 route table (one tool per Method-target route), and dispatches `tools/call` invocations through the same CIP-14 query / command paths an equivalent HTTP request would use. Actor handler code is unchanged.
+>
+> Payment gating reuses the CIP-18 r2 wire format over JSON-RPC `_meta.payment-authorization`. The MCP error code `-32402` mirrors HTTP `402`.
+>
+> Tool discovery is deterministic, verifiable, and on-chain-anchored — distinguishing Cowboy actors from MCP servers hosted on opaque infrastructure.
+
+### Rationale
+
+MCP is the standard interface between LLM agents and external tools. Treating every Cowboy actor as natively MCP-callable, with verifiable code and payable per-call, is a major architectural inflection that the WP should describe at the overview level.
+
+---
+
+## Delta 9 — Cross-Chain Architecture (CIP-25)
+
+**Proposed WP section:** new §16.z, supplements existing §16
+
+WP-v2 §16 "Bridge Infrastructure" says (line 830): "Cowboy relies on third-party bridge infrastructure for asset transfers and cross-chain message passing." and "Bridge selection and integration are determined by governance. The protocol does not implement its own bridge validator set."
+
+CIP-25 (Cross-Chain Architecture) proposes a normative three-layer architecture — L1 (state anchoring with pluggable trust backends), L2 (mailbox messaging with exactly-once semantics), L3 (asset bridges, lending, oracles, generic calls) — and identifies **runner-attested committee** as one of four legitimate L1 backends (the others being ZK light client, optimistic, native light client).
+
+These statements partially conflict: WP-v2 §16 says "no protocol-native validator set"; CIP-25 §1.4 + §A.5 says "runner-committee is a first-class backend." Tony's team's existing Cowboy→ETH withdrawal bridge already runs the runner-committee pattern in production, validating the design.
+
+Proposed §16.z:
+
+> ### 16.z. Cross-chain architecture (CIP-25)
+>
+> The protocol provides a layered cross-chain architecture (CIP-25) rather than relying solely on third-party bridges. Three orthogonal layers:
+>
+> 1. **L1 — State anchoring.** A pluggable interface (`IChainAnchor`) that exposes verifiable Merkle-proof reads of one chain's block commitments on another. Backends include (a) Cowboy-runner-attested committee, (b) ZK light client, (c) optimistic-with-fraud-window, (d) native light client. All backends produce the same `BlockCommitment` shape.
+> 2. **L2 — Mailbox.** A symmetric typed message primitive `(src, dst, sender, recipient, nonce, payload)` providing exactly-once, per-sender-monotonic, integrity-preserving cross-chain delivery on top of any L1 backend.
+> 3. **L3 — Applications.** Asset bridges (lock-mint / burn-release), cross-chain lending, oracle / inference relays (extending CIP-7 Watchtower streams cross-chain), generic cross-chain calls.
+>
+> Which backend is deployed for which chain-pair remains a **governance decision** per §16.2. CIP-25 standardizes the interface contract any backend must satisfy; it does **not** mandate the runner-committee backend protocol-wide. §16's "no protocol validator set" guarantee should be read narrowly as "no single mandatory bridge validator set"; the L1 interface admits both Cowboy-runner backends and pure third-party backends behind the same `IChainAnchor`.
+
+### Rationale
+
+Without this delta, the WP §16 statement and CIP-25's runner-committee proposal read as contradictory. Adding §16.z reframes them as complementary: WP §16 sets the **economic / governance policy** (no protocol-mandated bridge), CIP-25 sets the **architectural pattern** (any backend implements the same interface). Both hold.
+
+---
+
+## 6. Summary
+
+| Delta | Proposed WP section | Required by |
+|---|---|---|
+| 1 — Stake vs. operating balance | §17.x | CIP-14-aligned §6.3; existing runner / relay practice |
+| 2 — Read-only handler execution | §6.x | CIP-14-aligned §5 |
+| 3 — Deferred result storage | §9.x | CIP-14-aligned §8 |
+| 4 — System-mediated message authenticity (selector reservation withdrawn) | §6.y | CIP-14-aligned §6.2, CIP-16-aligned §5.6 |
+| 5 — Owner-mutable config at STORAGE_MANAGER | §9.y | CIP-15-aligned §4.1, §7.1 |
+| 6 — System actor address allocation correction (WP §9 0x0A) | §9 amendment | CIP-9, CIP-10 v2 §1 |
+| **7 — Payment layer** | §17.y | CIP-18 r2, CIP-19 (companion) |
+| **8 — MCP Ingress** | §6.z | CIP-19, CIP-15 v2.r2, CIP-18 r2 |
+| **9 — Cross-chain architecture** | §16.z | CIP-25 (also addresses tension with current §16.2 third-party-bridge framing) |
+
+These deltas are scoped to the v2.r2 alignment exercise. They do not address other potential WP revisions (CIP-13 actor-model delegation, CIP-23 TEE execution, CIP-21 liquidity pools, etc.); those would require separate analysis.
+
+---
+
+## 7. Out of scope
+
+- A full re-write of the WP is not justified by CIP-14/15/16 alignment alone. Most of the WP (consensus, gas markets, upgrade governance, account model) remains accurate.
+- Any rewording of the WP's framing of self-sovereignty in light of CIP-16-aligned §10 centralization risks (ACME, anycast edge, first-party TLD operation) is left for the WP authors. The brief in Part III of this document §8 surfaces the question; the right framing is editorial, not architectural.
+- The Chinese-language WP variants in `refs/whitepaper/` are not addressed here. Whichever variant the project considers canonical should receive the same deltas.
+
+---
+
+## Part III — WP-vs-CIP-Aligned Audit Brief (verbatim from former `wp-alignment-brief.md`)
+
+# Whitepaper Alignment Brief — CIP-14-aligned / CIP-15-aligned / CIP-16-aligned
+
+**Status:** Brief (non-modifying companion to `refs/whitepaper/`)
+**Created:** 2026-04-21
+**Scope:** Audit of how the three aligned drafts respect — or knowingly bend — the principles in the Cowboy whitepapers (`refs/whitepaper/`, `2026-03-21_cowboy-technical-whitepaper-revised.md`).
+
+This brief does not propose any change to the WP itself.
+
+---
+
+## 1. Pure asynchronous actor model
+
+> WP claim: actor handlers are message-driven; no synchronous external I/O within a handler.
+
+- **CIP-14-aligned**: respected. The "query path" (read-handler RPC, the alignment-conventions content (now inlined as Part III of cip-14/15/16 v2 docs) §5) executes the same handler against committed state with all I/O syscalls trapped. The command path is an `ActorMessage` like any other; LLM / HTTP egress remains async via `submit_job` + callback. The new `IngressDispatch` system instruction is a one-way fire-and-forget message — no synchronous response.
+- **CIP-15-aligned**: respected. Static-asset serving bypasses the actor entirely; nothing happens inside the handler. CORS preflight is Gateway-handled.
+- **CIP-16-aligned**: respected. DNS verification is a CIP-2 off-chain job; the result arrives via the `_dns.callback` system message, not a synchronous return.
+
+## 2. Determinism
+
+> WP claim: every consensus-touching execution is deterministic across validators.
+
+- **CIP-14-aligned**: tightened. The original CIP-14 §11.3 omitted `randomness` from the trapped list — present in the host at `pvm_host.rs:1372`. The aligned draft traps it on the read path, so two Gateways at the same `X-Cowboy-Block` MUST produce byte-identical responses.
+- **CIP-15-aligned**: tightened. Dual `X-Cowboy-Block` + `X-Cowboy-Manifest-Root` headers (§5.1) let clients verify byte-identical replay across Gateways for static assets too — closes the version-skew gap the original left between manifest_root caching and dynamic block height.
+- **CIP-16-aligned**: respects determinism *for chain state*. DNS resolution itself is non-deterministic; this is acknowledged and pushed to off-chain runners with majority voting (§5.3). The on-chain transition (`PENDING → ACTIVE`) is deterministic given a verifier majority — the same property CIP-2 already guarantees.
+
+## 3. EIP-1559 dual-metered gas (CIP-3)
+
+> WP claim: every fee flows through the dual-meter basefee + tip + treasury split governed by `SettlementConfig`.
+
+- **CIP-14-aligned**: respected. Name-registration fees, reverify fees, and Gateway pool funding all route through `SettlementConfig`-style records under `GOVERNANCE_SYSTEM_ACTOR=0x09` (the alignment-conventions content (now inlined as Part III of cip-14/15/16 v2 docs) §6) using the existing `UpdateSettlementConfig` opcode with a new `target_pool` discriminant. No new burn / treasury machinery is invented.
+- **CIP-15-aligned**: respected. No new fee surface; static serving is uncharged at the protocol level. The new "delinquency halt" rule (§5.3) ties Gateway serving authority to existing CIP-9 storage-fee accounting, rather than adding a parallel billing event.
+- **CIP-16-aligned**: respected. `EXTERNAL_REVERIFY_FEE` (§5.8) is governance-priced and routed through the same registry settlement config.
+
+## 4. Off-chain compute via Runners with verification (CIP-2)
+
+> WP claim: anything non-deterministic, network-bound, or compute-heavy goes off-chain to runners with optional N-of-M verification.
+
+- **CIP-14-aligned**: respected. The async LLM example handler (§8.5) uses `submit_job` exactly as today; the only change is that the callback writes to `RECEIPT_REGISTRY` instead of actor KV.
+- **CIP-15-aligned**: not exercised. Static-asset serving is not off-chain compute.
+- **CIP-16-aligned**: respected and extended. The new `DnsTxtRecordMatch` and `DnsCnameMatch` checks fit the existing `VerifierCheck` enum (`runner/src/types.rs:177`) — adding variants is the established extension pattern for new verification primitives. `MajorityVote` mode is already implemented (`runner/src/types.rs:215`); the aligned draft uses it. Original CIP-16's `Deterministic` choice was structurally wrong for non-deterministic DNS.
+
+## 5. Actor immutability with explicit upgrade hatch
+
+> WP claim: deployed actor code is immutable except via the explicit `sys.upgrade` entitlement.
+
+- **CIP-14-aligned**: respected. §4.8 enumerates both real upgrade paths (router proxy and `upgrade_self`) and tells authors to pick one. The original §7.8 silently relied on immutability for the router pattern but did not acknowledge that `upgrade_self` already exists in `pvm_host.rs:1765` — readers could be confused into building proxies when in-place upgrade was available.
+- **CIP-15-aligned**: respected. Route manifest updates are a separate authority (`update_route_manifest` from actor owner), letting routes evolve without changing actor code — this *strengthens* the immutability story by externalizing routing config from the immutable code.
+- **CIP-16-aligned**: respected. No actor-code touchpoints.
+
+## 6. Entitlement-gated capability surface
+
+> WP claim: every privileged actor capability flows through a manifest-declared entitlement, validated against the normative registry at deploy time.
+
+- **CIP-14-aligned**: respected. `ingress.http` is **proposed as** a new `RegistryEntry` in `node/types/src/registry.rs::REGISTRY` (precondition for CIP-14 v2 activation; the registry currently has 14 entries and would gain a 15th). The aligned draft drops the original's "Quota: ✅" because the registry has no on-chain quota accumulation primitive — `quota: false` matches reality. **Until the registry entry actually lands in code, CIP-14 v2 cannot activate.**
+- **CIP-15-aligned**: respected. Separate `ingress.static` entitlement (proposed as a 16th registry entry; precondition for CIP-15 v2 activation) keeps the param schema flat (works inside actual `ParamValue` shape constraints — no nested objects needed). Coexistence rule: declaring `ingress.static` without `ingress.http` is rejected.
+- **CIP-16-aligned**: respected. New `dns.attach_external` entitlement (proposed 17th registry entry) gates external attachment per actor. Same activation precondition as CIP-14/15 v2: the registry entry must land in code before CIP-16 v2 can activate.
+
+## 7. Self-sovereign service primitive
+
+> WP claim: an actor + protocol services should suffice to host a verifiable internet service without external hosting infrastructure.
+
+- **CIP-14-aligned**: respected. Adds the missing protocol service (Gateway pool) so the actor can be reached without operating a server.
+- **CIP-15-aligned**: respected. Adds the missing protocol service (Gateway-served public assets) so the actor can ship a website without operating a CDN.
+- **CIP-16-aligned**: respected, with explicit limitations (§10 of CIP-16-aligned). External attached domains require external DNS authority — a sovereignty boundary the protocol cannot remove without alternative roots like Handshake.
+
+---
+
+## 8. Where the alignment knowingly bends the WP framing
+
+These are not violations — they are extensions the WP did not anticipate, surfaced by the CIP-14/15/16 work.
+
+- **Gateway as a fourth node class** (CIP-14-aligned §7): the WP frames "off-chain participants" mostly as runners. The aligned drafts add Gateways as a distinct ingress class with their own staking, health, and incentive pool. Justified by CIP-10's "no ingress" constraint on runner containers — runners architecturally cannot do ingress, and validators / relay nodes are wrong roles for it.
+- **Receipt registry as a fourth state surface** (CIP-14-aligned §8): the WP storage model centers on actor KV, mailboxes, and timers. Receipts are a new dedicated surface owned by `RECEIPT_REGISTRY=0x0F`. Justified by the `MAX_TIMERS_PER_ACTOR=1024` constraint — per-request cleanup timers would exhaust the budget on any popular actor.
+- **ACME / first-party TLD centralization at v1** (CIP-16-aligned §10): the WP's "self-sovereign service" framing implies trustless infrastructure. CIP-16-aligned acknowledges that v1 sits inside the ICANN root and the existing CA system, with operational mitigation (multi-sig, transparency logs) rather than protocol-level trustlessness.
+
+---
+
+## 9. Open WP-level questions surfaced by this exercise
+
+These do not block the aligned drafts, but should land in a future WP revision:
+
+1. **Stake vs. operating balance separation for service-providing nodes.** The runner section already implicitly separates stake (slashable collateral) from gas balance (spendable). Gateways follow the same model in CIP-14-aligned §6.3 + §7.2. The WP should generalize this: any service-providing node has both, and mixing them is a category error.
+
+2. **Read-only handler execution (`read_handler` RPC) as protocol primitive.** The aligned drafts treat it as protocol-normative (Gateways depend on PVM trap semantics for safety, not just RPC convenience). The WP should reflect that read-only execution is part of the consensus-defined PVM contract, not just an RPC convenience layer.
+
+3. **Receipt / response-storage primitive that generalizes beyond ingress.** The pattern in CIP-14-aligned §8 (system-actor-owned, single-pruning-loop receipt registry) likely applies to any system actor that mediates third-party calls (oracle dispatch, future cross-chain bridges, etc.). The WP could promote it from a CIP-14 detail to a general "deferred result" pattern.
+
+4. **System-mediated handler invocation as a first-class pattern.** The selector-reservation idiom used in CIP-14-aligned §6.2 (`"http.request"` reserved at the PVM router) and CIP-16-aligned §5.6 (`ExternalDomainCallback` allowlisted to `RESULT_VERIFIER=0x03`) is not unique to ingress — it's the protocol-level analog of `internal` / `external` visibility in EVM contracts. The WP could surface it as a recurring pattern.
+
+5. **Static config storage at `STORAGE_MANAGER` for actor-owned routing / CORS / etc.** CIP-15-aligned moved route_manifest and cors_config out of the volume and into on-chain state at `STORAGE_MANAGER`. This pattern (chain-resident, owner-mutable, atomic with deploys) likely generalizes — many "deployment-scoped configuration" surfaces would benefit from the same model rather than reinventing per-feature storage.
