@@ -209,6 +209,7 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 - `2026-03-17_conflict_analysis.md` — 白皮书/CIP-2/代码冲突识别
 - `2026-03-21_cowboy_issues_fix_plan.md` — 95 issues 修复计划
 - `2026-03-31_bench_analysis_report.md` — Devnet 性能基准分析
+- `2026-05-29_ai_velocity_quality_engineering_methodology_CN.md` — 🆕 **方法论** AI 高速研发下的质量工程(三支柱:可执行不变量 / 风险分级 / 逃逸棘轮 + AI 对抗式 review + 运行时纵深防御)
 
 ---
 

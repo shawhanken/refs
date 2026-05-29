@@ -33,7 +33,7 @@ Cowboy's answer is to separate two concerns that Ethereum fuses together:
 
 CBFS is the storage substrate. It is designed to be usable standalone (as a plain distributed filesystem) and as the data plane for Cowboy, with the same binaries and wire protocol in both configurations. RAS is the control plane: it defines the rules under which Cowboy accounts own volumes, grant runners access, settle storage rent, and register and slash Relay Nodes.
 
-For architectural rationale and design decisions, see the [Cowboy Design Decisions Overview](./cowboy-design-decisions.md). For the on‑chain specification from which this document is derived, see **CIP‑9: CBFS‑Backed Runner Storage**.
+For architectural rationale and design decisions, see the [Cowboy Design Decisions Overview](./cowboy-design-decisions.md). Detailed on‑chain protocol specifications will be elaborated in future CIPs.
 
 # Architectural Overview
 
@@ -365,7 +365,7 @@ payload = bincode(DelegationCertSigningPayload {
 wallet_signature = Secp256k1Sign(wallet_key, keccak256(payload))
 ```
 
-The delegated CBFS key is stored encrypted at `~/.cbfs/cbfs_key.enc` under AES‑256‑GCM with a user‑supplied passphrase (or environment variable for headless use), decrypted on demand into `mlock`’d memory, and zeroed after each signing. Rotation and revocation are supported via `cbfs auth rotate` and `cbfs auth revoke`; the latter posts to the Storage Manager's revocation list (§6.1), propagated to Relay Nodes within the cache refresh bound (§5).
+The delegated CBFS key is stored encrypted at `~/.cbfs/cbfs_key.enc` under AES‑256‑GCM with a user‑supplied passphrase (or environment variable for headless use), decrypted on demand into `mlock`’d memory, and zeroed after each signing. Rotation and revocation are supported via `cbfs auth rotate` and `cbfs auth revoke`; the latter posts to the Storage Manager's revocation list (§6.1), propagated to Relay Nodes within the cache-freshness bound (see *Cache Freshness* under *On-Chain Control Plane*).
 
 ## Access Modes
 
@@ -590,7 +590,7 @@ The mechanism intentionally mirrors the state rent system specified in Technical
 
 # On‑Chain Control Plane
 
-Two system actors anchor RAS on Cowboy, both specified in the Technical Whitepaper §9 and detailed below. Their storage keys follow the pattern specified in CIP‑4.
+Two system actors anchor RAS on Cowboy: the **Storage Manager** at `0x0A` and the **Relay Registry** at `0x0B` (both registered in the system-actor table — Technical Whitepaper §9). Their state and instruction surfaces are detailed below.
 
 ## Storage Manager (`0x0A`)
 
@@ -663,7 +663,7 @@ Relay Nodes maintain local caches of Storage Manager and Relay Registry state �
 
 # State Transition Function (Storage Subset)
 
-This section specifies the storage‑relevant portion of the state transition function defined in Technical Whitepaper §State Transition Function. Within each block:
+This section specifies the storage‑relevant portion of the protocol state transition function defined in the Technical Whitepaper (see *The State Transition Function*). Within each block:
 
 1. **Process RAS system instructions.** Volume creation, deletion, undelete, commit manifest, revoke delegation, and settlement apply to Storage Manager state; relay registration, heartbeat, drain, and settlement apply to Relay Registry state.
 2. **Issue runner CapTokens.** For each runner job assigned in the block with volume attachments, derive and persist the runner CapToken and sealed DEK copies.
@@ -952,7 +952,7 @@ Refresh interval = 15 s; max staleness = 60 s.
 - **Destination selection:** extend `NodeSelector` beyond least‑used to include region / operator diversity, health, latency.
 - **Observability:** Prometheus metrics, operator dashboards (CBFS core remains `tracing`‑only).
 - **v2 Secrets Manager path:** route attachment DEK sealing through `0x04` to remove Dispatcher plaintext exposure.
-- **Public‑volume ecosystem:** DNS‑addressable actors serving static assets directly from relays per CIP‑14.
+- **Public‑volume ecosystem:** DNS‑addressable actors serving static assets directly from relays.
 
 ## 12.3. Out of scope (v1)
 
@@ -973,9 +973,9 @@ This document layers on, but never supersedes, the Technical Whitepaper. Specifi
 - State rent for **on‑chain actor storage** follows Technical Whitepaper §4.4 and §17.5; storage rent in this document applies only to **off‑chain CBFS volumes**.
 - The Runner Marketplace (Technical Whitepaper §5) is the consumer of runner CapTokens. Job dispatch integrates with the Storage Manager via `issue_attachments()` at job submission time.
 - Consensus, randomness, and networking follow Technical Whitepaper §6. Relay Nodes rely on the same QC‑derived randomness beacon for PoR challenge targeting.
-- Governance, upgrades, and system actor hot‑code replacement follow Technical Whitepaper §11 and CIP‑12.
+- Governance, upgrades, and system actor hot‑code replacement follow Technical Whitepaper §11.
 - Entitlements (Technical Whitepaper §15) MAY gate storage capabilities at the runner and actor manifest level (for example, whether an actor is permitted to open a volume at all); RAS CapTokens are the second, fine‑grained layer within an entitlement's allowed scope.
 
-Where this document and the Technical Whitepaper disagree on values or procedures, the Technical Whitepaper is the normative reference.
+Where this document and the Technical Whitepaper disagree on values or procedures, the Technical Whitepaper is the normative reference. Detailed on‑chain protocol specifications will be elaborated in future CIPs.
 
 _End of specification._

@@ -1,13 +1,15 @@
 # Cowboy 平台 CIP 实施度审计报告(2026-05-28)
 
-**审计日期**:2026-05-28
+**审计日期**:2026-05-28(含 PM update — §十)
 **前次基线**:[`2026-05-27_CIP_IMPLEMENTATION_AUDIT_CN.md`](./2026-05-27_CIP_IMPLEMENTATION_AUDIT_CN.md)(1 天前)
 **审计基线分支**:`devnet`
-**代码仓 HEAD**:
+**代码仓 HEAD**(主报告 5/28 AM 状态):
 - node: `f1ac7801` (devnet,5/28 11:09 +0800,**5/27 起 36 commits**)
 - runner: `a5915e8` (devnet,**1 commit:PR #85**)
 - cbss: `fdb9c1b` (无变化)
 - cbfs: `7294650` (无变化)
+
+**§十 PM update 状态**:node 进一步到 `5cc439c0`(PR #545,CIP-17 接口对齐)
 
 **评分策略**:沿用 5/27 校准模式 — 代码未变的 CIP 沿用 baseline,只对真实代码变化的 CIP 重新评分。
 
@@ -308,7 +310,7 @@ CIP-7 流加密 / CIP-10 容器 / CIP-11 QUIC push / CIP-14/15/16/18/19 Gateway 
 
 ---
 
-## 九、结语
+## 九、结语(5/28 AM)
 
 24 小时内**累计 36 个 commits**,关闭 5/27 报告里 5 个 P0 中的 4 个,同时完成 5/26 报告时点为 "v3 0%" 的 CIP-2 v3 整族实装(6 个子节,6 个 opcodes 94-99)。CIP-2 整体跃迁至 ✅ ~98% — 成为 5/28 当下**最完整的 CIP**(与 CIP-26 ~100% 并列)。
 
@@ -317,6 +319,78 @@ CIP-7 流加密 / CIP-10 容器 / CIP-11 QUIC push / CIP-14/15/16/18/19 Gateway 
 **唯一未动的 5/27 P0**:CIP-17 接口对齐(纯命名 + 字段)与 CIP-3 两个 cycle 充电子项 — 工作量均小,建议下次 PR 一次性收口。
 
 **下次审计建议**:1-2 周后核 CIP-1 v3 timer-lane basefee 是否启动 + CIP-23 v2 CAE 完整管道进展 + CIP-9 GET_MANIFEST RPC 与 ManifestCommitted 事件是否落地 + CIP-2 v3 §7 与端到端 e2e 测试。
+
+---
+
+## 十、5/28 PM 更新(PR #545)
+
+### 10.1 增量
+
+| 范围 | 内容 |
+|---|---|
+| node head | `f1ac7801`(AM)→ `5cc439c0`(PM) |
+| 新 commit | 1 个(**PR #545:`feat(rpc): CIP-17 verifiable state read GET /state/{addr}/{key_hex}`**) |
+| 其他仓 | 无变化 |
+
+### 10.2 CIP-17 完成度跃迁
+
+5/28 AM 评分(§一 1.3 列为"未变"):🟢 ~80%
+5/28 PM 评分:✅ **~95%**(从 🟢 段升入 ✅ 段)
+
+| 5/27 报告点名缺口 | 5/28 PM 状态 |
+|---|---|
+| 端点名:`/proof/storage/{addr}/{key}` vs spec `/state/{addr}/{key}` | ✅ **新增 `/state/{actor_address}/{key_hex}`**(`rpc/src/rpc.rs:326`);旧 `/proof/*` 端点保留向后兼容 |
+| 响应缺 `block_hash` 字段 | ✅ 已加(0x-prefix) |
+| 响应缺 `absent` 字段(不存在证明) | ✅ 已加 + `value=null` |
+| 响应缺 `prove?=false` query param | ✅ 已加(默认 prove=true,serde 默认值) |
+| 0x-prefix 规范化 | ✅ actor_address / value / state_root / block_hash 全部 0x-prefixed |
+| 内部 typed match 替代 string compare(memory feedback_typed_error_match 提到的 #318) | ✅ 已修 — `Err(Storage(qmdb::KeyNotFound))` 模式匹配替代 `msg.contains("KeyNotFound")` |
+
+### 10.3 仍缺(留给 CIP-17 ~95%→100%)
+
+- **Exclusion proof(不存在证明)** — 当 prove=true + absent 时,**返回 501 NotImplemented**(spec-compliant 临时方案,带清晰提示指向 ?prove=false);完整实装需要 `SerializableStateProof` 加 exclusion variant + QMDB 端非包含证明生成。
+- 完整 `proof.siblings` / `proof.path_nibbles` / `proof.leaf_hash` 字段结构按 spec §5.2 严格映射(当前是 QMDB MMR 而非 MPT,字段结构已实质上 spec-equivalent 但不字面同名)
+
+### 10.4 5/27 报告 5 个 P0 全部关闭
+
+| 5/27 P0 项 | 5/28 PM 状态 | PR |
+|---|---|---|
+| CIP-1 carry-forward bug | ✅ | #534 |
+| CIP-23 result-verifier TEE TODO | ✅ | runner #85 |
+| CIP-23 dispatcher 布尔过滤 | ✅ | #534 |
+| **CIP-17 接口对齐** | ✅ | **#545(PM)** |
+| CIP-20 事件 + post-hook + cells cap | ✅ | #534 |
+
+**5/28 收官**:5/27 报告 5 个 P0 **100% 关闭**;仅剩 CIP-3 两个 cycle 充电子项(secp256k1 verify + return data Cell 计费)— 这两项是 5/27 报告 §5.2 "新增"项的衍生,不属于核心 P0。
+
+### 10.5 PR #545 的工程信号
+
+PR #545 commit 历史展示了 **clean iteration cadence**:
+1. 初始:add response 类型 + handler + route(3 commits)
+2. spec polish:0x-prefix 全字段 + always-serialize value(`fix:0x-prefix all hex fields`)
+3. 测试覆盖:4 个 SPEC tests(invalid_address_400 / reject_invalid_key_hex / reject_oversized_key_hex / default_prove_true_via_serde_default)
+4. **absent + typed match 修复**(`fix(rpc): cip-17 use typed match for KeyNotFound, not string compare`)— 直接对应 memory `feedback_typed_error_match` 标注的 #318 issue + 经 curl 验证 live validator 返回行为
+5. **Almanax 安全 review fix**(`fix(rpc): cip-17 Almanax review — 501 on prove=true+absent`)— 防御性 501 + ErrorCode::NotImplemented = 1004 + 一个新 SPEC test
+
+整个 PR 共 **6 个 SPEC tests**(invalid_address / response_shape_serde / default_prove / reject_invalid_key_hex / reject_oversized_key_hex / absent_key_prove_true_returns_501)。
+
+### 10.6 状态分布(5/28 PM 最终)
+
+| 状态 | 5/27 | 5/28 AM | 5/28 PM | Δ from 5/27 |
+|---|---:|---:|---:|---|
+| ✅ ≥85% | 7 | 7 | **8** | **+CIP-17**(从 🟢 段升入) |
+| 🟢 60-85% | 7 | 7 | **6** | -CIP-17 |
+| 🟡 25-60% | 2 | 2 | 2 | 持稳 |
+| 🟠 5-25% | 5 | 5 | 5 | 持稳 |
+| ❌ <5% | 9 | 9 | 9 | 持稳 |
+
+✅ ≥85%(8):CIP-2 / CIP-3 / CIP-5 / CIP-6 / CIP-8 / **CIP-17** / CIP-20 / CIP-26
+
+### 10.7 结语(5/28 PM)
+
+5/28 共 **37 个 commits**(node 仓 36 AM + 1 PM)+ runner 1 PR。**5/27 报告 5 个 P0 在单日内 100% 关闭**,外加 CIP-2 v3 整族(opcodes 94-99)+ CIP-23 关键安全反模式清除。**审计开始以来,单日实施成绩最高的一天**。
+
+5/28 PM 起,剩下的 CIP-3 两个 cycle 充电子项 + CIP-17 exclusion proof 实装 + CIP-2 v3 §7 SemanticSimilarity 模型钉死,是接下来 1-2 周的最紧迫工作。
 
 ---
 

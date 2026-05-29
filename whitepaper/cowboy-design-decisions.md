@@ -16,7 +16,7 @@
 
 We are in the Age of the Agent. Advancements in LLMs have unleashed new modalities for software to act autonomously, but these intelligent systems remain economically handcuffed, trapped behind APIs and corporate accounts. Crypto provides the missing element: permissionless, programmable economic agency. Cowboy is a general-purpose Layer-1 blockchain designed to bridge this gap, enabling AI agents to become native citizens of a digital economy.
 
-Cowboy combines a **Python-based actor-model execution environment** with a **proof‑of‑stake consensus** and a **market for verifiable off‑chain computation**. Smart contracts on Cowboy are **actors**: Python programs with private state, a mailbox for messages, and chain‑native timers for autonomous scheduling. For heavy tasks like LLM inference or web requests, Cowboy integrates a decentralized network of **Runners** who execute jobs and attest to results under selectable trust models: N-of-M consensus, TEEs, and (in V2) ZK-proofs.
+Cowboy combines a **Python-based actor-model execution environment** with a **proof‑of‑stake consensus** and a **market for verifiable off‑chain computation**. Smart contracts on Cowboy are **actors**: Python programs with private state, a mailbox for messages, and chain‑native timers for autonomous scheduling. For heavy tasks — LLM inference, web requests, MCP tool calls, or containerized batch jobs — Cowboy integrates a decentralized network of **Runners** who execute jobs and attest to results under selectable trust models: N-of-M consensus, TEEs, and (in V2) ZK-proofs. Jobs MAY mount encrypted volumes through **Steamtrain**, the protocol's client-side-encrypted distributed storage layer.
 
 To ensure fair and predictable resource pricing, Cowboy introduces a **dual-metered gas model**, separating pricing for computation (**Cycles**) and data (**Cells**) into independent, EIP-1559-style fee markets. Security is provided by **Simplex BFT** consensus with **proof‑of‑stake**, fast finality, and mandatory proposer rotation. By bringing the world's most dominant AI programming language, Python, directly on-chain, Cowboy provides the critical infrastructure for the next generation of autonomous agents.
 
@@ -40,7 +40,7 @@ General‑purpose chains struggle with data‑hungry, latency‑sensitive apps. 
 
 - **Deterministic Python Actors:** A sandboxed Python VM with mailbox messaging, reentrancy (depth‑capped), and first-class support for the world's most popular programming language.
 - **Native Timers & Scheduler:** A protocol-level mechanism for autonomous, scheduled execution with dynamic, context-aware gas bidding, eliminating the need for external keeper networks.
-- **Verifiable Off-Chain Compute:** An open marketplace for off-chain jobs (e.g., LLM inference, API calls) with selectable trust models, including N-of-M consensus, TEE attestations, and (in V2) ZK-proofs.
+- **Verifiable Off-Chain Compute:** An open marketplace for off-chain jobs — LLM inference, HTTP fetches, MCP tool calls, custom compute, and one-shot container batch jobs — with selectable trust models, including N-of-M consensus, TEE attestations, and (in V2) ZK-proofs. Jobs may mount encrypted volumes via **Steamtrain**, the protocol's distributed storage layer; container images run against an on-chain allowlist for supply-chain integrity.
 - **Dual-Metered Gas:** Independent pricing and EIP-1559-style fee markets for compute (**Cycles**) and data/storage (**Cells**) to ensure fair and predictable costs.
 
 ## Why Python?
@@ -189,31 +189,27 @@ External keeper networks (like Ethereum's Gelato or Chainlink Automation) introd
 1. **Centralization Risk:** Keepers are typically operated by a small number of entities, creating single points of failure.
 2. **Cost Inefficiency:** Each keeper network requires separate infrastructure, payment mechanisms, and trust assumptions.
 3. **Coordination Overhead:** Actors must integrate with external services, manage subscriptions, and handle keeper failures.
-4. **MEV Exposure:** Keepers can observe scheduled transactions and potentially front-run them.
+4. **MEV (Maximal Extractable Value) Exposure:** Keepers can observe scheduled transactions and potentially front-run them.
 
 By making timers native to the protocol, Cowboy eliminates these issues while providing better guarantees and lower costs.
 
-### Scalable Design: The Tiered Calendar Queue
+### Scalable Design: Height-Indexed Storage
 
-The scheduler uses a multi-layered **tiered calendar queue** to manage timers efficiently across different time horizons without compromising performance. This architecture consists of three levels:
+The scheduler stores timers indexed by their target block `height`, with the same-height bucket ordered FIFO by insertion. This keeps the per-block work proportional to the number of timers actually firing this block, not to the total active population, and avoids the operational complexity of a priority queue or tiered calendar.
 
-- **Tier 1: Block Ring Buffer:** An `O(1)` queue for imminent timers, organized as a ring buffer where each slot represents a single block. This handles near-term scheduling with maximum efficiency.
-- **Tier 2: Epoch Queue:** A medium-term queue for timers scheduled in future epochs. Timers from this queue are efficiently migrated in batches to the Block Ring Buffer at the start of each new epoch.
-- **Tier 3: Overflow Sorted Set:** A Merkleized binary search tree for very long-term timers that fall outside the Epoch Queue's range, ensuring the protocol can handle any future-dated schedule.
+A separate `LANE_TIMER_CYCLES` budget (20% of the block) is dedicated to timer execution, and a parallel `TIMER_GC_CYCLES` budget handles TTL-expiry cleanup so a sweep storm cannot starve live execution. A per-actor cap (`max_timers_per_actor = 1,024`) bounds individual exposure.
 
-This tiered design ensures that the per-block work of processing timers remains constant and small, regardless of the total number of scheduled timers.
+### Economic Rationality: The Per-Fire Fee Payer Model
 
-### Economic Rationality: The Gas Bidding Agent (GBA)
+In the implemented v1 scheduler, each timer records `fee_payer`, `gas_limit_per_fire`, and `expires_at`. At the end of each block the protocol pre-charges `max_cost = gas_limit_per_fire × cycle_basefee + max_cells × cell_basefee` from the `fee_payer`, executes the handler, refunds unused gas, and removes the timer. Timers whose `fee_payer` cannot cover `max_cost`, or whose `expires_at` is reached, self-destruct without firing.
 
-A key innovation in Cowboy's scheduler is the concept of the **Gas Bidding Agent (GBA)**. Instead of pre-paying a fixed gas fee, an actor designates a GBA (which is another actor) to dynamically bid for its timer's execution when it becomes due.
+A future **EIP-1559 hybrid** target design (activated via Tier-3 governance) layers a timer-lane basefee and a priority tip on top of this, plus a per-actor fairness weight `W(actor) ∈ [1, 2]` over a 1,000-block rolling window. The fairness weight gives a small inclusion boost to actors whose effective fire rate is below the network median, ensuring eventual execution under sustained bidding congestion without requiring exponential-decay state to be maintained off-block.
 
-When a timer is ready to be executed, the protocol performs a read-only call to the actor's GBA, providing it with a rich `context` object containing real-time data like network congestion (current base fees), the timer's urgency (how many blocks it has been delayed), and the owner's balance. The GBA uses this context to return a competitive gas bid. This creates an intra-block auction for a dedicated portion of the block's compute budget, ensuring that high-priority tasks can get executed even during periods of high network traffic. To ensure a simple developer experience, actors which do not specify a GBA receive the network default.
-
-This design enables sophisticated scheduling strategies: an actor could implement a GBA that bids aggressively for critical timers but conservatively for low-priority ones, or that adjusts bids based on the actor's current balance and revenue.
+This design enables sophisticated scheduling strategies: an actor (or a Gas Bidding Agent acting on its behalf) can adjust `max_fee_per_cycle` and `max_priority_fee_per_cycle` per timer based on urgency, network congestion, and balance.
 
 ### Fairness and Liveness
 
-Timers that are not executed due to low bids or network congestion are automatically deferred to the next block. To prevent "timer starvation" where an actor is perpetually outbid, the protocol tracks an actor's scheduling history. It uses a weighted priority system with exponential decay to give a small boost to actors whose timers have been repeatedly deferred, ensuring eventual execution and maintaining network fairness.
+Under the v1 mechanism, timers whose `fee_payer` cannot cover `max_cost` at fire time self-destruct rather than block the lane; well-funded timers always fire. Under the future EIP-1559 hybrid, the per-actor fairness weight described above is the explicit anti-starvation primitive — actors at or below the network-median fire rate get the maximum boost, actors at 2× median or above get none.
 
 ### DoS Prevention Philosophy
 
@@ -229,7 +225,7 @@ For complete technical details on these mechanisms, see the [Technical Whitepape
 
 ## Verifiable Off-Chain Compute
 
-Many applications need access to web data, ML inference, or heavy transforms. Any actor can post a job with a price and latency target. **Runners**—off‑chain workers who stake CBY—pick up jobs, execute them, and post results.
+Many applications need access to web data, ML inference, or heavy transforms. Any actor can post a job with a price and latency target. **Runners**—off‑chain workers who stake CBY (the native protocol token)—pick up jobs, execute them, and post results.
 
 This market is **verifiable**: the chain accepts results under various trust models chosen by the developer. Runners who lie or miss deadlines risk being challenged and **slashed**.
 
@@ -306,7 +302,7 @@ Cowboy uses **Simplex BFT** consensus, a streamlined Byzantine Fault Tolerant pr
 
 1. **Simplicity:** Simplex achieves consensus with optimal latency while maintaining a simple design and provable liveness. Fewer moving parts means fewer bugs and easier auditing, which is critical for a system managing autonomous agents and financial assets.
 
-2. **Mandatory Proposer Rotation:** Unlike stable-leader protocols (like PBFT) where one validator might propose many consecutive blocks, Simplex rotates proposers every block via VRF. This is a deliberate MEV mitigation strategy—no single proposer observes transaction flow across multiple blocks, fundamentally limiting cross-block MEV extraction.
+2. **Mandatory Proposer Rotation:** Unlike stable-leader protocols (like PBFT) where one validator might propose many consecutive blocks, Simplex rotates proposers every block via a Verifiable Random Function (VRF). This is a deliberate MEV mitigation strategy—no single proposer observes transaction flow across multiple blocks, fundamentally limiting cross-block MEV extraction.
 
 3. **Fast Finality:** With ~1 second blocks and ~2 second finality, Cowboy enables autonomous agents to act on confirmed state quickly. This is critical for time-sensitive operations like trading, arbitrage, and cross-chain interactions.
 
@@ -431,9 +427,9 @@ Cowboy accepts these trade-offs because the alternative—forcing autonomous Pyt
 
 ## Ethereum Interoperability
 
-Interoperability is a foundational design goal. The same `secp256k1` key can control both a Cowboy account and an EVM address, letting agents hold ETH and ERC-20s, bridge assets, and sign EIP-1559 transactions under tight policy guards enforced by entitlements. A canonical bridge will carry funds and calldata, while Cowboy actors can subscribe to Ethereum events to trigger on-chain workflows.
+Interoperability is a foundational design goal. The same `secp256k1` key can control both a Cowboy account and an EVM address, letting agents hold ETH and ERC-20s, bridge assets, and sign EIP-1559 transactions under tight policy guards enforced by entitlements. The protocol does **not** ship its own bridge validator set — instead, governance selects third-party bridge infrastructure to carry funds and calldata, and exposes the integration to actors through the `bridge.asset` and `bridge.subscribe_event` entitlements. Cowboy actors can subscribe to Ethereum events to trigger on-chain workflows once an `EventListener` system actor (deferred, address to be assigned) is in place.
 
-This interoperability design recognizes that Cowboy and Ethereum serve complementary roles: Ethereum provides liquidity and security for high-value assets, while Cowboy provides the execution environment for autonomous agents. The bridge enables agents to leverage both ecosystems.
+This interoperability design recognizes that Cowboy and Ethereum serve complementary roles: Ethereum provides liquidity and security for high-value assets, while Cowboy provides the execution environment for autonomous agents. The chosen bridge enables agents to leverage both ecosystems without forcing the protocol to maintain validator sets it does not control.
 
 For complete technical specifications on the bridge and interoperability mechanisms, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
 
