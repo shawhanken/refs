@@ -105,6 +105,8 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 
 **性质**：非规范性 raw source，权威顺序仍是 **代码 > 修正案 > CIP > 白皮书 > plans/**。
 
+**重点新增**：[`2026-06-01_marshal-quality-platform-architecture.md`](plans/2026-06-01_marshal-quality-platform-architecture.md) — 🆕 **Marshal 通用质量工程平台总体架构蓝图 v1.3**（落地 [`analysis/2026-05-29` 方法论](analysis/2026-05-29_ai_velocity_quality_engineering_methodology_CN.md)；领域无关核心 + 可插拔领域包，Cowboy 为第一领域包；含分层规格体系（宪法/修正案/代码 + 双权威轴）与领域知识获取/生长机制；模块化单体大脑 + 无状态执行器 + 知识核脊椎，覆盖 7 子系统）。
+
 ---
 
 ## ⛓️ chain/ — 整体架构与集成
