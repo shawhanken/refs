@@ -1,0 +1,819 @@
+id,worktype,subsystem,severity,priority,assignee_bucket,state,project,title
+COW-824,Bug,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Mesa validator fails to load some @runner.continuation examples when runner.llm() prompt is built from multi-line f-string concatenation
+COW-821,Bug,Tooling,-,2,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",cowboy account nonce is not implemented but is required for retry logic
+COW-820,Bug,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work",bug: cowboy token balance always hangs
+COW-819,Bug,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",bug: python sdk missing timer functions
+COW-1546,CIP-conformance-audit,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,§9.2 (v2) Secrets-Manager direct sealed-DEK fetch path replacing
+COW-1545,CIP-conformance-audit,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,§12.3 reserve_storage_balance / get_storage_usage AccountStorageSummary
+COW-1544,CIP-conformance-audit,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,§13.4 transfer_volume(volume_name
+COW-923,CIP-conformance-audit,CBFS,high,2,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Strict SDK read mode (no placement-supplied address fallback)
+COW-922,CIP-conformance-audit,CBFS,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Public-read short-circuit on GetPlacement + GetShard
+COW-920,CIP-conformance-audit,CBFS,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Add GetManifest Relay RPC (AMEND 9-G)
+COW-918,CIP-conformance-audit,CBFS,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Spot-check responder for PoR challenges
+COW-935,CIP-conformance-audit,CBFS,low,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Wire node capacity_bytes to config (currently hardcoded 0)
+COW-933,CIP-conformance-audit,CBFS,low,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Multi-source relay registry refresh + background fetch
+COW-936,CIP-conformance-audit,CBFS,medium,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Add tests for packages currently with zero coverage
+COW-934,CIP-conformance-audit,CBFS,medium,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Convert 34 production panic!/unimplemented!/todo! to typed errors
+COW-932,CIP-conformance-audit,CBFS,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Volume metadata + OwnerCapToken caching
+COW-931,CIP-conformance-audit,CBFS,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] CLI connection pooling within process
+COW-930,CIP-conformance-audit,CBFS,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Cowboy-mode `cbfs mount` token-refresh design + implementation
+COW-928,CIP-conformance-audit,CBFS,medium,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] OwnerCapTokenV1 client-signed validation path on relays
+COW-926,CIP-conformance-audit,CBFS,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Signed request envelope on all /ras/ control-plane endpoints
+COW-925,CIP-conformance-audit,CBFS,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Ship `cbfs auth setup/rotate/revoke/status/whoami` CLI commands
+COW-1895,CIP-conformance-audit,CBSS,-,0,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),§3.6.2 automatic reshare triggers
+COW-1894,CIP-conformance-audit,CBSS,-,0,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),§4.4 health-score automation
+COW-1893,CIP-conformance-audit,CBSS,-,0,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),§5.3 canonical error vocabulary
+COW-1062,CIP-conformance-audit,CBSS,high,2,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] RPC pagination on GET /cbss/proxies
+COW-1055,CIP-conformance-audit,CBSS,high,2,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Pin Commonware branch as protected annotated tag (H8)
+COW-1051,CIP-conformance-audit,CBSS,high,2,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] TEE vendor-quote chain-of-trust (DOD-07-TEE v1.1)
+COW-1050,CIP-conformance-audit,CBSS,high,2,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Restore lost §5.9 spawned DKG e2e suite (DOD-04 v1.1)
+COW-1070,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Document residual H8 blocker prominently
+COW-1069,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Modulo bias note in weighted_proxy_position
+COW-1068,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] HPKE/DKG pubkey curve membership check (documented deferral)
+COW-1066,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Operator-level Sybil defense documentation
+COW-1065,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] CBSS storage prefix documentation block
+COW-1064,CIP-conformance-audit,CBSS,low,4,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] DOD-01 aggregate cargo log
+COW-1060,CIP-conformance-audit,CBSS,low,4,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] AAD endianness consistency
+COW-1067,CIP-conformance-audit,CBSS,medium,3,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] TEE expiry off-by-one boundary audit
+COW-1063,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Handler 404/410/409 branch tests
+COW-1061,CIP-conformance-audit,CBSS,medium,3,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] ACL codec cap tightened to 64 (MAX_ACL_ACTORS)
+COW-1059,CIP-conformance-audit,CBSS,medium,3,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Liveness index key cleanup on expire / response
+COW-1058,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Liveness challenge health-score attrition rate limit
+COW-1057,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] DKG sabotage evidence remains provable post-rotate
+COW-1056,CIP-conformance-audit,CBSS,medium,3,pav,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Release receipt release_id collateral fields
+COW-1054,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Real-validator scenario matrix (DOD-05/07 v1.1)
+COW-1053,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Fake-cbssd binary serving forged σ_i over QUIC (DOD-09 v1.1)
+COW-1052,CIP-conformance-audit,CBSS,medium,3,unassigned,Backlog,CIP-24: Cowboy Secret Service (CBSS),[CBSS] Real-validator stress test (DOD-08 v1.1)
+COW-1642,CIP-conformance-audit,CIP-12,-,0,unassigned,Backlog,CIP-12: On-Chain Governance & System Actor Upgrades,§7.7 Circuit-breaker pause (paused_actors
+COW-1640,CIP-conformance-audit,CIP-12,-,0,unassigned,Backlog,CIP-12: On-Chain Governance & System Actor Upgrades,§5.4 Circuit payload (Pause/Unpause/RatifyExtend/Cancel)
+COW-1637,CIP-conformance-audit,CIP-12,-,0,unassigned,Backlog,CIP-12: On-Chain Governance & System Actor Upgrades,§5.3 Content-addressed body_ref (CBFS)
+COW-1681,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8.6/§9.1-9.6 Gateway node role
+COW-1680,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8.1/§8.2 (orig) HttpRequestEnvelope / HttpResponseEnvelope canonical
+COW-1679,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8.4 receipt privacy (private flag
+COW-1678,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8.3/§6.4 command-path async flow
+COW-1677,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8.2 complete_receipt system call (opcode 66) + registry-wide TTL pruning
+COW-1676,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§8/§10 RECEIPT_REGISTRY (0x0F) system actor + Receipt record
+COW-1675,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§7.4/§9.4 gateway serving-fee pool
+COW-1674,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§6.3 gateway gas
+COW-1673,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§6.1/§6.2 system-mediated http.request
+COW-1672,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§6.1 SystemInstruction::IngressDispatch (opcode 65) command-path
+COW-1671,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§7.2/§9.2 gateway lifecycle
+COW-1670,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§7/§9.2 GATEWAY_REGISTRY (0x0E) system actor + GatewayProfile
+COW-1669,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.7/§7.7 Route Registry API
+COW-1668,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.6/§7.6 renewal (extend from current expiry)
+COW-1667,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.5/§6 RegistrySettlementConfig + system:registry_settlement_config +
+COW-1666,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.5/§7.5 registration economics
+COW-1665,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.4/§7.4 register handler (caller auth
+COW-1664,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.3/§7.3 name constraints ([a-z0-9-]
+COW-1663,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.2/§7.2 naming hierarchy + subdomain_policy (OWNER_ONLY default /
+COW-1662,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4.1 RouteRegistration record + name→registration storage +
+COW-1661,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§4/§7 ROUTE_REGISTRY (0x0D) system actor
+COW-1660,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§3.3/§6.4 deploy-time manifest_validate of ingress.http params (unknown
+COW-1659,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§3.1/§6.2 ingress.http param schema (allowlist_methods
+COW-1658,CIP-conformance-audit,CIP-14,-,0,unassigned,Backlog,CIP-14: DNS-Addressable Actors,§3/§6.1 (orig) ingress.http entitlement registry entry
+COW-1724,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§11 security considerations (reverification mandatory
+COW-1723,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§12/§8 external constants CHALLENGE_EXPIRY_BLOCKS
+COW-1722,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§10.3/§7.4 first-party TLD DNS authority serving from Route Registry
+COW-1721,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§7.3 verified_fqdn + namespace_kind injection into HttpRequestEnvelope by
+COW-1720,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§10/§7 Gateway resolution & serving policy (ACTIVE-only
+COW-1719,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§9.5/§5.5 ACME DNS-01 delegation (_acme-challenge CNAME →
+COW-1718,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§9.4/§5.4 CANONICAL_EDGE_HOSTNAME (anycast default
+COW-1716,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.10 reverify timer fee_payer=owner + TimerCancelledInsufficientFunds
+COW-1715,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.8 EXTERNAL_REVERIFY_FEE charged from owner per firing
+COW-1714,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.7/§5.10 reverification flow
+COW-1713,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,maybe_enable_dns_capability boot-time self-check NOT production-wired
+COW-1712,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,execute_dns_job NOT production-wired into runner worker loop
+COW-1711,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.3 begin_attach_external enqueuing a DNS-verification JobSpec into
+COW-1710,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.6 SuspendBinding failure-path opcode (0x03 allowlist) for
+COW-1709,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.6/§9 SystemInstruction::ExternalDomainCallback opcode 67 with
+COW-1708,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§5.2/§Part-III-§2.3 dns.attach_external entitlement registry entry
+COW-1707,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§9.2 reverify_external / detach_external / suspend_external methods
+COW-1706,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§9.2/§5.6 complete_attach_external system-mediated callback
+COW-1705,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§9.2/§5.2 begin_attach_external (nonce gen
+COW-1698,CIP-conformance-audit,CIP-16,-,0,unassigned,Backlog,CIP-16: Custom Domains & First-Party TLDs,§7.2/§3.1 RouteRegistration→DomainBinding one-time migration with legacy
+COW-1754,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.2 happy-path handler integration tests (prove=true present key
+COW-1753,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.3 step-5 / §11 bundled account-trie proof binding actor.state_root to
+COW-1752,CIP-conformance-audit,CIP-17,-,0,pav,Backlog,CIP-17: Verifiable State Read RPC,§9 stated default rate limit of 100 req/s for /state is not pinned
+COW-1751,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.2 proof field-shape divergence
+COW-1750,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.4 404 Not Found for non-existent actor_address is NOT implemented
+COW-1749,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.4 503 Service Unavailable (node temporarily not synced / block_height
+COW-1748,CIP-conformance-audit,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,§5.2/§5.4/§6.1 MARQUEE FEATURE
+COW-1760,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,§24 Genesis deployment of PaymentGate at 0x11
+COW-1759,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,§19 Protocol constants (PAYMENT_GATE_ADDRESS=0x11
+COW-1758,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,§18 Revenue distribution
+COW-1757,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,§16.2/§16.3 Payment-derived identity + account signature over (challenge.id
+COW-1756,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,§16.1 did:cowboy:<hex> DID format in MPP source field
+COW-1755,CIP-conformance-audit,CIP-18,-,0,unassigned,Backlog,CIP-18: Payments,"§9.5.3 method=""tempo"" (reserved)"
+COW-1380,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§7.5 Safety limits
+COW-1379,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§10 Randomness Evolution Path L2 (block_vrf_output EC-VRF in header) and
+COW-1378,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§8 'aggregator_timeout_blocks fallback to individual reveals /
+COW-1377,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§8 'Aggregator collects result_bytes via direct HTTP push' +
+COW-1376,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§8 step4 'assert runner_sig is valid Ed25519 over result_bytes' on reveals
+COW-1375,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§5/§3 VRF seed uses block_height (LE-padded into 32-byte proxy) as a
+COW-1374,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§5/Security 'candidates_snapshot Merkle root stored on-chain at submission
+COW-1373,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§3 step1 full JobSpec validation (bounds != 0
+COW-1372,CIP-conformance-audit,CIP-2,-,0,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,§1 Mandatory result_schema (max_return_bytes
+COW-1798,CIP-conformance-audit,CIP-20,-,0,unassigned,Backlog,CIP-20: Fungible Token Standard,ICIP20Actor actor-token interface / actor-based tokens (fee-on-transfer
+COW-1080,CIP-conformance-audit,CIP-20,low,4,unassigned,Backlog,CIP-20: Fungible Token Standard,[CI] Integrate examples/01-tokens/demo.sh into CI test suite
+COW-1082,CIP-conformance-audit,CIP-20,medium,3,unassigned,Backlog,CIP-20: Fungible Token Standard,[Explorer] Token balance + transfer history UI
+COW-1805,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,Reference platform impl cowboy-core/src/runtime/amm.rs (spec §Reference
+COW-1804,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,Hook resource cap enforcement (50k Cycles/Cells
+COW-1803,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,Sync event (events section) - example emits liquidity/swap events but no
+COW-1802,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,MEV-protection hook (6.3) and KYC/compliance hook (6.4) - absent (no hook
+COW-1801,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,On-chain limit orders via state-triggered timers (6.2 LimitOrderBook)
+COW-1800,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,Canonical token sorting in init (token_a>token_b swap) - spec ref impl
+COW-1799,CIP-conformance-audit,CIP-21,-,0,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,IV2Pool extras
+COW-1833,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event TokensClaimed(tokens
+COW-1832,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event BidPriceUpdated
+COW-1831,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event BidIncreased
+COW-1830,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event BidWithdrawn
+COW-1829,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event BidPlaced
+COW-1828,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event AuctionFailed(currency_raised
+COW-1827,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event AuctionGraduated(final_price
+COW-1826,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event AuctionEnded
+COW-1825,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event AuctionStarted
+COW-1824,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Event AuctionCreated
+COW-1823,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Overflow guard
+COW-1822,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],ICCAFactory.create_auction_with_token(name
+COW-1821,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],ICCAFactory.create_auction(...)->address with end>start
+COW-1820,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Timer integration
+COW-1819,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Timer integration
+COW-1818,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],"Hook gas/cell cap enforcement (50,000 Cycles / 50,000 Cells"
+COW-1817,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Checkpoint append per block for pro-rata claim accounting
+COW-1816,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],_remaining_demand(bid
+COW-1815,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Query methods
+COW-1814,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],ICCA.claim_batch(bid_ids)
+COW-1813,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],ICCA.claim(bid_id)->(tokens
+COW-1812,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],AuctionStatus enum (PENDING/ACTIVE/ENDED/GRADUATED/FAILED)
+COW-1811,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Checkpoint data structure (block
+COW-1810,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],AuctionState data structure (current_block
+COW-1809,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],Bid data structure (bid_id
+COW-1808,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],PoolType enum (V2_FULL_RANGE / V3_CONCENTRATED)
+COW-1807,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],ReleaseStep data structure (rate_mps u24
+COW-1806,CIP-conformance-audit,CIP-22,-,0,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],AuctionConfig data structure (token_id
+COW-1851,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,§6 governance microcode-revision blacklist via UpdateCpuRoot collateral +
+COW-1850,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,v2 §3 CIP-13 delegation interaction (effective_stake VRF weight vs
+COW-1849,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,§3.6.3 execute-in-TEE body
+COW-1847,CIP-conformance-audit,CIP-23,-,0,pav,Backlog,CIP-23: TEE Execution & Composite Attestation,§3.10 Secrets Manager get_secret(attestation) TEE-gating
+COW-1846,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,§3.5 On-chain storage strategy
+COW-1845,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,§3.6.5 VerifyCae gas budget (200k cycles / cert-chain 120k etc.) not
+COW-1844,CIP-conformance-audit,CIP-23,-,0,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,§3.4 ServiceSignature (scheme/service_pubkey/sig over
+COW-1901,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§2.5/§2.6 Cross-chain streaming
+COW-1900,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§1.3 state_root / parent_hash commitment fields
+COW-1899,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§1.6 Multi-destination cost reduction
+COW-1898,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§1.4/§A.5 Native light client backend (BLS12-381 sync-committee /
+COW-1897,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§1.4/§A.5 Optimistic backend with challenger bonds/incentives
+COW-1896,CIP-conformance-audit,CIP-25,-,0,unassigned,Backlog,CIP-25: Cross-Chain Architecture,§1.4/§1.5/§A.5 ZK light-client backend
+COW-1365,CIP-conformance-audit,CIP-26,-,0,unassigned,Backlog,CIP-26: Account-Scoped Actor Libraries,§3.9 future-GC reachability guard (GC must check union of live
+COW-1916,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§7.3 Feature gate governance parameter bank_activation_height
+COW-1915,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§6.1 Inter-bank state isolation (bank_id-scoped operator freeze/pause
+COW-1914,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§6.1 Cowboy Banking genesis bank entry (bank_id=1
+COW-1913,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§5.4 locked_after_transfer precise semantics (owner==agent && locked →
+COW-1912,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§4.6 GasCharged receipts with tx_digest for Indexer join / card-statement
+COW-1911,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§4.5 BankErr error family + engine ErrorMap (CardNotFound
+COW-1910,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§4.4 Edge-case handling (frozen/expired after reserve
+COW-1909,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§4.2 Async discipline using block_on_local for !Send futures in charge_gas
+COW-1908,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§3.4 SetBankFiatMintSigner instruction (caller==operator
+COW-1907,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§3.4 SetBankOperator instruction (caller==operator or governance
+COW-1906,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§3.3 PauseBank / UnpauseBank instructions (caller==operator
+COW-1905,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§3.2 SetDefaultCard instruction (caller==agent or card.owner
+COW-1904,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§2.7/§4.1 fee_payer resolution fork (card-address lookup →
+COW-1903,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§2.3 Day-1 gas_payment_token whitelist constraint (Native CBY or official
+COW-1902,CIP-conformance-audit,CIP-28,-,0,unassigned,Backlog,CIP-28: Cowboy Agent Banking,§1.3 New tx-level field tx.fee_payer_override
+COW-1144,CIP-conformance-audit,CIP-28,low,4,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA?
+COW-1924,CIP-conformance-audit,CIP-29,-,0,unassigned,Backlog,CIP-29: On-Chain Event Hooks,§5.1 Phase-0 @hookable pure-SDK prototype not present as a distinct
+COW-1923,CIP-conformance-audit,CIP-29,-,0,unassigned,Backlog,CIP-29: On-Chain Event Hooks,§6.3 P1-E emitter actor upgrade / redeployment semantics for existing
+COW-1922,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.3 zombie subscription bid/REGISTRATION_FEE handling on reap not
+COW-1921,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.5 ASYNC_FIRE_DEFERRAL_BLOCKS not explicitly applied as a configurable
+COW-1920,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.3 'commit subscriber writeset on sync-fire success' diverges from spec
+COW-1919,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.5 payload billing is approximate
+COW-1918,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.6 update_bid / topup_subscription NOT routed as 0x1D system-actor WRITE
+COW-1917,CIP-conformance-audit,CIP-29,-,0,pav,Backlog,CIP-29: On-Chain Event Hooks,§2.1/§2.4 EmitResult return value NOT surfaced
+COW-1285,CIP-conformance-audit,CIP-30,low,4,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Tooling] Pre-image table for hashed long keys (debugger / explorer enumeration)
+COW-1460,CIP-conformance-audit,CIP-5,-,0,pav,Backlog,CIP-5: Native Timer Mechanism,§5.1/§6.3 Spec frames pre-charge/execute/refund as a per-timer step5 over
+COW-1459,CIP-conformance-audit,CIP-5,-,0,pav,In Review,CIP-5: Native Timer Mechanism,§6.5 gc_cycles_per_block governance wiring is half-done
+COW-1458,CIP-conformance-audit,CIP-5,-,0,pav,Backlog,CIP-5: Native Timer Mechanism,§5.4 last paragraph 'If the fire-time self-destruct check has already
+COW-1457,CIP-conformance-audit,CIP-5,-,0,unassigned,Backlog,CIP-5: Native Timer Mechanism,§5.1 step5 / Appendix-A 'enqueue into a deferred queue
+COW-1543,CIP-conformance-audit,CIP-8,-,0,unassigned,Backlog,CIP-8: MPP Session Semantics,§4/§5 Runner session bootstrap relies on a PoC /session/observe HTTP push
+COW-1542,CIP-conformance-audit,CIP-8,-,0,unassigned,Backlog,CIP-8: MPP Session Semantics,§6.4/§16 SessionAsset::Cip20 token-escrow path
+COW-1541,CIP-conformance-audit,CIP-8,-,0,unassigned,Backlog,CIP-8: MPP Session Semantics,§4/§8.1/§8.3/§8.5/§16 On-chain events SessionOpened / SessionDeposited /
+COW-1540,CIP-conformance-audit,CIP-8,-,0,unassigned,Backlog,CIP-8: MPP Session Semantics,§8.1 OpenSession 'runner is registered (Runner Registry 0x01)' precondition
+COW-1013,CIP-conformance-audit,CIP-8,low,4,unassigned,Backlog,CIP-8: MPP Session Semantics,"[Code] When Slash milestone activates, extend Disputed with opened_at: u64"
+COW-1969,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Epoch boundaries (3600 blocks) with per-epoch validator-set / slashing /
+COW-1968,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Stake-weighted block rewards + 100% proposer tip payout is unimplemented.
+COW-1967,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Peer discovery is bit-vector gossip
+COW-1966,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",QUIC over TLS 1.3 is NOT the transport. WP §6.2 'Implementations MUST
+COW-1965,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Dedicated-lane BLOCK-SPACE partitioning + cascade is not implemented at
+COW-1964,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Mempool selection diverges from WP §6.4
+COW-1963,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Per-header VRF output+proof field is not on the block header. WP §6.1
+COW-1962,CIP-conformance-audit,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Proposer selection is VRF-based but NOT stake-weighted
+COW-1211,CIP-conformance-audit,Docs,low,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Spec/Docs] NAT traversal: choose protocol-level approach vs. continuing the Tailscale workaround
+COW-1133,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-26: Account-Scoped Actor Libraries,[Docs] Manifest interaction: tooling guidance for displaying expected pins
+COW-1097,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py
+COW-1084,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-20: Fungible Token Standard,[Docs] CIP-20 ↔ CIP-21 interaction worked examples
+COW-1014,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-8: MPP Session Semantics,[Docs] Note CIP-8 hard dependencies on CIP-18 r2 + CIP-19 + CIP-2
+COW-986,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-5: Native Timer Mechanism,"[Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...)"
+COW-940,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,"[Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound"
+COW-939,CIP-conformance-audit,Docs,low,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,"[Docs] CIP-9 v1 references to ""CIP-11"" should resolve to CIP-14 + CIP-15"
+COW-1195,CIP-conformance-audit,Examples,high,2,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] CIP-21 pool graduation: factory.get_or_create_v2|v3_pool() + mint_position()
+COW-1193,CIP-conformance-audit,Examples,high,2,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] Per-block clearing logic: SortedMap by max_price + pro-rata fill
+COW-1192,CIP-conformance-audit,Examples,high,2,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] Bid submission + escrow: place_bid / withdraw_bid / increase_bid / update_max_price
+COW-1198,CIP-conformance-audit,Examples,low,4,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] ICCAHook integration: validation hooks at place_bid / withdraw_bid / claim
+COW-1200,CIP-conformance-audit,Examples,medium,3,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] Reference auction example actor at examples/<NN>-cca/
+COW-1197,CIP-conformance-audit,Examples,medium,3,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] FAILED path: min_currency_raised threshold + claim() refund logic
+COW-1196,CIP-conformance-audit,Examples,medium,3,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],"[Examples] Anti-manipulation: TWAP checkpoints, flash-loan guards, bid duration locks, MEV-guard for timer"
+COW-1194,CIP-conformance-audit,Examples,medium,3,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Examples] Release schedule parsing: ReleaseStep iteration by block-height offset
+COW-1124,CIP-conformance-audit,Examples,medium,3,pav,Backlog,CIP-25: Cross-Chain Architecture,[Examples] Cross-chain example dapp(s): bridge / oracle / lending demo
+COW-1790,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§17 Security controls
+COW-1789,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§16 Protocol constants (MCP_PROTOCOL_VERSION
+COW-1788,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§14.3 Per-actor tool-list cache keyed by (actor
+COW-1787,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§14.1 Gateway MCP server impl
+COW-1786,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§13 Reserved _cowboy_* tool-name namespace
+COW-1785,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§12.4 pass/subscription credential evaluation ahead of charge per CIP-18
+COW-1784,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§12.3 Credential normalization to PaymentIntent + PaymentGate verify/settle
+COW-1783,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§12.2 Payment-required -32402 error frame with MPP challenges + x402_compat
+COW-1782,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§12.1 No-payment dispatch for pays=actor routes
+COW-1781,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§11.5 Error mapping
+COW-1780,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§11.4 Response mapping HttpResponseEnvelope→MCP content[]/isError/_meta
+COW-1779,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§11.3 Dispatch
+COW-1778,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§11.2 Translation to synthetic HttpRequestEnvelope (path param substitution
+COW-1777,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§11.1 tools/call request handling (name
+COW-1776,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§10.4 Tool name mapping = tool_name_prefix + sanitize(target.name)
+COW-1775,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§10.3 Schema-compatibility check across routes sharing a method name (skip
+COW-1774,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§10.3 Input schema derivation from path params + OpenAPI doc
+COW-1773,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§10.2 Tool entry shape (name/description/inputSchema/_meta.cowboy)
+COW-1772,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§10.1 tools/list generation algorithm
+COW-1771,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§9 Non-advertisement of resources/prompts/completions/sampling capabilities
+COW-1770,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§9 initialize capability negotiation
+COW-1769,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8.1 Session state limited to
+COW-1768,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8.1 Session termination via DELETE or MCP_SESSION_IDLE_TIMEOUT_SECONDS
+COW-1767,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8.1 Session lifecycle
+COW-1766,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8 Endpoint intercepted before route resolution (Gateway pre-routing)
+COW-1765,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8 405 Method Not Allowed for other methods on /_cowboy/mcp
+COW-1764,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§8 MCP endpoint at /_cowboy/mcp over streamable HTTP transport (POST/GET)
+COW-1763,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§7 Composition with payment.gate
+COW-1762,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§7 Prerequisite enforcement
+COW-1761,CIP-conformance-audit,Gateway,-,0,unassigned,Backlog,CIP-19: Gateway MCP Ingress,§7 `ingress.mcp` entitlement id with params (server_name
+COW-1186,CIP-conformance-audit,Gateway,high,2,unassigned,Backlog,CIP-18: Payments,[Gateway] CIP-19 MCP gating: /_cowboy/mcp endpoint + JSON-RPC error -32402
+COW-1185,CIP-conformance-audit,Gateway,high,2,unassigned,Backlog,CIP-18: Payments,[Gateway] PaymentPolicy cache + per-route lookup
+COW-1180,CIP-conformance-audit,Gateway,high,2,unassigned,Backlog,CIP-18: Payments,[Gateway] x402 wire format verifier (replace 501 stub)
+COW-924,CIP-conformance-audit,Gateway,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Gateway] Direct RAS+QUIC reader replacing HTTP wrapper
+COW-1189,CIP-conformance-audit,Gateway,low,4,unassigned,Backlog,CIP-18: Payments,[Gateway] /_cowboy/payment/openapi.json discovery endpoint
+COW-1407,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,§8.2 Batch-proof node deduplication across keys
+COW-1406,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,§7.3 Auxiliary-index full/incremental rebuild-from-ledger routine
+COW-1405,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,§5.4/CIP-17 Non-existence (exclusion) proofs for absent keys
+COW-1404,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,§8.1/§11 Height-indexed QMDB snapshots + SNAPSHOT_INTERVAL (1024)
+COW-1403,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,§8.1 Fast sync (download QMDB state at height H
+COW-1402,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.11 async/await deterministic FIFO scheduling + ban on
+COW-1401,CIP-conformance-audit,Node,-,0,pav,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.4 Deterministic GC
+COW-1400,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.6 Exception-handling cost metering (fixed cycles for raise /
+COW-1399,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.8 Import penalty cycle costs not charged
+COW-1398,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.10 String encoding determinism cost '10 + len(input) cycles' for
+COW-1397,CIP-conformance-audit,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,§2.2.4.2 Built-in function cost proportional to argument size (sum()/max()
+COW-1284,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] Cross-validator root-computation conformance test
+COW-1281,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] fork() O(1) clone: child.storage_root = parent.storage_root (replaces enumeration stopgap)
+COW-1280,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,"[Node] Gas formula for trie updates: deterministic, bounded cost per state_set / state_delete"
+COW-1277,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] state_set / state_delete recompute storage_root in cross-call write-set
+COW-1276,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] Per-actor Merkle subtree commitment in state store
+COW-1275,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] Add `storage_root: Digest` field to Actor record + Actor codec version bump
+COW-1266,CIP-conformance-audit,Node,high,0,pav,Todo,"Whitepaper — Economics, Entitlements & Genesis",[Node] Initial governance parameter state at 0x09 at genesis
+COW-1265,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Node] Genesis supply allocation: 1B CBY split 66.67% Company Reserve / 33.33% Network Distribution
+COW-1261,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Node] Treasury (0x08) state model: TreasuryState struct + inbound-flow accounting + governance withdrawal
+COW-1260,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Node] Inflation schedule: decreasing 8%/6%/4%/3%/2% curve + security-floor trigger
+COW-1259,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Node] Validator reward minting: per-block inflation for the 180M CBY validator pool
+COW-1253,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",[Node] Enforce 64 KiB inline blob cap at tx validation (WP §7.1)
+COW-1229,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] STF determinism integration test (same block + state → identical state root across two validators)
+COW-1228,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Reconcile STORAGE_EPOCH_BLOCKS: code 7200 (1h) vs WP §13 rent_epoch_length 86400 (1d)
+COW-1226,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles","[Node] Register unallocated system actors: 0x0D-0x12 (Route Registry, Gateway Registry, Receipt Registry, Container Registry, PaymentGate, Stream Key Manager)"
+COW-1212,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",[Node] VERIFY: chain_id in transaction signing payload (cross-fork replay risk)
+COW-1206,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node] Validator equivocation detection + slashing aggregation (Cowboy-side)
+COW-1203,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node] Validator set lifecycle: register / activate / exit / withdraw + epoch snapshot
+COW-1202,CIP-conformance-audit,Node,high,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node] VRF-based transaction ordering inside a block (WP §6.5)
+COW-1191,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[Node/Examples] ContinuousClearingAuction actor skeleton + clear_block algorithm
+COW-1188,CIP-conformance-audit,Node,high,2,pav,Backlog,CIP-18: Payments,[Node/Gateway] Nonce replay protection: atomic consumption on settlement
+COW-1183,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,"[Node] Four payment models: per-request, actor-funded budget, prepaid pass, epoch subscription + fallback chain"
+COW-1182,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,[Node] PaymentAuthorization struct + Ed25519 signing semantics
+COW-1181,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,[Node] PaymentIntent normalization (MPP and x402 → single shape)
+COW-1179,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,[Node] MPP wire format: WWW-Authenticate: Payment header + HMAC-SHA256 binding
+COW-1178,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,"[Node] PaymentGate system actor: state schema + instructions (settle, credit_inbound, refund, redeem_pass, subscribe)"
+COW-1177,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-18: Payments,[Node/Spec] PaymentGate system actor address: resolve 0x0013 (CIP-18) vs 0x11 (WP r2)
+COW-1148,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-29: On-Chain Event Hooks,[Node] Refund mechanism: actually credit cycle refunds to subscriber accounts
+COW-1137,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-28: Cowboy Agent Banking,"[Node] SpendWindow rolling-window enforcement (hourly / daily / monthly, M1 fixed-window)"
+COW-1136,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] charge_gas pipeline: Phase 1 reservation + Phase 2 settlement (§4.2)
+COW-1135,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] Card address derivation: keccak256 domain (§2.6)
+COW-1134,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] BankActor system actor `0x0D`: registration + state schema + handler stubs
+COW-1110,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,"[Node] FreshnessAnchor: nonce + deadline + generated_at, with replay tracking"
+COW-1108,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] Root certificate registry + governance-delayed UpdateCpuRoot / UpdateNrasRoot
+COW-1107,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,"[Node] Quote-format parsers: TDX TDQuoteV4, SNP AttestationReport, Nitro COSE_Sign1"
+COW-1103,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] Attestation-first runner registration (registry → 0x05::VerifyCae cross-call)
+COW-1102,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] MeasurementBinding type + Runner Registry extension (per-runner allowed measurements + status)
+COW-1101,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,"[Node] 8-step verify_cae pipeline (freshness, replay, cert chain, measurement, REPORTDATA, service sig, NRAS JWT, nonce insertion)"
+COW-1100,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] TEE Verifier `0x05` system actor: opcodes 57–60 (VerifyCae / UpdateCpuRoot / UpdateNrasRoot / GcNonces) + state
+COW-1099,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] Composite attestation binding rule: REPORTDATA = keccak(nonce ‖ service_pubkey ‖ gpu_measurement)
+COW-1098,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] CompositeAttestation envelope (CAE v1) struct + canonical encoding
+COW-1088,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Node/Examples] Swap routers: actor-router (flexible) + platform-router (amm_swap_exact_in/_out)
+COW-1087,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,"[Node/Examples] Pool factory + registry (create_v2_pool, create_v3_pool, get_pool by (tokenA, tokenB, fee))"
+COW-1086,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,"[Node/Examples] V3 concentrated-liquidity pool: ticks, positions, fee accumulators"
+COW-996,CIP-conformance-audit,Node,high,2,pav,Backlog,CIP-7: Watchtower (Simple Stream Protocol),"[Node] Ring buffer + strict per-stream sequence (head_sequence, floor_sequence, gap detection)"
+COW-921,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Emit ManifestCommitted chain event on successful commit_manifest (AMEND 9-H)
+COW-919,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] PoR challenge timer via CIP-5 with fee_payer = STORAGE_MANAGER
+COW-917,CIP-conformance-audit,Node,high,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node/RAS] Implement Proof-of-Retrievability (PoR) on-chain mechanism
+COW-1269,CIP-conformance-audit,Node,low,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Node] Treasury state rent: define grace threshold for system actor 0x08
+COW-1237,CIP-conformance-audit,Node,low,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node/Spec] Lane-aware STF: WP §3 should reference WP §6.3 lane budgets explicitly
+COW-1143,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] CIP-12 governance integration for RegisterBank (§3.4)
+COW-1123,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Node] Cross-chain proof TTL enforcement (finalized_at + max_age)
+COW-1121,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Node] Dual-backend defense-in-depth (B.6 pattern 1): combine two independent anchors
+COW-1029,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-12: On-Chain Governance & System Actor Upgrades,[Node] Foundation-separation enforcement: protocol prevents Foundation from being added to system_deployers
+COW-1003,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-7: Watchtower (Simple Stream Protocol),[Node/SDK] Optional CIP-2 ingestion config: timer → task submission → transform → encrypt → publish
+COW-984,CIP-conformance-audit,Node,low,4,pav,In Review,CIP-5: Native Timer Mechanism,[Node] Validate TimerConfig invariants at governance-update time
+COW-980,CIP-conformance-audit,Node,low,4,pav,Todo,CIP-4: State Storage & Persistence,[Node] Rent ↔ deferred-tx interaction tests (evicted actors' deferred queue)
+COW-979,CIP-conformance-audit,Node,low,4,pav,Todo,CIP-4: State Storage & Persistence,[Node] Historical state queries (proof-of-historical-state for light clients)
+COW-970,CIP-conformance-audit,Node,low,4,pav,Todo,CIP-3: Dual-Metered Fee Model,[Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering
+COW-938,CIP-conformance-audit,Node,low,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Verify CIP-31 Tier-0 parameter wiring vs hardcoded Rust constants
+COW-1283,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] Migration policy: pick wipe (devnet/testnet) vs online (any future mainnet) + implementation
+COW-1282,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node/RPC] Expose per-actor proof endpoint: `GET Actor.storage_root` + opens against subtree
+COW-1279,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-30: Per-Actor Storage Root,[Node] Define the well-known empty-trie root constant for the chosen scheme
+COW-1267,CIP-conformance-audit,Node,medium,0,pav,Todo,"Whitepaper — Economics, Entitlements & Genesis",[Node] Entitlement Registry (0x07): state schema + grant/revoke history + audit trail
+COW-1256,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",[Spec/Node] Align CIP-4 actor-state rent epoch and CIP-9 CBFS volume rent epoch (avoid orphaned-volume drift)
+COW-1255,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",[Node] Implement `host: blob commit (per KiB) = 40 cycles` metering
+COW-1254,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",[Node] Two-tier blob pricing: inline (≤64 KiB cells-metered) vs CBFS (>64 KiB storage-rent)
+COW-1236,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Cross-system-actor reentrancy/call-graph integration tests
+COW-1234,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Genesis: ensure all system actors (0x01..0x0C + 0x1D + reserved 0x0D..0x12) have code deployed at genesis
+COW-1233,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Cross-system-actor reentrancy + call-graph audit
+COW-1232,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Document precompile gas-cost table + verify against WP §3.5 examples
+COW-1230,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[Node] Epoch boundary processing order: define & test pre-tx vs post-tx ordering of rent/inflation/validator-set/basefee
+COW-1220,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",[Node] Deferred-tx concurrency tests: FIFO under concurrent same-sender deferreds
+COW-1219,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",[Node] Mempool: per-peer rate limit + sustained-load eviction tests
+COW-1216,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",[Node/Spec] Reconcile MAX_EMITS_PER_TX (16) vs WP §3 message fanout cap (1024)
+COW-1215,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",[Node] Access-list validation: replace empty stub with actual checks
+COW-1210,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node] P2P peer scoring + anti-spam at gossip layer
+COW-1209,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node/Spec] Full state sync protocol: state-trie chunk download + recovery
+COW-1207,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness","[Node] Cowboy-level integration tests for consensus invariants (finality, view change, validator-set transition)"
+COW-1205,CIP-conformance-audit,Node,medium,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",[Node] Block QC signer bitmap (finality-proof verification)
+COW-1187,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-18: Payments,[Node] payment.gate entitlement registration
+COW-1152,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-29: On-Chain Event Hooks,[Node/SDK] Payload schema validation at emit + subscribe time
+COW-1150,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-29: On-Chain Event Hooks,[Node] Manifest entitlement gating for event subscription (prevent untrusted spam)
+COW-1149,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-29: On-Chain Event Hooks,[Node] Subscriber actor deletion between emit and H+1 fire: emit a SubscriptionExpired event
+COW-1147,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-29: On-Chain Event Hooks,[Node] Receipt schema: triggered_by_emit field for async causality correlation
+COW-1142,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,"[Node] FiatMintVoucher signature verification + replay protection (§3.3, §6.2)"
+COW-1141,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] Timer-deferred tx double-accounting (§4.3)
+COW-1140,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] Card state machine: Active / Frozen / Closed / Expired transitions (§5.3)
+COW-1139,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,"[Node] Emit nine event types (CardIssued, CardDeposited, CardWithdrawn, GasCharged, Frozen, Unfrozen, PolicyUpdated, OwnershipTransferred, BankRegistered) (§3.6)"
+COW-1138,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Node] Whitelist enforcement: allowed_receivers + allowed_syscall_kinds
+COW-1117,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Node] Cross-chain fee prepayment + relayer bounty (20% treasury / 80% relayer)
+COW-1116,CIP-conformance-audit,Node,medium,3,pav,Backlog,CIP-25: Cross-Chain Architecture,"[Node] Cross-chain message timeout + cancellation (expiry, reclaim, on_timeout)"
+COW-1115,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Node] Fraud-proof window + slashing for runner-committee backend
+COW-1109,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node] CRL / TCB-update lifecycle handling
+COW-1093,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Node/Examples] Fee handling: protocol fee vault + DAO treasury distribution
+COW-1092,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Node/Examples] CIP-22 auction → CIP-21 pool graduation
+COW-1091,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Node/Examples] V3 position manager: positions as transferable NFTs
+COW-1090,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Node/Examples] Native TWAP oracle via timer-driven price-cumulative tracking
+COW-1089,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,"[Node/Examples] Validation hooks: can_swap, on_swap, can_add_liquidity, can_remove_liquidity"
+COW-1076,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-20: Fungible Token Standard,[Node] Multi-token aggregator / multicall for batch operations across token IDs
+COW-1074,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-20: Fungible Token Standard,[Node] Permits / EIP-2612-equivalent gasless approval + increase_allowance / decrease_allowance
+COW-1028,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-12: On-Chain Governance & System Actor Upgrades,[Node] Replace vote-weight=1 with stake-weighted ERC20Votes-style checkpoints
+COW-1005,CIP-conformance-audit,Node,medium,3,pav,Backlog,CIP-7: Watchtower (Simple Stream Protocol),[Node] Deterministic stream event emission
+COW-1002,CIP-conformance-audit,Node,medium,3,pav,Backlog,CIP-7: Watchtower (Simple Stream Protocol),"[Node] Paid-mode billing: fee_per_key_epoch_cby, protocol_fee_bps, key_epoch_blocks"
+COW-997,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-7: Watchtower (Simple Stream Protocol),"[Node/SDK] Filter DSL (depth ≤4, ≤16 predicates) — validation + compilation + evaluation"
+COW-983,CIP-conformance-audit,Node,medium,3,pav,In Review,CIP-5: Native Timer Mechanism,[Node] Test TimerExpired event when current_height > expires_at
+COW-982,CIP-conformance-audit,Node,medium,3,pav,In Review,CIP-5: Native Timer Mechanism,[Node] Test TimerCancelledInsufficientFunds event emission
+COW-981,CIP-conformance-audit,Node,medium,3,pav,In Review,CIP-5: Native Timer Mechanism,[Node] Integration test: timer pre-charge/refund roundtrip
+COW-964,CIP-conformance-audit,Node,medium,3,pav,Todo,CIP-3: Dual-Metered Fee Model,"[Node] Large-integer arithmetic surcharge: base_cost + max(bitlen(a), bitlen(b))/64"
+COW-963,CIP-conformance-audit,Node,medium,3,pav,Todo,CIP-3: Dual-Metered Fee Model,[Node] Complete per-bytecode instruction cost table (string/list concat dynamic surcharges)
+COW-962,CIP-conformance-audit,Node,medium,3,pav,Todo,CIP-2: Verifiable Off-Chain Compute,[Node] Dispute window: on-chain challenge / evidence / re-verification handler
+COW-929,CIP-conformance-audit,Node,medium,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Relay registry: add relay_identity_pubkey + chain-verified handshake
+COW-927,CIP-conformance-audit,Node,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] POST /ras/challenge endpoint + chain-state challenge records
+COW-2090,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",§3.3 Exactly-once-after-finality vs at-least-once-before-finality delivery
+COW-2089,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",§3.3 dedup_window retention guarantee (entries retained ≥
+COW-2088,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles","§3.3 Per-tx fanout hard limit of 1,024 messages (incl nested)"
+COW-2085,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",§3.1 /tmp scratch space per-invocation cap at 256 KiB
+COW-2022,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",§15 No per-actor 'list entitlements for actor' RPC
+COW-2021,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",§13 Container Image Registry (0x0A) per WP §9 table not deployed as a
+COW-2020,CIP-conformance-audit,Other,-,0,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis",§8.4 Slashed stake -> 100% burned
+COW-2019,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",§8.3 Vesting schedules absent
+COW-2011,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",CBFS §2.6 prefix-overlap rejection on write-token issuance
+COW-2010,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage","CBFS §8.1 fee components VOLUME_CREATION_FEE=1,000 CBY"
+COW-2009,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage","CBFS §6.3 RELAY_UNSTAKE_DELAY=7,200-block cooldown after full drain"
+COW-2007,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",CBFS §7.1/§7.2/§7.4 on-chain PoR challenge loop
+COW-2005,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",WP §4.3/§State-Rent dynamic rent_rate adjustment
+COW-1945,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",Appendix A TV1 (unsigned) and TV2 (signed) test vectors (exact CBOR hex
+COW-1944,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§2.5 signing hash defined as keccak256(CBOR(Tx_without_signature)) over
+COW-1943,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§2.5 to=null for actor creation and access_list as null|[[address
+COW-1942,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§2.5 canonical-CBOR ARRAY encoding in fixed field order (Tx = [chain_id
+COW-1941,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§2.4 EBNF Header field order
+COW-1937,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§2.1 field-set deviation
+COW-1935,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§1.2 exact derivation formula deviates
+COW-1934,CIP-conformance-audit,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",§1.2 python_source canonicalization (UTF-8
+COW-2056,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),Standardized C-ABI cross-VM call wrapper for PVM<->future-EVM (WP Storage
+COW-2055,CIP-conformance-audit,PVM,-,0,pav,Backlog,Whitepaper — Python Actor VM (PVM),Runtime integer bit-length enforcement (>4096 bits produced via arithmetic
+COW-2054,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),set_interval(every_n_blocks
+COW-2051,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),Eval/exec/compile/globals-modification reflection block as explicit
+COW-2050,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),Prohibition of `is` identity comparisons on strings/numbers (WP §3
+COW-2049,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),decimal module fixed rounding (ROUND_HALF_EVEN) + fixed precision
+COW-2048,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),Fixed recursion limit = 256 integrated with cycle metering (WP §3 'Fixed
+COW-1507,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),§14.3 token.* entitlement IDs (token.create/transfer/mint/burn) are NOT
+COW-1506,CIP-conformance-audit,PVM,-,0,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),§11.5 canonical-ordering residual (minor/partial)
+COW-1248,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Exception-mapping determinism: identical input → identical `HostError` across validators
+COW-1244,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Activate determinism integration tests currently marked #[ignore]
+COW-1243,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Cross-platform determinism CI test (Linux x86 vs macOS ARM)
+COW-1241,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Explicit GC disable + cycle-detection rejection
+COW-1240,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Graceful stack-overflow handling (remove RUST_MIN_STACK workaround)
+COW-1239,CIP-conformance-audit,PVM,high,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Enforce per-call heap cap (10 MiB); currently MAX_MEMORY_SIZE = isize::MAX
+COW-1199,CIP-conformance-audit,PVM,high,2,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],[PVM] Q96 math + SortedMap availability (host functions or SDK library)
+COW-1085,CIP-conformance-audit,PVM,high,2,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[PVM] Build platform AMM host functions (amm_get_amount_out / amm_get_amount_in / amm_quote / amm_tick_to_sqrt_price / amm_sqrt_price_to_tick / amm_get_liquidity_for_amounts / amm_get_amounts_for_liquidity)
+COW-1251,CIP-conformance-audit,PVM,low,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Snapshot/rollback scope: clarify checkpoint vs failure-isolation semantics
+COW-1131,CIP-conformance-audit,PVM,low,4,unassigned,Backlog,CIP-26: Account-Scoped Actor Libraries,[PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable
+COW-1250,CIP-conformance-audit,PVM,medium,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Document the per-instruction (Phase 2a observe-only) gas plan + cutover criteria
+COW-1249,CIP-conformance-audit,PVM,medium,0,pav,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Bytecode cache: instrumentation + persistence across handler calls
+COW-1247,CIP-conformance-audit,PVM,medium,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM/Spec] Normative host-function table with gas costs in WP §3
+COW-1245,CIP-conformance-audit,PVM,medium,0,unassigned,Backlog,Whitepaper — Python Actor VM (PVM),[PVM] Test memory + cells limit enforcement at handler boundary
+COW-993,CIP-conformance-audit,PVM,medium,3,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[CI] E2E continuation tests on live PVM sandbox
+COW-1622,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§15.6 QUIC+TLS1.3 transport replacing plaintext HTTP for job content
+COW-1621,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§14 Three-phase migration (Shadow / Hot Path / Sunset) gated by
+COW-1620,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§13 CIP-11 system constants (MIN/MAX_SUBSET
+COW-1619,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§12.4 Hello.version=1 versioning + Goodbye{unsupported_version} on
+COW-1618,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§12.3 VotePresenceBitmap inter-validator encoding
+COW-1617,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§12.1/§12.2 Length-prefixed CBOR frame envelope + full frame-type table
+COW-1616,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§11.3 QUIC connection-loss handling + exponential-backoff reconnect
+COW-1615,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§11.1 Per-dispatch ACK_TIMEOUT_BLOCKS HardFailure -> clear presence
+COW-1614,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§10.6 Dispatch Outcome classification
+COW-1613,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§10.5 JobCancel (0x24) push frame on reassignment/expiry/failure
+COW-1612,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§10.4 JobProgress (0x22) optional streaming progress
+COW-1611,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§10.3 JobResult (0x23) streamed back on job stream + signature
+COW-1610,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§10.2 JobAck (0x21) with AckStatus Accepted/Duplicate/Reject
+COW-1609,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§9.4 Result Verifier write path
+COW-1608,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§9.4 New dispatcher state
+COW-1607,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§9.3 MRU weight multiplier on Fisher-Yates iteration 0 only
+COW-1606,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§9.1 Dispatcher Filter 1.5 Presence
+COW-1605,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§8.4 Registry-order indexing of bitmaps as of parent block
+COW-1604,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§8.2 presence_threshold(n)=floor((n-1)/3)+1 (f+1)
+COW-1603,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§8.1 Canonical Presence Bitmap P(H) derived deterministically from
+COW-1602,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§7.2 Per-validator bitmap construction (open auth stream + recent ping +
+COW-1601,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§7.1 Vote payload extension
+COW-1600,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§6.5 CapabilityDelta (0x13) advisory runtime capability/entitlement updates
+COW-1599,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§6.4 BackpressureSignal (0x12) accepting_new=false -> validator clears bit
+COW-1598,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§6.3 Control-stream HeartbeatPing/HeartbeatPong (0x10/0x11) once per
+COW-1597,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§6.2 Per-IP Hello rate-limit for connection-storm DoS
+COW-1596,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§6.2 Pubkey-bound TLS handshake + Hello/HelloAck (0x01/0x02) frames with
+COW-1595,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§5.3 Subset rotation per SUBSET_EPOCH_BLOCKS / VALIDATOR_CHURN_THRESHOLD
+COW-1594,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§5.2 Validator-side DoS gate
+COW-1593,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§5.1 Subset size k = clamp(ceil(log2(|V|))+1
+COW-1592,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,"§5.1 Connectivity Subset function Sub(R,t)=first k validators by"
+COW-1591,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§4.1/§10.1 Push job delivery
+COW-1590,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-11: Runner Connectivity & Push Job Delivery,§4.1/§6.1 Persistent QUIC (RFC9000)+TLS1.3 runner->validator control
+COW-1588,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],v2 §5 system instruction opcodes 61–64 (RegisterBaseImage /
+COW-1587,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],v2 §4 BillingAttestation.tee_signature
+COW-1586,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],v2 §3 three-flow independent escrow model with container flow settling at
+COW-1585,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],v2 §2 ContainerSettlementConfig {runner 89% / treasury 1% / burn 10%}
+COW-1584,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],v2 §1 Container Registry actor address 0x10
+COW-1583,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],Appendix B default seccomp profile (allowed/blocked syscall categories)
+COW-1582,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§14.6 GPU side-channel mitigations (NVIDIA MIG isolation
+COW-1581,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§14.5 clean container env / no host-fs / no docker socket / TEE-sealed
+COW-1580,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§14.2 image supply-chain (digest pinning
+COW-1579,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§14.1 container-escape mitigations (namespace isolation
+COW-1578,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§13 parameter set (MAX_CPU_MILLICORES
+COW-1577,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§12.4 attestation-based compute settlement distinct from CIP-3 Cycles/Cells
+COW-1576,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§12.3 BillingAttestation {cpu_used
+COW-1575,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§12.2 image-pull egress fees (pull_cost = size * EGRESS_FEE_PER_BYTE
+COW-1574,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§12.1 compute-resource billing (max_compute_cost lock at submit_task from
+COW-1573,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§11.3 CIP-4 STORAGE key-space layout for image/class entries (keccak256
+COW-1572,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§11.2 Container Registry system actor (BaseImageEntry
+COW-1571,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§11.1 OffchainTask.runtime_config
+COW-1570,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§10.4 container exit-code → CIP-2 status mapping (0→COMPLETED
+COW-1569,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§10.3 failure-mode handling (OOM kill
+COW-1568,CIP-conformance-audit,Runner,-,0,unassigned,Backlog,CIP-10: Runner Container Runtime [Canceled],§10.1–10.2 full container lifecycle (image pull → create
+COW-1301,CIP-conformance-audit,Runner,high,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,"[Node/Runner] BillingAttestation CAE freshness audit: per-event generation, no cached reuse"
+COW-1114,CIP-conformance-audit,Runner,high,2,unassigned,Backlog,CIP-25: Cross-Chain Architecture,"[Node/Runner] Runner-committee attestation verifier (2-of-3 signature aggregation, threshold check)"
+COW-957,CIP-conformance-audit,Runner,high,2,pav,Todo,CIP-2: Verifiable Off-Chain Compute,"[Node/Runner] TEE attestation verification pipeline (SGX, SEV-SNP, TDX, AWS Nitro)"
+COW-1122,CIP-conformance-audit,Runner,low,4,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Runner] Runner job type `generate_inclusion_proof` (third-party proof service)
+COW-1184,CIP-conformance-audit,Runner,medium,3,unassigned,Backlog,CIP-18: Payments,[Node/Runner] EVM bridge facilitator: bridge.facilitate.evm entitlement + BridgeEvidence + credit_inbound
+COW-1120,CIP-conformance-audit,Runner,medium,3,pav,Backlog,CIP-25: Cross-Chain Architecture,[Node/Runner] min_confirmations configurable per source chain (probabilistic finality)
+COW-1119,CIP-conformance-audit,Runner,medium,3,unassigned,Backlog,CIP-25: Cross-Chain Architecture,[Runner] Runner-side reorg detection daemon + commitment_revoked primitive
+COW-1111,CIP-conformance-audit,Runner,medium,3,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Node/Runner] NVIDIA NCC GPU attestation (NRAS token + verification)
+COW-1012,CIP-conformance-audit,Runner,medium,3,unassigned,Backlog,CIP-8: MPP Session Semantics,[Node/Runner] Pin production COWBOY_SESSION_CHAIN_ID
+COW-1011,CIP-conformance-audit,Runner,medium,3,pav,Backlog,CIP-8: MPP Session Semantics,[Runner] Extend session integration tests to full E2E flow
+COW-937,CIP-conformance-audit,Runner,medium,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,"[Runner] Add CIP-9 integration tests (manifest round-trip, access modes, cache stress)"
+COW-1153,CIP-conformance-audit,SDK,low,4,pav,Backlog,CIP-29: On-Chain Event Hooks,[SDK] @emit / @on_event decorators in cowboy_sdk
+COW-1083,CIP-conformance-audit,SDK,low,4,unassigned,Backlog,CIP-20: Fungible Token Standard,[SDK] Allowance pagination + bulk-query for large holder lists
+COW-1081,CIP-conformance-audit,SDK,low,4,pav,Backlog,CIP-20: Fungible Token Standard,[SDK] Verify + complete /pvm/Lib/token.py host-call bindings
+COW-991,CIP-conformance-audit,SDK,low,4,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[SDK] Address scheme forward-compat plan beyond 20-byte Ethereum
+COW-990,CIP-conformance-audit,SDK,low,4,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[SDK] Reentrancy guard: optional per-call key arg to avoid factory-pattern collisions
+COW-989,CIP-conformance-audit,SDK,low,4,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[SDK] Entitlement subset comparison operator
+COW-992,CIP-conformance-audit,SDK,medium,3,pav,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[SDK] Mirror missing continuation features in standalone `cowboy` package
+COW-988,CIP-conformance-audit,SDK,medium,3,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[SDK] @on_stream(stream_id) decorator + stream_publish() helpers (CIP-7)
+COW-987,CIP-conformance-audit,SDK,medium,3,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),"[SDK] Actor-side runtime.mount(volume_id, access_mode) for CBFS workflows"
+COW-1278,CIP-conformance-audit,Spec,high,2,pav,Todo,CIP-30: Per-Actor Storage Root,[Spec] Decide trie scheme: normatively fix one Merkle scheme vs leave implementation-defined
+COW-1227,CIP-conformance-audit,Spec,high,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles","[Spec] Address collision audit: pick one home for each pending system actor (BankActor, Stream Key Manager)"
+COW-1073,CIP-conformance-audit,Spec,high,2,pav,Backlog,CIP-20: Fungible Token Standard,[Spec] Bridge / lock-and-mint CIP for ETH ↔ Cowboy L1 (blocking $COWBOY Aug 2026 launch)
+COW-1303,CIP-conformance-audit,Spec,low,4,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[Spec] Block-time constant alignment audit across v2 CIPs (1s block target)
+COW-1289,CIP-conformance-audit,Spec,low,4,pav,Todo,CIP-13: Runner Stake Delegation,[Spec/Process] Master opcode allocation table: versioning + drift-detection process
+COW-1271,CIP-conformance-audit,Spec,low,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[Spec] Cross-CIP parameter traceability matrix: WP §8/§13 → CIP refs → 0x09 storage keys
+COW-1155,CIP-conformance-audit,Spec,low,4,pav,Backlog,CIP-29: On-Chain Event Hooks,"[Spec] Handler signature canonicalization: handler(emitter, topic, payload) vs handler(payload)"
+COW-1010,CIP-conformance-audit,Spec,low,4,pav,Backlog,CIP-8: MPP Session Semantics,"[Spec] Normalize naming: expires_at → expires_at_block, opened_at → opened_at_block"
+COW-1009,CIP-conformance-audit,Spec,low,4,unassigned,Backlog,CIP-8: MPP Session Semantics,[Spec/Code] Document deferred SessionStatus::Slashed variant
+COW-1008,CIP-conformance-audit,Spec,low,4,unassigned,Backlog,CIP-8: MPP Session Semantics,[Spec] Clarify SessionStatus::Disputed fields
+COW-1257,CIP-conformance-audit,Spec,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage","[Spec] Document blob lifecycle: TTL, expiry, pruning policy"
+COW-1252,CIP-conformance-audit,Spec,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage",[Spec] Retitle WP §4 + clarify that Cowboy has no separate DA layer (all blob storage is CBFS)
+COW-1190,CIP-conformance-audit,Tests,high,2,unassigned,Backlog,CIP-18: Payments,[Tests] End-to-end payment test suite (MPP + x402 + bridge + replay + refund)
+COW-1156,CIP-conformance-audit,Tests,low,4,pav,Backlog,CIP-29: On-Chain Event Hooks,[Tests] Multi-emit receipt correlation (combined effect from N emits in one tx)
+COW-1015,CIP-conformance-audit,Tests,low,4,unassigned,Backlog,CIP-8: MPP Session Semantics,[Tests] Assert usage_digest is opaque (never inspected on-chain)
+COW-1270,CIP-conformance-audit,Tests,medium,0,pav,Todo,"Whitepaper — Economics, Entitlements & Genesis",[Tests] TGE / block-0 invariant test suite
+COW-1258,CIP-conformance-audit,Tests,medium,0,unassigned,Backlog,"Whitepaper — Data Availability, Blobs & Storage","[Tests] Integration tests for blob lifecycle (inline cap, CBFS anchoring, volume eviction)"
+COW-1201,CIP-conformance-audit,Tests,medium,3,unassigned,Backlog,CIP-22: Continuous Clearing Auctions [Blocked on CIP-21],"[Tests] Clearing math edge cases (pro-rata rounding, tie-break, partial fill, max u256)"
+COW-1145,CIP-conformance-audit,Tests,medium,3,unassigned,Backlog,CIP-28: Cowboy Agent Banking,[Tests] End-to-end card lifecycle integration tests
+COW-1125,CIP-conformance-audit,Tests,medium,3,pav,Backlog,CIP-25: Cross-Chain Architecture,[Tests] End-to-end cross-chain integration tests + adversarial cases
+COW-1096,CIP-conformance-audit,Tests,medium,3,unassigned,Backlog,CIP-21: DEX & Liquidity Pools,[Tests] Multi-hop routing + factory + hooks + TWAP integration tests
+COW-1078,CIP-conformance-audit,Tests,medium,3,pav,Backlog,CIP-20: Fungible Token Standard,"[Tests] Token hook coverage: rejection, gas limit, set_hook, transfer_ownership"
+COW-1077,CIP-conformance-audit,Tests,medium,3,unassigned,Backlog,CIP-20: Fungible Token Standard,[Tests] Token freeze / unfreeze coverage + frozen-account-blocks-transfer
+COW-173,Docs,Docs,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Add configuration reference documentation
+COW-87,Docs,Docs,-,0,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Implement API reference documentation
+COW-422,Docs,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Docs: architecture deep-dives (from whitepaper)
+COW-413,Docs,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Docs: annotated full examples
+COW-412,Docs,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work","Docs: PVM reference (whitelist, rules, metering)"
+COW-411,Docs,Tooling,-,2,pav,Backlog,"Node Hardening, Tooling & Supporting Work",Docs: auto-generated SDK reference
+COW-410,Docs,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work",Docs: task-oriented guides (how to do X)
+COW-409,Docs,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work","Docs: concepts section (actor model, continuations, etc.)"
+COW-408,Docs,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Docs: Getting Started guide (zero to deploy in 10 min)
+COW-1342,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: erlangcowboydemo
+COW-1341,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 32-cowbot
+COW-1340,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 30-blackjack
+COW-1339,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 29-casino-rounds
+COW-1336,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 26-local-simulation
+COW-1335,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 25-auth-roles
+COW-1334,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 24-failure-recovery
+COW-1333,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 23-read-through-oracle-cache
+COW-1332,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 22-actor-escrow-workflow
+COW-1331,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 21-pure-timer-scheduler
+COW-1330,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 20-minimal-runner-continuation
+COW-1329,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 19-texas-holdem
+COW-1328,Examples,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Example: 19-multi-actor-workflow
+COW-1327,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 18-ring-demo
+COW-1326,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 17-hn-feed
+COW-1325,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 16-contract-summarizer
+COW-1324,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 15-fraud-watcher
+COW-1323,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 14-compliance
+COW-1322,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 13-dao-copilot
+COW-1321,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 12-liquidation-oracle
+COW-1320,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 11-alerts-and-schedulers
+COW-1319,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 10-content-moderator
+COW-1318,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 09-image-generation
+COW-1317,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 08-audio-transcription
+COW-1316,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 07-sentiment-analysis
+COW-1315,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 06-content-recommendations
+COW-1312,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 03-rebalancing-agent
+COW-1311,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 02-liquidity-pools
+COW-1310,Examples,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Example: 01-tokens
+COW-750,Examples,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","Example actors (counter, token launch, LLM agent, DeFi)"
+COW-1274,Feature,CIP-5,low,4,unassigned,Backlog,CIP-5: Native Timer Mechanism,Architectural: decouple timer execution from propose's critical path
+COW-2178,Feature,Node,-,3,unassigned,Backlog,CIP-15: Public Asset Hosting & HTTP Routing,[Node] Land on-chain ingress.http + static_volumes binding (prereq for CIP-15 §6.8 route-volume enforcement)
+COW-2177,Feature,Node,low,3,pav,Backlog,CIP-4: State Storage & Persistence,"[Node] Benchmark fast-sync bootstrap speedup vs genesis replay (>10x, COW-977 acceptance)"
+COW-2188,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,Security Misconfiguration: unverified S3 executable distribution in Upload binaries to S3
+COW-2186,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,Observability: Prometheus metrics for Gateway + RAS
+COW-2185,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: turnkey owner-token refresh for Cowboy-mode FUSE mount
+COW-2184,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: full relay rewards distribution (pro-rata by shard count x age)
+COW-2183,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: Proof-of-Retrievability challenge/response + PoR-miss slashing
+COW-2182,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: NodeSelector destination diversity (region / operator / health / latency)
+COW-2181,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: manifest-shard gap migration CLI (dormant-owner volumes)
+COW-2180,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,CBFS: concurrent drain coordination (destination token-bucket)
+COW-2120,Other,CBFS,-,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS/Node] GET_MANIFEST relay RPC (public assembly + cache)
+COW-2115,Other,CBFS,-,2,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS] Wire owner-auth signing to canonical encoding (registry-proto)
+COW-2112,Other,CBFS,-,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CBFS/Node] PoR: per-shard chunk-roots + shard_root + challenge nonce
+COW-2099,Other,CBFS,-,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[CIP-9] Rewrite epic: triage grounded findings from mesa bring-up (cip-9-rewrite-ideas.md)
+COW-2096,Other,CBFS,-,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node/CBFS] Mount-allowlist principal type is ambiguous (Account vs Actor)
+COW-2095,Other,CBFS,-,3,pav,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,"[Node/CBFS] (owner, name) -> volume_id resolution broken (volume info / allow-actor --name 404)"
+COW-2094,Other,CBFS,-,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Ops/CBFS] Wipe relay sled placement stores on re-genesis + add logrotate
+COW-941,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,Remove Steamtrain references from CIP-9 title
+COW-914,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,Volume commit events silently lost when using cbfs put-many
+COW-894,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,ManifestCommitted chain event subscription
+COW-886,Other,CBFS,-,0,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,GET_MANIFEST RPC client (single round trip for public volumes)
+COW-877,Other,CIP-17,-,0,unassigned,Backlog,CIP-17: Verifiable State Read RPC,GET_STATE RPC + Merkle-proof verification on routes fetch
+COW-616,Other,CIP-17,-,3,pav,Backlog,CIP-17: Verifiable State Read RPC,[L10] Panic on unexpected URI scheme input
+COW-615,Other,CIP-17,-,3,unassigned,Backlog,CIP-17: Verifiable State Read RPC,[L9] No HTTP client timeouts enables hanging requests
+COW-614,Other,CIP-17,-,3,pav,Backlog,CIP-17: Verifiable State Read RPC,[L8] TLS setup uses expect causing process crash
+COW-2111,Other,CIP-2,-,3,unassigned,Todo,CIP-2: Verifiable Off-Chain Compute,USD-pegged runner stake floor
+COW-2110,Other,CIP-2,-,4,unassigned,Todo,CIP-2: Verifiable Off-Chain Compute,CBY/USD oracle primitive
+COW-2109,Other,CIP-2,-,4,unassigned,Todo,CIP-2: Verifiable Off-Chain Compute,Activate 50/30/20 slash split + wire challenger payout + fix the split-value inconsistency
+COW-99,Other,CIP-5,-,0,unassigned,Todo,CIP-5: Native Timer Mechanism,[Timer] Add same-block exponential pricing mechanism
+COW-91,Other,CIP-5,-,0,unassigned,Todo,CIP-5: Native Timer Mechanism,[Timer] Implement progressive deposit model
+COW-78,Other,CIP-5,-,0,pav,Todo,CIP-5: Native Timer Mechanism,[DeferredTx] Add target block height validation
+COW-149,Other,CLI,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[CLI] Implement transaction signing command
+COW-915,Other,Consensus,-,0,unassigned,Backlog,"Whitepaper — Consensus, P2P & Randomness",Canyon validator stuck at height 449k after PR #474 deploy — consensus engine tracks 0 peers
+COW-625,Other,Consensus,-,3,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[L19] Invalid identity input triggers WASM panic
+COW-624,Other,Consensus,-,3,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[L18] Large participants value can panic leader selection (WASM)
+COW-623,Other,Consensus,-,3,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[L17] Malformed stream message crashes inspector listener
+COW-622,Other,Consensus,-,3,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[L16] Inspector single-shot GET requests panic on errors
+COW-613,Other,Consensus,-,3,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[L7] Deterministic genesis leader key enables chain replay
+COW-166,Other,Consensus,-,0,unassigned,Todo,"Whitepaper — Consensus, P2P & Randomness",[Block] Implement compact block representation
+COW-123,Other,Consensus,-,0,unassigned,Todo,"Whitepaper — Consensus, P2P & Randomness",[Block] Add version field to block header
+COW-179,Other,Docs,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Implement troubleshooting guide
+COW-143,Other,Docs,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Implement deployment guide
+COW-120,Other,Docs,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Add Actor development tutorial
+COW-57,Other,Docs,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Docs] Add quick start guide
+COW-1308,Other,Examples,-,3,pav,Todo,CIP-2: Verifiable Off-Chain Compute,[Examples] CIP-2 v3 end-to-end economic e2e example and case study
+COW-2179,Other,Node,-,0,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,[Node] Decouple CIP-26 cold/cached handler-load gas from the in-process bytecode cache (consensus determinism)
+COW-2152,Other,Node,-,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Validate per_relay_effective_deltas at commit (caller-trust blast radius)
+COW-2119,Other,Node,-,4,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Volume-create error taxonomy (E_VOLUME_*)
+COW-2118,Other,Node,-,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Structured InsufficientStorageCapableRunners dispatch error
+COW-2114,Other,Node,-,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Private-volume staged-commit finalize authority (DEK-holder)
+COW-2113,Other,Node,-,2,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Node] Public-volume commit prefix-confinement check
+COW-2100,Other,Node,-,0,unassigned,Backlog,CIP-4: State Storage & Persistence,[Node] Wire fast-sync into bootstrap + ≥10× bench (COW-977 follow-up)
+COW-1307,Other,Node,-,2,pav,Backlog,CIP-3: Dual-Metered Fee Model,[Node] Meter return-data Cell consumption per spec §2.4
+COW-1306,Other,Node,-,2,unassigned,Backlog,CIP-3: Dual-Metered Fee Model,[Node] Charge PVM secp256k1 verify opcode at correct cycle cost per spec §2.3
+COW-1305,Other,Node,-,2,unassigned,Backlog,CIP-17: Verifiable State Read RPC,"[Node] Align proof endpoint paths: /proof/* → /state/*, add block_hash field, handle absent fields, prove?=false parameter"
+COW-117,Other,Node,-,0,unassigned,Todo,CIP-3: Dual-Metered Fee Model,[Gas] Add gas estimation API
+COW-2204,Other,Other,-,0,pav,Todo,,CIP-1 v3: default-GBA p50 estimator + Python ABI for custom bids / msg priority-TTL (pre-H_v3)
+COW-2203,Other,Other,-,0,unassigned,Backlog,,"CIP-31: propagate cowboy-ras economic constants to downstream copies (cbfs fork, runner pin, ras mirror)"
+COW-2147,Other,Other,-,0,unassigned,Backlog,"Whitepaper — Accounts, Transactions & Mempool",Normalize transaction execution status to a flat label in receipt RPC JSON
+COW-765,Other,Other,-,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",Entitlements implementation doesn't match the spec
+COW-626,Other,Other,-,3,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[L20] Unbounded vector encoding in entitlement
+COW-177,Other,Other,-,0,unassigned,Todo,"Whitepaper — Accounts, Transactions & Mempool",[Transaction] Implement transaction version field
+COW-630,Other,PVM,-,3,pav,Backlog,Whitepaper — Python Actor VM (PVM),[L24] Raw PVM error details echoed to clients
+COW-387,Other,PVM,-,1,pav,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),Errors: common error mapping table in PVM
+COW-386,Other,PVM,-,1,pav,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),"Errors: four-part error format (what, why, fix, link)"
+COW-378,Other,PVM,-,2,unassigned,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),SDK: correlation ID and timeout handling helpers
+COW-376,Other,PVM,-,1,pav,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),"SDK: PVM-safe helpers (vrf, time, math)"
+COW-231,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmHost] Add Host function call tracing
+COW-226,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Implement import trace export
+COW-221,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Add execution trace log level control
+COW-216,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Add whitelist/blacklist hot reload
+COW-208,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Implement parallel processor execution (reserved)
+COW-202,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmHost] Add storage access logging
+COW-195,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Add memory usage tracking
+COW-187,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Add execution metrics Prometheus export
+COW-181,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Add Decimal module precision config
+COW-175,Other,PVM,-,0,pav,Todo,CIP-4: State Storage & Persistence,[PvmHost] Add storage size tracking
+COW-169,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Implement import resolution caching
+COW-163,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Implement execution error classification
+COW-158,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Add execution options validation
+COW-151,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Implement locale fixed to C.UTF-8
+COW-145,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Add NFC Unicode normalization
+COW-137,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmHost] Add storage batch read optimization
+COW-130,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Add execution statistics collection
+COW-124,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Implement execution result caching
+COW-119,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmHost] Implement state snapshot optimization
+COW-113,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Implement execution dry-run mode
+COW-105,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[Continuation] Add resume state validation
+COW-100,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Implement stack size limit
+COW-95,Other,PVM,-,0,pav,Todo,CIP-4: State Storage & Persistence,[PvmHost] Implement storage quota enforcement
+COW-94,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[Continuation] Implement FSM state machine validation
+COW-90,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Implement recursion depth limit
+COW-85,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Add execution context isolation
+COW-80,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Implement ordered_set to replace built-in set
+COW-75,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Add runtime determinism testing tool
+COW-71,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[PvmExecutor] Add execution timeout mechanism
+COW-66,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Add bytecode verification step
+COW-62,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[Continuation] Add checkpoint serialization format definition
+COW-56,Other,PVM,-,0,unassigned,Todo,Whitepaper — Python Actor VM (PVM),[Determinism] Implement stdlib hash verification
+COW-52,Other,PVM,-,0,pav,Todo,Whitepaper — Python Actor VM (PVM),[PvmRuntime] Implement module caching mechanism
+COW-46,Other,PVM,-,0,pav,Backlog,CIP-6: In-PVM Actor SDK (cowboy_sdk),[DEVNET][CIP-6] Loop + await: loop detection and continuation state explosion risk
+COW-2117,Other,Runner,-,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Runner] Registrar must require x25519 before setting storage_support
+COW-2116,Other,Runner,-,3,unassigned,Backlog,CIP-9: Cowboy File System (CBFS)-Backed Runner Storage,[Runner/Node] Wire runner deregister/re-register end-to-end
+COW-1309,Other,SDK,-,2,unassigned,Backlog,CIP-23: TEE Execution & Composite Attestation,[SDK] `tee_call` PVM SDK helper for invoking attested off-chain compute
+COW-2202,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",pagination for actors needs work
+COW-2199,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Reconcile node JobSpec protocol caps with CIP-2 (follow-up to COW-2136 / PR #624)
+COW-2172,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",need an option to login with a different account
+COW-2092,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Speed up node CI Pipeline: parallelize clippy + decouple build from test gate
+COW-1347,Other,Tooling,-,3,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Project: Keep CLI/read semantics compatible with examples
+COW-1346,Other,Tooling,-,2,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Project: Add examples CI smoke suite
+COW-1345,Other,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work",Project: Stabilize runner-backed example flow
+COW-1344,Other,Tooling,-,2,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Project: Maintain Docker example harness
+COW-1343,Other,Tooling,-,2,pav,Todo,"Node Hardening, Tooling & Supporting Work",Project: Restore multivalidator correctness on main
+COW-903,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Concurrent-request coalescing (single-flight per object)
+COW-902,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Cache warming on actor registration
+COW-901,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Compressed variants in object cache
+COW-900,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Hedged parallel shard fetch
+COW-899,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Compression: Accept-Encoding → serve precomputed gzip/br variants
+COW-898,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Conditional requests via If-None-Match against per-object ETags
+COW-897,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CORS for Volume routes (apply cors_config + permissive default)
+COW-896,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","CORS precedence for Method routes (actor wins, gateway fills from cors_config)"
+COW-895,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Verify fail-closed on malformed CBOR routes write
+COW-893,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",MANIFEST_POLL_INTERVAL-driven cache refresh loop
+COW-892,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Replace HttpCbfsClient prototype with manifest/shard split
+COW-891,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",405 Method Not Allowed on non-GET/HEAD to Volume routes
+COW-890,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Volume fallback object + status (SPA support)
+COW-889,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",resolve_volume_path (strip_prefix + volume_path_prefix)
+COW-888,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Reed-Solomon reconstruction + BLAKE3 integrity chain
+COW-887,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",GET_SHARD RPC client + K-shard reconstruction fallback
+COW-885,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","Object LRU cache keyed by (volume_id, object_path)"
+COW-884,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Per-volume metadata cache (manifest + content_types + cache_config + cors_config)
+COW-883,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Wire CIP-18 payment gating (replace NotReadyVerifier)
+COW-882,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","Operational metrics surface (hit/miss, per-actor RPS, per-route p50/p95/p99)"
+COW-881,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",Confirm named-handler dispatch on validator /actor/read + /submit_wait
+COW-880,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",Confirm path-param delivery to validator on /actor/read + /submit_wait
+COW-879,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CIP-9 §13.5 storage-status-driven Volume serving
+COW-878,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Routes-table churn metric (per-actor state_root change rate)
+COW-823,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",need a list of sessions on the sidebar
+COW-751,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",API reference and PyPI publishing
+COW-749,Other,Tooling,-,2,pav,Backlog,"Node Hardening, Tooling & Supporting Work",README and quickstart guide
+COW-631,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",[I1] Tailing fixed path allows symlink data leak
+COW-629,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[L23] Relative rm -rf may delete unintended directory
+COW-628,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",[L22] Untrusted BASE_URL enables curl option injection
+COW-627,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[L21] Unescaped URL path segments enable injection
+COW-621,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[L15] Overbroad pkill may terminate unrelated processes
+COW-620,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",[L14] Unbounded PEM body parsing can exhaust memory
+COW-619,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[L13] 16-bit checksum allows easy key substitution
+COW-618,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",[L12] Symlinked test directory can delete arbitrary files
+COW-617,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",[L11] Grepped PID kill can terminate wrong process
+COW-612,Other,Tooling,-,3,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[L6] Logging full submissions enables disk-fill DoS
+COW-527,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Use runners from console
+COW-526,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Install CLI as dependency
+COW-525,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",New version checks
+COW-515,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Configure IP allowlist variable in terraform.tfvars
+COW-514,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Set up API Gateway with usage plan and initial API keys
+COW-513,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Configure Tailscale ACLs for Mesa tags
+COW-508,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",Create API Gateway module for key-gated RPC access
+COW-503,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",pvm_host API docs
+COW-502,Other,Tooling,-,0,pav,Todo,"Node Hardening, Tooling & Supporting Work",Initial getting started guide + example actors
+COW-501,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",llms.txt at docs domain root
+COW-500,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",.cursorrules in cowboy init output
+COW-499,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Skills for Claude/Codex/OpenClaw
+COW-498,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context
+COW-496,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work","Four-part error format (what, why, fix, link)"
+COW-495,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",Error Messages
+COW-492,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",SDK
+COW-491,Other,Tooling,-,2,unassigned,In Progress,"Node Hardening, Tooling & Supporting Work",Account balance/nonce/info commands
+COW-490,Other,Tooling,-,3,pav,In Progress,"Node Hardening, Tooling & Supporting Work",cowboy wallet create command
+COW-489,Other,Tooling,-,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",cowboy actor logs (tail actor logs)
+COW-482,Other,Tooling,-,2,pav,In Progress,"Node Hardening, Tooling & Supporting Work",CLI
+COW-481,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Core examples in cowboy/examples folder compile
+COW-475,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Incident runbook (degraded mode / halt / restart)
+COW-474,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Snapshots + restore runbook
+COW-473,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","Basic chain monitoring + alerting (block lag, RPC error rate, peer count)"
+COW-462,Other,Tooling,-,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Public testnet RPC endpoint (+ Status Page)
+COW-445,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Ecosystem: Corral IDE (or VS Code extension branding)
+COW-444,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Ecosystem: bounty board and grants program
+COW-442,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Ecosystem: reusable component registry
+COW-443,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","Ecosystem: actor marketplace (view source, fork)"
+COW-441,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Ecosystem: actor-aware block explorer
+COW-440,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Ecosystem: web-based playground / REPL
+COW-439,Other,Tooling,-,4,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Interfaces: on-chain interface registry
+COW-438,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Interfaces: cowboy inspect for any deployed actor
+COW-437,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Interfaces: auto-generate interface definitions from code
+COW-436,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Frontend SDK: WebSocket event subscriptions
+COW-435,Other,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Frontend SDK: transaction building and signing
+COW-434,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Frontend SDK: actor storage queries
+COW-433,Other,Tooling,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",Frontend SDK: wallet connection (secp256k1)
+COW-432,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Frontend SDK: JS/TS SDK for browser interaction
+COW-430,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Upgrades: rollback support with state restoration
+COW-429,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Upgrades: state migration generation and validation
+COW-428,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Upgrades: cowboy upgrade with dry-run diff
+COW-427,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Observability: cost breakdown and trending
+COW-426,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Observability: message trace visualization
+COW-425,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Observability: runner job tracker
+COW-424,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Observability: timer timeline visualization
+COW-423,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Observability: live state viewer in Cowchat
+COW-421,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: actor graph visualization
+COW-419,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: snippet registry for AI code generation
+COW-418,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy trace cross-block execution trace
+COW-416,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: MCP server for live doc queries
+COW-415,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy rollback revert to previous version
+COW-414,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy watch live actor TUI dashboard
+COW-420,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy upgrade versioned upgrades
+COW-407,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: prediction-market template (Wrangler)
+COW-406,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: watcher template for monitoring + alerts
+COW-405,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: oracle-provider template for Watchtower feed
+COW-404,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: trading-bot template (LLM signal + execution)
+COW-403,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: arb-bot template for price differential trading
+COW-402,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Templates: minimal template for Hello World actor
+COW-401,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: CI pipeline auto-generate from source
+COW-400,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: llms.txt at docs domain root
+COW-399,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: .cursorrules in cowboy init output
+COW-397,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",AI Context: SKILL.md for Claude / Cowork
+COW-396,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: deploy/logs commands in command palette
+COW-398,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: snippet library for common patterns
+COW-395,Other,Tooling,-,3,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: inline cost estimates (CodeLens)
+COW-391,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: quickfix suggestions for PVM violations
+COW-390,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: VS Code extension with real-time diagnostics
+COW-394,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",IDE/Linter: PVM linter for forbidden imports & non-determinism
+COW-393,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Testing: pre-deploy gate (tests must pass)
+COW-392,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Testing: JUnit XML output for CI
+COW-389,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Testing: message sequence fuzzing / property testing
+COW-379,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",SDK: storage utilities and migration scaffolding (stub)
+COW-373,Other,Tooling,-,2,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work",Local dev: cowboy.yaml config format
+COW-363,Other,Tooling,-,2,pav,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy secrets manage encrypted secrets
+COW-364,Other,Tooling,-,1,pav,Backlog,"Node Hardening, Tooling & Supporting Work",CLI: cowboy init scaffolding with templates
+COW-234,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Engine] Implement block production pause/resume API
+COW-220,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Transaction] Add access list support (reserved)
+COW-218,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[RPC] Add API version support
+COW-69,Other,Tooling,-,0,unassigned,Todo,"Node Hardening, Tooling & Supporting Work",[Timer] Implement block ring buffer for immediate timers
+COW-722,Security-audit,Audit,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Audit LOW] L-24: Counter overflow causes persistent method failure
+COW-721,Security-audit,Audit,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Audit LOW] L-23: Unvalidated remote URL allows unsafe outbound requests
+COW-720,Security-audit,Audit,-,3,pav,Todo,CIP-4: State Storage & Persistence,[Audit LOW] L-22: Non-atomic commit across multiple databases
+COW-707,Security-audit,Audit,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Audit LOW] L-4: Default dev RPC uses plain HTTP (no TLS)
+COW-706,Security-audit,Audit,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Audit LOW] L-3: Network requests may hang without timeouts (CLI commands)
+COW-705,Security-audit,Audit,-,3,pav,Todo,"Node Hardening, Tooling & Supporting Work",[Audit LOW] L-2: Actor execute can exfiltrate local files
+COW-701,Security-audit,Audit,-,2,unassigned,Todo,"Whitepaper — Consensus, P2P & Randomness",[Audit MEDIUM] M-16: Unbounded spawned tasks can accumulate indefinitely
+COW-697,Security-audit,Audit,-,2,pav,Todo,"Whitepaper — Accounts, Transactions & Mempool",[Audit MEDIUM] M-12: Zero max_backlog allows unbounded account growth in mempool
+COW-605,Security-audit,CIP-17,-,2,pav,Backlog,CIP-17: Verifiable State Read RPC,[M22] Unbounded response body may exhaust memory (client)
+COW-606,Security-audit,CIP-2,-,2,unassigned,Backlog,CIP-2: Verifiable Off-Chain Compute,[M23] Unbounded hex decode enables memory exhaustion (runner)
+COW-603,Security-audit,Consensus,-,2,pav,Backlog,"Whitepaper — Consensus, P2P & Randomness",[M20] Private key logged in tracing span
+COW-2196,Security-audit,Other,-,3,pav,Backlog,,Counter overflow guard lost in refactor (regression of L-24 / COW-722)
+COW-767,Security-audit,Security,high,0,pav,Backlog,CIP-20: Fungible Token Standard,[mesa-bot] CLI accepts token operations with nonexistent token IDs without validation
+COW-761,Security-audit,Security,high,0,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis","[mesa-bot] Entitlement constraints (rate_limit, max_uses, amount limits) not enforced"
+COW-759,Security-audit,Security,high,0,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[mesa-bot] Entitlement delegation depth_max field is never enforced
+COW-762,Security-audit,Security,low,0,unassigned,Backlog,"Node Hardening, Tooling & Supporting Work","[mesa-bot] Health endpoint leaks version, uptime, and internal component status"
+COW-754,Security-audit,Security,low,0,pav,Backlog,"Node Hardening, Tooling & Supporting Work",[mesa-bot] Swagger UI and OpenAPI spec publicly exposed on devnet
+COW-760,Security-audit,Security,medium,0,unassigned,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[mesa-bot] No RPC endpoints for querying entitlements — permissions are opaque
+COW-758,Security-audit,Security,medium,0,unassigned,Backlog,"Whitepaper — State Transition Function, System Actors & Precompiles",[mesa-bot] System actor code readable via /actor/{addr}/code endpoint
+COW-757,Security-audit,Security,medium,0,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[mesa-bot] Namespace entitlement prefix matching causes unintended permission grants
+COW-755,Security-audit,Security,medium,0,pav,Backlog,"Whitepaper — Economics, Entitlements & Genesis",[mesa-bot] Global+All entitlement creates unrestricted god-mode permission
