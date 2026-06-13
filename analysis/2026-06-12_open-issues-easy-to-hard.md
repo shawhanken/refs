@@ -1,43 +1,40 @@
-# 未解决 Issue 全列表 — 由易到难(2026-06-13 二次更新,Linear 实时数据)
+# 未解决 Issue 全列表 — 由易到难(2026-06-13 四次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **644 条**(570 Backlog / 68 Todo / 5 In Progress / 1 In Review;PL 120 / 未指派 524)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **635 条**(554 Backlog / 67 Todo / 5 In Progress / 9 In Review;PL 126 / 未指派 509)。
 
-**排序依据:** 6 档分级,继承上一版各 issue 档位;本次刷新状态、扣除已闭环、并把 COW-938 由 Tier-1 重分到 Tier-4(其「14 参数搬治理」实为共识级改动,非 Tier-1)。⚠ = In Progress/In Review。
+**排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
-**自上一版(658 条)闭环 16 条**:COW-697, COW-970, COW-986, COW-1081, COW-1155, COW-1211, COW-1237, COW-1247, COW-1250, COW-1251, COW-1253, COW-1257, COW-1271, COW-1303, COW-2095, COW-2118。
+**自上一版闭环 7 条**:COW-143, COW-397, COW-411, COW-413, COW-500, COW-989, COW-1064。
 
-**新增 2 条**:COW-2265, COW-2266。
+**第 4 次更新(2026-06-13)闭环 4 条(从 Tier-2 移除)**:COW-767(token_id 校验)、COW-990(reentrancy per-call key)、COW-1080(demo.sh 进 CI)、COW-2262(IBE 临时量 r 擦零)均已 Done。状态推进:COW-2263(coverage flake)PR 推送 devnet → In Review;COW-1097 / COW-1133 / COW-1507 Backlog → In Review。无新增 open issue。
 
-**本会话 Tier-1 清理成果(2026-06-12→13)**:
-- 已合并:COW-1237/1247/1257/1271(#169)、1155/1251/1211(#170)、1250(#171)
-- 核验关单:COW-1303(1s 出块一致)、COW-1081(token host-call 已全包装)
-- 留开有因:COW-970(计划已交付,留 BasefeeConfig 代码)、COW-986(CIP-5↔CIP-9 fee_payer 矛盾待 owner 决策)、COW-938(重分 Tier-4)
-
-**Tier-1 剩余基本是硬骨头**:COW-1064(cbss 小工具,需编译);内容写作 10 条(143 部署指南 / 474·475 runbook / 413 注释样例 / 422 架构深挖 / 411 SDK 参考 / 397·499·500·501 AI-context);绿地或阻塞 4 条(1097·1084 CIP-21 未建成 / 1144 Big Sky 平台不在盘 / 1133 CIP-26 带 CLI 功能)。
+**本会话整体战果(Tier-1 全清 + 内容文档批 + Tier-2 起步)**:
+- Tier-1 易/决策/核验层 + 内容文档批(部署/快照/事故 runbook、AI-context SKILL/adapters/.cursorrules、SDK 自动参考、注释样例、架构深挖)全部交付
+- Tier-2 起步:COW-2262(IBE 临时量擦零)、990(reentrancy key=)、989/1064/500(关单/已合并)
+- 已合并:cowboy #173/#174/#175/#176(部署/AI-context/SDK 参考/注释样例)、node #710、cbss #26
+- 待审 PR:cowboy #177(架构深挖)、node #711、cbss #27
+- 留开有因:986(CIP-5↔CIP-9 fee_payer 矛盾待 owner)、970(BasefeeConfig 代码收尾)、501(Mintlify llms.txt 线上核实)
+- ✅ COW-767(随机 token_id 转账据报在 mesa 上成功)已修复关单(本次更新移除)
 
 ---
 
-## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(15 条)
+## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(11 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | Backlog | — |
+| COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | In Review ⚠ | PL |
 | COW-1084 | [Docs] CIP-20 ↔ CIP-21 interaction worked examples | CIP-20: Fungible Token Standard | Backlog | — |
-| COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | Backlog | — |
+| COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
 | COW-1144 | [Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA? | CIP-28: Cowboy Agent Banking | Backlog | — |
-| COW-397 | AI Context: SKILL.md for Claude / Cowork | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-500 | .cursorrules in cowboy init output | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-501 | llms.txt at docs domain root | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-499 | Skills for Claude/Codex/OpenClaw | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-413 | Docs: annotated full examples | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-422 | Docs: architecture deep-dives (from whitepaper) | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-143 | [Docs] Implement deployment guide | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-474 | Snapshots + restore runbook | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-475 | Incident runbook (degraded mode / halt / restart) | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-411 | Docs: auto-generated SDK reference | Node Hardening, Tooling & Supporting Wor | Backlog | PL |
-| COW-1064 | [CBSS] DOD-01 aggregate cargo log | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
+| COW-499 | Skills for Claude/Codex/OpenClaw | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
+| COW-422 | Docs: architecture deep-dives (from whitepaper) | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
+| COW-474 | Snapshots + restore runbook | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
+| COW-475 | Incident runbook (degraded mode / halt / restart) | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
+| COW-970 | [Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering | CIP-3: Dual-Metered Fee Model | Backlog | PL |
+| COW-986 | [Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...) | CIP-5: Native Timer Mechanism | Backlog | PL |
 
-## Tier 2 — 小型有界代码修复(每条 ≤1 天)(14 条)
+## Tier 2 — 小型有界代码修复(每条 ≤1 天)(9 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -45,16 +42,11 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-1712 | execute_dns_job NOT production-wired into runner worker loop | CIP-16: Custom Domains & First-Party TLD | Backlog | — |
 | COW-1131 | [PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable | CIP-26: Account-Scoped Actor Libraries | Backlog | — |
-| COW-989 | [SDK] Entitlement subset comparison operator | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
-| COW-990 | [SDK] Reentrancy guard: optional per-call key arg to avoid factory-pattern collisions | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
 | COW-1506 | §11.5 canonical-ordering residual (minor/partial) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
-| COW-1507 | §14.3 token.* entitlement IDs (token.create/transfer/mint/burn) are NOT | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
-| COW-767 | [mesa-bot] CLI accepts token operations with nonexistent token IDs without validation | CIP-20: Fungible Token Standard | Backlog | PL |
-| COW-1080 | [CI] Integrate examples/01-tokens/demo.sh into CI test suite | CIP-20: Fungible Token Standard | Backlog | PL |
+| COW-1507 | §14.3 token.* entitlement IDs (token.create/transfer/mint/burn) are NOT | CIP-6: In-PVM Actor SDK (cowboy_sdk) | In Review ⚠ | PL |
 | COW-1893 | §5.3 canonical error vocabulary | CIP-24: Cowboy Secret Service (CBSS) | Backlog | PL |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
-| COW-2262 | cbss-crypto: zeroize the IBE encryption ephemeral r (blstrs Scalar has no Zeroize impl) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
-| COW-2263 | node Coverage (cargo llvm-cov) job flakes on PVM interpreter init — red on live devnet | — | Backlog | — |
+| COW-2263 | node Coverage (cargo llvm-cov) job flakes on PVM interpreter init — red on live devnet | — | In Review ⚠ | PL |
 
 ## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(86 条)
 
