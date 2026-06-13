@@ -1,42 +1,30 @@
-# 未解决 Issue 全列表 — 由易到难(2026-06-13 更新,Linear 实时数据)
+# 未解决 Issue 全列表 — 由易到难(2026-06-13 二次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **658 条**(581 Backlog / 67 Todo / 5 In Progress / 5 In Review;PL 128 / 未指派 530)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **644 条**(570 Backlog / 68 Todo / 5 In Progress / 1 In Review;PL 120 / 未指派 524)。
 
-**排序依据:** 沿用 6 档分级(继承上一版各 issue 的档位);本次刷新状态并扣除已闭环 issue。⚠ = In Progress/In Review(已有人在做或 PR 在审,勿重复认领)。
+**排序依据:** 6 档分级,继承上一版各 issue 档位;本次刷新状态、扣除已闭环、并把 COW-938 由 Tier-1 重分到 Tier-4(其「14 参数搬治理」实为共识级改动,非 Tier-1)。⚠ = In Progress/In Review。
 
-**自上一版(669 条)闭环 13 条**:COW-755, COW-757, COW-759, COW-761, COW-939, COW-1010, COW-1014, COW-1216, COW-1227, COW-1252, COW-1269, COW-1278, COW-2199。
+**自上一版(658 条)闭环 16 条**:COW-697, COW-970, COW-986, COW-1081, COW-1155, COW-1211, COW-1237, COW-1247, COW-1250, COW-1251, COW-1253, COW-1257, COW-1271, COW-1303, COW-2095, COW-2118。
 
-**新增 2 条**:COW-2262(cbss-crypto zeroize IBE ephemeral)、COW-2263(coverage llvm-cov 在 PVM 解释器 init 处 flake)——均小型,手动归入 Tier 2。
+**新增 2 条**:COW-2265, COW-2266。
 
-**本会话产出(2026-06-12→13 批量循环)**:
-- ① 决策双票 COW-1227/1278 → cowboy#166 / #167(**已 merge**,Done)
-- ③ docs 批 COW-1010/1014/1216/1252 → cowboy#168(**已 merge**,Done)
-- ④ entitlement 安全簇 COW-755/757/759/761 → 一手核验+113 测试全绿,**已修复/缓解关单**(无需 PR)
-- ② Tier-2 收尾 COW-697/1253/2095 → node#707(**In Review**,CI 绿,待人工协调共识上线)
-- 前提过时关单:COW-1269(系统 actor 免租金早已实现)、COW-939(CIP-9 已整篇重写)
-- COW-1215 退回 Backlog(`access_list` 字段尚不存在,需绑 tx-encoding 迁移 epic → 移入 Tier 5)
+**本会话 Tier-1 清理成果(2026-06-12→13)**:
+- 已合并:COW-1237/1247/1257/1271(#169)、1155/1251/1211(#170)、1250(#171)
+- 核验关单:COW-1303(1s 出块一致)、COW-1081(token host-call 已全包装)
+- 留开有因:COW-970(计划已交付,留 BasefeeConfig 代码)、COW-986(CIP-5↔CIP-9 fee_payer 矛盾待 owner 决策)、COW-938(重分 Tier-4)
+
+**Tier-1 剩余基本是硬骨头**:COW-1064(cbss 小工具,需编译);内容写作 10 条(143 部署指南 / 474·475 runbook / 413 注释样例 / 422 架构深挖 / 411 SDK 参考 / 397·499·500·501 AI-context);绿地或阻塞 4 条(1097·1084 CIP-21 未建成 / 1144 Big Sky 平台不在盘 / 1133 CIP-26 带 CLI 功能)。
 
 ---
 
-## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(28 条)
+## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(15 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-986 | [Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...) | CIP-5: Native Timer Mechanism | Backlog | — |
-| COW-1237 | [Node/Spec] Lane-aware STF: WP §3 should reference WP §6.3 lane budgets explicitly | WP—State Transition Function, System Act | Backlog | — |
-| COW-1247 | [PVM/Spec] Normative host-function table with gas costs in WP §3 | WP—Python Actor VM (PVM) | Backlog | — |
-| COW-1250 | [PVM] Document the per-instruction (Phase 2a observe-only) gas plan + cutover criteria | WP—Python Actor VM (PVM) | Backlog | PL |
-| COW-1251 | [PVM] Snapshot/rollback scope: clarify checkpoint vs failure-isolation semantics | WP—Python Actor VM (PVM) | Backlog | PL |
-| COW-1257 | [Spec] Document blob lifecycle: TTL, expiry, pruning policy | WP—Data Availability, Blobs & Storage | Backlog | — |
-| COW-1271 | [Spec] Cross-CIP parameter traceability matrix: WP §8/§13 → CIP refs → 0x09 storage keys | WP—Economics, Entitlements & Genesis | Backlog | — |
-| COW-1303 | [Spec] Block-time constant alignment audit across v2 CIPs (1s block target) | CIP-23: TEE Execution & Composite Attest | Backlog | — |
 | COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | Backlog | — |
 | COW-1084 | [Docs] CIP-20 ↔ CIP-21 interaction worked examples | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | Backlog | — |
-| COW-1211 | [Spec/Docs] NAT traversal: choose protocol-level approach vs. continuing the Tailscale worka | WP—Consensus, P2P & Randomness | Backlog | — |
-| COW-970 | [Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering | CIP-3: Dual-Metered Fee Model | Todo | PL |
 | COW-1144 | [Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA? | CIP-28: Cowboy Agent Banking | Backlog | — |
-| COW-1155 | [Spec] Handler signature canonicalization: handler(emitter, topic, payload) vs handler(paylo | CIP-29: On-Chain Event Hooks | Backlog | PL |
 | COW-397 | AI Context: SKILL.md for Claude / Cowork | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-500 | .cursorrules in cowboy init output | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-501 | llms.txt at docs domain root | Node Hardening, Tooling & Supporting Wor | Backlog | — |
@@ -47,19 +35,14 @@
 | COW-474 | Snapshots + restore runbook | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-475 | Incident runbook (degraded mode / halt / restart) | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-411 | Docs: auto-generated SDK reference | Node Hardening, Tooling & Supporting Wor | Backlog | PL |
-| COW-1081 | [SDK] Verify + complete /pvm/Lib/token.py host-call bindings | CIP-20: Fungible Token Standard | Backlog | PL |
-| COW-938 | [Node] Verify CIP-31 Tier-0 parameter wiring vs hardcoded Rust constants | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-1064 | [CBSS] DOD-01 aggregate cargo log | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
 
-## Tier 2 — 小型有界代码修复(每条 ≤1 天)(17 条)
+## Tier 2 — 小型有界代码修复(每条 ≤1 天)(14 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-758 | [mesa-bot] System actor code readable via /actor/{addr}/code endpoint | WP—State Transition Function, System Act | Backlog | — |
-| COW-2095 | [Node/CBFS] (owner, name) -> volume_id resolution broken (volume info / allow-actor --name 4 | CIP-9: Cowboy File System (CBFS)-Backed  | In Review ⚠ | PL |
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-697 | [Audit MEDIUM] M-12: Zero max_backlog allows unbounded account growth in mempool | WP—Accounts, Transactions & Mempool | In Review ⚠ | PL |
-| COW-1253 | [Node] Enforce 64 KiB inline blob cap at tx validation (WP §7.1) | WP—Data Availability, Blobs & Storage | In Review ⚠ | PL |
 | COW-1712 | execute_dns_job NOT production-wired into runner worker loop | CIP-16: Custom Domains & First-Party TLD | Backlog | — |
 | COW-1131 | [PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable | CIP-26: Account-Scoped Actor Libraries | Backlog | — |
 | COW-989 | [SDK] Entitlement subset comparison operator | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
@@ -164,10 +147,11 @@
 | COW-1029 | [Node] Foundation-separation enforcement: protocol prevents Foundation from being added to s | CIP-12: On-Chain Governance & System Act | Backlog | — |
 | COW-1751 | §5.2 proof field-shape divergence | CIP-17: Verifiable State Read RPC | Backlog | — |
 
-## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(88 条)
+## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(89 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-938 | [Node] Verify CIP-31 Tier-0 parameter wiring vs hardcoded Rust constants | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-924 | [Gateway] Direct RAS+QUIC reader replacing HTTP wrapper | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-929 | [Node] Relay registry: add relay_identity_pubkey + chain-verified handshake | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-930 | [CBFS] Cowboy-mode `cbfs mount` token-refresh design + implementation | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
@@ -257,7 +241,7 @@
 | COW-2114 | [Node] Private-volume staged-commit finalize authority (DEK-holder) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2005 | WP §4.3/§State-Rent dynamic rent_rate adjustment | WP—Data Availability, Blobs & Storage | Backlog | — |
 
-## Tier 5 — 最难 — 共识核心 / 密码学 / 大型绿地(按 epic 规划)(234 条)
+## Tier 5 — 最难 — 共识核心 / 密码学 / 大型绿地(按 epic 规划)(236 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -495,8 +479,10 @@
 | COW-425 | Observability: runner job tracker | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-426 | Observability: message trace visualization | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-427 | Observability: cost breakdown and trending | Node Hardening, Tooling & Supporting Wor | Backlog | — |
+| COW-2265 | mainnet launch: bundle devnet consensus-rule deltas (node#686 receipt code 1613, node#707 64 | Node Hardening, Tooling & Supporting Wor | Todo | — |
+| COW-2266 | Reconcile whitepaper genesis parameter defaults vs reference implementation (basefee T_c/T_b | Node Hardening, Tooling & Supporting Wor | Todo | — |
 
-## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(205 条)
+## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(204 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -521,7 +507,6 @@
 | COW-1586 | v2 §3 three-flow independent escrow model with container flow settling at | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1587 | v2 §4 BillingAttestation.tee_signature | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1588 | v2 §5 system instruction opcodes 61–64 (RegisterBaseImage / | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
-| COW-2118 | [Node] Structured InsufficientStorageCapableRunners dispatch error | CIP-9: Cowboy File System (CBFS)-Backed  | In Review ⚠ | — |
 | COW-894 | ManifestCommitted chain event subscription | CIP-9: Cowboy File System (CBFS)-Backed  | In Review ⚠ | PL |
 | COW-921 | [Node] Emit ManifestCommitted chain event on successful commit_manifest (AMEND 9-H) | CIP-9: Cowboy File System (CBFS)-Backed  | In Progress ⚠ | PL |
 | COW-1056 | [CBSS] Release receipt release_id collateral fields | CIP-24: Cowboy Secret Service (CBSS) | In Progress ⚠ | PL |
