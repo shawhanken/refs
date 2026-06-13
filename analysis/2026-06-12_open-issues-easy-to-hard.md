@@ -1,12 +1,17 @@
-# 未解决 Issue 全列表 — 由易到难(2026-06-13 四次更新,Linear 实时数据)
+# 未解决 Issue 全列表 — 由易到难(2026-06-13 五次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **635 条**(554 Backlog / 67 Todo / 5 In Progress / 9 In Review;PL 126 / 未指派 509)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **635 条**(551 Backlog / 67 Todo / 5 In Progress / 12 In Review;PL 126 / 未指派 509)。
 
 **排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
 **自上一版闭环 7 条**:COW-143, COW-397, COW-411, COW-413, COW-500, COW-989, COW-1064。
 
 **第 4 次更新(2026-06-13)闭环 4 条(从 Tier-2 移除)**:COW-767(token_id 校验)、COW-990(reentrancy per-call key)、COW-1080(demo.sh 进 CI)、COW-2262(IBE 临时量 r 擦零)均已 Done。状态推进:COW-2263(coverage flake)PR 推送 devnet → In Review;COW-1097 / COW-1133 / COW-1507 Backlog → In Review。无新增 open issue。
+
+**第 5 次更新(2026-06-13,易档批量循环战果)**:
+- ✅ 已交付(Backlog → In Review,均附 PR):**COW-1084**(cowboy #181,CIP-21 §2.4 worked example)、**COW-1131**(node #713,linter `nested-import` 非共识)、**COW-1506**(cowboy #182,§11.5 CBOR 排序修 spec 对齐实现)。
+- ⤴ 重分档(原 Tier-2 错档,详见各档说明):**COW-1712**、**COW-1893** → Tier-4(共识/跨仓库);**COW-758** → Tier-0(mesa-bot 误报,建议 Cancel)。
+- 结论:**Tier-2 "真·易" 已耗尽**;余 6 条多为文档/决策/已 In Review。再往下需进 Tier-3(数天/条)或做错档的共识版。
 
 **本会话整体战果(Tier-1 全清 + 内容文档批 + Tier-2 起步)**:
 - Tier-1 易/决策/核验层 + 内容文档批(部署/快照/事故 runbook、AI-context SKILL/adapters/.cursorrules、SDK 自动参考、注释样例、架构深挖)全部交付
@@ -23,7 +28,7 @@
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | In Review ⚠ | PL |
-| COW-1084 | [Docs] CIP-20 ↔ CIP-21 interaction worked examples | CIP-20: Fungible Token Standard | Backlog | — |
+| COW-1084 | [Docs] CIP-20 ↔ CIP-21 interaction worked examples | CIP-20: Fungible Token Standard | In Review ⚠ | PL |
 | COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
 | COW-1144 | [Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA? | CIP-28: Cowboy Agent Banking | Backlog | — |
 | COW-501 | llms.txt at docs domain root | Node Hardening, Tooling & Supporting Wor | Backlog | — |
@@ -34,17 +39,14 @@
 | COW-970 | [Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering | CIP-3: Dual-Metered Fee Model | Backlog | PL |
 | COW-986 | [Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...) | CIP-5: Native Timer Mechanism | Backlog | PL |
 
-## Tier 2 — 小型有界代码修复(每条 ≤1 天)(9 条)
+## Tier 2 — 小型有界代码修复(每条 ≤1 天)(6 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-758 | [mesa-bot] System actor code readable via /actor/{addr}/code endpoint | WP—State Transition Function, System Act | Backlog | — |
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-1712 | execute_dns_job NOT production-wired into runner worker loop | CIP-16: Custom Domains & First-Party TLD | Backlog | — |
-| COW-1131 | [PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable | CIP-26: Account-Scoped Actor Libraries | Backlog | — |
-| COW-1506 | §11.5 canonical-ordering residual (minor/partial) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
+| COW-1131 | [PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
+| COW-1506 | §11.5 canonical-ordering residual (minor/partial) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | In Review ⚠ | PL |
 | COW-1507 | §14.3 token.* entitlement IDs (token.create/transfer/mint/burn) are NOT | CIP-6: In-PVM Actor SDK (cowboy_sdk) | In Review ⚠ | PL |
-| COW-1893 | §5.3 canonical error vocabulary | CIP-24: Cowboy Secret Service (CBSS) | Backlog | PL |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 | COW-2263 | node Coverage (cargo llvm-cov) job flakes on PVM interpreter init — red on live devnet | — | In Review ⚠ | PL |
 
@@ -139,10 +141,16 @@
 | COW-1029 | [Node] Foundation-separation enforcement: protocol prevents Foundation from being added to s | CIP-12: On-Chain Governance & System Act | Backlog | — |
 | COW-1751 | §5.2 proof field-shape divergence | CIP-17: Verifiable State Read RPC | Backlog | — |
 
-## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(89 条)
+## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(91 条)
+
+> 2026-06-13 重分档(原列 Tier-2,经核查实为子系统级):
+> - **COW-1893**:CBSS §5.3 错误码塌缩,176 处 InvalidData → 命名变体;错误码经 structured_error_map 入 receipt_root = **共识变更**,需协调上线 + 棘轮。
+> - **COW-1712**:DNS executor 在 node/runner/(库)是孤儿,真正 worker loop 在独立 runner/ 仓库且无 `JobType::Dns`、不依赖该 crate;接线=新增 on-chain JobType(共识)+跨仓库搬运+依赖 CIP-16 上游(COW-1711/1713)。
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-1893 | §5.3 canonical error vocabulary (CBSS InvalidData 塌缩→命名错误码;改 receipt_root=共识) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | PL |
+| COW-1712 | execute_dns_job NOT production-wired (跨仓库 CIP-16;需 on-chain JobType::Dns=共识) | CIP-16: Custom Domains & First-Party TLD | Backlog | — |
 | COW-938 | [Node] Verify CIP-31 Tier-0 parameter wiring vs hardcoded Rust constants | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-924 | [Gateway] Direct RAS+QUIC reader replacing HTTP wrapper | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-929 | [Node] Relay registry: add relay_identity_pubkey + chain-verified handshake | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
@@ -474,10 +482,13 @@
 | COW-2265 | mainnet launch: bundle devnet consensus-rule deltas (node#686 receipt code 1613, node#707 64 | Node Hardening, Tooling & Supporting Wor | Todo | — |
 | COW-2266 | Reconcile whitepaper genesis parameter defaults vs reference implementation (basefee T_c/T_b | Node Hardening, Tooling & Supporting Wor | Todo | — |
 
-## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(204 条)
+## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(205 条)
+
+> 2026-06-13 重分档(原列 Tier-2):**COW-758** 经对抗审计判定为 **mesa-bot 误报**——系统 actor 0x01–0x05 的"code"只是 genesis 注释标记串(`b"# Runner Registry System Actor"` 等),真正逻辑在 Rust 原生 crate;链上状态本就公开,暴露注释不泄露逻辑/密钥。加 RPC 特判反违反 Simplicity。**建议 Cancel**(待用户点名)。
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-758 | [mesa-bot] System actor code readable via /actor/{addr}/code(误报/建议 Cancel) | WP—State Transition Function, System Act | Backlog | — |
 | COW-1568 | §10.1–10.2 full container lifecycle (image pull → create | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1569 | §10.3 failure-mode handling (OOM kill | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1570 | §10.4 container exit-code → CIP-2 status mapping (0→COMPLETED | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
