@@ -212,6 +212,8 @@ CIP-1 到 CIP-25（Actor 调度、链下计算、费用模型、Tokens、存储�
 - `2026-03-21_cowboy_issues_fix_plan.md` — 95 issues 修复计划
 - `2026-03-31_bench_analysis_report.md` — Devnet 性能基准分析
 - `2026-05-29_ai_velocity_quality_engineering_methodology_CN.md` — 🆕 **方法论** AI 高速研发下的质量工程(三支柱:可执行不变量 / 风险分级 / 逃逸棘轮 + AI 对抗式 review + 运行时纵深防御)
+- `2026-06-14_cip-33-trading-post-explainer.md` — 🆕 **CIP-33 详解** Trading Post(actor 雇佣/分销/计费/解密垄断式版权保护)商业企图 + 机制 + 三张时序图(hire→分账→密钥发放→执行 / PerCall 结算 / 撤销失效)
+- `2026-06-14_cip-33-rollout-coordination-checklist.md` — 🆕 **CIP-33 上线 checklist** Marshal 四件套(cowboy#180 / node#700 / cbss#24 / runner#113)审计汇总:跨仓依赖图 + node#700 两个 latent HIGH(已上棘轮)+ 规格↔实现 MUST 缺口 + 原子上线顺序与上线前验证清单
 
 ---
 
