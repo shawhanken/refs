@@ -53,7 +53,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(6 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(5 条)
 
 > **2026-06-14 第 7 次更新 — Tier-3 全面降噪**:对 56 条未降噪项逐条回代码核验。**32 条已实作→close 候选(待点名关单,不计入难度档)**:24 个 example(1310/1311/1312/1315–1328/1331–1335/1339/1340,均接 test_examples_local.sh,⚠仅核验结构未跑实时 green)、CBFS 914/928/936、CIP-17/4 1305/1751/1403/1404、secrets 363。
 
@@ -66,14 +66,13 @@
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-2120 | [CBFS/Node] GET_MANIFEST relay RPC (public assembly + cache) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-926 | [CBFS] Signed request envelope on all /ras/ control-plane endpoints | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-931 | [CBFS] CLI connection pooling within process | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-933 | [CBFS] Multi-source relay registry refresh + background fetch | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-1011 | [Runner] Extend session integration tests to full E2E flow | CIP-8: MPP Session Semantics | Backlog | PL |
 | COW-386 | Errors: four-part error format (what, why, fix, link) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 
-## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(118 条)
+## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(119 条)
 
 > 2026-06-13 重分档(原列 Tier-2,经核查实为子系统级):
 > - **COW-1893**:CBSS §5.3 错误码塌缩,176 处 InvalidData → 命名变体;错误码经 structured_error_map 入 receipt_root = **共识变更**,需协调上线 + 棘轮。
@@ -81,6 +80,7 @@
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-2120 | [CBFS/Node] GET_MANIFEST relay RPC(实为子系统级:relay 只存本地 shard 索引、无 manifest cache→须 peer-fetch K shard 重组+跨 crate 共享 sdk fetch_manifest 重组逻辑=组装网关;≈COW-920)(可行性重评 2026-06-14) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-987 | [SDK] runtime.mount 需新 PVM host API+entitlement(降噪自 Tier-3) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
 | COW-1542 | §6.4/§16 SessionAsset::Cip20 链上 escrow(降噪自 Tier-3) | CIP-8: MPP Session Semantics | Backlog | — |
 | COW-1543 | §4/§5 runner session bootstrap 需链事件订阅子系统(/session/observe 仍 PoC)(降噪自 Tier-3) | CIP-8: MPP Session Semantics | Backlog | — |
