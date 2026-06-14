@@ -1,6 +1,6 @@
 # 未解决 Issue 全列表 — 由易到难(2026-06-13 五次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **627 条**(549 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 121 / 未指派 506)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **624 条**(546 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 119 / 未指派 505)。
 
 **排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
@@ -51,7 +51,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(74 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(71 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -118,14 +118,11 @@
 | COW-117 | [Gas] Add gas estimation API | CIP-3: Dual-Metered Fee Model | Todo | PL |
 | COW-363 | CLI: cowboy secrets manage encrypted secrets | Node Hardening, Tooling & Supporting Wor | Backlog | PL |
 | COW-373 | Local dev: cowboy.yaml config format | Node Hardening, Tooling & Supporting Wor | Backlog | — |
-| COW-376 | SDK: PVM-safe helpers (vrf, time, math) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
-| COW-378 | SDK: correlation ID and timeout handling helpers | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
 | COW-386 | Errors: four-part error format (what, why, fix, link) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 | COW-988 | [SDK] @on_stream(stream_id) decorator + stream_publish() helpers (CIP-7) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
 | COW-992 | [SDK] Mirror missing continuation features in standalone `cowboy` package | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 | COW-993 | [CI] E2E continuation tests on live PVM sandbox | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 | COW-1003 | [Node/SDK] Optional CIP-2 ingestion config: timer → task submission → transform → encrypt →  | CIP-7: Watchtower (Simple Stream Protoco | Backlog | — |
-| COW-1153 | [SDK] @emit / @on_event decorators in cowboy_sdk | CIP-29: On-Chain Event Hooks | Backlog | PL |
 | COW-1083 | [SDK] Allowance pagination + bulk-query for large holder lists | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1029 | [Node] Foundation-separation enforcement: protocol prevents Foundation from being added to s | CIP-12: On-Chain Governance & System Act | Backlog | — |
 | COW-1751 | §5.2 proof field-shape divergence | CIP-17: Verifiable State Read RPC | Backlog | — |
