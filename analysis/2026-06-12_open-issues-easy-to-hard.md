@@ -1,6 +1,6 @@
 # 未解决 Issue 全列表 — 由易到难(2026-06-13 五次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **628 条**(550 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 121 / 未指派 507)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **627 条**(549 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 121 / 未指派 506)。
 
 **排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
@@ -48,7 +48,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(86 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(85 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -89,7 +89,6 @@
 | COW-926 | [CBFS] Signed request envelope on all /ras/ control-plane endpoints | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-928 | [CBFS] OwnerCapTokenV1 client-signed validation path on relays | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-931 | [CBFS] CLI connection pooling within process | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-932 | [CBFS] Volume metadata + OwnerCapToken caching | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-933 | [CBFS] Multi-source relay registry refresh + background fetch | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-936 | [CBFS] Add tests for packages currently with zero coverage | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-937 | [Runner] Add CIP-9 integration tests (manifest round-trip, access modes, cache stress) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
