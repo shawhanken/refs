@@ -19,6 +19,7 @@
 - ➕ 新增 open 2 条 → Tier-3:COW-2268、COW-2269(均 CIP-3,他团队)。
 - 计数:635 → **630**(Done×6 + Canceled×1 − 新增×2 + 其他净变);Tier-1 11→9、Tier-2 6→2、Tier-3 86→88、Tier-0 205→204。
 - ❌ **COW-934 已 Canceled**(用户授权):Tier-3 首个批次试做,深入后判定 audit-bot 误报——所有第一方 panic 都在 `#[cfg(test)]` 内(测试断言,生产路径已返回 typed error),非测试的全在 third_party(驗收已排除);FakeStore fixture 也在用。Tier-3 88→87,总数 630→629。
+- 🧪 SDK 簇去噪(2026-06-14):**3 个已实作 close 候选(待点名)**:COW-1153(@emit/@on_event)、376(pvm_random/pvm_time/SoftFloat)、378(timeout/correlation)。**2 个共识→Tier-4**:1074(permit/allowance ops)、1076(token_multicall)。真 Tier-3 留:988(@on_stream)、992(standalone 镜像)、993(CI E2E)、1083(allowance 分页 helper);386 部分实作+与 COW-496 重复待 dedup。Tier-3 76→74,Tier-4 100→102。
 - 🧪 node-WP audit 簇去噪(2026-06-14):无可关票;**6 个共识错放 → Tier-4**:COW-1212(chain_id 签名缺失=replay,已实证)、1226(系统actor 0x0D-0x12 genesis)、1230(STF 步序)、1234(genesis stubs)、2089(STF dedup 窗口)、2235(consensus 事件基建)。真 Tier-3 留:1219(mempool 限流)、1232(gas 表 test+doc)、1243/1244(determinism 测试)、1945(test vectors,注:spec array vs impl map 编码分歧待决)。Tier-3 82→76,Tier-4 94→100。
 - 🧪 CBSS audit 簇去噪(2026-06-14):无「已实作可关」票(与 CBFS 不同,全是真剩活)。1050/1052/1054 = 真测试工作(Tier-3 正确);**1057/1894/1895 = 共识变更**(slashing 链状态 / VRF weight 选举 / 链上 reshare 触发)→ 移 Tier-4。Tier-3 85→82,Tier-4 91→94,总数不变 627。
 - 🧹 档位纠偏:本表"由易到难"按**难度**排,但易档曾混入"易但现在不可拿"的项。将 4 条从 Tier-1 移入 Tier-0(被阻塞/他团队/绿地):**COW-986 / COW-970 / COW-501 / COW-1144**。Tier-1 9→5(剩余 5 条全是 In Review ⚠,无新可拿项),Tier-0 204→208。开放总数不变(630)。今后:**难度定档位,阻塞/他团队/绿地一律 Tier-0**,⚠ 仅表 in-flight。
@@ -50,7 +51,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(76 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(74 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -126,12 +127,10 @@
 | COW-1003 | [Node/SDK] Optional CIP-2 ingestion config: timer → task submission → transform → encrypt →  | CIP-7: Watchtower (Simple Stream Protoco | Backlog | — |
 | COW-1153 | [SDK] @emit / @on_event decorators in cowboy_sdk | CIP-29: On-Chain Event Hooks | Backlog | PL |
 | COW-1083 | [SDK] Allowance pagination + bulk-query for large holder lists | CIP-20: Fungible Token Standard | Backlog | — |
-| COW-1074 | [Node] Permits / EIP-2612-equivalent gasless approval + increase_allowance / decrease_allowa | CIP-20: Fungible Token Standard | Backlog | — |
-| COW-1076 | [Node] Multi-token aggregator / multicall for batch operations across token IDs | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1029 | [Node] Foundation-separation enforcement: protocol prevents Foundation from being added to s | CIP-12: On-Chain Governance & System Act | Backlog | — |
 | COW-1751 | §5.2 proof field-shape divergence | CIP-17: Verifiable State Read RPC | Backlog | — |
 
-## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(100 条)
+## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(102 条)
 
 > 2026-06-13 重分档(原列 Tier-2,经核查实为子系统级):
 > - **COW-1893**:CBSS §5.3 错误码塌缩,176 处 InvalidData → 命名变体;错误码经 structured_error_map 入 receipt_root = **共识变更**,需协调上线 + 棘轮。
@@ -139,6 +138,8 @@
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-1074 | [Node] Permits/EIP-2612 gasless approval + increase/decrease_allowance(共识:新 token op) | CIP-20: Fungible Token Standard | Backlog | — |
+| COW-1076 | [Node] Multi-token token_multicall batch(共识:新 token 指令) | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1212 | [Node] chain_id in tx signing payload(共识:确认缺失,加 chain_id=改签名字节,wire+共识) | WP—Accounts/STF/Consensus | Backlog | — |
 | COW-1226 | [Node] Register system actors 0x0D-0x12(共识:genesis/系统actor集+依赖CIP-14/10/18/7绿地) | WP—Accounts/STF/Consensus | Backlog | — |
 | COW-1230 | [Node] Epoch boundary STF step ordering(共识:执行顺序定 state root) | WP—Accounts/STF/Consensus | Backlog | — |
