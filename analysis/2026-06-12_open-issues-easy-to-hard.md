@@ -34,6 +34,8 @@
 
 ---
 
+**第 7+8 次更新(2026-06-14,Tier-3 降噪+可行性重排)**:对 71 条 Tier-3 先降噪(32 已实作→close 候选)再按「本地可完成+验证」复筛 → **Tier-3 71→6**(真可本地交付:2120/926/931/933/1011/386),16→Tier-4(共识/真-validator/sandbox/跨平台/blocked),16→Tier-0(绿地/他团队/非本地/需决策/needs-human);COW-1219 已 shipped(node PR #723,Marshal PASS)。**教训:降噪靠标题+轻量检查会高估本地可完成性,批量修前须实测筛选。**
+
 ## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(5 条 — 均已 In Review,无可拿新项)
 
 | Issue | Title | Project | State | Asg |
@@ -51,83 +53,27 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(71 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(6 条)
+
+> **2026-06-14 第 7 次更新 — Tier-3 全面降噪**:对 56 条未降噪项逐条回代码核验。**32 条已实作→close 候选(待点名关单,不计入难度档)**:24 个 example(1310/1311/1312/1315–1328/1331–1335/1339/1340,均接 test_examples_local.sh,⚠仅核验结构未跑实时 green)、CBFS 914/928/936、CIP-17/4 1305/1751/1403/1404、secrets 363。
+
+> **2026-06-14 第 8 次更新 — Tier-3 可行性重排**:对降噪后剩余 keeper 按「验收能否本地完成+验证」复筛(1 shipped + 4 路并行核验)。**Tier-3 71→6**,Tier-4 102→118,Tier-0 208→224(Tier-5 不变;close 候选+1219 仍 open,开放总数不变)。
+> - ✅ **COW-1219**(mempool 逐出/readd-race 测试)已交付 node PR #723(Marshal PASS,In Review)→移出难度档。
+> - **16 条 → Tier-4**(需基建/共识/被阻塞):987(runtime.mount host API)、1542/1543(链上 escrow/runner 链事件订阅)、2100(fast-sync 接 bootstrap)、1029(Foundation-separation 共识)、1083(allowance 链上索引)、1754(真 marshal Actor harness)、988(Blocked by CIP-7)、993(live PVM sandbox CI)、1050/1052/1054(spawned 真-validator harness)、1243(macOS 双平台)、1244(full-stdlib bundle harness)、2177(blocked on 2100)、117(dry-run harness+CIP-3)。
+> - **16 条 → Tier-0**(他团队/非本地/需决策/needs-human/绿地):1344/1347(Docker harness/umbrella)、2186(RAS 指标已存在+Gateway 非本地)、1003(CIP-7 绿地)、2268/2269/1232(CIP-3)、1308(CIP-2)、920(needs-human)、937(runner→cbfs git-dep 边界)、1329/1341/1342(外部 LLM/Erlang/远程 devnet)、1945(需 CBOR array-vs-map spec 裁定)、373(design-first)、992(standalone pkg 不在本地)。
+> - **真·Tier-3 仅余 6**(本地可改可验):2120/926/931/933(CBFS 单仓本地可测;2120≈920 去重、931/933 已部分实现)、1011(runner session 测试 mock-driven 可扩)、386(SDK 四段式错误格式纯 Python pytest)。
+> - **关键教训:降噪靠标题+轻量检查会高估本地可完成性;批量修前须按「本地可跑通」实测筛选。**
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-2268 | CIP-3 §2.2.2: fix put_blob / file.write host-fn names to match code(他团队 CIP-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
-| COW-2269 | Remove or wire dead cip3.lane_fee.* governance params (governance theater)(他团队 CIP-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
-| COW-1310 | Example: 01-tokens | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1311 | Example: 02-liquidity-pools | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1312 | Example: 03-rebalancing-agent | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1315 | Example: 06-content-recommendations | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1316 | Example: 07-sentiment-analysis | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1317 | Example: 08-audio-transcription | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1318 | Example: 09-image-generation | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1319 | Example: 10-content-moderator | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1320 | Example: 11-alerts-and-schedulers | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1321 | Example: 12-liquidation-oracle | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1322 | Example: 13-dao-copilot | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1323 | Example: 14-compliance | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1324 | Example: 15-fraud-watcher | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1325 | Example: 16-contract-summarizer | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1326 | Example: 17-hn-feed | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1327 | Example: 18-ring-demo | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1328 | Example: 19-multi-actor-workflow | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1329 | Example: 19-texas-holdem | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1331 | Example: 21-pure-timer-scheduler | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1332 | Example: 22-actor-escrow-workflow | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1333 | Example: 23-read-through-oracle-cache | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1334 | Example: 24-failure-recovery | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1335 | Example: 25-auth-roles | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1339 | Example: 29-casino-rounds | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1340 | Example: 30-blackjack | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1341 | Example: 32-cowbot | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1342 | Example: erlangcowboydemo | Node Hardening, Tooling & Supporting Wor | Todo | PL |
-| COW-1344 | Project: Maintain Docker example harness | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-1347 | Project: Keep CLI/read semantics compatible with examples | Node Hardening, Tooling & Supporting Wor | Todo | — |
-| COW-920 | [CBFS] Add GetManifest Relay RPC (AMEND 9-G) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2120 | [CBFS/Node] GET_MANIFEST relay RPC (public assembly + cache) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-914 | Volume commit events silently lost when using cbfs put-many | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-926 | [CBFS] Signed request envelope on all /ras/ control-plane endpoints | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-928 | [CBFS] OwnerCapTokenV1 client-signed validation path on relays | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-931 | [CBFS] CLI connection pooling within process | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-933 | [CBFS] Multi-source relay registry refresh + background fetch | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-936 | [CBFS] Add tests for packages currently with zero coverage | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
-| COW-937 | [Runner] Add CIP-9 integration tests (manifest round-trip, access modes, cache stress) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-2186 | Observability: Prometheus metrics for Gateway + RAS | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-987 | [SDK] Actor-side runtime.mount(volume_id, access_mode) for CBFS workflows | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
-| COW-1050 | [CBSS] Restore lost §5.9 spawned DKG e2e suite (DOD-04 v1.1) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
-| COW-1052 | [CBSS] Real-validator stress test (DOD-08 v1.1) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
-| COW-1054 | [CBSS] Real-validator scenario matrix (DOD-05/07 v1.1) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
 | COW-1011 | [Runner] Extend session integration tests to full E2E flow | CIP-8: MPP Session Semantics | Backlog | PL |
-| COW-1542 | §6.4/§16 SessionAsset::Cip20 token-escrow path | CIP-8: MPP Session Semantics | Backlog | — |
-| COW-1543 | §4/§5 Runner session bootstrap relies on a PoC /session/observe HTTP push | CIP-8: MPP Session Semantics | Backlog | — |
-| COW-1308 | [Examples] CIP-2 v3 end-to-end economic e2e example and case study | CIP-2: Verifiable Off-Chain Compute | Todo | PL |
-| COW-1219 | [Node] Mempool: per-peer rate limit + sustained-load eviction tests | WP—Accounts, Transactions & Mempool | Backlog | — |
-| COW-1232 | [Node] Document precompile gas-cost table + verify against WP §3.5 examples | WP—State Transition Function, System Act | Backlog | — |
-| COW-1243 | [PVM] Cross-platform determinism CI test (Linux x86 vs macOS ARM) | WP—Python Actor VM (PVM) | Backlog | PL |
-| COW-1244 | [PVM] Activate determinism integration tests currently marked #[ignore] | WP—Python Actor VM (PVM) | Todo | PL |
-| COW-1945 | Appendix A TV1 (unsigned) and TV2 (signed) test vectors (exact CBOR hex | WP—Accounts, Transactions & Mempool | Backlog | PL |
-| COW-1305 | [Node] Align proof endpoint paths: /proof/* → /state/*, add block_hash field, handle absent  | CIP-17: Verifiable State Read RPC | Backlog | PL |
-| COW-1754 | §5.2 happy-path handler integration tests (prove=true present key | CIP-17: Verifiable State Read RPC | Backlog | — |
-| COW-2100 | [Node] Wire fast-sync into bootstrap + ≥10× bench (COW-977 follow-up) | CIP-4: State Storage & Persistence | Backlog | — |
-| COW-2177 | [Node] Benchmark fast-sync bootstrap speedup vs genesis replay (>10x, COW-977 acceptance) | CIP-4: State Storage & Persistence | Backlog | PL |
-| COW-1403 | §8.1 Fast sync (download QMDB state at height H | CIP-4: State Storage & Persistence | Backlog | PL |
-| COW-1404 | §8.1/§11 Height-indexed QMDB snapshots + SNAPSHOT_INTERVAL (1024) | CIP-4: State Storage & Persistence | Backlog | — |
-| COW-117 | [Gas] Add gas estimation API | CIP-3: Dual-Metered Fee Model | Todo | PL |
-| COW-363 | CLI: cowboy secrets manage encrypted secrets | Node Hardening, Tooling & Supporting Wor | Backlog | PL |
-| COW-373 | Local dev: cowboy.yaml config format | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-386 | Errors: four-part error format (what, why, fix, link) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
-| COW-988 | [SDK] @on_stream(stream_id) decorator + stream_publish() helpers (CIP-7) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
-| COW-992 | [SDK] Mirror missing continuation features in standalone `cowboy` package | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
-| COW-993 | [CI] E2E continuation tests on live PVM sandbox | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
-| COW-1003 | [Node/SDK] Optional CIP-2 ingestion config: timer → task submission → transform → encrypt →  | CIP-7: Watchtower (Simple Stream Protoco | Backlog | — |
-| COW-1083 | [SDK] Allowance pagination + bulk-query for large holder lists | CIP-20: Fungible Token Standard | Backlog | — |
-| COW-1029 | [Node] Foundation-separation enforcement: protocol prevents Foundation from being added to s | CIP-12: On-Chain Governance & System Act | Backlog | — |
-| COW-1751 | §5.2 proof field-shape divergence | CIP-17: Verifiable State Read RPC | Backlog | — |
 
-## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(102 条)
+## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(118 条)
 
 > 2026-06-13 重分档(原列 Tier-2,经核查实为子系统级):
 > - **COW-1893**:CBSS §5.3 错误码塌缩,176 处 InvalidData → 命名变体;错误码经 structured_error_map 入 receipt_root = **共识变更**,需协调上线 + 棘轮。
@@ -135,6 +81,22 @@
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-987 | [SDK] runtime.mount 需新 PVM host API+entitlement(降噪自 Tier-3) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
+| COW-1542 | §6.4/§16 SessionAsset::Cip20 链上 escrow(降噪自 Tier-3) | CIP-8: MPP Session Semantics | Backlog | — |
+| COW-1543 | §4/§5 runner session bootstrap 需链事件订阅子系统(/session/observe 仍 PoC)(降噪自 Tier-3) | CIP-8: MPP Session Semantics | Backlog | — |
+| COW-2100 | [Node] fast-sync 接 bootstrap=启动/共识路径(降噪自 Tier-3) | CIP-4: State Storage & Persistence | Backlog | — |
+| COW-1029 | [Node] Foundation-separation 改 genesis/治理共识态(降噪自 Tier-3) | CIP-12: On-Chain Governance & System Act | Backlog | — |
+| COW-1083 | Allowance 枚举需链上索引(key 76B>32 hashed 不可扫描=共识+迁移)(降噪自 Tier-3) | CIP-20: Fungible Token Standard | Backlog | — |
+| COW-1754 | §5.2 CIP-17 happy-path 测试需真 marshal Actor harness(transmute mock→SIGSEGV)(降噪自 Tier-3) | CIP-17: Verifiable State Read RPC | Backlog | — |
+| COW-988 | [SDK] @on_stream Blocked by CIP-7 节点 stream 投递未实现(降噪自 Tier-3) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | — |
+| COW-993 | [CI] E2E continuation 需 live PVM sandbox harness(不存在)(降噪自 Tier-3) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
+| COW-1050 | [CBSS] spawned DKG e2e 需真 validator+5×cbssd harness(降噪自 Tier-3) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
+| COW-1052 | [CBSS] Real-validator stress test 需 spawned validator fixture(降噪自 Tier-3) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
+| COW-1054 | [CBSS] Real-validator scenario matrix 需 spawned validator harness(降噪自 Tier-3) | CIP-24: Cowboy Secret Service (CBSS) | Backlog | — |
+| COW-1243 | [PVM] 跨平台 determinism CI 需 Linux x86+macOS ARM(本地仅 Linux)(降噪自 Tier-3) | WP—Python Actor VM (PVM) | Backlog | PL |
+| COW-1244 | [PVM] 激活 #[ignore] determinism 需 full-stdlib bundle harness(降噪自 Tier-3) | WP—Python Actor VM (PVM) | Todo | PL |
+| COW-2177 | [Node] fast-sync bench >10× blocked on COW-2100 接线(降噪自 Tier-3) | CIP-4: State Storage & Persistence | Backlog | PL |
+| COW-117 | [Gas] gas estimation API 需 dry-run harness(+CIP-3 他团队)(降噪自 Tier-3) | CIP-3: Dual-Metered Fee Model | Todo | PL |
 | COW-1074 | [Node] Permits/EIP-2612 gasless approval + increase/decrease_allowance(共识:新 token op) | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1076 | [Node] Multi-token token_multicall batch(共识:新 token 指令) | CIP-20: Fungible Token Standard | Backlog | — |
 | COW-1212 | [Node] chain_id in tx signing payload(共识:确认缺失,加 chain_id=改签名字节,wire+共识) | WP—Accounts/STF/Consensus | Backlog | — |
@@ -479,7 +441,28 @@
 | COW-2265 | mainnet launch: bundle devnet consensus-rule deltas (node#686 receipt code 1613, node#707 64 | Node Hardening, Tooling & Supporting Wor | Todo | — |
 | COW-2266 | Reconcile whitepaper genesis parameter defaults vs reference implementation (basefee T_c/T_b | Node Hardening, Tooling & Supporting Wor | Todo | — |
 
-## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(208 条)
+## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(224 条)
+
+> 2026-06-14 第 7+8 次更新降噪/可行性重排移入(详见 Tier-3 §更新):16 条原 Tier-3 项实为绿地/umbrella/非本地/他团队/需决策/needs-human,改列 Tier-0。
+
+| Issue | Title | Project | State | Asg |
+|---|---|---|---|---|
+| COW-1344 | Project: Docker example harness(绿地,无 Dockerfile)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Todo | — |
+| COW-1347 | Project: CLI/read semantics umbrella(永不关)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Todo | — |
+| COW-2186 | Observability Prometheus(RAS 指标已存在,Gateway 非本地 crate)(降噪自 Tier-3) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
+| COW-1003 | [Node/SDK] CIP-2 ingestion config(CIP-7 绿地未起)(降噪自 Tier-3) | CIP-7: Watchtower (Simple Stream Protoco | Backlog | — |
+| COW-2268 | CIP-3 §2.2.2 host-fn 名(他团队 CIP-3)(降噪自 Tier-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
+| COW-2269 | CIP-3 dead lane_fee 治理参数(他团队 CIP-3)(降噪自 Tier-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
+| COW-1232 | [Node] precompile gas 表 doc+verify(他团队 CIP-3+跨仓 WP)(降噪自 Tier-3) | WP—State Transition Function, System Act | Backlog | — |
+| COW-1308 | [Examples] CIP-2 v3 经济 e2e 示例(他团队 CIP-2)(降噪自 Tier-3) | CIP-2: Verifiable Off-Chain Compute | Todo | PL |
+| COW-920 | [CBFS] GetManifest Relay RPC(needs-human)(降噪自 Tier-3) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
+| COW-937 | [Runner] CIP-9 集成测试(runner→cbfs git-dep main 边界本地改无效)(降噪自 Tier-3) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
+| COW-1329 | Example 19-texas-holdem(需 runner+LLM keys+远程 devnet)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Todo | PL |
+| COW-1341 | Example 32-cowbot(需 MOONSHOT/Slack keys+llama-server)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Todo | PL |
+| COW-1342 | Example erlangcowboydemo(Erlang 工具链未装)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Todo | PL |
+| COW-1945 | Appendix A TV1/TV2 test vectors(需先裁定 CBOR array-vs-map=spec 决策)(降噪自 Tier-3) | WP—Accounts, Transactions & Mempool | Backlog | PL |
+| COW-373 | Local dev cowboy.yaml(design-decision-first)(降噪自 Tier-3) | Node Hardening, Tooling & Supporting Wor | Backlog | — |
+| COW-992 | [SDK] mirror continuation 到 standalone cowboy package(不在本地工作区)(降噪自 Tier-3) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 
 > 2026-06-14 从 Tier-1 移入(易但**不可拿**——本档区分"难度低"与"现在能不能动手"):
 > - **COW-986** — 阻塞:CIP-5↔CIP-9 fee_payer 语义矛盾,待 owner 裁定后才能写示例。
