@@ -1,6 +1,6 @@
 # 未解决 Issue 全列表 — 由易到难(2026-06-13 五次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **630 条**(552 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 122 / 未指派 508)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **629 条**(551 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 121 / 未指派 508)。
 
 **排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
@@ -18,6 +18,7 @@
 - ❌ COW-758 **已 Canceled**(用户授权,mesa-bot 误报)。
 - ➕ 新增 open 2 条 → Tier-3:COW-2268、COW-2269(均 CIP-3,他团队)。
 - 计数:635 → **630**(Done×6 + Canceled×1 − 新增×2 + 其他净变);Tier-1 11→9、Tier-2 6→2、Tier-3 86→88、Tier-0 205→204。
+- ❌ **COW-934 已 Canceled**(用户授权):Tier-3 首个批次试做,深入后判定 audit-bot 误报——所有第一方 panic 都在 `#[cfg(test)]` 内(测试断言,生产路径已返回 typed error),非测试的全在 third_party(驗收已排除);FakeStore fixture 也在用。Tier-3 88→87,总数 630→629。
 - 🧹 档位纠偏:本表"由易到难"按**难度**排,但易档曾混入"易但现在不可拿"的项。将 4 条从 Tier-1 移入 Tier-0(被阻塞/他团队/绿地):**COW-986 / COW-970 / COW-501 / COW-1144**。Tier-1 9→5(剩余 5 条全是 In Review ⚠,无新可拿项),Tier-0 204→208。开放总数不变(630)。今后:**难度定档位,阻塞/他团队/绿地一律 Tier-0**,⚠ 仅表 in-flight。
 
 **本会话整体战果(Tier-1 全清 + 内容文档批 + Tier-2 起步)**:
@@ -47,7 +48,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(88 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(87 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
@@ -91,7 +92,6 @@
 | COW-931 | [CBFS] CLI connection pooling within process | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-932 | [CBFS] Volume metadata + OwnerCapToken caching | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-933 | [CBFS] Multi-source relay registry refresh + background fetch | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-934 | [CBFS] Convert 34 production panic!/unimplemented!/todo! to typed errors | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-936 | [CBFS] Add tests for packages currently with zero coverage | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | PL |
 | COW-937 | [Runner] Add CIP-9 integration tests (manifest round-trip, access modes, cache stress) | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2186 | Observability: Prometheus metrics for Gateway + RAS | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
