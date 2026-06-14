@@ -36,6 +36,11 @@
 
 **第 7+8 次更新(2026-06-14,Tier-3 降噪+可行性重排)**:对 71 条 Tier-3 先降噪(32 已实作→close 候选)再按「本地可完成+验证」复筛 → **Tier-3 71→6**(真可本地交付:2120/926/931/933/1011/386),16→Tier-4(共识/真-validator/sandbox/跨平台/blocked),16→Tier-0(绿地/他团队/非本地/需决策/needs-human);COW-1219 已 shipped(node PR #723,Marshal PASS)。**教训:降噪靠标题+轻量检查会高估本地可完成性,批量修前须实测筛选。**
 
+**第 9 次更新(2026-06-14,批量循环交付战报)**:对第 7/8 次重排后的 6 条真 Tier-3 跑 batch-issue-loop(start-issue-fix + marshal 门禁),全部出口:
+- ✅ **已交付 PR(均 base devnet、Marshal PASS、附 reviewer 总结)**:**COW-1219**→node #723(**已 merge/Done**,mempool 逐出+readd-race 测试);**COW-931+933**→cbfs #48(In Review,连接池 idle-TTL + relay registry 多-RPC fallback;Marshal 抓到并修 S1 MED 安全:fail-open 曾漏到 peer-drain 授权路径,已拆为读路径 fail-open/授权路径 fail-closed);**COW-1011**→runner #115(In Review,session 全生命周期 + cross-session voucher 拒绝测试);**COW-386**→node #724(In Review,四段式错误格式 drift-guard,抓到 PurityViolationError/PermissionDeniedError 漏守卫)。
+- ⤴ **COW-2120 实现调查后 re-tier → Tier-4**:GET_MANIFEST server-side 组装实为 peer-fetch 组装网关子系统(relay 只存本地 shard 索引、无 manifest cache;重组逻辑在 cbfs-sdk 而 node 不依赖它,须抽共享 crate)。
+- **结论:第 7/8 次重排筛出的 6 条真·本地可交付 Tier-3,已交付 4(含 1 merged)、re-tier 1、仅剩 COW-926(/ras/ 签名信封全链路验证,security-heavy high-tier,值得独立专注 PR)。** 本表'快速可交付'Tier-3 池实质清空。
+
 ## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(5 条 — 均已 In Review,无可拿新项)
 
 | Issue | Title | Project | State | Asg |
@@ -53,7 +58,7 @@
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(5 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(1 条 — 仅剩 COW-926(安全重活,待专做);其余 5 条已交付/重分,见第 9 次更新)
 
 > **2026-06-14 第 7 次更新 — Tier-3 全面降噪**:对 56 条未降噪项逐条回代码核验。**32 条已实作→close 候选(待点名关单,不计入难度档)**:24 个 example(1310/1311/1312/1315–1328/1331–1335/1339/1340,均接 test_examples_local.sh,⚠仅核验结构未跑实时 green)、CBFS 914/928/936、CIP-17/4 1305/1751/1403/1404、secrets 363。
 
@@ -67,10 +72,6 @@
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-926 | [CBFS] Signed request envelope on all /ras/ control-plane endpoints | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-931 | [CBFS] CLI connection pooling within process | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-933 | [CBFS] Multi-source relay registry refresh + background fetch | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-1011 | [Runner] Extend session integration tests to full E2E flow | CIP-8: MPP Session Semantics | Backlog | PL |
-| COW-386 | Errors: four-part error format (what, why, fix, link) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | Backlog | PL |
 
 ## Tier 4 — 较难 — 子系统级:状态机 / 经济 / 计量(每条 1–2 周;多处碰共识需协调上线)(119 条)
 
