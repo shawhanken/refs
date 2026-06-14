@@ -18,6 +18,7 @@
 - ❌ COW-758 **已 Canceled**(用户授权,mesa-bot 误报)。
 - ➕ 新增 open 2 条 → Tier-3:COW-2268、COW-2269(均 CIP-3,他团队)。
 - 计数:635 → **630**(Done×6 + Canceled×1 − 新增×2 + 其他净变);Tier-1 11→9、Tier-2 6→2、Tier-3 86→88、Tier-0 205→204。
+- 🧹 档位纠偏:本表"由易到难"按**难度**排,但易档曾混入"易但现在不可拿"的项。将 4 条从 Tier-1 移入 Tier-0(被阻塞/他团队/绿地):**COW-986 / COW-970 / COW-501 / COW-1144**。Tier-1 9→5(剩余 5 条全是 In Review ⚠,无新可拿项),Tier-0 204→208。开放总数不变(630)。今后:**难度定档位,阻塞/他团队/绿地一律 Tier-0**,⚠ 仅表 in-flight。
 
 **本会话整体战果(Tier-1 全清 + 内容文档批 + Tier-2 起步)**:
 - Tier-1 易/决策/核验层 + 内容文档批(部署/快照/事故 runbook、AI-context SKILL/adapters/.cursorrules、SDK 自动参考、注释样例、架构深挖)全部交付
@@ -29,19 +30,15 @@
 
 ---
 
-## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(9 条)
+## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(5 条 — 均已 In Review,无可拿新项)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | In Review ⚠ | PL |
 | COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
-| COW-1144 | [Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA? | CIP-28: Cowboy Agent Banking | Backlog | — |
-| COW-501 | llms.txt at docs domain root | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-499 | Skills for Claude/Codex/OpenClaw | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
 | COW-474 | Snapshots + restore runbook | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
 | COW-475 | Incident runbook (degraded mode / halt / restart) | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
-| COW-970 | [Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering | CIP-3: Dual-Metered Fee Model | Backlog | PL |
-| COW-986 | [Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...) | CIP-5: Native Timer Mechanism | Backlog | PL |
 
 ## Tier 2 — 小型有界代码修复(每条 ≤1 天)(2 条)
 
@@ -484,7 +481,20 @@
 | COW-2265 | mainnet launch: bundle devnet consensus-rule deltas (node#686 receipt code 1613, node#707 64 | Node Hardening, Tooling & Supporting Wor | Todo | — |
 | COW-2266 | Reconcile whitepaper genesis parameter defaults vs reference implementation (basefee T_c/T_b | Node Hardening, Tooling & Supporting Wor | Todo | — |
 
-## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(204 条)
+## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(208 条)
+
+> 2026-06-14 从 Tier-1 移入(易但**不可拿**——本档区分"难度低"与"现在能不能动手"):
+> - **COW-986** — 阻塞:CIP-5↔CIP-9 fee_payer 语义矛盾,待 owner 裁定后才能写示例。
+> - **COW-970** — 他团队(CIP-3)+ 阻塞:依赖 BasefeeConfig 代码收尾。
+> - **COW-501** — 阻塞:需在线上 docs 域名核实 Mintlify llms.txt,本地无法闭环。
+> - **COW-1144** — CIP-28(Agent Banking)绿地未建,决策前置无意义,绿地排除。
+
+| Issue | Title | Project | State | Asg |
+|---|---|---|---|---|
+| COW-986 | [Docs] CIP-9 §12 example: schedule_timer_ex(fee_payer=STORAGE_MANAGER)(阻塞:待 owner 裁定 CIP-5↔9 矛盾) | CIP-5: Native Timer Mechanism | Backlog | PL |
+| COW-970 | [Node] Promote Phase 2a pvm_per_instr_gas into consensus metering(他团队 CIP-3 + 阻塞) | CIP-3: Dual-Metered Fee Model | Backlog | PL |
+| COW-501 | llms.txt at docs domain root(阻塞:需线上域名核实) | Node Hardening, Tooling & Supporting Wor | Backlog | — |
+| COW-1144 | [Decision] MOOLA ↔ BankActor semantics(CIP-28 绿地排除) | CIP-28: Cowboy Agent Banking | Backlog | — |
 
 > 2026-06-14:**COW-758** 已 **Canceled**(用户授权)——经对抗审计判定为 mesa-bot 误报:系统 actor 0x01–0x05 的"code"只是 genesis 注释标记串(`b"# Runner Registry System Actor"` 等),真正逻辑在 Rust 原生 crate;链上状态本就公开,暴露注释不泄露逻辑/密钥。已脱离本清单范围(state=canceled),从下表移除。
 
