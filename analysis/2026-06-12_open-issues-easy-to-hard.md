@@ -1,6 +1,6 @@
 # 未解决 Issue 全列表 — 由易到难(2026-06-13 五次更新,Linear 实时数据)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **635 条**(551 Backlog / 67 Todo / 5 In Progress / 12 In Review;PL 126 / 未指派 509)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派(—)} — 共 **630 条**(552 Backlog / 67 Todo / 5 In Progress / 6 In Review;PL 122 / 未指派 508)。
 
 **排序依据:** 6 档分级,继承既有档位;COW-938 已重分 Tier-4。⚠ = In Progress/In Review(已有 PR 在审,勿重复认领)。
 
@@ -13,6 +13,12 @@
 - ⤴ 重分档(原 Tier-2 错档,详见各档说明):**COW-1712**、**COW-1893** → Tier-4(共识/跨仓库);**COW-758** → Tier-0(mesa-bot 误报,建议 Cancel)。
 - 结论:**Tier-2 "真·易" 已耗尽**;余 6 条多为文档/决策/已 In Review。再往下需进 Tier-3(数天/条)或做错档的共识版。
 
+**第 6 次更新(2026-06-14)**:
+- ✅ 已合并 Done(移出清单):COW-1084、COW-1131、COW-1506(本团队本轮交付)+ COW-422、COW-1507、COW-2263(他人/前序合并)。
+- ❌ COW-758 **已 Canceled**(用户授权,mesa-bot 误报)。
+- ➕ 新增 open 2 条 → Tier-3:COW-2268、COW-2269(均 CIP-3,他团队)。
+- 计数:635 → **630**(Done×6 + Canceled×1 − 新增×2 + 其他净变);Tier-1 11→9、Tier-2 6→2、Tier-3 86→88、Tier-0 205→204。
+
 **本会话整体战果(Tier-1 全清 + 内容文档批 + Tier-2 起步)**:
 - Tier-1 易/决策/核验层 + 内容文档批(部署/快照/事故 runbook、AI-context SKILL/adapters/.cursorrules、SDK 自动参考、注释样例、架构深挖)全部交付
 - Tier-2 起步:COW-2262(IBE 临时量擦零)、990(reentrancy key=)、989/1064/500(关单/已合并)
@@ -23,37 +29,33 @@
 
 ---
 
-## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(11 条)
+## Tier 1 — 最易 — 纯文档 / 决策记录 / 验证型一行修(每条数小时)(9 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-1097 | [Docs] CIP-21 implementation roadmap + ETAs in cip21_reference.py | CIP-21: DEX & Liquidity Pools | In Review ⚠ | PL |
-| COW-1084 | [Docs] CIP-20 ↔ CIP-21 interaction worked examples | CIP-20: Fungible Token Standard | In Review ⚠ | PL |
 | COW-1133 | [Docs] Manifest interaction: tooling guidance for displaying expected pins | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
 | COW-1144 | [Decision] MOOLA ↔ BankActor semantics: can a card pay gas in MOOLA? | CIP-28: Cowboy Agent Banking | Backlog | — |
 | COW-501 | llms.txt at docs domain root | Node Hardening, Tooling & Supporting Wor | Backlog | — |
 | COW-499 | Skills for Claude/Codex/OpenClaw | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
-| COW-422 | Docs: architecture deep-dives (from whitepaper) | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
 | COW-474 | Snapshots + restore runbook | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
 | COW-475 | Incident runbook (degraded mode / halt / restart) | Node Hardening, Tooling & Supporting Wor | In Review ⚠ | PL |
 | COW-970 | [Node] Plan to promote Phase 2a pvm_per_instr_gas (observe-only) into consensus metering | CIP-3: Dual-Metered Fee Model | Backlog | PL |
 | COW-986 | [Docs] CIP-9 §12 example: actor calling schedule_timer_ex(fee_payer=STORAGE_MANAGER, ...) | CIP-5: Native Timer Mechanism | Backlog | PL |
 
-## Tier 2 — 小型有界代码修复(每条 ≤1 天)(6 条)
+## Tier 2 — 小型有界代码修复(每条 ≤1 天)(2 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
 | COW-940 | [Docs] Resolve CBFS Phase 2 open questions: PoD frequency, scoring weights, clock skew bound | CIP-9: Cowboy File System (CBFS)-Backed  | Backlog | — |
-| COW-1131 | [PVM] Dynamic imports inside handler body: explicit error rather than silent unresolvable | CIP-26: Account-Scoped Actor Libraries | In Review ⚠ | PL |
-| COW-1506 | §11.5 canonical-ordering residual (minor/partial) | CIP-6: In-PVM Actor SDK (cowboy_sdk) | In Review ⚠ | PL |
-| COW-1507 | §14.3 token.* entitlement IDs (token.create/transfer/mint/burn) are NOT | CIP-6: In-PVM Actor SDK (cowboy_sdk) | In Review ⚠ | PL |
 | COW-2258 | [Indexer/Wallet] Add big-endian decoders for the new on-chain receipt events (session / mani | — | Todo | PL |
-| COW-2263 | node Coverage (cargo llvm-cov) job flakes on PVM interpreter init — red on live devnet | — | In Review ⚠ | PL |
 
-## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(86 条)
+## Tier 3 — 中等 — 边界清晰的功能 / 测试 / 接线(每条数天)(88 条)
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
+| COW-2268 | CIP-3 §2.2.2: fix put_blob / file.write host-fn names to match code(他团队 CIP-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
+| COW-2269 | Remove or wire dead cip3.lane_fee.* governance params (governance theater)(他团队 CIP-3) | CIP-3: Dual-Metered Fee Model | Backlog | — |
 | COW-1310 | Example: 01-tokens | Node Hardening, Tooling & Supporting Wor | Todo | PL |
 | COW-1311 | Example: 02-liquidity-pools | Node Hardening, Tooling & Supporting Wor | Todo | PL |
 | COW-1312 | Example: 03-rebalancing-agent | Node Hardening, Tooling & Supporting Wor | Todo | PL |
@@ -482,13 +484,12 @@
 | COW-2265 | mainnet launch: bundle devnet consensus-rule deltas (node#686 receipt code 1613, node#707 64 | Node Hardening, Tooling & Supporting Wor | Todo | — |
 | COW-2266 | Reconcile whitepaper genesis parameter defaults vs reference implementation (basefee T_c/T_b | Node Hardening, Tooling & Supporting Wor | Todo | — |
 
-## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(205 条)
+## Tier 0 — 排除项 — 回避令 / 被阻塞 / 他团队 / 仓库不在本地 / in-flight(不建议拿)(204 条)
 
-> 2026-06-13 重分档(原列 Tier-2):**COW-758** 经对抗审计判定为 **mesa-bot 误报**——系统 actor 0x01–0x05 的"code"只是 genesis 注释标记串(`b"# Runner Registry System Actor"` 等),真正逻辑在 Rust 原生 crate;链上状态本就公开,暴露注释不泄露逻辑/密钥。加 RPC 特判反违反 Simplicity。**建议 Cancel**(待用户点名)。
+> 2026-06-14:**COW-758** 已 **Canceled**(用户授权)——经对抗审计判定为 mesa-bot 误报:系统 actor 0x01–0x05 的"code"只是 genesis 注释标记串(`b"# Runner Registry System Actor"` 等),真正逻辑在 Rust 原生 crate;链上状态本就公开,暴露注释不泄露逻辑/密钥。已脱离本清单范围(state=canceled),从下表移除。
 
 | Issue | Title | Project | State | Asg |
 |---|---|---|---|---|
-| COW-758 | [mesa-bot] System actor code readable via /actor/{addr}/code(误报/建议 Cancel) | WP—State Transition Function, System Act | Backlog | — |
 | COW-1568 | §10.1–10.2 full container lifecycle (image pull → create | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1569 | §10.3 failure-mode handling (OOM kill | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
 | COW-1570 | §10.4 container exit-code → CIP-2 status mapping (0→COMPLETED | CIP-10: Runner Container Runtime [Cancel | Backlog | — |
