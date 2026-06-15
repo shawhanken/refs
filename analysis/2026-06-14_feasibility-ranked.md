@@ -18,10 +18,10 @@
 
 | 档 | 含义 | 条数(约) |
 |---|---|---|
-| **F-0 close 候选** | 已实作,核验后即可关单(几乎零成本) | 10 |
-| **F-1 真·易(S,≤1天)** | 本地可改可测的小活 | 9 |
-| **F-2 真·中(M,数天)** | 本地可改可测,边界较大 | 7 |
-| **F-3 example 跑验** | 目录+demo.sh 已在,跑本地 validator 验证/修回归 | 24 |
+| **F-0 close 候选** | ~~已实作,核验后即可关单~~ → **2026-06-15 已全部消化(0 剩)** | 10→0 |
+| **F-1 真·易(S,≤1天)** | ~~本地可改可测的小活~~ → **已清空**(202/231/363 交付merge、400/501 关闭) | 9→0 |
+| **F-2 真·中(M,数天)** | ~~本地可改可测~~ → **实测全非干净**(共识/设计/集成/已覆盖) | 7→0 |
+| **F-3 example 跑验** | 目录+demo.sh 已在,跑本地 validator 验证/修回归(**未跑,留专门一轮**) | 24 |
 | — 下面全是"现在做不了" — | | |
 | **B-1 SECURITY-HEAVY** | 本地可做但高危安全,需专注 PR | 3 |
 | **B-2 INFRA-HARNESS** | 需先建测试/CI/沙箱/多节点 harness | ~13 |
@@ -33,7 +33,29 @@
 
 ---
 
-## ✅ F-0 — close 候选(先核验再点名关单,最划算)
+## 🔻 2026-06-15 实测进度与纠偏(batch-issue-loop 跑过 F-0/F-1/F-2 后)
+
+**实测结论:易档(F-0 / F-1 / F-2)到此全部清空或核实为非干净池。** 真上手逐条回代码后,F-1/F-2 与 6 月初一样仍系统性高估——"标题+轻核"定的档位经不起"验收能否本地跑通"的对抗式核验。
+
+**已交付 / 已关(本轮)**
+- **COW-202 + COW-231**(结构化 `pvm::host` tracing)→ node PR **#726 merged** → Done。
+- **COW-363**(`cowboy secrets list` 只读 RPC `GET /cbss/secrets/{account}` + CLI)→ node PR **#727 merged** → Done。原标 F-1,实为"缺按-account 枚举后端"的 F-2,按点名升级实现。
+- **COW-501 → Done**、**COW-400 → Duplicate**:WebFetch 实测 `https://docs.cowboy.inc/llms.txt` + `/llms-full.txt` 均 Mintlify 原生解析、发布时自动再生 → 零代码。
+
+**F-0 已无可关**:69/387/46/1305/1751/914/928 已 Done;474/475 他人 In Review;2099 是 CIP-9 epic 伞(非 close 候选)。
+
+**F-2 七条全非干净**(见下表逐条纠偏)。**F-3 example** 未跑(集成 flavor:需 release 二进制 + 本地 validator,偏 flaky;留作专门一轮)。
+
+**往后只剩"重"票**(非自动 batch-loop fodder,需逐个慎做/要人拍板):B-1 安全专注 PR(926 等)、B-4 共识协调上线(~60)、B-2 先建 harness、B-3 设计裁定、B-5 绿地、B-6 非本地。
+
+---
+
+## ✅ F-0 — close 候选 ✅ 已全部消化(2026-06-15:无可关)
+
+> 现状:7 已 Done(69/387/46/1305/1751/914/928)· 474/475 他人 In Review · 2099 = CIP-9 epic 伞。**已无 verify+close 余量。**
+
+| Issue | 仓 | 证据 / 理由 |
+|---|---|---|
 
 | Issue | 仓 | 证据 / 理由 |
 |---|---|---|
@@ -50,30 +72,35 @@
 
 > 注:批量标 Done 需用户点名授权;每条建议关单前回代码再确认一次。
 
-## ✅ F-1 — 真·易(S,≤1 天,本地可改可测)
+## ✅ F-1 — 真·易(S,≤1 天)✅ 已清空(2026-06-15)
 
-| Issue | 仓 | 做什么 |
+> 真·干净本地批只有 202/231/363,均已交付+merge;400/501 原生关闭;其余早先排除。
+
+| Issue | 仓 | 状态 / 做什么 |
 |---|---|---|
-| COW-363 | node/cli | 补 `cowboy secrets list` 变体(set/policy/delete 已 ship) |
-| COW-1063 | node/rpc | CBSS handler 404/410/409 分支测试(逻辑已在,扩 CbssTestStore fixture) |
-| COW-231 | node | PvmHost host-call 调用 tracing(纯 observability,不碰共识) |
-| COW-202 | node | 存储读写 access logging(纯 observability) |
-| COW-399 | node/cli | `cowboy init` 输出加 `.cursorrules`(验证文件写出) |
-| COW-499 | cowboy | 从 canonical SKILL.md 打包 per-platform AI-context adapters |
-| COW-400 / COW-501 | cowboy | 生成 docs 根 `llms.txt`(两条近重复,建议合并) |
-| COW-940 | cbfs | 裁定 PoD 频率/打分权重/clock-skew 并落为 cbfs 常量(skew 常量已在) |
+| COW-202 | node | ✅ **Done**(PR #726):存储读写 → 结构化 `pvm::host` trace |
+| COW-231 | node | ✅ **Done**(PR #726):host-call → 结构化 `pvm::host` trace |
+| COW-363 | node/cli | ✅ **Done**(PR #727):`secrets list` 只读 RPC+CLI(实为 F-2:缺枚举后端) |
+| COW-400 | cowboy | ✅ **Duplicate**(of 501) |
+| COW-501 | cowboy | ✅ **Done**:`llms.txt`/`llms-full.txt` 实测 Mintlify 原生托管,零代码 |
+| COW-1063 | node/rpc | 他人在途(PR #725,In Review) |
+| COW-399 | node/cli | 早先 **Canceled** |
+| COW-499 | cowboy | 早先 **In Review**(他人) |
+| COW-940 | cbfs | ✗ 非干净:三问里两问需 devnet 遥测/漂移**实测数据** → 实为 B-3 设计裁定 |
 
-## ✅ F-2 — 真·中(M,数天,本地可改可测)
+## ⚠️ F-2 — 真·中(M,数天)❌ 2026-06-15 实测:七条全非干净,无一为自动 batch 批
 
-| Issue | 仓 | 做什么 / 注意 |
+> 逐条回代码后,F-2 全部落入 共识 / 设计裁定 / 集成 / 已被覆盖,**没有"纯加法、单测可验、非共识"的干净批**。
+
+| Issue | 仓 | 实测纠偏 |
 |---|---|---|
-| COW-105 | node | continuation resume-state 校验 + 测试 |
-| COW-1329 | cowboy | 19-texas-holdem 写 README + 接入 test_examples_local.sh + 跑通 |
-| COW-1347 | node | 保持 CLI/read 语义与 examples 兼容(本地 example sweep 验证) |
-| COW-930 | cbfs | Cowboy-mode `cbfs mount` token-refresh 设计+实现(无共识/peer-fetch) |
-| COW-496 | node | 错误信息改四段式 —— ⚠ 只动文案,**勿改错误码/字段语义**(进 receipt_root=共识) |
-| COW-1893 | cbss(docs) | 定义 CIP-24 §5.3 canonical 错误词汇(规格文本;代码侧塌缩=共识,不在此) |
-| COW-936 | cbfs | 给低覆盖包补测试(前提"零覆盖"已过时,价值有限,边界开放) |
+| COW-105 | node | ✗ **共识风险**:续体 resume-state 校验走 PVM 执行层,改校验可能动 accept/reject;验收模糊;续体本就是雷区(COW-824/2229)|
+| COW-930 | cbfs | ✗ **设计裁定+绿地味**:描述开头即"decide before implementing,三选一架构",且翻转一个"by design 故意 defer"的特性 |
+| COW-1329 | cowboy | ✗ **集成**:example 跑验,需 release 二进制+validator;归 F-3 |
+| COW-1347 | node | ✗ **"Project:" 追踪伞**,无具体可交付 |
+| COW-496 | node | ✗ **大概率已被 COW-386 覆盖**(devnet tip = `COW-386 enforce four-part error format across all error classes`);且错误文案进 receipt_root=共识风险 |
+| COW-1893 | cbss(docs) | ✗ 规格文本裁定(词汇定义),非代码批 |
+| COW-936 | cbfs | ✗ 价值有限(前提"零覆盖"已过时),边界开放 |
 
 ## ✅ F-3 — example 跑验(S;目录+demo.sh 已在 `cowboy/examples/`,接入 test_examples_local.sh)
 
@@ -159,6 +186,12 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 
 ## 一句话
 
-**真正现在能本地交付的只有 ~26 条**(10 close 候选 + 9 易 + 7 中)外加 24 条 example 跑验;其余 ~535 条
-被「共识 / 缺基建 / 绿地 / 他团队·非本地」四类挡住。建议拿取顺序:**F-0 → F-1 → F-2 → F-3**,然后才考虑
-B-1(926 等安全,专注做)或先投资 B-2 的 harness(一次性解锁 CIP-17 测试、CBSS e2e、example CI 等一批)。
+~~真正现在能本地交付的只有 ~26 条(10 close + 9 易 + 7 中)外加 24 example~~ —— **2026-06-15 修正:这个估计仍偏乐观。** 实测后 F-0/F-1/F-2 三个易档全部清空或核实为非干净:本轮真正干净交付的只有 **3 条代码批**(COW-202/231/363,2 个 PR 已 merge)+ **2 条原生关闭**(COW-400/501)。F-0 已无可关。
+
+**剩下的全是"重"票**,无一为自动 batch-loop fodder:
+- **F-3 example**(24):本地可跑但偏集成(需 release 二进制 + validator),留作专门一轮;
+- **B-1 安全专注 PR**(3,如 COW-926 `/ras/` 签名信封全验证)——高危,一处错=绕过,必须单独专注做;
+- **B-2 先建 harness**(~13)——一次性解锁 CIP-17 handler 测试 / CBSS e2e / example CI 一批,投资回报最高;
+- **B-3 设计裁定 / B-4 共识协调上线(~60)/ B-5 绿地 / B-6 非本地** —— 需人拍板或协调上线。
+
+**推荐下一步**:① 就此收尾;或 ② 先投 B-2 一个 harness(把"没法本地测"的根因解决,为后续批量铺路);或 ③ 点一个具体 B-1/B-4 重票专注做。教训重申:档位务必在真上手前逐条回代码验"验收能否本地跑通",别信"标题+轻核"。
