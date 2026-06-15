@@ -23,7 +23,7 @@
 | **F-2 真·中(M,数天)** | ~~本地可改可测~~ → **实测全非干净**(共识/设计/集成/已覆盖) | 7→0 |
 | **F-3 example 跑验** | 目录+demo.sh 已在,跑本地 validator 验证/修回归(**未跑,留专门一轮**) | 24 |
 | — 下面全是"现在做不了" — | | |
-| **B-1 SECURITY-HEAVY** | 本地可做但高危安全,需专注 PR(926→#732 merged;2274→#733、1057→#735 In Review;**仅剩 1051**) | 3→1 |
+| **B-1 SECURITY-HEAVY** | 本地可做但高危安全,需专注 PR(926→#732 merged;2274→#733、1057→#735 In Review;1051 退回 Backlog=实为 B-3,**档已清零**) | 3→0 |
 | **B-2 INFRA-HARNESS** | 需先建测试/CI/沙箱/多节点 harness | ~13 |
 | **B-3 SPEC/DESIGN-DECISION** | 需先裁规格/设计 | ~24 |
 | **B-4 CONSENSUS** | 碰 state-root/genesis/receipt,需协调上线 | ~60 |
@@ -74,7 +74,7 @@
 - **COW-2274 → node PR #733**(926 follow-up):`/ras/` 控制面**签名信封 + 链上吊销**。8 端点(6 POST + 2 GET)raw-body `Bytes` 在 JSON 解析前验签(canonical 含 `Keccak256(body)`);`is_delegation_revoked` + `verify_authenticated_envelope_checked` 补齐 926 推迟的 "cert not revoked"。**加固轮**:再接 cbss-rewrap/mount-allowlist 2 POST + 2 GET 改 `OriginalUri`(主路由零回归)。顺手修 2 个 ras.rs 源扫描 guard 误报 bug(`ras_usage_report` 扫到 EOF、整文件 consensus-write 扫描误伤测试)。不变量 6/6、Almanax 0、对抗 review 无 high/crit、`cargo test --workspace` 绿。**needs_human 因**:信封无条件强制,cbfs 客户端须先签 POST 信封否则 401(延续 #732 的 GET rollout)。
 - **COW-1057 → node PR #735**(CIP-24 CBSS):`DkgCeremonyRecord` 让 DKG sabotage 在 `ExpireDkgPending` 后仍可 slash(verifier 回退持久化记录;rotate 删、expire 留)。不变量 6/6(含 cbss wire round-trip + econ)、Almanax 0、`cargo test --workspace` 绿。对抗 review **6/7 维干净**,一条 **MEDIUM**:`(scope,epoch)` 记录在 expire→重发同 scope 时被覆盖→首个 ceremony 的恶意 dealer 重新逃逸——**非回归**(严格优于原状)、**非误罚**(签名绑定委员会);已在代码内注明。**全 fix** 需 evidence wire 带 per-ceremony id(跨仓 node+runner/cbss,follow-up,因 auto-mode 拒建票未单独立票,折进 PR/issue 评论)。**needs_human 因**:新持久化态 + slashing 可达性=共识变更,需协调上线 + 人裁 clobber 限制是否可接受。
 
-**本会话(再续)累计:node #733 + #735(各含加固/注记提交),均 In Review 待人工 merge。** B-1 安全票仅剩 **COW-1051**(DCAP/VLEK 厂商证书链,需真实 attestation 测试向量,本地难验,不建议自动跑)。**自动 batch-loop fodder 至此彻底清零**——往后纯靠用户逐个点名重票(B-4 共识/B-3 设计/B-5 绿地/B-6 非本地)。
+**本会话(再续)累计:node #733 + #735(各含加固/注记提交),均 In Review 待人工 merge。** B-1 安全票最后一条 **COW-1051** 回代码核实后**退回 Backlog + 写 scoping 评论**:链上现状=只对治理预注册可信公钥验 quote 签名,**零厂商凭据验证**;runner-tee 944 行是自生成 key 的模拟。COW-1051=从零造共识关键 TEE 验证器(无 x509/dcap 依赖、须确定性 block-time X.509、缺真实 Intel/AMD 测试向量、**需先做 CIP-24 §3.8 设计裁定=实为 B-3**、CIP-23/24 跨团队多周活)。**不硬上半成品/合成向量**(安全验证器假绿比不做更糟)。**B-1 安全档至此全部处理完毕,自动 batch-loop fodder 彻底清零**——往后纯靠用户逐个点名重票(B-4 共识/B-3 设计/B-5 绿地/B-6 非本地)。
 
 > 运维记:本环境 SSH(22)push github 卡死 → 改 `gh auth setup-git` + HTTPS push。auto-mode 拒绝未经明确请求的新建 Linear issue → follow-up 折进现有评论。
 
@@ -141,14 +141,14 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 
 ## ✗ B-1 — SECURITY-HEAVY(本地可做,但高危,需专注 PR,不可趁乱)
 
-> **进度(2026-06-15):仅剩 COW-1051。** 926 MVP→#732 merged;其 follow-up 2274→#733、1057→#735 均已交付(In Review,Marshal needs_human,等人工 merge)。
+> **进度(2026-06-15):B-1 全部处理完。** 926 MVP→#732 merged;follow-up 2274→#733、1057→#735(In Review,Marshal needs_human,等人工 merge);1051 回代码核实=共识关键 TEE 验证器从零造、需设计裁定+真实向量 → **退回 Backlog + scoping 评论**(详见下表)。
 
 | Issue | 仓 | 状态 / 为何高危 |
 |---|---|---|
 | COW-926 | node/rpc | ✅ MVP **#732 merged**(服务端验证在 node/rpc,非 cbfs);follow-up COW-2274 |
 | COW-2274 | node/rpc | ✅ **PR #733**(In Review):`/ras/` POST 信封 + 吊销,8 端点;需人裁 cbfs 客户端 rollout 排序 |
 | COW-1057 | node/cbss | ✅ **PR #735**(In Review):DkgCeremonyRecord 让 sabotage 在 expire 后仍可 slash;共识相关 + MEDIUM clobber 限制待人裁 |
-| COW-1051 | cbss | ⬜ **仅此未做**:DCAP/VLEK 厂商证书链 + CRL/TCB 校验(大密码学面;需真实 attestation 测试向量,本地难验)|
+| COW-1051 | node/execution + cbss/runner-tee | ⛔ **退回 Backlog + scoping 评论**:链上现状只验治理预注册公钥=零厂商凭据;从零造共识关键 DCAP/VLEK 验证器(无 x509/dcap 依赖、须确定性 block-time、缺真实 Intel/AMD 向量、**需先 CIP-24 §3.8 设计裁定=实为 B-3**、CIP-23/24 跨团队多周)。不硬上半成品 |
 
 ## ✗ B-2 — INFRA-HARNESS(需先建不存在的测试/CI/沙箱基建)
 
