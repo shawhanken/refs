@@ -192,10 +192,13 @@ semantic rule** (not a systemic codec problem). New MUST-FIX beyond R1/R2:
 - **(LOW)** CIP-29 `EmitOrigin::from_metadata_bytes` ignores trailing bytes (`:563`) — defense
   in depth only (CIP-29 rides deferred/system txs the node builds; not a tx-canonical break).
 
-**Confirmed by round-4 (no action):** R1 blast radius is **CONTAINED** — `Instruction` reaches
-consensus ONLY via `Transaction` in `Block.transactions` (receipts store `tx_type:u8`, not the
-full `Instruction`), so **plan Task 2b path (a) — change the `Custom` encoding — is safe** in the
-tx flag-day. Also: because F1 makes `tx_hash`/`digest` **signature-independent**, neither `v`-
+**Confirmed by round-4, corrected by round-5 (B5):** `Instruction` reaches consensus via
+`Transaction`, and `Transaction` reaches consensus on TWO surfaces — `Block.transactions`
+(→ `tx_root`/`block_hash`) **and `StateValue::DeferredTx` (`storage/state_value.rs:319`) →
+`state_root`** (receipts store only `tx_type:u8`, not the full `Instruction`). Both are reset on
+the devnet flag-day, so **plan Task 2b path (a) — change the `Custom` encoding — is still safe**;
+but the surface list is `{tx_root, block_hash, state_root}`, and the **R10 round-trip test must
+also cover a `Transaction` wrapped in `StateValue::DeferredTx`**. Also: because F1 makes `tx_hash`/`digest` **signature-independent**, neither `v`-
 nor s-malleability of `EthSignature` can fork tx identity (the one axis where the design fully
 holds). Exhaustively-checked-clean enums: all `SystemInstruction`/`ActorInstruction`/`LibraryInstruction`
 sub-dispatch (`_ => Err(InvalidEnum)`), `Scope`/`Action`, all `cbss` enums, `SessionAsset`,

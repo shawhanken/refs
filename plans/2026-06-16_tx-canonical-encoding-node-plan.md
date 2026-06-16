@@ -165,6 +165,10 @@ fn every_instruction_roundtrips_to_identity() {
 ```
 
 Build `sample_one_per_opcode()` explicitly (it doubles as living documentation of the opcode set).
+**(B5)** Also round-trip a `Transaction` wrapped in `StateValue::DeferredTx`
+(`storage/state_value.rs:319`) — the new tx codec reaches `state_root` through it, not only
+`tx_root`/`block_hash`, so its self-delimiting decode must consume exactly its bytes inside a
+`StateValue`.
 
 - [ ] **Step 3a (path a): make the codec injective**
 
@@ -315,8 +319,18 @@ for w in self.additional_signers.windows(2) {
 // (also reject an additional signer equal to `from` if that is the policy)
 ```
 
-Clients must sort `additional_signers` by address before signing. Note this in the cli/SDK
-migration (Task 9b).
+- [ ] **Step 3b (REGRESSION — mandatory, A1): fix `sign_multi` to sort+dedup, or in-crate tests red**
+
+`Transaction::sign_multi` (`execution.rs:231-275`) builds `additional_signers` from
+`signers[1..]` **in caller order** (`:254`) — so the txs it produces (and the in-crate tests
+`test_transaction_sign_multi_verify` `:7911` / `test_transaction_sign_multi_tampered_fails`
+`:7933`) will FAIL the new `verify()` rule. This is NOT just a client concern; `sign_multi` is
+in `cowboy-types`. Fix `sign_multi` to **sort `signers[1..]` by address and reject duplicates
+before** computing the hash and assembling, so the produced tx satisfies the R7 rule. Update
+the two multisig tests to expect sorted output. (Clients in Task 9b then just call the fixed
+`sign_multi` / sort before signing.)
+
+Run: `cargo test -p cowboy-types -- sign_multi additional_signers` → PASS after the fix.
 
 - [ ] **Step 4: Run + commit**
 
@@ -1006,8 +1020,8 @@ git add -A && git commit -m "chore: fmt + regression fixes for canonical tx enco
   contained) — R1 CRITICAL; plus the **exhaustive all-opcode round-trip test** (R10).
 - **Strict bool/length leaf fixes** (Task 2c) — `Constraints` (R2) + `accept_delegation` (R6,
   the second bool R2 missed) + `SessionVoucher` length (R8).
-- **`additional_signers` canonical order + uniqueness + bound** (Task 2d) — R7 HIGH, a
-  malleability rule in `verify()` (not the codec) that codec-only rounds could not catch.
+- **`additional_signers` canonical order + uniqueness + bound** (Task 2d) — R7 HIGH; **also fix
+  the in-crate `sign_multi` builder** (A1 regression — else `cowboy-types` tests red).
 - **`METADATA_CFG` ≥ ~6.4 KB** (Task 3 Cfg note) — R9, or deferred CIP-29 txs fail decode.
 - **`digest()`/`tx_hash` migration** (Task 5b) — was the critical omission (F1).
 - **node cli + rpc/runner message-to-sign** (Task 9b) — same-workspace `payload_*` callers (F2).
@@ -1027,6 +1041,17 @@ git add -A && git commit -m "chore: fmt + regression fixes for canonical tx enco
   invalid ⇒ reject) — re-state for the commonware-codec canonical encoding + advisory access_list (F5).
 - **Flag-day activation** runbook + coordinated devnet reset.
 - **Header/Block canonicalization (COW-1941)** and **address/code_hash canonicalization (COW-1934/1935)** — sibling specs.
+- **(B7 — ticket) `Message::read` is non-injective AND Merkle-hashed into `state_root`** (via
+  `StateValue::MailboxMessage`, `state_value.rs:297`): `!=1` `has_origin` tag (`execution.rs:4781`),
+  lossy `MessageType::from_u8` (`:4639`), trailing-optional `has_remaining` (`:4788`) — the SAME
+  defect class this plan fixes for the tx, in a state-root-hashed type → independent state-root
+  malleability. The tx work is one instance of a codebase-wide codec-reuse hazard. The fix
+  pattern exists (`Timer`/`MailboxMessageV2` got strict `try_from_u8`). File a separate ticket to
+  make `Message::read` strict+injective with a round-trip test.
+- **(B6 — ticket) WP line 198** ("all trust-boundary data MUST use canonical CBOR") is already
+  false across the codebase (chain types use commonware-codec; CIP-6 §4.2.3 length-first; CIP-11
+  §4.2.1; RAS serde; CBSS ciborium). The WP rewrite must give it a **principled** rewrite (each
+  boundary uses its declared canonical encoding), scoped beyond §2/Appendix A — not a tx-only patch.
 
 ## Open items to resolve during review (not blockers)
 - Exact `RangeCfg` constructor spelling for the net-new `Vec<(Address, …)>` reads (no template

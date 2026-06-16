@@ -151,9 +151,12 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
 - **(LOW)** CIP-29 `EmitOrigin::from_metadata_bytes` 忽略尾位元組(`:563`)—— 僅縱深防禦(CIP-29 走
   node 自建的 deferred/system tx;非 tx-canonical 破口)。
 
-**第四輪確認(無須動):** R1 blast radius **CONTAINED** —— `Instruction` 只經 `Transaction`(在
-`Block.transactions`)進共識(receipt 存 `tx_type:u8` 非整個 `Instruction`),故 **plan Task 2b 路徑
-(a)—— 改 `Custom` 編碼 —— 在 tx flag-day 內安全**。又:因 F1 使 `tx_hash`/`digest` **與簽名無關**,
+**第四輪確認、第五輪更正(B5):** `Instruction` 經 `Transaction` 進共識,而 `Transaction` 進共識有
+**兩個面** —— `Block.transactions`(→ `tx_root`/`block_hash`)**與 `StateValue::DeferredTx`
+(`storage/state_value.rs:319`)→ `state_root`**(receipt 只存 `tx_type:u8` 非整個 `Instruction`)。
+兩者皆在 devnet flag-day 重置,故 **plan Task 2b 路徑 (a)—— 改 `Custom` 編碼 —— 仍安全**;但表面清單為
+`{tx_root, block_hash, state_root}`,且 **R10 round-trip 測試須涵蓋包在 `StateValue::DeferredTx` 內的
+`Transaction`**。又:因 F1 使 `tx_hash`/`digest` **與簽名無關**,
 `EthSignature` 的 `v`/s-malleability 皆無法 fork tx 身份(設計在此軸完全成立)。窮盡核實乾淨的 enum:
 所有 `SystemInstruction`/`ActorInstruction`/`LibraryInstruction` 子分派(`_ => Err(InvalidEnum)`)、
 `Scope`/`Action`、所有 `cbss` enum、`SessionAsset`、`Submission`/`UpdatesFilter`、葉子原語
