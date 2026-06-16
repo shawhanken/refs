@@ -18,9 +18,13 @@
 
 | File | Responsibility | Change |
 |---|---|---|
-| `node/types/src/execution.rs` | `Transaction` struct + `Write`/`Read`/`EncodeSize` + signing/verify | Modify: add 2 fields; rewrite codec; replace `payload_*` with `signing_hash` |
-| `node/types/src/constants.rs` | error slug/code for chain-id mismatch | Modify: add `E_TX_WRONG_CHAIN_ID` |
+| `node/types/src/execution.rs` | `Transaction` struct + `Write`/`Read`/`EncodeSize` + `signing_hash`/`digest` + verify | Modify: add 2 fields; rewrite codec; replace `payload_*` with `signing_hash`/`signing_preimage`; **migrate `digest_preimage` (Task 5b, F1)** |
+| `node/types/src/constants.rs` | error code + `MAX_TRANSACTION_BYTES` + Cfg bound consts | Modify: add `E_TX_WRONG_CHAIN_ID`; `*_CFG`/`MAX_ADDITIONAL_SIGNERS` |
 | `node/types/src/tx_vectors.rs` | frozen conformance vectors TV1/TV2 + tests | Create |
+| `node/rpc/src/handlers/chain.rs` | submission boundary | Modify: `Submission::decode` (reject trailing) + re-home `MAX_TRANSACTION_BYTES` (Task 3 §4, F3/F5) |
+| `node/chain/src/mempool_listener.rs` | mempool decode boundary | Modify: same strict-decode fix (F3) |
+| `node/rpc/src/handlers/runner.rs` | runner message-to-sign / heartbeat | Modify: migrate `payload_hash`→`signing_hash` (Task 9b, F2) |
+| `node/cli/src/commands.rs` | cli tx signing | Modify: migrate `payload_*`→`signing_hash` (Task 9b, F2) |
 | `node/<admission path>` (chain/mempool) | reject wrong `chain_id` | Modify (Task 9) |
 
 The canonical **field order** is frozen (spec §5.1):
@@ -166,13 +170,15 @@ impl Read for Transaction {
         let max_priority_fee_per_cycle = UInt::<u64>::read(reader)?.into();
         let max_priority_fee_per_cell = UInt::<u64>::read(reader)?.into();
         let from = Address::read(reader)?;
-        let access_list = Option::<Vec<(Address, Vec<[u8; 32]>)>>::read_cfg(reader, &(.., (.., ()).into()).into())?; // see note
-        let metadata = Vec::<u8>::read_cfg(reader, &(..).into())?;
+        // access_list / metadata Cfg: see the "Note on Cfg" below for the exact nested
+        // (RangeCfg, ..) types — these are net-new, no template exists. Use bounded RangeCfg.
+        let access_list = Option::<Vec<(Address, Vec<[u8; 32]>)>>::read_cfg(reader, &ACCESS_LIST_CFG)?;
+        let metadata = Vec::<u8>::read_cfg(reader, &METADATA_CFG)?;
         let origin_tx_hash = Option::<Digest>::read(reader)?;
         let origin_remaining_cycles = Option::<u64>::read(reader)?;
         let origin_remaining_cells = Option::<u64>::read(reader)?;
         let signature = EthSignature::read(reader)?;
-        let additional_signers = Vec::<(Address, EthSignature)>::read_cfg(reader, &(.., ()).into())?;
+        let additional_signers = Vec::<(Address, EthSignature)>::read_cfg(reader, &ADDITIONAL_SIGNERS_CFG)?;
         Ok(Self { chain_id, nonce, instruction, cycles_limit, cells_limit,
             max_fee_per_cycle, max_fee_per_cell, max_priority_fee_per_cycle,
             max_priority_fee_per_cell, from, access_list, metadata, origin_tx_hash,
@@ -181,11 +187,20 @@ impl Read for Transaction {
 }
 ```
 
-**Note on `Cfg` for `Vec`/`Option<Vec>`:** the exact `RangeCfg` arguments must match how the
-codebase reads bounded `Vec`s elsewhere (search `read_cfg` in `execution.rs` — e.g. how
-`Block::read` reads `transactions`, how `Account::read` reads its `Vec`s). Copy that idiom
-exactly; the bound for `metadata`/`access_list`/`additional_signers` should reuse the existing
-length-bound constants (e.g. `MAX_TRANSACTION_BYTES`-derived). Do not introduce unbounded reads.
+**Note on `Cfg` (F4 — this is net-new codec work, not a copy):** `additional_signers`
+(`Vec<(Address, EthSignature)>`) and `access_list` (`Option<Vec<(Address, Vec<[u8;32]>)>>`)
+were previously serialized inside the whole-tx serde-CBOR blob — **there is no existing
+commonware-codec read of a `Vec<(Address, ...)>` tuple to copy.** Write it explicitly:
+- `Vec<T>::read_cfg` takes `(RangeCfg, T::Cfg)`. For a tuple `(A, B)`, `T::Cfg = (A::Cfg, B::Cfg)`.
+- `Address::Cfg = ()`, `EthSignature::Cfg = ()`, `[u8;32]::Cfg = ()`.
+- So `additional_signers` Cfg is `(RangeCfg, ((), ()))`; `metadata: Vec<u8>` is `(RangeCfg, ())`;
+  `access_list: Option<Vec<(Address, Vec<[u8;32]>)>>` is `Option`-tag + the inner Vec Cfg
+  `(RangeCfg, ((), (RangeCfg, ())))`.
+- Pick the `RangeCfg` upper bounds from sane limits (reuse a `MAX_TRANSACTION_BYTES`-derived
+  element cap; e.g. a small `MAX_ADDITIONAL_SIGNERS` and access-list bounds). **Do not** use
+  unbounded `..` for attacker-controlled `Vec`s. Verify the exact `RangeCfg` constructor
+  spelling against `commonware_codec` (it is `RangeCfg::from(..=N)` / a range), and confirm
+  `EthSignature` actually `impl`s `Read`/`Write`/`FixedSize` (it does — `signature.rs:105`).
 
 - [ ] **Step 3: Replace `impl EncodeSize for Transaction`** with the sum of field `encode_size()`s (same field order), mirroring `Block`'s `EncodeSize` (`:4141`).
 
@@ -203,12 +218,27 @@ impl EncodeSize for Transaction {
 }
 ```
 
-- [ ] **Step 4: Enforce strict decoding at the call boundary**
+- [ ] **Step 4: Enforce strict decoding at the real submission boundary (F3 + F5)**
 
-Find where a tx is decoded from a length-delimited buffer (submission/mempool). Ensure the
-decoder rejects **trailing bytes** after a full `Transaction::read` (no leftover in the
-delimited region) and a wrong byte length. If the existing framing already length-delimits and
-checks `remaining()`, assert that property in a test (Task 4); otherwise add the check.
+The production decode is `Submission::read(&mut body.as_ref())` at
+`node/rpc/src/handlers/chain.rs:221` (and the mempool listener path). **`commonware_codec::Read::read_cfg`
+does NOT check end-of-buffer** — only `Decode::decode`/`decode_cfg` does (`Error::ExtraData`).
+So switch the boundary to the end-of-buffer-checking decode and reject trailing bytes:
+
+```rust
+// node/rpc/src/handlers/chain.rs ~:221 — was Submission::read(&mut body.as_ref())
+use commonware_codec::DecodeExt; // or Decode
+let submission = match Submission::decode(body.as_ref()) { // rejects trailing bytes (ExtraData)
+    Ok(s) => s,
+    Err(e) => return /* 400 invalid submission */,
+};
+```
+
+Also **re-home the `MAX_TRANSACTION_BYTES` bound** that previously lived inside the deleted
+length-prefixed `Transaction::read` (`constants.rs` + old `:411`): enforce it at this boundary
+(reject a submission whose encoded tx exceeds `MAX_TRANSACTION_BYTES`). Apply the same
+`decode`-not-`read` + size-bound fix to the mempool listener decode path
+(`node/chain/src/mempool_listener.rs`).
 
 - [ ] **Step 5: Run the round-trip test**
 
@@ -232,34 +262,42 @@ git commit -m "feat(types): encode Transaction with ordered commonware-codec, no
 **Files:**
 - Modify: `node/types/src/execution.rs` (tests module)
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing tests against the REAL decode path**
+
+Use `Submission::decode` (the end-of-buffer-checking codec extension) — the same call the
+boundary uses (Task 3 Step 4) — not a fictional helper. Put this test in the crate that owns
+`Submission` (`cowboy-types`).
 
 ```rust
 #[test]
-fn tx_decode_rejects_trailing_bytes() {
-    let tx = sample_signed_tx();
-    let mut bytes = tx.encode().to_vec();
+fn submission_decode_rejects_trailing_bytes() {
+    let sub = Submission::single(sample_signed_tx()); // or the existing Submission constructor
+    let mut bytes = sub.encode().to_vec();
     bytes.push(0xAA); // trailing garbage
-    // The submission-layer decoder (length-delimited) must reject extra bytes.
-    assert!(decode_tx_strict(&bytes).is_err(), "trailing bytes must be rejected");
+    assert!(Submission::decode(bytes.as_ref()).is_err(),
+        "trailing bytes after a submission must be rejected (ExtraData)");
 }
 
 #[test]
-fn tx_decode_rejects_truncated() {
+fn submission_decode_rejects_truncated() {
+    let sub = Submission::single(sample_signed_tx());
+    let bytes = sub.encode();
+    assert!(Submission::decode(&bytes[..bytes.len() - 1]).is_err());
+}
+
+#[test]
+fn tx_read_rejects_truncated() {
     let tx = sample_signed_tx();
     let bytes = tx.encode();
-    let truncated = &bytes[..bytes.len() - 1];
-    assert!(Transaction::decode(&mut <&[u8]>::clone(&truncated)).is_err());
+    assert!(Transaction::read(&mut &bytes[..bytes.len() - 1]).is_err());
 }
 ```
 
-`decode_tx_strict` is the submission-boundary decoder from Task 3 Step 4 (exact-length). If the
-boundary is in another crate, place this test there instead and import the helper.
+- [ ] **Step 2: Run**
 
-- [ ] **Step 2: Run to verify they fail / then pass after Task 3's strict boundary**
-
-Run: `cargo test -p cowboy-types tx_decode_rejects -- --nocapture`
-Expected: PASS once Task 3 Step 4 is in place (trailing/truncated rejected).
+Run: `cargo test -p cowboy-types -- submission_decode_rejects tx_read_rejects -- --nocapture`
+Expected: PASS once Task 3 Step 4 switches the boundary to `decode`. (`read`-vs-`decode` is the
+whole point: `read` ignores trailing bytes, `decode` rejects them.)
 
 - [ ] **Step 3: Commit**
 
@@ -305,33 +343,46 @@ impl Transaction {
     /// keccak256 of the canonical encoding with all signatures zeroed (signer
     /// addresses retained). This is what every signer signs. Replaces PayloadSign.
     pub fn signing_hash(&self) -> [u8; 32] {
+        keccak256(&self.signing_preimage())
+    }
+
+    /// Canonical encoding with every signature zeroed (signer addresses kept).
+    /// Shared by `signing_hash` AND `digest_preimage` (Task 5b), so the tx
+    /// identity is signature-independent and there is one canonical preimage.
+    pub fn signing_preimage(&self) -> Vec<u8> {
         let mut bare = self.clone();
         bare.signature = EthSignature::ZERO;
         for (_addr, sig) in bare.additional_signers.iter_mut() {
             *sig = EthSignature::ZERO;
         }
-        cowboy_types::keccak256(&bare.encode())
+        bare.encode().to_vec()
     }
 }
 ```
 
+`keccak256` is called bare (it is `use`d in the crate already, `execution.rs:5/175`) — **not**
+`cowboy_types::keccak256` (that path does not resolve inside the `cowboy-types` crate).
+
 Delete `payload_bytes` and `payload_hash` (and the inner `PayloadSign` struct). Update the
-sign helpers (`:189`, `:241`) to sign `self.signing_hash()`.
+sign helpers (`:189`, `:241`) to sign `self.signing_hash()`. (Note: `digest_preimage` is
+migrated to reuse `signing_preimage` in **Task 5b** — do that before deleting `payload_bytes`,
+or `digest_preimage` won't compile.)
 
 - [ ] **Step 4: Update `verify()`** (`:317`) — replace the `payload_hash(...)` call with
 `self.signing_hash()`, recovering each signer against it. Keep the deferred-tx branch
 unchanged (deferred txs are not signature-verified).
 
 ```rust
-// in verify(), non-deferred branch:
+// in verify(), non-deferred branch.
+// recover_address returns Result<Address, RecoveryError> (signature.rs:70) — match Ok, not Some.
 let hash = self.signing_hash();
 match self.signature.recover_address(&hash) {
-    Some(addr) if addr == self.from => {}
+    Ok(addr) if addr == self.from => {}
     _ => return false,
 }
 for (addr, sig) in &self.additional_signers {
     match sig.recover_address(&hash) {
-        Some(rec) if &rec == addr => {}
+        Ok(rec) if &rec == addr => {}
         _ => return false,
     }
 }
@@ -349,6 +400,81 @@ Expected: new test PASS; update/delete the old `payload_hash` tests (`:8599+`) t
 cargo fmt --all
 git add node/types/src/execution.rs
 git commit -m "feat(types): sign over canonical encoding, delete PayloadSign drift (COW-1944)"
+```
+
+---
+
+## Task 5b: Migrate `digest()` / `digest_preimage()` to the canonical encoding (F1 — critical)
+
+The chain's tx identity is `Transaction::digest() = keccak256(digest_preimage())`
+(`execution.rs:438`), used for the tx-root Merkle leaves (`storage/src/merkle_utils.rs`),
+receipt keys + tx-location (`storage/src/process_block.rs`), the indexer
+(`chain/src/indexer.rs`), and deferred-origin checks. `digest_preimage()` (`:444`) currently
+calls the deleted `payload_bytes` **and** manually appends deferred extras (`origin_tx_hash`
++ origin gas as BE bytes). After this work those fields are intrinsic canonical fields, so the
+manual append is redundant. **The tx identity stays signature-independent** (today's property):
+`digest_preimage` reuses `signing_preimage` (signatures zeroed). Result: `tx_hash == signing_hash`.
+
+**Files:**
+- Modify: `node/types/src/execution.rs:438-485` (`digest`, `digest_preimage`)
+
+- [ ] **Step 1: Write the failing test**
+
+```rust
+#[test]
+fn digest_preimage_is_canonical_signature_independent() {
+    let tx = sample_signed_tx();
+    // identity excludes the signature (re-signing / s-malleability must not change the digest)
+    let mut tx2 = tx.clone();
+    tx2.signature = EthSignature::ZERO;
+    assert_eq!(tx.digest(), tx2.digest(), "digest must be signature-independent");
+    // identity DOES cover content (metadata, chain_id, instruction)
+    let mut tx3 = tx.clone();
+    tx3.metadata = b"y".to_vec();
+    assert_ne!(tx.digest(), tx3.digest());
+    // digest preimage == signing preimage (one canonical preimage)
+    assert_eq!(tx.digest_preimage(), tx.signing_preimage());
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `cargo test -p cowboy-types digest_preimage_is_canonical_signature_independent -- --exact`
+Expected: FAIL (old `digest_preimage` uses `payload_bytes` + manual deferred append).
+
+- [ ] **Step 3: Reimplement `digest_preimage`**
+
+```rust
+impl Transaction {
+    /// The canonical BMT-leaf preimage: the signature-independent canonical
+    /// encoding (origin_* fields are intrinsic, so no manual deferred append).
+    pub fn digest_preimage(&self) -> Vec<u8> {
+        self.signing_preimage()
+    }
+}
+```
+
+`digest()` (`:438`) is unchanged: `Digest::from(keccak256(&self.digest_preimage()))`.
+
+- [ ] **Step 4: Run + full digest/deferred regression**
+
+Run: `cargo test -p cowboy-types -- digest && cargo test -p cowboy-execution -- deferred`
+Expected: PASS. Fix any deferred-tx test that hard-coded the old preimage layout; the
+`origin_tx_hash` tamper-resistance property still holds (those fields are in the canonical
+encoding).
+
+- [ ] **Step 5: Note the cross-repo ripple (do NOT change here)**
+
+The Solidity bridge re-derives `keccak256(digest_preimage())` (comment at `:446-448`). Its
+leaf re-derivation must move to the canonical encoder. Add a one-line note to the follow-on
+cross-repo plan; under the devnet flag-day there is likely no live bridge to migrate yet.
+
+- [ ] **Step 6: Commit**
+
+```bash
+cargo fmt --all
+git add node/types/src/execution.rs
+git commit -m "feat(types): tx digest over canonical signature-independent preimage (COW-1944/F1)"
 ```
 
 ---
@@ -535,13 +661,63 @@ git commit -m "feat: reject transactions with mismatched chain_id at admission (
 
 ---
 
+## Task 9b: Migrate same-workspace `payload_*` callers — cli + rpc/runner (F2 — in scope)
+
+Deleting `payload_bytes`/`payload_hash` (Task 5) breaks node-internal callers that the spec
+wrongly deferred. These MUST migrate to `signing_hash()` in this plan, or those flows fail
+`verify()` / won't compile.
+
+**Files:**
+- Modify: `node/rpc/src/handlers/runner.rs` (`heartbeat_payload_hash` `:272-273`; the
+  message-to-sign endpoints around `:398/409/459/882`)
+- Modify: `node/cli/src/commands.rs` (tx signing call sites that use `payload_hash`)
+
+- [ ] **Step 1: Migrate the runner message-to-sign hash**
+
+`heartbeat_payload_hash` (`runner.rs:273`) calls `Transaction::payload_hash(...)`. Replace its
+body so the server hands the runner **the same hash `verify()` now checks**: build the
+`Transaction` it represents and return `tx.signing_hash()` (or, if the heartbeat is not a full
+tx, replace `payload_hash` with the explicit canonical-preimage keccak used by `signing_hash`).
+The recover side (`:460 recover_address(&payload_hash)`) already returns `Result` — keep it,
+but feed it the new hash. The `message_to_sign_base64` (`:409`) must encode the new hash bytes.
+
+- [ ] **Step 2: Migrate cli signing**
+
+In `node/cli/src/commands.rs`, replace any `Transaction::payload_hash(...)`/`payload_bytes(...)`
+construction with `tx.signing_hash()` on the assembled `Transaction` (set `chain_id` from the
+node's configured chain id; `access_list: None`).
+
+- [ ] **Step 3: Build the affected crates**
+
+Run: `cargo build -p cowboy-rpc -p cowboy-cli`
+Expected: compiles (no references to the deleted `payload_hash`/`payload_bytes`).
+
+- [ ] **Step 4: Test the runner heartbeat sign/verify round-trip**
+
+Run: `cargo test -p cowboy-rpc -- heartbeat`
+Expected: the endpoint's returned hash, when signed, is accepted by the recover path (update
+the existing heartbeat test to the new hash).
+
+- [ ] **Step 5: Commit**
+
+```bash
+cargo fmt --all
+git add node/rpc/src/handlers/runner.rs node/cli/src/commands.rs
+git commit -m "feat: migrate cli + runner message-to-sign to canonical signing_hash (F2)"
+```
+
+---
+
 ## Task 10: Full workspace regression + invariant gate
 
 - [ ] **Step 1: Run the full suite**
 
 Run: `cd node && CARGO_TARGET_DIR=$PWD/.cargo-target cargo test --workspace`
-Expected: green. Fix any test that hard-coded the old serde-CBOR tx bytes or `payload_hash` API
-(rewrite to `signing_hash`/canonical `encode`).
+Expected: green. Known tests that WILL break and must be rewritten to `signing_hash`/canonical
+`encode`/`digest`: `test_transaction_codec_roundtrip` (`execution.rs:5585`), the
+`payload_hash`/`payload_bytes` tests (`:8573-8632`, `:6283`), the `digest_preimage` tests
+(`:5716, 5739`), and any golden test with hard-coded serde-CBOR tx bytes. Also the runner
+heartbeat test (Task 9b) and any chain/storage test asserting a specific `tx.digest()`/tx-root.
 
 - [ ] **Step 2: Run the econ + tx invariants explicitly**
 
@@ -561,15 +737,27 @@ git add -A && git commit -m "chore: fmt + regression fixes for canonical tx enco
 
 ---
 
+## In scope (folded in from the audit, F1/F2/F3)
+- **`digest()`/`tx_hash` migration** (Task 5b) — was the critical omission (F1).
+- **node cli + rpc/runner message-to-sign** (Task 9b) — same-workspace `payload_*` callers (F2).
+- **Strict trailing-byte rejection + `MAX_TRANSACTION_BYTES` re-home** at `Submission::decode`
+  and the mempool listener (Task 3 §4 / Task 4) (F3/F5).
+
 ## Out of scope (separate follow-on plans)
 - **Wallet parity** (JS commonware-codec encoder + keccak, byte-parity vs `refs/common/tx-canonical-vectors.json`).
-- **cli / SDK / runner** switch to canonical signing.
-- **WP §2 + Appendix A rewrite** (cowboy docs) describing the canonical commonware-codec encoding.
+- **SDK (python)** client switch to canonical signing.
+- **Solidity bridge** BMT-leaf re-derivation must move to the canonical encoder (F1 ripple) —
+  cross-repo coordination item; likely no live bridge under the devnet flag-day.
+- **WP rewrite** (cowboy docs): §2 + Appendix A **and the standalone MUST at WP line 198**
+  ("all data crossing trust boundaries MUST use canonical CBOR") **and §2.2(d)** (access-list
+  invalid ⇒ reject) — re-state for the commonware-codec canonical encoding + advisory access_list (F5).
 - **Flag-day activation** runbook + coordinated devnet reset.
 - **Header/Block canonicalization (COW-1941)** and **address/code_hash canonicalization (COW-1934/1935)** — sibling specs.
 
 ## Open items to resolve during review (not blockers)
-- Exact `RangeCfg`/length-bound arguments for `Vec`/`Option<Vec>` reads — copy the existing
-  `Block::read`/`Account::read` idiom verbatim.
-- `chain_id` `None` handling in genesis (accept-any vs pinned devnet default) — genesis owner.
-- Whether `metadata`/`access_list` need their own max-length constants (reuse `MAX_TRANSACTION_BYTES`-derived bound).
+- Exact `RangeCfg` constructor spelling for the net-new `Vec<(Address, …)>` reads (no template
+  exists — see Task 3's "Note on Cfg", F4); define `ACCESS_LIST_CFG`/`METADATA_CFG`/`ADDITIONAL_SIGNERS_CFG`.
+- **`chain_id` decision (resolved):** pin a concrete devnet `chain_id` in genesis (genesis
+  currently `Option<u64>` defaulting to `None`); clients use it; admission rejects mismatch —
+  no "accept-any" in non-test config. Confirm the pinned value with the genesis owner.
+- Max-length constants for `metadata`/`access_list`/`additional_signers` (derive from `MAX_TRANSACTION_BYTES`).

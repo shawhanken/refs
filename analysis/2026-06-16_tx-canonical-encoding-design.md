@@ -32,6 +32,64 @@ all other decisions stand unchanged.
 
 ---
 
+## 0b. Audit fixes (2026-06-16, folding Marshal F1–F6)
+
+An independent adversarial audit (Marshal, run #186) verified the determinism foundation and
+the encoding decision as sound, but found real gaps. Resolutions (these SUPERSEDE the
+matching text below; the node plan implements them):
+
+- **F1 (critical) — `tx_hash` / `digest()` must be migrated explicitly.** The chain's tx
+  identity is `Transaction::digest() = keccak256(digest_preimage())`, and `digest_preimage()`
+  currently calls `payload_bytes()` (deleted by this work) plus a manual deferred-extras
+  append (`execution.rs:444-485`). **Resolution:** `digest_preimage()` becomes the canonical
+  `encode()` of the transaction **with all signatures zeroed** (the same preimage as
+  `signing_hash`). This (a) removes the `payload_bytes` dependency, (b) makes `origin_*`
+  intrinsic canonical fields so the manual deferred append disappears, (c) keeps the tx
+  identity **signature-independent** (preserving today's property and closing ECDSA
+  s-value malleability on identity). Consequence: `tx_hash == signing_hash` (same preimage).
+  This supersedes §4.4's "encode(full signed tx)" — the canonical preimage **excludes**
+  signatures. **Ripple:** the Solidity bridge re-derives `keccak256(digest_preimage())`
+  (`execution.rs:446-448` comment) → its leaf re-derivation must switch to the canonical
+  encoder; tracked as a cross-repo coordination item (devnet-flag-day, likely no live bridge).
+
+- **F2 (high) — cli + the node's runner message-to-sign endpoint are IN SCOPE.** Deleting
+  `payload_bytes`/`payload_hash` breaks same-workspace callers: `node/cli/src/commands.rs`
+  signing and **`node/rpc/src/handlers/runner.rs`** (`heartbeat_payload_hash` `:273`, the
+  `/…/message-to-sign` endpoints `:882+`) — the server-side hash the node hands runners to
+  sign. These are node-internal and MUST migrate to `signing_hash()` in this plan (not the
+  follow-on), or runner/heartbeat txs fail `verify()`.
+
+- **F3 (high) — strict trailing-byte rejection at the real boundary.** The production decode
+  is `Submission::read(&mut body.as_ref())` (`node/rpc/src/handlers/chain.rs:221`).
+  `commonware_codec::Read::read_cfg` does **not** check end-of-buffer; only `Decode::decode`
+  does (`Error::ExtraData`). **Resolution:** the submission boundary must use the
+  end-of-buffer-checking decode (or assert `remaining() == 0`) and reject trailing bytes;
+  tests target the real `Submission`/admission path, not a fictional helper.
+
+- **F4 (medium) — plan snippets corrected:** `recover_address` returns `Result` (match
+  `Ok(..)`, not `Some(..)`); `keccak256` is called bare/`crate::` inside the types crate (not
+  `cowboy_types::`); the `Vec<(Address, Vec<[u8;32]>)>` (access_list) and
+  `Vec<(Address, EthSignature)>` (additional_signers) codecs are **net-new** (no existing
+  template to copy — they previously rode inside the whole-tx serde-CBOR blob).
+
+- **F5 (med/low) — WP scope + bounds.** The WP rewrite must also amend the **standalone
+  normative MUST at WP line 198** ("all data crossing trust boundaries MUST use canonical
+  CBOR, RFC 8949") and **§2.2(d)** (access-list-invalid ⇒ reject) — not just §2/Appendix A.
+  `MAX_TRANSACTION_BYTES` (`constants.rs`) is currently enforced inside the length-prefixed
+  `Transaction::read`; with the prefix gone it must be re-homed to the submission boundary.
+
+- **F6 (low) — accuracy.** `is_deferred()` is **purely `origin_tx_hash.is_some()`**
+  (`execution.rs:277`) — §4.3's "(nonce=0, signature==ZERO, origin_remaining_* present)"
+  describes conditions `verify()` checks for deferred txs, not the discriminant. The reused
+  `Instruction::read` does **not** reject unknown top-level module bytes — they decode as
+  `Custom` (`execution.rs:3349`); the "rejects unknown opcodes" phrasing is dropped (this is
+  not a malleability hole: each `Custom` value still has one encoding). **chain_id `None`
+  decision:** genesis `chain_id` is `Option<u64>` defaulting to `None`; for devnet we **pin a
+  concrete devnet `chain_id` in genesis** and clients use it — admission rejects any mismatch
+  (no "accept-any" mode in non-test config).
+
+---
+
 ## 1. Problem
 
 Whitepaper §2 (cowboy-technical-whitepaper.md, lines 461–493, normative) defines a

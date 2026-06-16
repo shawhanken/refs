@@ -27,6 +27,55 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
 
 ---
 
+## 0b. 審計修正(2026-06-16,折入 Marshal F1–F6)
+
+獨立對抗式審計(Marshal,run #186)核實了確定性地基與編碼裁定 sound,但找到真實缺口。
+解決(以下**取代**下文對應文字;node plan 實作之):
+
+- **F1(critical)— `tx_hash` / `digest()` 須明確遷移。** 鏈上 tx 身份為
+  `Transaction::digest() = keccak256(digest_preimage())`,而 `digest_preimage()` 現呼叫
+  `payload_bytes()`(本工作要刪)+ 手動追加 deferred 額外位元組(`execution.rs:444-485`)。
+  **解決:** `digest_preimage()` 改為交易的 canonical `encode()`、**所有簽名清零**(與
+  `signing_hash` 同一 preimage)。如此(a)去除 `payload_bytes` 依賴,(b)`origin_*` 成內建
+  canonical 欄位、手動 deferred 追加消失,(c)tx 身份保持**與簽名無關**(保留今日性質、並關閉
+  ECDSA s-value 對身份的 malleability)。結果:`tx_hash == signing_hash`(同 preimage)。此取代
+  §4.4 的「encode(full signed tx)」—— canonical preimage **排除**簽名。**漣漪:** Solidity bridge
+  以 `keccak256(digest_preimage())` 重導 leaf(`execution.rs:446-448` 註)→ 其 leaf 重導須改用
+  canonical 編碼器;列為跨倉協調項(devnet flag-day,bridge 多半未上線)。
+
+- **F2(high)— cli + node 的 runner message-to-sign 端點屬本計畫範圍。** 刪
+  `payload_bytes`/`payload_hash` 會打斷同工作區呼叫方:`node/cli/src/commands.rs` 簽名,與
+  **`node/rpc/src/handlers/runner.rs`**(`heartbeat_payload_hash` `:273`、`message-to-sign`
+  端點 `:882+`)—— node 發給 runner 簽的 hash。這些是 node 內部,**本計畫**內須遷到
+  `signing_hash()`(非 follow-on),否則 runner/heartbeat tx 過不了 `verify()`。
+
+- **F3(high)— 真實邊界的嚴格拒尾位元組。** 生產解碼是
+  `Submission::read(&mut body.as_ref())`(`node/rpc/src/handlers/chain.rs:221`)。
+  `commonware_codec::Read::read_cfg` **不**檢查緩衝結尾;只有 `Decode::decode` 檢
+  (`Error::ExtraData`)。**解決:** 提交邊界須用會檢結尾的 decode(或斷言 `remaining()==0`)並拒
+  尾位元組;測試打真實 `Submission`/admission 路徑,非虛構 helper。
+
+- **F4(medium)— plan 片段更正:** `recover_address` 回 `Result`(配 `Ok(..)` 非 `Some(..)`);
+  `keccak256` 在 types crate 內裸呼叫/`crate::`(非 `cowboy_types::`);
+  `Vec<(Address, Vec<[u8;32]>)>`(access_list)與 `Vec<(Address, EthSignature)>`
+  (additional_signers)的 codec 是**全新**(無既有模板可抄 —— 它們過去藏在整 tx 的 serde-CBOR
+  blob 內)。
+
+- **F5(med/low)— WP 範圍 + 界限。** WP 重寫須一併修 **WP line 198 的獨立 normative MUST**
+  (跨信任邊界資料 MUST 用 canonical CBOR,RFC 8949)與 **§2.2(d)**(access-list 無效⇒拒)——
+  不只 §2/Appendix A。`MAX_TRANSACTION_BYTES` 現於長度前綴的 `Transaction::read` 內強制;前綴去除
+  後須改置於提交邊界。
+
+- **F6(low)— 準確性。** `is_deferred()` **純為 `origin_tx_hash.is_some()`**
+  (`execution.rs:277`)—— §4.3 的「(nonce=0, signature==ZERO, origin_remaining_* present)」是
+  `verify()` 對 deferred tx 內部檢查的條件,非判別式。被覆用的 `Instruction::read` **不**拒未知
+  頂層 module byte —— 它們解為 `Custom`(`execution.rs:3349`);「拒未知 opcode」措辭移除(此非
+  malleability 洞:每個 `Custom` 值仍唯一編碼)。**chain_id `None` 裁定:** genesis `chain_id` 為
+  `Option<u64>` 預設 `None`;devnet **在 genesis 釘一個具體 devnet `chain_id`**、客戶端用之,
+  admission 拒任何不符(非測試配置無「accept-any」模式)。
+
+---
+
 ## 1. 問題
 
 白皮書 §2(cowboy-technical-whitepaper.md,461–493 行,normative)把交易定義為平坦的 13 元素
