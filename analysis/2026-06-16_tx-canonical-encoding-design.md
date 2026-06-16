@@ -80,13 +80,75 @@ matching text below; the node plan implements them):
 
 - **F6 (low) — accuracy.** `is_deferred()` is **purely `origin_tx_hash.is_some()`**
   (`execution.rs:277`) — §4.3's "(nonce=0, signature==ZERO, origin_remaining_* present)"
-  describes conditions `verify()` checks for deferred txs, not the discriminant. The reused
-  `Instruction::read` does **not** reject unknown top-level module bytes — they decode as
-  `Custom` (`execution.rs:3349`); the "rejects unknown opcodes" phrasing is dropped (this is
-  not a malleability hole: each `Custom` value still has one encoding). **chain_id `None`
-  decision:** genesis `chain_id` is `Option<u64>` defaulting to `None`; for devnet we **pin a
-  concrete devnet `chain_id` in genesis** and clients use it — admission rejects any mismatch
-  (no "accept-any" mode in non-test config).
+  describes conditions `verify()` checks for deferred txs, not the discriminant. **chain_id
+  `None` decision:** genesis `chain_id` is `Option<u64>` defaulting to `None`; for devnet we
+  **pin a concrete devnet `chain_id` in genesis** and clients use it — admission rejects any
+  mismatch (no "accept-any" mode in non-test config). (See R3 — this must be an ordered
+  activation step, not an invisible prerequisite.)
+
+---
+
+## 0c. Round-3 deep-audit fixes (2026-06-16, Marshal run #188 — block-for-revision)
+
+A third, deeper audit walked the **`Instruction` leaf types** the first two rounds assumed
+clean, and found the central anti-malleability invariant (§4.1: "every tx has exactly one
+canonical byte encoding; `decode∘encode == id`") is **FALSE** for the reused codec. These are
+MUST-FIX before implementation:
+
+- **R1 (CRITICAL) — `Instruction` codec is non-injective on `Custom`.** `Instruction::Write`
+  for `Custom{module, action, data}` emits `module` **raw** (`execution.rs:2554`), but
+  `Instruction::read` dispatches on that first byte (`0→System, 1→Actor, 3→Library`, else
+  `Custom`, `:3348`). So `Custom{module: 0, action: 0, data: <20 bytes>}` encodes to the **same
+  bytes** as `System(CreateAccount{account})`, and `decode(encode(Custom{module:0,..}))`
+  returns `System(...)` — not identity. The OLD serde-CBOR map was injective here (field-name
+  keyed), so switching is a **regression** on the exact axis this work targets; it is also
+  **untested** (the existing round-trip only uses `module: 5`). **Resolution (decide in the
+  plan):** EITHER (a) make the codec injective — `Custom::write` pins the category byte
+  (`TX_CATEGORY_CUSTOM = 2`) and stores `module` in the body, `Read` dispatches on `2` →
+  `Custom` (verify the blast radius first: `Instruction` reaches consensus only via
+  `Transaction` inside `Block.transactions`, so this is contained in the same flag-day **iff**
+  nothing else encodes `Instruction` outside a tx — confirm by grep); OR (b) keep the codec but
+  **reject `Custom{module ∈ {0,1,3}}` at admission/construction** and **scope §4.1's invariant
+  to admission-valid txs**. Either way: add round-trip tests over `module ∈ {0,1,2,3}`. (a) is
+  the truly-canonical fix; (b) is lower-blast-radius. Default to (a) if the grep shows
+  `Instruction` is tx-only.
+
+- **R2 (HIGH) — `Constraints` bool fields are non-strict.** `Constraints` (`entitlement.rs:262`,
+  carried by `EntitlementGrant/Delegate/CreateRole`) writes `(self.delegatable as u8)` and reads
+  `u8::read()? != 0` (`:326/367`), so byte `0x02` decodes `true` and re-encodes `0x01` —
+  `encode∘decode != id`, a malleability vector reachable from user txs. Commonware's own
+  `bool::read` rejects non-0/1; the manual `!= 0` is the hole. **Fix:** strict bool decode.
+
+- **R3 (HIGH, ops/liveness) — genesis `chain_id` flag-day trap.** `chain_id` defaults to `None`
+  everywhere except the local-setup path. If activation ships the `tx.chain_id != node_chain_id`
+  admission check while genesis stays `None` (and `None` is treated as a concrete value), **every
+  tx is rejected → chain halt**. **Resolution:** promote "update genesis `chain_id` to the pinned
+  devnet value" to an **explicit, first, blocking step** of the activation runbook (§7); in
+  non-test config, `None` ⇒ **hard startup error** (never silent accept-any, or replay protection
+  is void).
+
+- **R4 (doc, MUST for wallet/SDK byte-parity) — §4.1's specifics are actively misleading.** The
+  §0 blanket "read CBOR as commonware-codec" does NOT neutralize §4.1's concrete rules, which a
+  wallet/SDK implementer follows literally. §4.1's "definite-length CBOR array",
+  "minimal-length integers", "Option = CBOR null" are all WRONG for commonware-codec, which is:
+  a **flat concatenation** (no array wrapper); **mixed integers** — minimal **varint (`UInt`)**
+  for the bare `u64` (chain_id/nonce/gas) but **fixed-width big-endian** for `u128` amounts and
+  `Option<u64>` payloads; **`Option` = a `bool`(0/1) tag + value** (never "null"); byte strings =
+  **varint length + bytes**. §4.1 below is corrected accordingly, and the **TV fixture (§4.5) is
+  the byte authority**. The moot "evaluate ciborium vs hand-rolled" open items (§4.1 / §11) are
+  struck — the primitive is decided (commonware-codec).
+
+- **R5 (test) — `EncodeSize` exactness.** The hand-written `Transaction::EncodeSize` (17 fields)
+  must exactly equal the `Write` byte length or commonware-codec mis-sizes buffers. Add an
+  `assert_eq!(tx.encode_size(), tx.encode().len())` test.
+
+**Verified solid by round-3 (no action):** bounded-`Vec` decode rejects an out-of-range length
+**before** allocation (no decode-bomb); `UInt` is strict-minimal; the reused
+`Instruction::EncodeSize` matches its `Write`; all tx-reachable leaf types are deterministic
+(CBSS fixed-size; `ActorManifest` uses a sorted `BTreeMap`, not `HashMap`; no floats); the
+deferred-tx preimage migration is coherent and the devnet reset is **genuinely required** (not
+merely convenient — pre-flag-day `origin_tx_hash` values would otherwise fail the parent-receipt
+check).
 
 ---
 
@@ -155,12 +217,18 @@ single coordinated flag-day / devnet reset rather than a dual-format transition.
 ### 4.1 `canonical` codec — `node/types/src/canonical.rs` (new)
 - **Responsibility:** deterministic bytes ↔ `Transaction`.
 - **Interface:** `encode(tx: &Transaction) -> Vec<u8>`; `decode(bytes: &[u8]) -> Result<Transaction, CodecError>`.
-- **Encoding rules (RFC 8949 §4.2.1 "core deterministic" subset):**
-  - Top level is a **definite-length CBOR array** whose elements are the transaction fields
-    in the **frozen order** of §5.1.
-  - Integers use **minimal-length** encoding; **no** floating point; **no** indefinite-length
-    items; map/array lengths are definite. Byte strings (addresses, hashes, signature,
-    metadata) are major-type-2 with minimal length headers.
+- **Encoding rules (commonware-codec; corrected per R4 — NOT CBOR):**
+  - **Flat concatenation** of the transaction fields in the **frozen order** of §5.1 — there
+    is **no array wrapper** (commonware-codec writes fields back-to-back).
+  - **Mixed integer encodings (match the existing impls exactly):** bare `u64` fields
+    (`chain_id`, `nonce`, gas/fee fields) use minimal **varint `UInt`**; `u128` amounts and
+    `Option<u64>` payloads use **fixed-width big-endian**; collection lengths use varint.
+  - `Option<T>` = a **`bool` (0x00/0x01) tag followed by the value if present** — never CBOR
+    "null". `Vec<T>` / byte strings = **varint length prefix + elements/bytes**.
+  - No floating point; no indefinite-length items; every integer/`bool` has a unique strict
+    form (`UInt` rejects non-minimal; `bool` must reject bytes ∉ {0,1} — see R2).
+  - **The TV fixture (§4.5) is the authoritative byte reference;** clients reproduce it, not
+    a prose reading of these bullets.
   - `Instruction` is encoded as its own deterministic sub-array `[category, sub_type, body]`
     consistent with the existing `tx_type()` opcode scheme (so the typed enum has a stable,
     canonical wire form). `body` is the recursive deterministic encoding of the selected
@@ -175,9 +243,9 @@ single coordinated flag-day / devnet reset rather than a dual-format transition.
   indefinite-length items, trailing bytes after the array, wrong element count, duplicate or
   unexpected structure. **Invariant:** every `Transaction` has exactly one valid byte
   encoding, and `decode(encode(tx)) == tx` and `encode(decode(b)) == b` for all canonical `b`.
-- **Depends on:** a CBOR primitive layer (evaluate `ciborium`/the existing `into_writer` low
-  level vs a hand-rolled minimal writer — the implementation plan picks one; the requirement
-  is determinism + strictness, not the library).
+- **Primitive layer (decided, R4):** the existing `commonware-codec` `Write`/`Read` — no new
+  CBOR layer, no `ciborium`. Reuse `Instruction`'s impls and write the `Transaction` field
+  encoding in the same idiom as `Block::write`.
 
 ### 4.2 `chain_id` field + admission validation
 - Add `chain_id: u64` to `Transaction` (§5.1). Sourced by clients from the node's genesis
@@ -337,7 +405,7 @@ All of the above run through the Marshal invariant gate. Because the change move
 ---
 
 ## 11. Open items for the implementation plan (not design blockers)
-- Choose the CBOR primitive layer for the strict deterministic codec (library vs hand-rolled).
+- ~~Choose the CBOR primitive layer~~ — DECIDED (R4): reuse `commonware-codec` (not CBOR).
 - Final home/path of the shared TV fixture readable by both node and wallet.
 - Exact new error-code slug/number for `chain_id` mismatch (follow the four-part error format,
   COW-386).

@@ -67,12 +67,54 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
   後須改置於提交邊界。
 
 - **F6(low)— 準確性。** `is_deferred()` **純為 `origin_tx_hash.is_some()`**
-  (`execution.rs:277`)—— §4.3 的「(nonce=0, signature==ZERO, origin_remaining_* present)」是
-  `verify()` 對 deferred tx 內部檢查的條件,非判別式。被覆用的 `Instruction::read` **不**拒未知
-  頂層 module byte —— 它們解為 `Custom`(`execution.rs:3349`);「拒未知 opcode」措辭移除(此非
-  malleability 洞:每個 `Custom` 值仍唯一編碼)。**chain_id `None` 裁定:** genesis `chain_id` 為
-  `Option<u64>` 預設 `None`;devnet **在 genesis 釘一個具體 devnet `chain_id`**、客戶端用之,
-  admission 拒任何不符(非測試配置無「accept-any」模式)。
+  (`execution.rs:277`)。**chain_id `None` 裁定:** genesis `chain_id` 為 `Option<u64>` 預設
+  `None`;devnet **在 genesis 釘一個具體 devnet `chain_id`**、客戶端用之,admission 拒任何不符
+  (非測試配置無「accept-any」模式)。(見 R3 —— 須為有序啟用步驟,非隱形前提。)
+
+---
+
+## 0c. 第三輪深度審計修正(2026-06-16,Marshal run #188 — block 須修)
+
+第三輪更深審計走訪前兩輪假設乾淨的 **`Instruction` 葉子型別**,發現核心反 malleability 不變量
+(§4.1:每筆 tx 恰一規範編碼、`decode∘encode==id`)對覆用的 codec **為假**。以下實作前 MUST-FIX:
+
+- **R1(CRITICAL)— `Instruction` codec 在 `Custom` 上非單射。** `Instruction::Write` 對
+  `Custom{module,action,data}` 把 `module` **原樣**寫出(`execution.rs:2554`),但 `Read` 以該首
+  byte 分派(`0→System,1→Actor,3→Library`,否則 `Custom`,`:3348`)。故
+  `Custom{module:0,action:0,data:<20 bytes>}` 編碼**等同** `System(CreateAccount)`,且
+  `decode(encode(Custom{0}))=System` 非 identity。舊 serde-CBOR map 在此**是單射**(欄位名為鍵)→
+  改用即為**回歸**;且**未測**(round-trip 只用 `module:5`)。**解決(plan 內裁):** 或(a)讓 codec
+  單射 —— `Custom::write` 釘 category byte(`TX_CATEGORY_CUSTOM=2`)、`module` 入 body,`Read` 以
+  `2`→`Custom`(先 grep 確認 blast radius:`Instruction` 只經 `Transaction`→`Block.transactions`
+  進共識,則本 flag-day 內含);或(b)保留 codec 但 **admission/構造時拒 `Custom{module∈{0,1,3}}`**
+  並把 §4.1 不變量**範圍縮到 admission-valid tx**。兩者皆須加 `module∈{0,1,2,3}` round-trip 測試。
+  若 grep 證 `Instruction` 僅 tx-only,預設取(a)。
+
+- **R2(HIGH)— `Constraints` bool 欄位非嚴格。** `Constraints`(`entitlement.rs:262`,由
+  `EntitlementGrant/Delegate/CreateRole` 攜帶)寫 `(self.delegatable as u8)`、讀 `u8::read()? != 0`
+  (`:326/367`),故 `0x02` 解 `true` 再編 `0x01` —— `encode∘decode != id`,用戶 tx 可達的 malleability。
+  **修:** 嚴格 bool 解碼。
+
+- **R3(HIGH,ops/liveness)— genesis `chain_id` flag-day 陷阱。** `chain_id` 除 local-setup 外處處
+  預設 `None`。若啟用上了 `tx.chain_id != node_chain_id` 檢查而 genesis 仍 `None`(且 `None` 當具體值)
+  → **每筆 tx 被拒 → 鏈停**。**解決:** 把「更新 genesis `chain_id` 到釘定值」升為啟用 runbook(§7)的
+  **明確、第一、阻塞**步驟;非測試配置 `None` ⇒ **啟動硬失敗**(絕不靜默 accept-any,否則防重放失效)。
+
+- **R4(文檔,wallet/SDK 位元組相容 MUST)— §4.1 具體規則具誤導性。** §0 的「CBOR 讀作 commonware-codec」
+  **不**中和 §4.1 的具體規則,wallet/SDK 實作者會照字面做。§4.1 的「definite-length CBOR array」、
+  「minimal-length 整數」、「Option=CBOR null」對 commonware-codec **全錯**,實為:**扁平串接**(無陣列
+  外層);**混合整數** —— bare `u64`(chain_id/nonce/gas)用最小 **varint(`UInt`)**、`u128` 金額與
+  `Option<u64>` 用**固定大端**;**`Option` = `bool`(0/1)tag + 值**(非 null);位元組串 = **varint 長度 +
+  位元組**。下文 §4.1 已據此更正,且 **TV fixture(§4.5)為位元組權威**。`ciborium vs 手寫` 的開放項
+  (§4.1/§11)刪除 —— 原語已定(commonware-codec)。
+
+- **R5(測試)— `EncodeSize` 精確。** 手寫的 17 欄 `Transaction::EncodeSize` 須精確等於 `Write` 位元組
+  長度,否則 commonware-codec 誤算緩衝。加 `assert_eq!(tx.encode_size(), tx.encode().len())` 測試。
+
+**第三輪核實 solid(無須動作):** 有界 `Vec` 解碼在**配置前**拒超界長度(無 decode-bomb);`UInt` 嚴格
+最小;覆用的 `Instruction::EncodeSize` 與 `Write` 相符;所有 tx 可達葉子型別確定性(CBSS 固定大小;
+`ActorManifest` 用排序 `BTreeMap` 非 `HashMap`;無浮點);deferred preimage 遷移一致且 devnet 重置
+**確有必要**(否則 flag-day 前的 `origin_tx_hash` 會過不了 parent-receipt 檢查)。
 
 ---
 
@@ -136,10 +178,14 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
 ### 4.1 `canonical` codec — `node/types/src/canonical.rs`(新)
 - **職責:** 確定性 bytes ↔ `Transaction`。
 - **介面:** `encode(tx: &Transaction) -> Vec<u8>`;`decode(bytes: &[u8]) -> Result<Transaction, CodecError>`。
-- **編碼規則(RFC 8949 §4.2.1「core deterministic」子集):**
-  - 頂層是 **definite-length CBOR 陣列**,元素為 §5.1 **凍結順序**的交易欄位。
-  - 整數用**最小長度**編碼;**無**浮點;**無**不定長項;map/array 長度皆 definite。位元組串
-    (地址、雜湊、簽名、metadata)為 major-type-2、最小長度標頭。
+- **編碼規則(commonware-codec;依 R4 更正 —— 非 CBOR):**
+  - 交易欄位依 §5.1 **凍結順序**做**扁平串接** —— **無陣列外層**(commonware-codec 欄位首尾相接)。
+  - **混合整數編碼(須與既有 impl 完全一致):** bare `u64`(`chain_id`、`nonce`、gas/fee)用最小
+    **varint `UInt`**;`u128` 金額與 `Option<u64>` 用**固定大端**;集合長度用 varint。
+  - `Option<T>` = **`bool`(0x00/0x01)tag 後接值(若有)** —— 非 CBOR null。`Vec<T>`/位元組串 =
+    **varint 長度前綴 + 元素/位元組**。
+  - 無浮點;無不定長;每個整數/`bool` 唯一嚴格形(`UInt` 拒非最小;`bool` 須拒 ∉{0,1} —— 見 R2)。
+  - **TV fixture(§4.5)為位元組權威**;客戶端複製它,非照這些 bullet 的字面。
   - `Instruction` 編為自己的確定性子陣列 `[category, sub_type, body]`,與既有 `tx_type()`
     opcode 方案一致(讓型別 enum 有穩定規範 wire 形)。`body` 是所選 variant 欄位的遞迴確定性編碼。
   - `Option<T>` 編為 CBOR `null`(缺)或值(在)。`Vec<T>` 為 definite-length 陣列。
@@ -149,8 +195,8 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
   非最小整數、不定長項、陣列後尾位元組、元素數錯、重複或非預期結構。**不變量:** 每筆
   `Transaction` 恰有一個合法位元組編碼,且對所有規範 `b`,`decode(encode(tx)) == tx`、
   `encode(decode(b)) == b`。
-- **依賴:** CBOR 原語層(實作計畫評估 `ciborium`/既有 `into_writer` 低層 vs 手寫最小 writer
-  —— 需求是確定性 + 嚴格,非特定函式庫)。
+- **原語層(已定,R4):** 既有 `commonware-codec` `Write`/`Read` —— 無新 CBOR 層、無 `ciborium`。
+  覆用 `Instruction` 的 impl,`Transaction` 欄位編碼照 `Block::write` 同一慣例寫。
 
 ### 4.2 `chain_id` 欄位 + admission 驗證
 - 往 `Transaction` 加 `chain_id: u64`(§5.1)。客戶端從 node 的 genesis `chain_id` 取。納入
@@ -296,6 +342,6 @@ canonical 編碼是這些元素**依此順序**的 definite-length 陣列(順序
 ---
 
 ## 11. 留給實作計畫的開放項(非設計阻塞)
-- 嚴格確定性 codec 的 CBOR 原語層選型(函式庫 vs 手寫)。
+- ~~嚴格確定性 codec 的 CBOR 原語層選型~~ —— 已定(R4):覆用 `commonware-codec`(非 CBOR)。
 - 共享 TV fixture 最終路徑(node 與 wallet 都能取)。
 - `chain_id` mismatch 的最終錯誤碼 slug/編號(遵四段式錯誤格式,COW-386)。

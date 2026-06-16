@@ -114,6 +114,122 @@ git commit -m "test(types): pin canonical tx round-trip"
 
 ---
 
+## Task 2b: Make the `Instruction` codec injective on `Custom` (R1 — CRITICAL)
+
+The reused `Instruction` codec is **non-injective**: `Custom::write` emits `module` raw
+(`execution.rs:2554`) while `Instruction::read` dispatches on that first byte
+(`0→System, 1→Actor, 3→Library`, `:3348`). So `Custom{module:0,action:0,data:<20 bytes>}`
+encodes identically to `System(CreateAccount)`, and `decode(encode(Custom{module:0,..}))` ≠
+identity — breaking the canonical invariant the whole work depends on. Fix this **before**
+Task 3 reuses the codec.
+
+**Files:**
+- Modify: `node/types/src/execution.rs` (`Instruction::write` `:1647`, `::read` `:2581`)
+
+- [ ] **Step 1: Decide (a) vs (b) by blast-radius grep**
+
+Run: `cd node && grep -rn "Instruction::read\|\.write(.*instruction\|instruction.write\|impl Write for Instruction" --include=*.rs | grep -v test`
+Expected: confirm `Instruction` is encoded only via `Transaction` (which is in `Block.transactions`).
+- If **tx-only** → take **(a)** (truly-canonical codec fix, contained in this flag-day).
+- If `Instruction` is encoded elsewhere in consensus (receipts/messages/storage) → take **(b)**
+  (admission guard; smaller blast radius).
+
+- [ ] **Step 2a (path a): write the failing round-trip test over reserved modules**
+
+```rust
+#[test]
+fn instruction_custom_roundtrip_over_reserved_modules() {
+    for module in [0u8, 1, 2, 3, 4, 5] {
+        let inst = Instruction::Custom { module, action: 7, data: vec![9, 9] };
+        let bytes = inst.encode();
+        let back = Instruction::decode(bytes.as_ref()).expect("decode");
+        assert_eq!(back, inst, "Custom{{module={module}}} must round-trip to identity");
+    }
+}
+```
+
+- [ ] **Step 3a (path a): make the codec injective**
+
+In `Instruction::write`, the `Custom` arm must pin the category byte and put `module` in the
+body (so it can never collide with the `0/1/3` discriminants):
+
+```rust
+Self::Custom { module, action, data } => {
+    TX_CATEGORY_CUSTOM.write(writer); // 2u8 — distinct from System(0)/Actor(1)/Library(3)
+    module.write(writer);
+    action.write(writer);
+    data.write(writer);
+}
+```
+
+In `Instruction::read`, add an explicit `2 =>` arm that reads `module, action, data` into
+`Custom`, and make the final arm `other => Err(Error::InvalidEnum("Instruction", other))`
+(reject unknown categories rather than silently bucketing them as `Custom`). Update
+`Instruction::EncodeSize` for `Custom` to `1 + module.encode_size() + action.encode_size() + data.encode_size()`.
+
+- [ ] **Step 2b/3b (path b, ONLY if grep shows non-tx encoders): admission guard**
+
+Leave the codec; in admission (Task 9) reject `Instruction::Custom { module, .. }` where
+`module ∈ {0,1,3}` with a structured error, and scope the §4.1 invariant to admission-valid
+txs in the design. Add the same round-trip test but asserting those modules are *rejected at
+admission* (not that they round-trip).
+
+- [ ] **Step 4: Run + full instruction codec regression**
+
+Run: `cargo test -p cowboy-types -- instruction codec roundtrip`
+Expected: PASS, including the new reserved-module test. Fix `test_transaction_codec_roundtrip`
+if path (a) shifted the `Custom` bytes (it does — that is the intended canonicalization).
+
+- [ ] **Step 5: Commit**
+
+```bash
+cargo fmt --all
+git add node/types/src/execution.rs
+git commit -m "fix(types): make Instruction codec injective on Custom (R1, anti-malleability)"
+```
+
+---
+
+## Task 2c: Strict bool in `Constraints` (R2 — HIGH)
+
+`Constraints` (`node/types/src/entitlement.rs:262`, carried by `EntitlementGrant/Delegate/CreateRole`)
+writes `(self.delegatable as u8)` and reads `u8::read()? != 0` (`:326/367/369`), so byte `0x02`
+decodes `true` and re-encodes `0x01` — a malleability vector reachable from user txs.
+
+**Files:**
+- Modify: `node/types/src/entitlement.rs` (`Constraints` `Write`/`Read` ~`:320-370`)
+
+- [ ] **Step 1: Write the failing test**
+
+```rust
+#[test]
+fn constraints_reject_non_canonical_bool() {
+    let c = Constraints { delegatable: true, revocable: false, /* ..other fields.. */ };
+    let mut bytes = c.encode().to_vec();
+    // flip the delegatable byte (first bool) to a non-canonical 0x02
+    // (locate its offset from the canonical encoding) and assert decode fails:
+    // find the byte that is 0x01 for delegatable, set it to 0x02
+    // (in practice: construct bytes with 0x02 in the bool position)
+    assert!(Constraints::decode(/* bytes with 0x02 bool */).is_err(),
+        "a bool byte not in {0,1} must be rejected");
+}
+```
+
+- [ ] **Step 2: Make the bool decode strict**
+
+Replace `u8::read()? != 0` with the codec's strict `bool::read` (which rejects bytes ∉ {0,1},
+`commonware_codec primitives.rs`), or `match u8::read()? { 0 => false, 1 => true, _ => return Err(Error::Invalid("Constraints","bool")) }`. Keep `Write` as `bool::write` (which emits 0/1).
+
+- [ ] **Step 3: Run + commit**
+
+Run: `cargo test -p cowboy-types -- constraints`
+```bash
+cargo fmt --all && git add node/types/src/entitlement.rs
+git commit -m "fix(types): strict bool decode in Constraints (R2, anti-malleability)"
+```
+
+---
+
 ## Task 3: Rewrite `Transaction` `Write`/`Read`/`EncodeSize` to ordered commonware-codec
 
 **Files:**
@@ -217,6 +333,22 @@ impl EncodeSize for Transaction {
     }
 }
 ```
+
+- [ ] **Step 3b: Assert `EncodeSize` exactness (R5)**
+
+commonware-codec pre-sizes the output buffer from `encode_size()`; any drift from `Write`
+corrupts the encoding. Add to the round-trip test (Task 2):
+
+```rust
+#[test]
+fn tx_encode_size_matches_encoded_len() {
+    let tx = sample_signed_tx();
+    assert_eq!(tx.encode_size(), tx.encode().len(),
+        "EncodeSize must equal the Write byte length");
+}
+```
+
+Run: `cargo test -p cowboy-types tx_encode_size_matches_encoded_len -- --exact` → PASS.
 
 - [ ] **Step 4: Enforce strict decoding at the real submission boundary (F3 + F5)**
 
@@ -658,9 +790,14 @@ if tx.chain_id != node_chain_id {
 }
 ```
 
-Source `node_chain_id` from the genesis config already threaded into the node (the
-`chain_id: Option<u64>` in `chain/src/genesis.rs`; treat `None` as "accept any" only in test
-config, or pin a devnet default — decide with the genesis owner during review).
+Source `node_chain_id` from the genesis config (the `chain_id: Option<u64>` in
+`chain/src/genesis.rs`). **R3 (HIGH, chain-halt risk):** in non-test config, a `None`
+`chain_id` MUST be a **hard startup error** — never "accept any" (that voids replay
+protection). And because every client tx now carries a concrete `chain_id` that admission
+checks, **"update genesis `chain_id` to the pinned devnet value" is the FIRST, blocking step of
+the activation runbook** (§7 / design §0c-R3) — if the admission check ships while genesis is
+`None`, the chain admits zero txs. Add a startup assertion that `chain_id` is `Some(_)` in
+production config, and list the genesis pin as activation step 0.
 
 - [ ] **Step 4: Run**
 
@@ -762,11 +899,17 @@ git add -A && git commit -m "chore: fmt + regression fixes for canonical tx enco
 
 ---
 
-## In scope (folded in from the audit, F1/F2/F3)
+## In scope (folded in from the audits, F1–F3 / R1–R5)
+- **`Instruction` codec injectivity on `Custom`** (Task 2b) — R1 CRITICAL: the reused codec is
+  non-injective; must be fixed (or admission-guarded) before Task 3 reuses it.
+- **Strict bool in `Constraints`** (Task 2c) — R2 HIGH malleability in user entitlement txs.
 - **`digest()`/`tx_hash` migration** (Task 5b) — was the critical omission (F1).
 - **node cli + rpc/runner message-to-sign** (Task 9b) — same-workspace `payload_*` callers (F2).
 - **Strict trailing-byte rejection + `MAX_TRANSACTION_BYTES` re-home** at `Submission::decode`
   and the mempool listener (Task 3 §4 / Task 4) (F3/F5).
+- **`EncodeSize` exactness assertion** (Task 3 Step 3b) — R5.
+- **Genesis `chain_id` hard-fail on `None` + pin as activation step 0** (Task 9) — R3 HIGH
+  (chain-halt risk if shipped with `None`).
 
 ## Out of scope (separate follow-on plans)
 - **Wallet parity** (JS commonware-codec encoder + keccak, byte-parity vs `refs/common/tx-canonical-vectors.json`).
