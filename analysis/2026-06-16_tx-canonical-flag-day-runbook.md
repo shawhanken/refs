@@ -21,10 +21,10 @@ audit, econ + state-root invariants green). What remains is human coordination.
 | # | Item | Owner | Status |
 |---|------|-------|--------|
 | P1 | node #742 reviewed + approved (consensus change + design audit) | node reviewers | ☐ |
-| P2 | **Wallet byte-parity PR ready** — wallet (JS) reproduces the canonical encoding, passing its parity test vs `refs/common/tx-canonical-vectors.json` | wallet owner | ☐ (Plan B) |
+| P2 | **Wallet byte-parity PR ready** — wallet (JS) reproduces the canonical encoding, passing its parity test vs `refs/common/tx-canonical-vectors.json` | wallet owner | ✅ **wallet PR #14** (draft; parity 4/4 — tv1 hex/signing-hash/tv2 all match) |
 | P3 | SDK (Python) client-side tx construction (if any) reproduces the canonical encoding vs the same fixture | SDK owner | ☐ (Plan B; may be N/A if SDK doesn't build/sign txs client-side) |
 | P4 | **Genesis `chain_id` pinned** to a concrete devnet value (e.g. 1) in every config that will run — NOT `None` (a `None` chain_id hard-fails / rejects all txs in the new code) | genesis/devnet owner | ☐ (local-devnet `setup generate` already pins `Some(1)`; remote/default configs need it) |
-| P5 | #743 (Message/Receipt strict decode) merged first OR included — it's behavior-preserving and can land earlier; recommended to merge before the flag-day to reduce #742's blast radius | node reviewers | ☐ (PR #743 open) |
+| P5 | #743 (Message/Receipt strict decode) merged first OR included — it's behavior-preserving and can land earlier; recommended to merge before the flag-day to reduce #742's blast radius | node reviewers | ☐ (**node PR #743** open) |
 
 > **P2 is the gating prerequisite.** Until the wallet emits the new encoding, the flag-day would
 > reject every wallet-signed tx.
