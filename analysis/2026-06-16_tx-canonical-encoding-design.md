@@ -152,6 +152,57 @@ check).
 
 ---
 
+## 0d. Round-4 exhaustive-audit fixes (2026-06-16, Marshal run #189)
+
+Round 4 went EXHAUSTIVE where round 3 sampled — it enumerated every tx-reachable enum and bool.
+Net: the canonical invariant is **achievable with a handful of enumerable point-fixes plus one
+semantic rule** (not a systemic codec problem). New MUST-FIX beyond R1/R2:
+
+- **R6 (HIGH) — a SECOND non-strict bool R2 missed.** `SystemInstruction::RunnerUpdateDelegationConfig.accept_delegation`
+  writes `if {1u8} else {0u8}` (`execution.rs:2058`) and reads `u8::read()? != 0` (`:2845`) —
+  opcode 119, user-submittable; `0x02` → `true` → re-encodes `0x01`. R2 only fixed `Constraints`
+  in `entitlement.rs`; this `execution.rs` site is identical. **Fix:** same strict
+  `match {0,1,_=>Err}`. (Note: ~6 sibling bools in the same impl ARE strict — this is an
+  inconsistent-copy hazard; the test in R10 must catch any others mechanically.)
+
+- **R7 (HIGH) — `additional_signers` has no canonical order or uniqueness.** `verify()`
+  (`execution.rs:346`) iterates `additional_signers` in stored order, checking each `(addr,sig)`
+  recovers to `addr`; it enforces **neither order nor dedup**, and `all_signer_addresses()`
+  (`:100`) is order-dependent. So the same signer SET in two orders — or padded with duplicate
+  valid entries — yields **distinct `tx_hash`/`signing_hash`** for one logical authorization =
+  tx-identity malleability. **This lives in `verify()`, not the codec**, which is why the
+  codec-focused rounds 1–3 structurally could not find it. **Fix:** require `additional_signers`
+  to be **sorted by address with no duplicates** (reject otherwise at `verify()`/admission), and
+  bound by `MAX_ADDITIONAL_SIGNERS`.
+
+- **R8 (MEDIUM) — `SessionVoucher` signature pad/truncate is non-injective.** `session.rs:156`
+  pads/truncates `signature` to `VOUCHER_SIGNATURE_LEN` on write and always reads that length, so
+  a short/long-padded voucher normalizes on decode (`encode∘decode != id`). Tx-reachable via
+  `SessionSettle` (op 54) / `SessionSlash` (op 57). **Fix:** reject `signature.len() != VOUCHER_SIGNATURE_LEN`
+  at decode/construction.
+
+- **R9 (MEDIUM, plan) — `METADATA_CFG` lower bound.** The `metadata` `RangeCfg` upper bound MUST
+  be **≥ the max CIP-29 envelope (~6.4 KB)**, or system event-fire **deferred** txs fail to
+  decode. Pin it precisely (not "open").
+
+- **R10 (test mandate) — exhaustive round-trip.** The conformance round-trip test must iterate
+  **every `SystemInstruction` opcode and every tx-reachable nested enum** (not just `Custom`
+  modules) — the only mechanical guarantee that no further `!= 0`/catch-all site survives.
+
+- **(LOW)** CIP-29 `EmitOrigin::from_metadata_bytes` ignores trailing bytes (`:563`) — defense
+  in depth only (CIP-29 rides deferred/system txs the node builds; not a tx-canonical break).
+
+**Confirmed by round-4 (no action):** R1 blast radius is **CONTAINED** — `Instruction` reaches
+consensus ONLY via `Transaction` in `Block.transactions` (receipts store `tx_type:u8`, not the
+full `Instruction`), so **plan Task 2b path (a) — change the `Custom` encoding — is safe** in the
+tx flag-day. Also: because F1 makes `tx_hash`/`digest` **signature-independent**, neither `v`-
+nor s-malleability of `EthSignature` can fork tx identity (the one axis where the design fully
+holds). Exhaustively-checked-clean enums: all `SystemInstruction`/`ActorInstruction`/`LibraryInstruction`
+sub-dispatch (`_ => Err(InvalidEnum)`), `Scope`/`Action`, all `cbss` enums, `SessionAsset`,
+`Submission`/`UpdatesFilter`, the leaf primitives `Address`/`EthSignature`/`Digest`.
+
+---
+
 ## 1. Problem
 
 Whitepaper §2 (cowboy-technical-whitepaper.md, lines 461–493, normative) defines a

@@ -126,15 +126,14 @@ Task 3 reuses the codec.
 **Files:**
 - Modify: `node/types/src/execution.rs` (`Instruction::write` `:1647`, `::read` `:2581`)
 
-- [ ] **Step 1: Decide (a) vs (b) by blast-radius grep**
+- [ ] **Step 1: Confirm blast radius (round-4 verified CONTAINED → take path (a))**
 
-Run: `cd node && grep -rn "Instruction::read\|\.write(.*instruction\|instruction.write\|impl Write for Instruction" --include=*.rs | grep -v test`
-Expected: confirm `Instruction` is encoded only via `Transaction` (which is in `Block.transactions`).
-- If **tx-only** → take **(a)** (truly-canonical codec fix, contained in this flag-day).
-- If `Instruction` is encoded elsewhere in consensus (receipts/messages/storage) → take **(b)**
-  (admission guard; smaller blast radius).
+Round-4 audit already verified the grep: `Instruction` reaches consensus ONLY via `Transaction`
+in `Block.transactions` (receipts store `tx_type:u8`, not the full `Instruction`; deferred
+messages wrap their `Instruction` in `Transaction`). So **take path (a)** — change the `Custom`
+encoding; it is contained in the tx flag-day. (Re-run `grep -rn "impl Write for Instruction\|Instruction::read" node --include=*.rs | grep -v test` only to re-confirm nothing new appeared.)
 
-- [ ] **Step 2a (path a): write the failing round-trip test over reserved modules**
+- [ ] **Step 2a (path a): write the failing round-trip tests — reserved modules AND exhaustive opcodes (R10)**
 
 ```rust
 #[test]
@@ -147,6 +146,25 @@ fn instruction_custom_roundtrip_over_reserved_modules() {
     }
 }
 ```
+
+**R10 — exhaustive round-trip is the convergence guarantee.** Add a test that round-trips a
+representative value of **every `SystemInstruction` opcode and every tx-reachable nested enum**
+(not just `Custom`). This is the only mechanical way to prove no other `!= 0`/catch-all site
+survives. Drive it from a vector of one sample per opcode:
+
+```rust
+#[test]
+fn every_instruction_roundtrips_to_identity() {
+    for inst in sample_one_per_opcode() { // one Instruction per SystemInstruction/Actor/Library/Custom opcode
+        let bytes = inst.encode();
+        assert_eq!(Instruction::decode(bytes.as_ref()).unwrap(), inst,
+            "opcode {:?} must round-trip", inst.tx_type());
+        assert_eq!(inst.encode_size(), bytes.len(), "EncodeSize must match for {:?}", inst.tx_type());
+    }
+}
+```
+
+Build `sample_one_per_opcode()` explicitly (it doubles as living documentation of the opcode set).
 
 - [ ] **Step 3a (path a): make the codec injective**
 
@@ -190,14 +208,19 @@ git commit -m "fix(types): make Instruction codec injective on Custom (R1, anti-
 
 ---
 
-## Task 2c: Strict bool in `Constraints` (R2 — HIGH)
+## Task 2c: Strict/injective leaf fixes — `Constraints` + `accept_delegation` bools, `SessionVoucher` length (R2/R6/R8)
 
-`Constraints` (`node/types/src/entitlement.rs:262`, carried by `EntitlementGrant/Delegate/CreateRole`)
-writes `(self.delegatable as u8)` and reads `u8::read()? != 0` (`:326/367/369`), so byte `0x02`
-decodes `true` and re-encodes `0x01` — a malleability vector reachable from user txs.
+Three non-injective leaf sites reachable from user txs:
+- **R2 (HIGH)** `Constraints` bools (`entitlement.rs:326/367/369`): `as u8`/`!= 0`.
+- **R6 (HIGH)** `SystemInstruction::RunnerUpdateDelegationConfig.accept_delegation`
+  (`execution.rs:2058` write / `:2845` read `!= 0`) — opcode 119, **the same bug R2 missed**.
+- **R8 (MEDIUM)** `SessionVoucher.signature` pad/truncate to `VOUCHER_SIGNATURE_LEN`
+  (`session.rs:156` write / `:174` read) — short/long encodings normalize on decode.
 
 **Files:**
 - Modify: `node/types/src/entitlement.rs` (`Constraints` `Write`/`Read` ~`:320-370`)
+- Modify: `node/types/src/execution.rs` (`RunnerUpdateDelegationConfig` read ~`:2845`)
+- Modify: `node/types/src/session.rs` (`SessionVoucher` `Write`/`Read` ~`:147-176`)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -215,17 +238,93 @@ fn constraints_reject_non_canonical_bool() {
 }
 ```
 
-- [ ] **Step 2: Make the bool decode strict**
+- [ ] **Step 2: Make all three sites strict/injective**
 
-Replace `u8::read()? != 0` with the codec's strict `bool::read` (which rejects bytes ∉ {0,1},
-`commonware_codec primitives.rs`), or `match u8::read()? { 0 => false, 1 => true, _ => return Err(Error::Invalid("Constraints","bool")) }`. Keep `Write` as `bool::write` (which emits 0/1).
+- `Constraints` (`entitlement.rs:367/369`) and `accept_delegation` (`execution.rs:2845`):
+  replace `u8::read()? != 0` with strict `bool::read` (rejects bytes ∉ {0,1}) or
+  `match u8::read()? { 0 => false, 1 => true, _ => return Err(Error::Invalid(<type>,"bool")) }`.
+  Keep `Write` as `bool::write` (emits 0/1). (Cross-check the ~6 sibling bools already strict in
+  the same `RunnerUpdateDelegationConfig` impl — match their pattern.)
+- `SessionVoucher::read` (`session.rs:174`): reject `signature.len() != VOUCHER_SIGNATURE_LEN`
+  with an error instead of normalizing; `Write` must require the caller to pass exactly that
+  length (assert/validate at construction).
 
 - [ ] **Step 3: Run + commit**
 
-Run: `cargo test -p cowboy-types -- constraints`
+Run: `cargo test -p cowboy-types -- constraints delegation voucher`
 ```bash
-cargo fmt --all && git add node/types/src/entitlement.rs
-git commit -m "fix(types): strict bool decode in Constraints (R2, anti-malleability)"
+cargo fmt --all
+git add node/types/src/entitlement.rs node/types/src/execution.rs node/types/src/session.rs
+git commit -m "fix(types): strict bool/length decode in Constraints, accept_delegation, SessionVoucher (R2/R6/R8)"
+```
+
+---
+
+## Task 2d: Canonicalize `additional_signers` — order + uniqueness + bound (R7 — HIGH)
+
+`additional_signers` is bound into both `signing_hash` and `tx_hash`, but `verify()`
+(`execution.rs:346-388`) enforces **no order and no uniqueness** — and `all_signer_addresses()`
+(`:100`) is order-dependent. So the same multisig authorization in two orders, or padded with
+duplicate valid entries, produces **distinct tx identities** = malleability. This lives in
+`verify()`/admission, not the codec.
+
+**Files:**
+- Modify: `node/types/src/execution.rs` (`verify()` ~`:317-390`)
+- Modify: `node/types/src/constants.rs` (`MAX_ADDITIONAL_SIGNERS`)
+
+- [ ] **Step 1: Write the failing tests**
+
+```rust
+#[test]
+fn additional_signers_must_be_sorted_and_unique() {
+    let tx = sample_multisig_tx(); // from + 2 additional signers, canonically sorted
+    assert!(tx.verify());
+
+    // reordered additional_signers → reject
+    let mut reordered = tx.clone();
+    reordered.additional_signers.reverse();
+    assert!(!reordered.verify(), "non-canonical (unsorted) signer order must be rejected");
+
+    // duplicate signer → reject
+    let mut dup = tx.clone();
+    dup.additional_signers.push(dup.additional_signers[0].clone());
+    assert!(!dup.verify(), "duplicate additional signer must be rejected");
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `cargo test -p cowboy-types additional_signers_must_be_sorted_and_unique -- --exact`
+Expected: FAIL (verify currently accepts any order/dups).
+
+- [ ] **Step 3: Enforce in `verify()`**
+
+At the top of the non-deferred branch of `verify()`:
+
+```rust
+// Canonical multisig: additional_signers strictly ascending by address, no dups,
+// bounded — so one authorization has exactly one tx identity.
+if self.additional_signers.len() > MAX_ADDITIONAL_SIGNERS {
+    return false;
+}
+for w in self.additional_signers.windows(2) {
+    if w[0].0 >= w[1].0 { // not strictly ascending (covers unsorted AND duplicates)
+        return false;
+    }
+}
+// (also reject an additional signer equal to `from` if that is the policy)
+```
+
+Clients must sort `additional_signers` by address before signing. Note this in the cli/SDK
+migration (Task 9b).
+
+- [ ] **Step 4: Run + commit**
+
+Run: `cargo test -p cowboy-types -- additional_signers verify multisig`
+```bash
+cargo fmt --all
+git add node/types/src/execution.rs node/types/src/constants.rs
+git commit -m "fix(types): require sorted, unique, bounded additional_signers (R7, anti-malleability)"
 ```
 
 ---
@@ -313,10 +412,13 @@ commonware-codec read of a `Vec<(Address, ...)>` tuple to copy.** Write it expli
   `access_list: Option<Vec<(Address, Vec<[u8;32]>)>>` is `Option`-tag + the inner Vec Cfg
   `(RangeCfg, ((), (RangeCfg, ())))`.
 - Pick the `RangeCfg` upper bounds from sane limits (reuse a `MAX_TRANSACTION_BYTES`-derived
-  element cap; e.g. a small `MAX_ADDITIONAL_SIGNERS` and access-list bounds). **Do not** use
-  unbounded `..` for attacker-controlled `Vec`s. Verify the exact `RangeCfg` constructor
-  spelling against `commonware_codec` (it is `RangeCfg::from(..=N)` / a range), and confirm
-  `EthSignature` actually `impl`s `Read`/`Write`/`FixedSize` (it does — `signature.rs:105`).
+  element cap; small `MAX_ADDITIONAL_SIGNERS` and access-list bounds). **Do not** use unbounded
+  `..` for attacker-controlled `Vec`s. Verify the exact `RangeCfg` constructor spelling against
+  `commonware_codec` (it is `RangeCfg::from(..=N)` / a range), and confirm `EthSignature`
+  `impl`s `Read`/`Write`/`FixedSize` (it does — `signature.rs:105`).
+- **R9 — `METADATA_CFG` lower bound:** `metadata` carries CIP-29 system envelopes, so its
+  `RangeCfg` upper bound MUST be **≥ the max CIP-29 envelope (~6.4 KB)** or system event-fire
+  **deferred** txs fail to decode. Pin it to a constant ≥ that floor (not an arbitrary small cap).
 
 - [ ] **Step 3: Replace `impl EncodeSize for Transaction`** with the sum of field `encode_size()`s (same field order), mirroring `Block`'s `EncodeSize` (`:4141`).
 
@@ -899,10 +1001,14 @@ git add -A && git commit -m "chore: fmt + regression fixes for canonical tx enco
 
 ---
 
-## In scope (folded in from the audits, F1–F3 / R1–R5)
-- **`Instruction` codec injectivity on `Custom`** (Task 2b) — R1 CRITICAL: the reused codec is
-  non-injective; must be fixed (or admission-guarded) before Task 3 reuses it.
-- **Strict bool in `Constraints`** (Task 2c) — R2 HIGH malleability in user entitlement txs.
+## In scope (folded in from the audits, F1–F3 / R1–R10)
+- **`Instruction` codec injectivity on `Custom`** (Task 2b, path (a) — blast radius verified
+  contained) — R1 CRITICAL; plus the **exhaustive all-opcode round-trip test** (R10).
+- **Strict bool/length leaf fixes** (Task 2c) — `Constraints` (R2) + `accept_delegation` (R6,
+  the second bool R2 missed) + `SessionVoucher` length (R8).
+- **`additional_signers` canonical order + uniqueness + bound** (Task 2d) — R7 HIGH, a
+  malleability rule in `verify()` (not the codec) that codec-only rounds could not catch.
+- **`METADATA_CFG` ≥ ~6.4 KB** (Task 3 Cfg note) — R9, or deferred CIP-29 txs fail decode.
 - **`digest()`/`tx_hash` migration** (Task 5b) — was the critical omission (F1).
 - **node cli + rpc/runner message-to-sign** (Task 9b) — same-workspace `payload_*` callers (F2).
 - **Strict trailing-byte rejection + `MAX_TRANSACTION_BYTES` re-home** at `Submission::decode`

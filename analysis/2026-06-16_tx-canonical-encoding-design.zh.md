@@ -118,6 +118,49 @@ Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`
 
 ---
 
+## 0d. 第四輪窮盡式審計修正(2026-06-16,Marshal run #189)
+
+第四輪在 round 3 抽樣處改為**窮盡** —— 列舉每個 tx 可達 enum 與 bool。結論:規範不變量
+**靠少數可枚舉的點修 + 一條語義規則即可達成**(非系統性 codec 問題)。R1/R2 之外的新 MUST-FIX:
+
+- **R6(HIGH)— R2 漏掉的第二個非嚴格 bool。** `SystemInstruction::RunnerUpdateDelegationConfig.accept_delegation`
+  寫 `if{1u8}else{0u8}`(`execution.rs:2058`)、讀 `u8::read()? != 0`(`:2845`)—— opcode 119、
+  用戶可提交;`0x02`→`true`→再編 `0x01`。R2 只修了 `entitlement.rs` 的 `Constraints`;此 `execution.rs`
+  站點相同。**修:** 同 `match {0,1,_=>Err}`。(同 impl 內約 6 個兄弟 bool **是**嚴格的 —— 不一致複製
+  風險;R10 的測試須機械化抓出其餘。)
+
+- **R7(HIGH)— `additional_signers` 無規範順序或唯一性。** `verify()`(`execution.rs:346`)按儲存
+  順序迭代 `additional_signers`、僅檢每個 `(addr,sig)` 復原為 `addr`;**不檢順序也不去重**,且
+  `all_signer_addresses()`(`:100`)順序相關。故同一 signer 集的兩種順序、或補重複有效項 → 一個邏輯
+  授權產生**不同 `tx_hash`/`signing_hash`** = tx 身份 malleability。**此洞在 `verify()` 非 codec**,
+  故聚焦 codec 的 1-3 輪結構上抓不到。**修:** 要求 `additional_signers` **按地址排序且無重複**
+  (否則 `verify()`/admission 拒)+ `MAX_ADDITIONAL_SIGNERS` 界限。
+
+- **R8(MEDIUM)— `SessionVoucher` 簽名 pad/truncate 非單射。** `session.rs:156` write 時把
+  `signature` pad/截到 `VOUCHER_SIGNATURE_LEN`、read 恆產該長度,故短/長補的 voucher 解碼時正規化
+  (`encode∘decode != id`)。經 `SessionSettle`(op 54)/`SessionSlash`(op 57)tx 可達。**修:**
+  decode/構造時拒 `signature.len() != VOUCHER_SIGNATURE_LEN`。
+
+- **R9(MEDIUM,plan)— `METADATA_CFG` 下界。** `metadata` 的 `RangeCfg` 上界須 **≥ 最大 CIP-29
+  envelope(~6.4 KB)**,否則系統 event-fire 的 **deferred** tx 解不出。須精確釘(非「open」)。
+
+- **R10(測試強制)— 窮盡 round-trip。** conformance round-trip 測試須迭代**每個 `SystemInstruction`
+  opcode 與每個 tx 可達巢狀 enum**(非只 `Custom` module)—— 唯一能機械化保證無其餘 `!=0`/catch-all
+  殘留的方法。
+
+- **(LOW)** CIP-29 `EmitOrigin::from_metadata_bytes` 忽略尾位元組(`:563`)—— 僅縱深防禦(CIP-29 走
+  node 自建的 deferred/system tx;非 tx-canonical 破口)。
+
+**第四輪確認(無須動):** R1 blast radius **CONTAINED** —— `Instruction` 只經 `Transaction`(在
+`Block.transactions`)進共識(receipt 存 `tx_type:u8` 非整個 `Instruction`),故 **plan Task 2b 路徑
+(a)—— 改 `Custom` 編碼 —— 在 tx flag-day 內安全**。又:因 F1 使 `tx_hash`/`digest` **與簽名無關**,
+`EthSignature` 的 `v`/s-malleability 皆無法 fork tx 身份(設計在此軸完全成立)。窮盡核實乾淨的 enum:
+所有 `SystemInstruction`/`ActorInstruction`/`LibraryInstruction` 子分派(`_ => Err(InvalidEnum)`)、
+`Scope`/`Action`、所有 `cbss` enum、`SessionAsset`、`Submission`/`UpdatesFilter`、葉子原語
+`Address`/`EthSignature`/`Digest`。
+
+---
+
 ## 1. 問題
 
 白皮書 §2(cowboy-technical-whitepaper.md,461–493 行,normative)把交易定義為平坦的 13 元素
