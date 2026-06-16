@@ -73,9 +73,8 @@ window, **abort before step 3** (do not merge) — nothing is lost.
 
 ## Follow-ons (NOT blocking the flag-day; sequence after)
 
-- **WP rewrite** (Plan C): §2 + Appendix A + the standalone line-198 MUST → describe the
-  commonware-codec canonical form. Doc-only; do after #742 lands. (Highest Marshal tier — amends
-  the whitepaper.)
+- **WP rewrite** (Plan C): ✅ drafted — **cowboy PR #191** (§2 + Appendix A normative TV1/TV2 +
+  line-198 principled rewrite). Draft; land with/after #742. (Amends the whitepaper.)
 - **A3/A4 trailing-tail version-gate** (`Message`/`TransactionReceipt` `has_remaining()` tails):
   a `Message` wire change requiring a format-version byte; fold into THIS flag-day's reset if
   done in time, else a later coordinated upgrade. See `refs/plans/2026-06-16_tx-canonical-followons-plan.md` Plan A.
