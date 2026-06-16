@@ -10,6 +10,28 @@ to `to/value/payload`.
 
 ---
 
+## 0. Refinement (2026-06-16): encoding primitive = commonware-codec, not CBOR
+
+Plan-time grounding found that `Instruction`, `Block`, `Notarized`, `Actor`, `Message`,
+`Account`, etc. **already use a deterministic, ordered `commonware_codec::{Write, Read}`
+binary encoding** (`node/types/src/execution.rs:1647` Instruction, `:4042` Block — the latter
+is what `block_hash`/consensus is built on). **`Transaction` is the lone outlier**: its
+`Write` does `ciborium::into_writer(self)` → a serde-CBOR **map** (`execution.rs:397`). That
+serde-CBOR map is the actual root cause of the "map vs array / non-canonical" defect.
+
+**Decision (supersedes the "CBOR" framing in §4.1, §5, §4.6, §6, §11 below):** the canonical
+encoding is the **ordered `commonware-codec` binary encoding**, reusing `Instruction`'s
+existing `Write`/`Read`. We rewrite `Transaction::{Write, Read, EncodeSize}` to the ordered
+field pattern that `Block` already uses (instead of serde-CBOR), add the new fields, and
+define the signing hash over this encoding. WP §2 + Appendix A are rewritten to describe the
+**canonical commonware-codec binary encoding** (not CBOR). This eliminates the outlier,
+reuses the whole existing deterministic Instruction encoding (no per-variant re-encoding),
+and aligns the tx with the consensus encoding used everywhere else. Wherever the sections
+below say "CBOR array", read "ordered commonware-codec encoding"; the field order in §5.1 and
+all other decisions stand unchanged.
+
+---
+
 ## 1. Problem
 
 Whitepaper §2 (cowboy-technical-whitepaper.md, lines 461–493, normative) defines a

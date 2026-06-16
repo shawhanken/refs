@@ -9,6 +9,24 @@
 
 ---
 
+## 0. 精煉(2026-06-16):編碼原語 = commonware-codec,非 CBOR
+
+Plan 階段 grounding 發現:`Instruction`、`Block`、`Notarized`、`Actor`、`Message`、`Account`
+等**早已用確定性、有序的 `commonware_codec::{Write, Read}` 二進位編碼**
+(`node/types/src/execution.rs:1647` Instruction、`:4042` Block —— 後者即 `block_hash`/共識所建)。
+**`Transaction` 是唯一例外**:其 `Write` 做 `ciborium::into_writer(self)` → serde-CBOR **map**
+(`execution.rs:397`)。這個 serde-CBOR map 正是「map vs array / 非規範」缺陷的真正根因。
+
+**裁定(取代下文 §4.1、§5、§4.6、§6、§11 的「CBOR」措辭):** 規範化編碼採**有序
+`commonware-codec` 二進位編碼**,覆用 `Instruction` 既有的 `Write`/`Read`。把
+`Transaction::{Write, Read, EncodeSize}` 改寫為 `Block` 已用的有序欄位模式(取代 serde-CBOR)、
+加新欄位、簽名雜湊定義在此編碼上。WP §2 + Appendix A 改寫為描述**規範化 commonware-codec
+二進位編碼**(非 CBOR)。如此消除異類、覆用整棵既有確定性 Instruction 編碼(無需逐變體重寫)、
+並與全鏈其他共識編碼對齊。下文凡寫「CBOR 陣列」處,讀作「有序 commonware-codec 編碼」;§5.1 的
+欄位順序與其他所有裁定不變。
+
+---
+
 ## 1. 問題
 
 白皮書 §2(cowboy-technical-whitepaper.md,461–493 行,normative)把交易定義為平坦的 13 元素
