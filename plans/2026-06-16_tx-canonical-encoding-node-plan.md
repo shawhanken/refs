@@ -237,8 +237,10 @@ let submission = match Submission::decode(body.as_ref()) { // rejects trailing b
 Also **re-home the `MAX_TRANSACTION_BYTES` bound** that previously lived inside the deleted
 length-prefixed `Transaction::read` (`constants.rs` + old `:411`): enforce it at this boundary
 (reject a submission whose encoded tx exceeds `MAX_TRANSACTION_BYTES`). Apply the same
-`decode`-not-`read` + size-bound fix to the mempool listener decode path
-(`node/chain/src/mempool_listener.rs`).
+`decode`-not-`read` + size-bound fix to the mempool listener path
+(`node/chain/src/mempool_listener.rs:175`), which decodes **`Pending::read`** (not
+`Submission`/`Transaction`) — `Pending` has `Cfg=()`, so switch it to `Pending::decode(data)`
+to reject trailing bytes.
 
 - [ ] **Step 5: Run the round-trip test**
 
@@ -269,9 +271,11 @@ boundary uses (Task 3 Step 4) — not a fictional helper. Put this test in the c
 `Submission` (`cowboy-types`).
 
 ```rust
+// Submission is an ENUM (api.rs:437): variants Seed/Transactions/Summary — there is NO
+// `Submission::single`. Use the Transactions variant.
 #[test]
 fn submission_decode_rejects_trailing_bytes() {
-    let sub = Submission::single(sample_signed_tx()); // or the existing Submission constructor
+    let sub = Submission::Transactions(vec![sample_signed_tx()]);
     let mut bytes = sub.encode().to_vec();
     bytes.push(0xAA); // trailing garbage
     assert!(Submission::decode(bytes.as_ref()).is_err(),
@@ -280,7 +284,7 @@ fn submission_decode_rejects_trailing_bytes() {
 
 #[test]
 fn submission_decode_rejects_truncated() {
-    let sub = Submission::single(sample_signed_tx());
+    let sub = Submission::Transactions(vec![sample_signed_tx()]);
     let bytes = sub.encode();
     assert!(Submission::decode(&bytes[..bytes.len() - 1]).is_err());
 }
@@ -309,6 +313,12 @@ git commit -m "test(types): tx decode rejects trailing/truncated bytes (anti-mal
 ---
 
 ## Task 5: `signing_hash` over canonical encoding; delete `PayloadSign`
+
+> **ORDERING (S1):** Task 5 deletes `payload_bytes`, but `digest_preimage()` still calls it
+> until Task 5b migrates it. **Do Task 5b's `digest_preimage` migration in the SAME change as
+> the `payload_bytes` deletion** (Steps below: add `signing_preimage` + `signing_hash` first,
+> then migrate `digest_preimage` (5b Step 3), THEN delete `payload_bytes`). The document
+> numbers 5 → 5b but the deletion must come last.
 
 **Files:**
 - Modify: `node/types/src/execution.rs` (`payload_bytes`/`payload_hash` ~line 110-160; `verify` ~line 317-390; sign helpers ~line 189/241)
@@ -414,6 +424,12 @@ calls the deleted `payload_bytes` **and** manually appends deferred extras (`ori
 + origin gas as BE bytes). After this work those fields are intrinsic canonical fields, so the
 manual append is redundant. **The tx identity stays signature-independent** (today's property):
 `digest_preimage` reuses `signing_preimage` (signatures zeroed). Result: `tx_hash == signing_hash`.
+
+> **Note:** `tx_hash == signing_hash` is intentional and benign. `digest()` is **already**
+> signature-independent today (it hashes `payload_bytes`, which excludes the signature), so no
+> consumer assumes `tx_hash` commits to the signature — verified: `merkle_utils.rs:20`,
+> `process_block.rs:47`, and the indexer all just consume `digest()`. This matches the prior
+> behavior; it is not a semantic change downstream.
 
 **Files:**
 - Modify: `node/types/src/execution.rs:438-485` (`digest`, `digest_preimage`)
@@ -668,18 +684,27 @@ wrongly deferred. These MUST migrate to `signing_hash()` in this plan, or those 
 `verify()` / won't compile.
 
 **Files:**
-- Modify: `node/rpc/src/handlers/runner.rs` (`heartbeat_payload_hash` `:272-273`; the
-  message-to-sign endpoints around `:398/409/459/882`)
-- Modify: `node/cli/src/commands.rs` (tx signing call sites that use `payload_hash`)
+- Modify: `node/rpc/src/handlers/runner.rs` — ALL `Transaction::payload_bytes`/`payload_hash`
+  call sites. There are more than heartbeat: `heartbeat_payload_hash` (`:272-273`, used `:398/409/459`)
+  PLUS the message-to-sign endpoints at **`:944, :1071, :1208, :1309, :1469, :1587`**
+  (job-result, registration, etc.). `:882` is only a doc comment — the real calls are the six
+  above. Every one breaks when Task 5 deletes `payload_bytes`; `cargo build -p cowboy-rpc`
+  (Step 3) is the backstop, but migrate them all deliberately.
+- Modify: `node/cli/src/commands.rs` (tx signing call sites that use `payload_hash`/`payload_bytes`)
 
-- [ ] **Step 1: Migrate the runner message-to-sign hash**
+- [ ] **Step 1: Migrate the runner message-to-sign hashes (all 7 sites)**
 
-`heartbeat_payload_hash` (`runner.rs:273`) calls `Transaction::payload_hash(...)`. Replace its
-body so the server hands the runner **the same hash `verify()` now checks**: build the
-`Transaction` it represents and return `tx.signing_hash()` (or, if the heartbeat is not a full
-tx, replace `payload_hash` with the explicit canonical-preimage keccak used by `signing_hash`).
-The recover side (`:460 recover_address(&payload_hash)`) already returns `Result` — keep it,
-but feed it the new hash. The `message_to_sign_base64` (`:409`) must encode the new hash bytes.
+Each site builds the `Transaction` the runner will submit and must hand the runner **the same
+hash `verify()` now checks** = `tx.signing_hash()`. For `heartbeat_payload_hash` (`:273`) and
+each of the six message-to-sign endpoints, construct the `Transaction` and return
+`tx.signing_hash()`; the recover side (`:460 recover_address(&payload_hash)`) already returns
+`Result` — feed it the new hash; `message_to_sign_base64` (`:409`) encodes the new hash bytes.
+
+**chain_id threading (REQUIRED — Task 1 made `chain_id` mandatory, Task 9 rejects mismatches):**
+the server-built tx for heartbeat/each endpoint must set `chain_id = node's configured chain_id`
+(the same value admission checks) and `access_list: None`, so the hash it signs matches the tx
+that passes admission. Source `node_chain_id` from the node config already threaded for Task 9;
+do NOT take it from the (untrusted) request body.
 
 - [ ] **Step 2: Migrate cli signing**
 
