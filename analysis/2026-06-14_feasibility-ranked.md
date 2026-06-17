@@ -23,9 +23,9 @@
 | **F-2 真·中(M,数天)** | ~~本地可改可测~~ → **实测全非干净**(共识/设计/集成/已覆盖) | 7→0 |
 | **F-3 example 跑验** | 目录+demo.sh 已在,跑本地 validator 验证/修回归(**未跑,留专门一轮**) | 24 |
 | — 下面全是"现在做不了" — | | |
-| **B-1 SECURITY-HEAVY** | 本地可做但高危安全,需专注 PR(926→#732 merged;2274→#733、1057→#735 In Review;1051 退回 Backlog=实为 B-3,**档已清零**) | 3→0 |
+| **B-1 SECURITY-HEAVY** | 926→#732、2274→#733、1057→#735;**2026-06-17 审计修复战役再清 10 条 MED/LOW + 7 HIGH 全闭环**(15 PR,见 §2026-06-17);剩余审计 3 簇仅残留(2306 限流/认证、2310、pvm) | 清零→审计批 |
 | **B-2 INFRA-HARNESS** | 需先建测试/CI/沙箱/多节点 harness | ~13 |
-| **B-3 SPEC/DESIGN-DECISION** | 需先裁规格/设计 | ~24 |
+| **B-3 SPEC/DESIGN-DECISION** | 需先裁规格/设计(tx 编码簇 8 条 2026-06-16 攻坚中→node #742 等,待 flag-day) | ~24 |
 | **B-4 CONSENSUS** | 碰 state-root/genesis/receipt,需协调上线 | ~60 |
 | **B-5 GREENFIELD** | 大型未起功能(IDE/前端 SDK/市场/新子系统) | ~60 |
 | **B-6 OTHER-TEAM / 非本地 / CROSS-REPO** | CIP-2/3/4、gateway/console/builder/cowpilot/explorer/terraform 等不在本地 | ~95 |
@@ -77,6 +77,75 @@
 **本会话(再续)累计:node #733 + #735(各含加固/注记提交),均 In Review 待人工 merge。** B-1 安全票最后一条 **COW-1051** 回代码核实后**退回 Backlog + 写 scoping 评论**:链上现状=只对治理预注册可信公钥验 quote 签名,**零厂商凭据验证**;runner-tee 944 行是自生成 key 的模拟。COW-1051=从零造共识关键 TEE 验证器(无 x509/dcap 依赖、须确定性 block-time X.509、缺真实 Intel/AMD 测试向量、**需先做 CIP-24 §3.8 设计裁定=实为 B-3**、CIP-23/24 跨团队多周活)。**不硬上半成品/合成向量**(安全验证器假绿比不做更糟)。**B-1 安全档至此全部处理完毕,自动 batch-loop fodder 彻底清零**——往后纯靠用户逐个点名重票(B-4 共识/B-3 设计/B-5 绿地/B-6 非本地)。
 
 > 运维记:本环境 SSH(22)push github 卡死 → 改 `gh auth setup-git` + HTTPS push。auto-mode 拒绝未经明确请求的新建 Linear issue → follow-up 折进现有评论。
+
+---
+
+## 🔻 2026-06-16 — B-3 tx 编码簇攻坚 + 五仓全量审计 + CIP-24/23 联审
+
+易档早已空,本日全在"重"票:一次裁掉了一整个 **B-3 簇**、把审计护栏铺进五仓、并联审两条 CIP。
+
+**B-3 tx 规范化编码簇 → 三仓 flag-day 在途(原列 B-3 的整簇 + B-4 的 1212 一并消化)。**
+- **node PR #742(OPEN, draft)**:`COW-1942` 主票,折入原 B-3 簇 **1945/1943/1941/1937/1215/1753** + 原 B-4 **1212(chain_id 签名)**。serde-CBOR → commonware-codec 规范编码 + `chain_id` 防重放 + 反 malleability + 冻结测试向量;11 commit、6 轮审计、subagent-driven;最终全息 review 抓到 per-task 漏的 **CLI chain_id CRITICAL**;workspace 4358 测试绿。Marshal **needs_human**(共识 flag-day,待协调上线)。
+- **node PR #743(MERGED)**:严格 `Message`/`Receipt` codec 解码(state-root 反 malleability,B7),配合 #742 收紧 wire。
+- **wallet PR #14(OPEN)**:钱包换 commonware-codec(Plan B),对 node #742 `tx_vectors.rs` 三方逐字节核对全中;Marshal **pass**。潜伏 LOW:`additional_signers` 缺 20B 地址(v1 恒 `[]` 休眠)。部署前须对 #742 合并 commit 重核。
+- **cowboy PR #191(OPEN)**:白皮书 §2 + Appendix A 落同一字节契约(Plan C)。
+- → **B-3 tx 簇(1945/1942/1943/1941/1937/1215/1753)+ B-4 的 1212 从"未决"转"在途待 flag-day"**,见下表已划线。
+
+**五仓全量代码审计(9 并行 agent 对抗审)→ 7 条确认 HIGH/CRITICAL(均现网),已起棘轮护栏并落地。** 报告 `refs/analysis/2026-06-16_*`。确认项:C1 pvm `import os` 绕沙箱(CRITICAL,探针复核)/ C2 cbfs `owner_signature` 零校验 / C3 重复结算 / C4 延迟费铸造 / C5 CBSS None 跨账户外泄 / C6 `active_jobs` 死读 / C7 receipt 指针分叉。已转 Linear 票 + 合入 ratchet 回归门禁:
+- node **#739 MERGED**(COW-2284,blacklisted module 即便预缓存也须拦 = C1)、**#741 MERGED**(COW-2286,job 至多结算一次 = C3 双花 escrow drain)、**#740 MERGED**(COW-2288 CBSS None-policy + COW-2303 upgrade param-drop = C5)、**#738 MERGED**(COW-2297 `token_mint` 须校验 `mint_authority` = C4 类)。
+
+**其他本地 merged:** node **#737**(COW-2277 storage epoch 边界 O(history) CPU grind 修复)、**#728**(COW-2258 indexer session/cip29 receipt 事件结构化解码器)、runner **#117**(COW-2278 job-result nonce 撞 heartbeat 修复)。
+
+**CIP 联审(review-only,非可行性交付):**
+- **CIP-24 inbound-verify 三仓**:cowboy **#185** + node **#729** Marshal needs_human / runner **#116** pass。node #729 抓到 **1703 错误码冲突**(`SecretAccessDenied` ↔ `LibCapExceeded`)→ 棘轮 `esc-20260615`;runner #116 安全过硬但 release-failure 误当终态(liveness MEDIUM)。三仓须协同上线。
+- **CIP-23 v3 TEE**:cowboy PR **#188**,Marshal needs_human;两疑似矛盾(§3.2 地址/opcodes)回代码核对均驳回;棘轮 `esc-20260616-cip23-chip-root-determinism` 占坑。
+
+> 小结:本日无"易档新增交付"(易档确已空);进展全在 B-3 簇协调推进 + 审计护栏铺设 + CIP 联审。tx 编码簇、CIP-24、CIP-23 三组均 needs_human / flag-day,等人工协调上线。
+
+---
+
+## 🔻 2026-06-17 — 五仓审计修复战役(15 PR;HIGH 池全清 + 10 条 MED/LOW)
+
+把 2026-06-16 审计起的棘轮护栏**逐条实作修复**。一个会话交付 **15 个 PR**(跨 node/runner/cbss/cbfs),**7 条确认 HIGH(C1–C7)全部闭环**,外加 10 条 MED/LOW。每条走完整闭环:前提回 devnet/main tip 核实 → TDD + **实作原本"假绿"的棘轮 invariant 测试** → 全 workspace 0 失败 → 对抗式 review → `gate-record`(run 206–218)→ 英文 PR/Linear 评论 → In Review。
+
+**HIGH(C1–C7)收口表:**
+
+| 发现 | 交付 | Marshal |
+|---|---|---|
+| C1 pvm `import os` 绕沙箱 | node #739(ratchet,早先 merged) | — |
+| C2 cbfs `owner_signature` 零校验 | COW-2285 Done(早先) | — |
+| C3 runner 重复结算 | node #741(早先 merged) | — |
+| **C4 延迟费铸进 burn sink** | **node #749** | needs_human |
+| C5 CBSS None 跨账户外泄 | node #740(早先 merged) | — |
+| **C6 `active_jobs` 死计数 + 聚合质押** | **node #747** | needs_human |
+| **C7 heap 指针进 `receipt_root` fork** | **node #752** | needs_human |
+
+**MED/LOW(本战役 11 条):**
+- cbfs **#53**(COW-2304:PutShard 不验 shard_id 派生 → 持卷 A cap 覆写卷 B 字节投毒;store 层卷绑定,**仅跨卷且字节真变才拒**)→ **Marshal PASS**(对抗 review 自审抓到首版会误杀内容定址 manifest-node dedup → 改 byte-change-gated;非共识、无 wire 改)。
+- cbss **#30**(COW-2306:`read_frame` 按声明 len 全量预分配 → 未认证者 16MiB×256 流不发 body = 4GiB RSS 放大;改 64KiB 分块增量读、单超时)→ **Marshal PASS**(只做放大 primitive;per-IP 限流 + 客户端认证[CIP-24 app 层设计]留 follow-up;`CountingReader` 测断言单读 ≤ chunk;非共识)。
+- runner **#120**(COW-2295/2296:secret 进日志脱敏 + SSRF guard + 禁跟随重定向)→ **MERGED**(对抗 review 当场抓到我自己 PR 里的 redirect 绕过并同环修)。
+- node **#750**(COW-2298:per-height timer list 无界 → 永久 halt DoS;写前 cap + 拒绝须 recoverable)→ needs_human。
+- node **#751**(COW-2299:跨 actor 重入 root → 陈旧读/丢写;`active_call_actors` 集中守卫,call_actor + emit sync-fire 两路)→ needs_human(对抗 review 抓到 emit 同源后门)。
+- node **#753**(COW-2294:token-hook cap 漏 storage-read gas → 结算移到 `restore_limit` 前)→ needs_human。
+- node **#754**(COW-2308/2309:mempool 延迟队列加 count cap + 防饿死 user tx)→ **Marshal PASS**(非共识:`next()` 只在 propose,不在 verify)。
+- node **#755**(COW-2307:block `extra_data` 排除出 digest → wire malleability;**仅非空才** length-prefixed fold = 向后兼容空块、无硬分叉)→ needs_human。
+- cbss **#29**(COW-2305:PartialSign 无 replay 防护;bounded `ServedRequests` dedup,reject-before-authorize + insert-on-success)→ needs_human(reject vs 幂等 re-serve 的 retry/liveness 权衡留人裁)。
+- node **#756**(COW-2293:`2**20000`/`1<<20000` 常量折叠绕 4096-bit 守卫;validate_actor_code 加 AST 检查,**整数 ilog2 上界**判位长——自审抓到初版 float `log2` 跨 libm 末位差会 fork deploy gate 并改回整数)→ needs_human。残留裸大 hex 字面量 + 完整修=pvm/ 运行时守卫。
+- node **#748**:清掉 devnet tip 上误提交的 COW-951 旧 `plan.md`。
+
+**对抗式 review 当场抓到并同环修的真 bug**:① COW-2289 cancel 路径漏清 in-flight 索引(永久 over-count);② COW-2299 CIP-29 emit sync-fire 与 call_actor 同源的重入后门(只守 call_actor 会让棘轮假绿)。
+
+**经验沉淀**(已入记忆,可复用):halt 修复必须确保拒绝本身 recoverable(否则把 halt 搬家);共识文本脱敏选共识边界而非 pvm/(node CI 不跑 pvm/ workspace = 盲区);mempool 改动先确认 `next()` 不在 verify = 非共识;econ 守恒用代数 proptest 别驱动全 PVM;向后兼容 fold 用"仅非空才 append";审切帧/重入查**所有** snapshot substrate 调用点;审 active 棘轮 invariant 必核 `location_test` 真存在(否则 `running 0 tests` 假绿);cbss/cbfs base = **main**(非 devnet);cbss e2e 从 worktree 必挂(硬编码 `../../../node`);Clone 结构体加守卫字段用 `Arc<Mutex<>>`。
+
+**审计池剩余 3 簇 = 全非干净本地修**(已逐条核 premise;2293 的 node 侧 deploy-gate 部分已于 #756 拿下,留 pvm/ 运行时完整修;2304 已由 #53 拿下,完整密码学绑定留 follow-up):
+
+| 剩余 | 为何非干净 |
+|---|---|
+| cbss **2306 残留** | 放大 primitive 已由 #30 拿下;**per-IP 限流**(transport 建设)+ **客户端认证**(CIP-24 app 层设计,需裁定)留 follow-up |
+| cbss **2310**(LOW) | round 消息不带 `epoch` → 修需加字段(wire + flag-day),或"拒重叠 start"语义不明(恐坏 reshare) |
+| pvm/ **2291/2292** + 2293 残留 | 确定性 `id()`/沙箱模块需 attribute 级隔离;2293 完整修=运行时 int 物化守卫(裸大 hex 字面量)= pvm/ CI 盲区 |
+
+> 小结:**node 侧可乾净本地交付的审计票已耗尽**(#756 拿下 2293 的 node deploy-gate 部分后);HIGH 安全池全清;cbfs 2304 投毒已由 #53 store 层卷绑定拿下(Marshal PASS)。剩余 MED/LOW 均需协议/wire 改、设计裁定或 pvm/ 慢工,非"快速继续"。共识修复一律 needs_human 等协调 flag-day 上线(非共识已 PASS:#754 mempool、cbfs #53;#120 runner 已 merged)。
 
 ---
 
@@ -160,7 +229,7 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 
 ## ✗ B-3 — SPEC / DESIGN-DECISION(需先裁规格或设计)
 
-- **tx 编码 array-vs-map 未决**(连带一簇):COW-1945/1942/1943/1941/1937/1215/1753
+- ~~**tx 编码 array-vs-map 未决**(连带一簇):COW-1945/1942/1943/1941/1937/1215/1753~~ → **2026-06-16 攻坚中**:整簇折入 node PR **#742**(canonical commonware-codec + replay/malleability)+ #743(MERGED)+ wallet #14 + cowboy #191;Marshal needs_human,共识 flag-day 待协调上线
 - **裸 epic 无描述**(范围未定):COW-482(CLI)/492(SDK)/495/498(AI Context)
 - **升级/迁移模型未设计**:COW-428/429/437/438
 - **本地 dev 配置格式未定**:COW-373(cowboy.yaml/toml)
@@ -171,7 +240,7 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 代表簇:
 - **CBFS 链上 RAS**(`node/execution/src/ras.rs`):2113/2114/2152/2184/921/894/927/929/938/1544/1545/1546;**PoR**:2112/917/918/919/2183
 - **Economics/Genesis**:1259/1260/1261/1265/1266/1267/2019/2020/2021
-- **tx/derivation**:1212(chain_id 签名)/177(tx version)/1944/1935/1934
+- **tx/derivation**:~~1212(chain_id 签名)~~ → **2026-06-16 折入 node PR #742**(tx-canonical 簇,待 flag-day);177(tx version)/1944/1935/1934
 - **token 新指令**:1074(permit)/1076(multicall)/1798(ICIP20)
 - **timer**:1457/1458/1460;**governance**:1028/1029/1012;**session escrow**:1542
 - **PVM 执行语义**(改 accept/reject 或 gas→receipt):94/119/137/1239/1240/1241/1248/1249/1255/2054/2055
@@ -215,6 +284,8 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 ---
 
 ## 一句话
+
+> **2026-06-17 终态**:易档(F-0/1/2/3)早已清空;6-16 五仓审计起的 **7 条 HIGH(C1–C7)+ 10 条 MED/LOW 已全部修复交付**(15 PR,见 §2026-06-17 段;runner #120 已 merged、其余 In Review)。**node 侧可乾净本地交付的审计票至此耗尽**;cbfs 2304 投毒(#53)、cbss 2306 预分配放大(#30)均已干净拿下(Marshal PASS)。审计池仅剩残留:cbss 2306 的 per-IP 限流/客户端认证、cbss 2310、pvm 2291・2293・2292 —— 全需协议/wire 改、设计裁定或 pvm/ CI 盲区。共识修复一律 needs_human 等 flag-day。
 
 ~~真正现在能本地交付的只有 ~26 条(10 close + 9 易 + 7 中)外加 24 example~~ —— **2026-06-15 修正:这个估计仍偏乐观。** 实测后 F-0/F-1/F-2 三个易档全部清空或核实为非干净:本轮真正干净交付的只有 **3 条代码批**(COW-202/231/363,2 个 PR 已 merge)+ **2 条原生关闭**(COW-400/501)。F-0 已无可关。
 
