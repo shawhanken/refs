@@ -1,7 +1,9 @@
 # 可行性重排 — 由易到难(2026-06-14,Linear 实时全量)
 
-**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派} —
-共 **619 条**(541 Backlog / 67 Todo / 6 In Review / 5 In Progress;502 未指派 / 117 PL)。
+**范围:** Linear COW 团队,state ∉ {completed, canceled},assignee ∈ {pavilionledger(PL), 未指派}。
+- **2026-06-14 基线:619 条**(541 Backlog / 67 Todo / 6 In Review / 5 In Progress;502 未指派 / 117 PL)。
+- **2026-06-17 实时复核:574 条**(525 Backlog / 43 Todo / 4 In Progress / 1 In Review / 1 Duplicate;486 未指派 / 88 PL)。净 **−45**(PL 117→88、未指派 502→486);见 §2026-06-17(实时复核)。
+- **2026-06-19 实时复核:563 → 546 条**(本会话:#780/COW-95 + **#788/COW-1029** 均 merged→devnet 转 Done;关 4 张 stale 1405→Done、175/1306/1307→Canceled;3-agent sweep 后再清 **11 张已修批** 701/220/720/1002/119/1234/1266/1267/1374/1375/1642→Done)。累计本会话 **−17**(2 交付 + 15 关单);§2026-06-18 的整批 node 交付已 reconcile 为 Done + merged→devnet,见 §2026-06-19 三段。
 
 **方法:** 程式化预分类(348 条明显的他团队/绿地/共识/canceled epic 按专案层级定档)+ **7 路并行 agent
 对其余 271 条逐条回代码核验**,判据 = 「**验收能否在本地仓库实现 AND 本地验证**」。这是对 6 月初降噪
@@ -23,8 +25,8 @@
 | **F-2 真·中(M,数天)** | ~~本地可改可测~~ → **实测全非干净**(共识/设计/集成/已覆盖) | 7→0 |
 | **F-3 example 跑验** | 目录+demo.sh 已在,跑本地 validator 验证/修回归(**未跑,留专门一轮**) | 24 |
 | — 下面全是"现在做不了" — | | |
-| **B-1 SECURITY-HEAVY** | 926→#732、2274→#733、1057→#735;**2026-06-17 审计修复战役再清 10 条 MED/LOW + 7 HIGH 全闭环**(15 PR,见 §2026-06-17);剩余审计 3 簇仅残留(2306 限流/认证、2310、pvm) | 清零→审计批 |
-| **B-2 INFRA-HARNESS** | 需先建测试/CI/沙箱/多节点 harness | ~13 |
+| **B-1 SECURITY-HEAVY** | 926→#732、2274→#733、1057→#735;**2026-06-17 审计修复战役再清 12 条 MED/LOW + 7 HIGH 全闭环**(17 PR,见 §2026-06-17);剩余审计 2 簇仅残留(2306 限流/认证、pvm 2291/2293残留) | 清零→审计批 |
+| **B-2 INFRA-HARNESS** | 需先建测试/CI/沙箱/多节点 harness;**2026-06-17 pvm CI 盲区收口**:test-pvm 去 -E filter 跑整个 pvm-runtime crate(node #758,本地 243 过、**CI 已绿**)→ 新 pvm 测试自动覆盖、堵 #366/#665 类盲区根源 | ~13 |
 | **B-3 SPEC/DESIGN-DECISION** | 需先裁规格/设计(tx 编码簇 8 条 2026-06-16 攻坚中→node #742 等,待 flag-day) | ~24 |
 | **B-4 CONSENSUS** | 碰 state-root/genesis/receipt,需协调上线 | ~60 |
 | **B-5 GREENFIELD** | 大型未起功能(IDE/前端 SDK/市场/新子系统) | ~60 |
@@ -104,9 +106,9 @@
 
 ---
 
-## 🔻 2026-06-17 — 五仓审计修复战役(15 PR;HIGH 池全清 + 10 条 MED/LOW)
+## 🔻 2026-06-17 — 五仓审计修复战役(17 PR;HIGH 池全清 + 12 条 MED/LOW)
 
-把 2026-06-16 审计起的棘轮护栏**逐条实作修复**。一个会话交付 **15 个 PR**(跨 node/runner/cbss/cbfs),**7 条确认 HIGH(C1–C7)全部闭环**,外加 10 条 MED/LOW。每条走完整闭环:前提回 devnet/main tip 核实 → TDD + **实作原本"假绿"的棘轮 invariant 测试** → 全 workspace 0 失败 → 对抗式 review → `gate-record`(run 206–218)→ 英文 PR/Linear 评论 → In Review。
+把 2026-06-16 审计起的棘轮护栏**逐条实作修复**。一个会话交付 **17 个 PR**(跨 node/runner/cbss/cbfs),**7 条确认 HIGH(C1–C7)全部闭环**,外加 12 条 MED/LOW。每条走完整闭环:前提回 devnet/main tip 核实 → TDD + **实作原本"假绿"的棘轮 invariant 测试** → 全 workspace 0 失败 → 对抗式 review → `gate-record`(run 206–220)→ 英文 PR/Linear 评论 → In Review。
 
 **HIGH(C1–C7)收口表:**
 
@@ -120,9 +122,13 @@
 | **C6 `active_jobs` 死计数 + 聚合质押** | **node #747** | needs_human |
 | **C7 heap 指针进 `receipt_root` fork** | **node #752** | needs_human |
 
-**MED/LOW(本战役 11 条):**
+**MED/LOW(本战役 13 条):**
 - cbfs **#53**(COW-2304:PutShard 不验 shard_id 派生 → 持卷 A cap 覆写卷 B 字节投毒;store 层卷绑定,**仅跨卷且字节真变才拒**)→ **Marshal PASS**(对抗 review 自审抓到首版会误杀内容定址 manifest-node dedup → 改 byte-change-gated;非共识、无 wire 改)。
 - cbss **#30**(COW-2306:`read_frame` 按声明 len 全量预分配 → 未认证者 16MiB×256 流不发 body = 4GiB RSS 放大;改 64KiB 分块增量读、单超时)→ **Marshal PASS**(只做放大 primitive;per-IP 限流 + 客户端认证[CIP-24 app 层设计]留 follow-up;`CountingReader` 测断言单读 ≤ chunk;非共识)。
+- cbss **#31**(COW-2310:无 epoch 的 round 消息按 scope+kind 查 HashMap → 同 scope 两未 finalize 仪式绑错;取拒重叠方案,`insert_new_ceremony` 拒同(scope,kind)异 epoch 在飞,5 个 insert 站全走)→ **Marshal PASS**(无 wire 改;liveness:内存态+链强制单活+重启清,supersede 否决因需清 3 张侧表;非共识)。
+- node **#757**(COW-2292:socket/subprocess/select/signal/threading/ssl/inspect actor 可直接 import 上链零拦截[只 --strict linter];`validate_actor_code` 加 check#7 AST 拒,dotted-root 匹配)→ **needs_human**(共识 flag-day;**选 deploy-gate 非 runtime blacklist 因后者炸 SDK**——gate 只扫 actor 源、preamble 执行层单独注入,已核实 code_bytes=StatePrefix::Code;动态 __import__ 残留)。
+- node **#759**(COW-2293 残留①:裸大整数字面量 `0xFFFF…`/`1_000…` 绕 #756 expr 检查+#3 源串扫;`validate_actor_code` 加 check#8 AST 扫所有 base 超 4096-bit 字面量,**源文本切片取位长**[ruff Int 无 bit_length]、整数算位长非 float、自审闭 `_` 分隔十进制姊妹绕过)→ **needs_human**(共识 flag-day)。
+- cbss **#32**(COW-2306 残留:accept loop 无 per-source 限→单 peer 占满 256 全局槽饿死他人;加 per-IP 并发连接 cap=16,握手前 `incoming.refuse()`、RAII prune、**loopback 豁免**保本地多节点)→ **Marshal PASS**(非共识;残留客户端认证=CIP-24 设计裁定)。
 - runner **#120**(COW-2295/2296:secret 进日志脱敏 + SSRF guard + 禁跟随重定向)→ **MERGED**(对抗 review 当场抓到我自己 PR 里的 redirect 绕过并同环修)。
 - node **#750**(COW-2298:per-height timer list 无界 → 永久 halt DoS;写前 cap + 拒绝须 recoverable)→ needs_human。
 - node **#751**(COW-2299:跨 actor 重入 root → 陈旧读/丢写;`active_call_actors` 集中守卫,call_actor + emit sync-fire 两路)→ needs_human(对抗 review 抓到 emit 同源后门)。
@@ -137,15 +143,199 @@
 
 **经验沉淀**(已入记忆,可复用):halt 修复必须确保拒绝本身 recoverable(否则把 halt 搬家);共识文本脱敏选共识边界而非 pvm/(node CI 不跑 pvm/ workspace = 盲区);mempool 改动先确认 `next()` 不在 verify = 非共识;econ 守恒用代数 proptest 别驱动全 PVM;向后兼容 fold 用"仅非空才 append";审切帧/重入查**所有** snapshot substrate 调用点;审 active 棘轮 invariant 必核 `location_test` 真存在(否则 `running 0 tests` 假绿);cbss/cbfs base = **main**(非 devnet);cbss e2e 从 worktree 必挂(硬编码 `../../../node`);Clone 结构体加守卫字段用 `Arc<Mutex<>>`。
 
-**审计池剩余 3 簇 = 全非干净本地修**(已逐条核 premise;2293 的 node 侧 deploy-gate 部分已于 #756 拿下,留 pvm/ 运行时完整修;2304 已由 #53 拿下,完整密码学绑定留 follow-up):
+**审计池剩余 2 簇 = 全非干净本地修**(已逐条核 premise;2293 的 node 侧 deploy-gate 部分已于 #756 拿下,留 pvm/ 运行时完整修;2304 已由 #53 拿下,完整密码学绑定留 follow-up):
 
 | 剩余 | 为何非干净 |
 |---|---|
-| cbss **2306 残留** | 放大 primitive 已由 #30 拿下;**per-IP 限流**(transport 建设)+ **客户端认证**(CIP-24 app 层设计,需裁定)留 follow-up |
-| cbss **2310**(LOW) | round 消息不带 `epoch` → 修需加字段(wire + flag-day),或"拒重叠 start"语义不明(恐坏 reshare) |
-| pvm/ **2291/2292** + 2293 残留 | 确定性 `id()`/沙箱模块需 attribute 级隔离;2293 完整修=运行时 int 物化守卫(裸大 hex 字面量)= pvm/ CI 盲区 |
+| cbss **2306 残留** | 放大 primitive #30、per-IP 限流 #32 均已拿下;**仅剩客户端认证**(`with_no_client_auth`=CIP-24 app 层 auth 设计,需治理裁定才动) |
+| pvm/ **2291** + 2293 残留② | 2291 确定性 `id()`/默认 `repr()`/身份 `hash()` 运行时身份面(隐式 f-string repr 静态拦不全)= pvm/ 运行时活;2293 残留② = 运行时**算术**产生大 int 的物化守卫(_GuardedInt,裸大**字面量①已由 #759 deploy-gate 拿下**)。(2292 import #757、2293 字面量 #759 均 deploy-gate 拿下;**pvm CI 盲区已由 #758 收口**→运行时修若做,pvm-runtime 测试自动进 CI 门禁) |
 
 > 小结:**node 侧可乾净本地交付的审计票已耗尽**(#756 拿下 2293 的 node deploy-gate 部分后);HIGH 安全池全清;cbfs 2304 投毒已由 #53 store 层卷绑定拿下(Marshal PASS)。剩余 MED/LOW 均需协议/wire 改、设计裁定或 pvm/ 慢工,非"快速继续"。共识修复一律 needs_human 等协调 flag-day 上线(非共识已 PASS:#754 mempool、cbfs #53;#120 runner 已 merged)。
+
+---
+
+## 🔻 2026-06-17(实时复核)— 重新拉 Linear 全量,核对池缩水与新票
+
+重新对 Linear COW 团队跑「state ∉ {completed,canceled} ∧ assignee ∈ {PL,未指派}」全量查询(非缓存),对照 6-14 基线核验。**结论:本文档的分档与"易档已空"判断仍成立;唯一实质变化是审计修复战役已 reconcile 到 Done,以及 7 条审计衍生新票入池(全落重档)。**
+
+**① 池 619 → 574(净 −45)。** 6-14 以来 **96 条转 Done**(91 条 PL),即 §2026-06-15/16/17 三段记录的所有交付(F-0/1/2/3 verify+close、determinism harness、tx-canonical 主票 1942、五仓审计 HIGH C1–C7 + 12 条 MED/LOW)均已**关单为 Done**——不再是文档原文所述"In Review 待人工 merge"。下列审计票现状全部 **Done**(此前记 In Review/needs_human):
+> 926 / 1057 / 1942 / 2274 / 2284 / 2286 / 2287 / 2288 / 2289 / 2290 / 2292 / 2293 / 2294 / 2295 / 2296 / 2297 / 2298 / 2299 / 2304 / 2305 / 2306 / 2307 / 2308 / 2309 / 2310。
+> (即 §2026-06-17 收口表里 C4/C6/C7 + 全部 MED/LOW 行,均已落地关单。)
+
+**② 当前池内"在途"仅 6 条**(In Progress / In Review / Duplicate),无一为本方可自动批的易活:
+| Issue | 状态 | 归档 |
+|---|---|---|
+| COW-1058 / 1056 | In Progress | CBSS 链上态(B-4 共识) |
+| COW-921 / 894 | In Progress / In Review | ManifestCommitted 链事件(B-4 共识/事件基建,他人在途) |
+| COW-482 | In Progress | CLI epic(B-3 裸 epic) |
+| COW-400 | Duplicate | of 501,待清(F-1 已记) |
+
+**③ 7 条新票(全 2026-06-15/16 创建,均审计/follow-up 衍生),逐条归档——无新增 FEASIBLE-NOW:**
+| 新票 | 摘要 | 归档 / 为何非易 |
+|---|---|---|
+| COW-2272 | [Indexer/Wallet] CIP-9 ManifestCommitted 解码器 follow-up(#2258/#728 后续) | **B-4 + B-6**:indexer 侧 decoder 阻塞于 producer 未上 devnet(node #681 系列);wallet JS 侧非本地 |
+| COW-2283 | canyon-reset Ansible 一键重置(aws-infrastructure PR #957) | **B-6 非本地**:ansible/aws-infrastructure 仓不在工作区 |
+| COW-2291 | [MED][node/pvm] `id()`/默认 `hash()`/`repr()` 身份面可观测→returned/stored 即 fork | ✅ **node PR #763 已 MERGED→devnet**(全闭 id+repr+hash;原 Marshal needs_human=共识 flag-day,gate run232):per-execution thread-local 重映射(`ExecObjectIdScope`);4 轮对抗 review 修 resume-reset 盲区+非-object repr+_thread repr+nested-call clobber;**hash 经专项调查+对抗 review 证安全**(checkpoint allowlist 拒 opaque 键、ABC/singledispatch miss→确定性重算同结果、迭代插入序、gas observe-only 在非-root sidecar);pvm-runtime 232 绿 |
+| COW-2311 | [LOW][cbfs] `GetShard` 存在性预言机(ErrAuth vs ErrNotFound) | ✅ **已交付 cbfs PR #54**(base=main,Marshal pass):三处 present-but-unauthorized→ErrNotFound 对齐 GetPlacement;诚实标注**时序侧信道残留**(与参考 handler 同源、非本 diff 引入)留 follow-up |
+| COW-2312 | [LOW][cbfs] 写路径无配额强制(`max_capacity_bytes` 仅 advisory) | ✅ **已交付 cbfs PR #54**(base=main,Marshal pass):`max_capacity_bytes` 接进 handler,store.put 前校验 `decision.max_bytes` + `used+incoming>cap`→ErrCapacity;镜像 peer-drain 路径;非共识 |
+| COW-2313 | [LOW][wallet] 私钥明文存 `chrome.storage.local`(passkey 加密为 opt-in) | **B-3 设计裁定**(已回 wallet 代码核实+发 scoping 评论):无密码即无 KEK 来源,at-rest 加密对本地读威胁无效;真修需 ①passkey 设默认 或 ②加 password-based 解锁 UX——产品决策,**不硬上半成品** |
+| COW-2314 | [LOW][node] `PayloadSign` 缺 chain-id/genesis→跨网重放 | ✅ **已被 #742 修(devnet)**:`Transaction::write` 首字段即 `chain_id`(进签名 hash),commit `48f76efe`(COW-1942)→ verify+close 候选,已发证据评论;待 flag-day 上线后关单 |
+
+**④ 易档(F-0/F-1/F-2/F-3)复核:仍全空。** picker 范围内未出现任何新的"本地可改可测、非共识、纯加法"票;新入池 7 条全部落入 B-1 LOW(安全面,需谨慎)/ B-2 pvm 运行时 / B-3-B4 共识 / B-6 非本地。**自动 batch-loop fodder 仍为零**。唯一可专注做的 future 小批是 cbfs LOW 簇(2311/2312)——**2026-06-17 已专注交付 → cbfs PR #54**(TDD,Marshal pass,In Review);至此 cbfs LOW 簇清空,剩余审计残留(2306 客户端认证、pvm 2291/2293 运行时)均需设计裁定或 pvm/ 慢工。
+
+> 复核记:96 条 Done 中 91 条 PL,印证三段战报已收口为 Done;池缩水主因即审计战役关单,而非新易票出现。分档结构无需重排。
+
+---
+
+## 🔻 2026-06-18 — CIP-20 token 新指令簇起手(B-4 line 281 的 1074)
+
+审计池清空后,转向**本团队 owns 的 CIP-20 token 新指令**(B-4 token 簇 1074/1076/1798)。本日交付 **COW-1074**(ERC-20 approve race + EIP-2612 permit)两段:
+
+- **node PR #764(MERGED → devnet)** part1:atomic `increase_allowance`/`decrease_allowance`(opcode 21/22)关经典 approve race(先 approve(0) 再 approve(N) 的中间态被抢花);镜像 `handle_token_approve`。**经验:新 `SystemInstruction` 必改 4 处 codec**(`write`/`read`/`encode_size`/`sub_type`),opcode 唯一性不变量在 `cowboy-types` crate。Marshal **needs_human**(共识 flag-day,run235)。
+- **node PR #766(In Review,needs_human run241;branch `fix/cow-1074-token-permit`,未上 devnet)** part2:`token_permit`(opcode 23,EIP-2612 gasless approval)。对抗 review 当场抓到**系统性漏洞**:permit digest 原用 `tx.chain_id`(共识 `verify` + mempool 均不校验 = 攻击者可控,源 `ras.rs:68`)→ **已修=绑节点自身 chain_id**(`ExecutionEngine.with_chain_id`,genesis 经 `chain::engine`→`Application::with_mempool_and_storage`→engine 穿线;唯一生产构造点 `application.rs:405`,其余 373 个 `::new()` 全是测试)。**教训:execution 层勿信 `tx.chain_id` 做安全判断。**
+
+**reconcile:COW-2291(node PR #763)已 MERGED → devnet**(§2026-06-17 实时复核 row ④ 原记 needs_human/in-flight;现核 devnet 已含 commit `b7951a5b`)。
+
+→ **B-4 token 簇:1074 转「allowance(#764)已上 devnet + permit(#766)在途待 flag-day」**;1076(multicall)/1798(ICIP20)仍未起。无新增 FEASIBLE-NOW(CIP-20 新指令全为共识改动,需协调 flag-day)。
+
+**COW-1748(CIP-17 缺键 exclusion proof)→ node PR #767(Marshal PASS,非共识 read-path)。** 易档空后挑「重」票实测发现的**反例**:并非所有 B-2/CIP 票都卡共识/harness——CIP-17 是 read-path,QMDB ordered/variable **原生**支持 exclusion proof(`exclusion_proof()`/`verify_exclusion_proof()`),故缺键 501→200+可验 exclusion proof 是「把现有能力穿过栈」的干净加法(storage `state_exclusion_proof` + `SerializableExclusionProof` + handler + additive 响应字段),非共识、向后兼容、本地可测(storage 层 self-verify proof against root)。**教训**:`VariableEncoding` 私有不可命名→方法内 match destructure 成 serializable;`dummy_marshal_mailbox` transmute 假 sender→full get_state handler 单测必 stall(无 CIP-17 handler 全路径测试,只 serde shape+storage self-verify)。→ **CIP-17 read-path 是本团队可干净交付的一类**,B-2/CIP 簇里 read-path/纯加法子项值得逐个甄别(别一刀切判 harness/共识)。
+
+**COW-1232(WP §17.3 gas 一致性)→ node PR #769(Marshal PASS,test-only 非共识,部分交付)。** Documentation-labeled 票里唯一干净可做的:加 `spec_gas_wp_17_3_platform_token_costs` 钉 WP §17.3 Platform Token 表==`GasCosts::default()`(防 doc↔code 漂移)。已有测试盖了 §17.3 Actor API + crypto。**绝不改 gas.rs 常数(=共识),只加断言**。`token_create` cells 公式 / `token_balance_of` + WP 转 normative = whitepaper follow-up(issue 保持 open)。**经验**:gas 类「文档↔常数一致性」票是纯加断言测试(非共识、本地可测);docs-label 池其余多是设计裁定(1073/1144/1177/940)非可写文档。
+
+**COW-2328 e2e 半 → node PR #770(Marshal PASS,真端到端验证 #767)。** 用户授权跑 e2e:worktree 建 #767 分支 → build release validator(3.5min)→ symlink target→.cargo-target → scripts/run_build.sh 生成 config → `start_all.sh --test`(纯链上不需 runner)→ `[8]` 缺键 `/state/0x..06/{absent}?prove=true` 真跑出 HTTP 200+value:null+absent:true+exclusion_proof(kind=span)+inclusion 省略,**23 passed/0 failed**。这是 live get_state exclusion handler arm 唯一对真节点覆盖。**注:#767 本会话 merge devnet(squash),stacked 分支 rebase --onto origin/devnet 后 PR base devnet。** 剩余半=proof-verifier 客户端验证(仍 open)。
+
+**COW-2328 proof-verifier 半(option A)→ 撞大坑撤回。** 用户选 A(node 暴露 encoded operation + verifier)。实作后用闭环测试(生成真 proof 喂 proof-verifier)发现:**proof-verifier crate 的 MMR 重实现根本验不过真 commonware proof**(隔离测出 `verify_state_proof_json(op.encode(), …)=false`;现有测试全用 dummy bytes,从未对真 proof 验过)——**inclusion 也坏**。根因在 grafting MMR 重实现某处与 commonware 分歧,需专门 MMR 调试(独立大工程,宜单立票)。已 git reset 撤回未提交改动(不上未验证 verifier 码),COW-2328 评论 comment-6bc134ad 记录。**教训:proof-verifier 是潜在死功能;client-verify 必先修其 MMR。**
+
+**COW-177(tx 协议版本字节,共识)→ node PR #776(Marshal needs_human=flag-day)。** 用户点名做共识票。Transaction 加前导 u8 版本字节(仿 ETH typed-tx envelope,升级杠杆)。**关键:做成 wire/协议常量而非 per-tx struct 字段** → 零构造器 churn,且自动进 signing hash(领头 codec=preimage)。重生成 tx_vectors + refs JSON mirror;全 `cargo test --workspace` 零 fallout(Transaction::sign 重派生);7/7 不变量含 contract.tx_encoding_roundtrip;对抗 review SOUND(签+decode 双守卫、无 serde 旁路)。flag-day:JS wallet 须同日加同字节(cf #742/wallet#14)。**经验:加共识 tx 字段优先做 wire 常量(零 struct churn);改 tx 编码必重生成冻结 vectors。**
+
+**COW-1307 / 1306 gas-metering 前提驳倒(comment-only,荐 Cancel/re-scope)。** 从我 89 张 assigned 队列挑「乾净 code」时,gas 簇两张都是 stale/wrong-premise:
+- **COW-1307(return-data Cell 未计量)** = stale:顶层 handler return-data 已计量(actor_instruction.rs:953-963,CIP-3 §2.2.2,return_data_cells_per_byte=1)+ sub-call 经 charge_return_data_cells(pvm_host 2238/2273,COW-965);return-data 已 gas-bounded。荐 Cancel。
+- **COW-1306(secp256k1 verify opcode 未计费)** = wrong-premise:host 只暴露 `ed25519_verify`(已正确计费+测),**无 secp256k1 verify opcode**;`CRYPTO_SECP256K1_VERIFY_CYCLES=10_000` 定义但**从未 consume**;secp256k1 仅用于协议层 tx ecrecover(transaction.rs:80)非 actor op。真要做=加 secp256k1_verify host syscall(pvm/ ABI feature)非计费修复。荐 re-scope/Cancel。
+- COW-1215(access-list stub)早被他人评论驳倒(Transaction 根本无 access_list 字段)。
+
+**COW-117(/estimate_gas dual-gas 估算)→ node PR #782(Marshal PASS,非共识 read-only)。** 用户要「真·专案」,选了三类里最低风险的非共识 feature。`POST /estimate_gas` dry-run signed tx(begin_batch→execute_transactions→rollback_batch)返 cycles/cells+suggested limits,零状态变更。plumbing 关键:**rpc 已依赖 cowboy-execution 且无环**→handler 内构造一次性引擎(AppState 无 engine);绑 state.chain_id 对齐生产 permit。follow-up=unsigned(需滥用决定)/fee 估算/真 block context。**经验:RPC 执行 tx 先查 rpc→execution 依赖+环+AppState 有无 engine;begin_batch→execute→rollback_batch 是现成隔离原语。**
+
+**WP §826 资源限制簇已完成 + COW-175 refute。** 本会话把 WP §826 的 per-actor/per-tx 资源 cap 簇基本做完:fanout_per_tx(#779)、storage_quota(#780)、quota 上限 8MiB(已存在 system_instruction.rs:3213)、mailbox_bytes(COW-2087 done)、reentrancy_depth=32(已存在);**只剩 memory_per_call 10MiB(COW-1239)= 深 pvm/(无分配计数器,需从零建,见前)**。COW-175(storage 实时追踪)= kv_bytes/kv_count 早已是→refute 荐 Cancel。COW-117(gas 估算 API)非共识但需把 ExecutionEngine 接进 RPC(AppState 只有 storage/mempool 无 engine)= 中型 plumbing 非单点。**单点乾净 cap 池至此耗尽。**
+
+**COW-95(per-actor storage byte quota 1 MiB)→ node PR #780(Marshal needs_human 共识 flag-day,run259)。** 用户选做 feature+选(i)回填;深挖发现**回填不必要**——per-actor `kv_bytes` 计数器**早已存在**且增量维护(set_actor_storage)、进 state_root,对所有现存 actor 已准确(我先前「需先建追踪基建」结论是错的,漏看 kv_bytes)。故 collapse 成单点 check 挨着已有 `MAX_ACTOR_KV_COUNT` cap,复用 `Error::StorageFull`,check-before-mutate。系统 actor 豁免(COW-978);quota 拒绝=优雅失败 tx(transaction.rs:383 catch)非块中止;披露多 key mid-flush 部分持久化=同 kv_count cap(COW-700 class,非本 PR 引入)。**经验:审 cap/quota 先查是否已有进 state_root 的增量计数器(有就无需 backfill,类似 2088 复用既有 accumulator)。** 五仓投机引擎 commit-time 拒绝必确认 transaction.rs:383 catch 成 receipt status 非块中止。
+
+**COW-2089(§3.3 dedup_window)→ 前提误诊纠正,发评论不改码(用户选项1)。** 用户选做 2089;深挖发现 **triage 误判**:`seen_messages` 是 per-block ephemeral(reset_block_state 每 block 清空,engine.rs:290),非跨 block LRU——500k 容量单 block 永不触及,LRU 逐出不发生;且 msg id 含 block_height(actor_instruction.rs:1108)→ reorg 后同消息得不同 id=自毁跨 block dedup。WP §3.3 真要求 = id `keccak256(sender‖nonce‖msg_hash)` + 持久化 per-actor dedup set(actor storage)+ window 保留/GC ≥10k blocks + gas。**真修=大型共识特性,与 COW-2090 重叠**,非票面「LRU→window」小改。发英文纠正+重新定范评论,荐重新分级+并 2090 走设计通道。**经验:审 dedup/投递 先查 dedup set 是 per-block 重置还是持久化 + id 是否含 block_height。** 不 rush exactly-once-delivery 这种最敏感共识机制。
+
+**COW-2088(WP §3.3 per-tx fanout 1024 cap)→ node PR #779(Marshal needs_human 共識 flag-day,run258)。** 「收尾」后续 继续 重挖,发现 2088 是**真乾淨的 spec-mandated 安全修复**(纠正了「池已枯竭」结论):outgoing messages 有计数但从未强制 1024 上限=explosive-fanout DoS。修=`MAX_FANOUT_PER_TX` 常量 + `send_message` charge 前拒、**复用 payload-size guard 的 InvalidInput 路径**(安全 revert,不依赖 no-per-tx-rollback 引擎)。**关键结构事实**:嵌套 call_actor 共享同一 `ctx.outgoing_messages`(capture_call_snapshot 不存它)→ `.len()`=per-tx-including-nested 计数,单一 chokepoint。submit_job 走 send_message 故计入(一致);CIP-29 emit 用独立 Vec 不计入(符 §3.3)。无 pvm/ 改动。**经验:DoS cap 类共识修复优先单一 host chokepoint + 复用已存 Err 路径。**
+
+**cip-audit-2026-05 stale-premise 三票驳倒 → 用户授权后已 Cancel(1818/1804/1945)。** 续做时甄别 CIP-20 簇,发现是**已修但票未关**的 false-premise 池:
+- **COW-1818 / COW-1804(hook 50k Cycles/Cells cap "absent / no hooks")** — 实为已全实作+测:`TOKEN_HOOK_MAX_CYCLES/CELLS=50_000`(gas.rs:363-365)、`execute_handler(...,Some(cycles),Some(cells))` 子限额 enforce + `TokenHookGasExceeded/CellsExceeded` 错误(actor_instruction.rs:332-374)、conformance 测 `spec_cip20_cycles_1`+`spec_cip20_cells_1`(core.rs:2886);**2026-05-28 #534 已落**(在 cip-audit 快照后)。两票互为 dup。
+- **COW-1945(TV1/TV2 vectors "未 pin"、CBOR map-form)** — 已被 #742+#177 满足:vectors 现 pin 在 `types/src/tx_vectors.rs`+`refs/common/tx-canonical-vectors.json`;"CBOR/array" 框架因 #742 改 commonware-codec 而**设计性过时**;残留仅 WP Appendix A 旧向量需 doc 更新(spec 层,另立)。
+- **方法论收获**:cip-audit-2026-05 backlog(247 条)含大量「已修但票未关」的 stale-premise 票;甄别透镜=回 origin/devnet 核代码+测试+landing commit。**关单需用户授权**,故只发英文证据评论荐 Cancel。
+
+**COW-1260(WP §8.2 通脹曲線,经济)→ node PR #778(Marshal PASS run257)。** 续做时考察通脹簇:**COW-1259(鑄幣/分配)真被卡**——active validator set 是共识层(Simplex)概念,execution/storage 层看不到(pre-COW-1028),无法按 stake 分配。**COW-1260(纯曲线)则干净**:WP §8.2 钉死 8/6/4/3/2% 排程 + 10% hard cap + ±2pp + security-floor,验收是纯确定性算式。落 `execution/src/inflation.rs` 纯函数模组(`base/effective_gross_inflation_bps`、`year_for_height`、`per_block_reward` saturating、`is_valid_adjustment` 护栏);12 unit+proptest。**ticket 明文允许 "Hardcode or store at 0x09" → 选 hardcode**;**模组未被任何执行路径消费 → 零共识面 → PASS 非 needs_human**(1259 接线才是 flag-day)。**关键经验:`BLOCKS_PER_YEAR=31_536_000` 回一手源核正——Explore agent 把 STORAGE_EPOCH_BLOCKS=7200 误标「2 blocks/sec」,WP §§342/608/663+constants.rs:498 均「~1 秒区块」,差一倍会让 reward 减半。** 印证 [[feedback_verify_primary_source]]。
+
+**COW-2329 → 已修复 node PR #772(Marshal PASS,SOUND)。** rewrite proof-verifier mmr.rs 三函数镜像 commonware d77641a(mmr_root fold→concat、peak_digest_from_range 共享 rev-sibling 迭代器+descend-both-then-fill、reconstruct_grafted_root 双迭代器 front-peaks/back-siblings + byte-identical 边界检查);**cowboy-storage dev-dep proof-verifier 闭环矩阵**(真 inclusion proof 跨 12 key 数,valid 过/wrong-root 拒/tampered-element 拒=soundness)验证;对抗 review 逐行核 commonware=SOUND 无 false-accept。**解锁 COW-2328**(node encoded_operation + verify_exclusion_proof 可在 #772 上建)。follow-up:grafting layer(height 8)≥256 keys 覆盖(码未改)。
+
+**COW-2329(原始发现):proof-verifier MMR 验不过真 proof。** 接 COW-2328 阻塞往下挖:**proof-verifier grafting MMR 重实现根本验不过真 commonware proof**(inclusion+exclusion 都坏,现有测试全 dummy bytes)。对照 commonware `mmr/proof.rs::reconstruct_peak_digests`+`hasher.rs` 精确定位:leaf/node hashing 匹配,但 root 用 **fold/prefix 模型** vs commonware **flat concat/双迭代器**(root=concat非fold、range外peaks各自从digests前端取非单prefix、siblings从后端rev)。comment-56901e62 是完整实现 spec。**未当场修**:结构性 rewrite+共识关键,必须多形态测试矩阵(跨叶数/peak配置)验,会话极长不 rush。诊断(最难部分)已完成。**教训:重实现共识验证只用 dummy 数据测=潜在死功能。**
+
+**COW-2328 客户端 exclusion 验证 → 已交付 node PR #774(Marshal PASS,建在 #772 上)。** proof-verifier `verify_exclusion_proof`=span_contains+**绑 span 界到 MMR 认证 op**(重构 `0xD2||span_key||span_value||span_next_key`==encoded_operation+定长54-byte StateKey 防 byte-reslice)+委托 verify_state_proof。**3 轮对抗 review:R1 抓 span 界未绑(CRITICAL 可伪造 present 键 absent)、R2 抓 byte-reslice、R3 SOUND**;两伪造均负测。**关键教训:重写共识 verifier 必须多轮对抗 review——头两轮都抓到 critical false-accept,binding+定长 field 是修复核心。** CIP-17 §5.3 端到端闭环完成(#767 serve→#770 e2e→#772 MMR verifier→#774 client verify)。
+
+**COW-2328(原始,授权):CIP-17 §5.3 客户端 exclusion-proof 验证 + e2e。** #767/#768 的 follow-up——node 已**服务** exclusion proof,但客户端**验证**(proof-verifier crate `verify_exclusion_proof` 须精确复制 QMDB `span_contains` 含 cyclic wrap + key 序 + Operation 编码)+ examples/proof e2e 缺键用例(真端到端验证 server+client 一致)未做。**为何独立成票**:proof-verifier 是独立 crate(自重实 MMR、不依赖 commonware qmdb),隔离下无真 proof 可测=假绿风险,须 e2e harness 才能可信交付。Improvement/severity:medium,CIP-17 project。
+
+**COW-1754(CIP-17 §5.2 handler 集成测试)→ node PR #768(Marshal PASS,stacked on #767,非共识 test-infra)。** 续 #1748:根因=诊断出的 `dummy_marshal_mailbox` transmute 假 sender→`get_state` await marshal 时 runtime stall。修法=`BlockSource` trait seam + **AppState 加默认泛型参 B**(关键:现存 `AppState<E,M,T>` 30+ 引用+生产构造全不 ripple,只 `get_state` 泛型化),`EmptyBlockSource` 返 None 让 full handler 跑通;加 4 个 §5.2 集成测试+回填 #1748 handler-arm 测试。**经验**:RPC handler 要 await marshal 的单测=BlockSource seam+默认泛型参(零生产行为变更);这类「B-2 harness」票里也有非共识、可干净交付的 test-seam 子项。
+
+**COW-2327(新建,授权):token_transfer_batch partial-failure 非原子已实证确认。** COW-1076 顺带发现,2026-06-18 写 probe(sender=100,batch[60→A,60→B] 第2笔失败)实跑出 `sender=40 A=60 B=0`=第1笔写入留存=非原子;CIP-20 §SDK「atomic」在无回滚引擎下不可实作。非供给守恒洞但违反原子契约。用户授权独立建票 **COW-2327**(Bug/severity:medium,CIP-20 project,含 repro+fix 设计分叉)。
+
+**COW-1076 multicall:回代码核验 → 重归 B-3 设计裁定(非干净实作),已发英文设计评论不动码。** 三项发现:① 引擎**无 per-tx 回滚**(`execute_transaction` 把 handler Err 映射成状态但不还原 store 写入;`speculative.rs` 逐 tx 循环不丢弃失败 tx 写入);② 现有 `token_transfer_batch` 的「all-or-nothing」**已实证确认是 latent bug**(2026-06-18 写 probe test 跑出 `sender=40 A=60 B=0`:第1笔 commit、第2笔失败后第1笔写入留存=非原子;只 loop+`?` 无预校验余额;CIP-20 §SDK 宣称「atomic + hooks called for each」在无回滚引擎下**不可实作**)— 非供给守恒洞但违反原子契约,evidence+repro 已折进 COW-1076 评论,待裁定后另立工作项(未授权不建票);③ transfer 对 hooked token 调 `call_transfer_hook`→`call_actor` 可写任意状态,单纯快照 token keys 还原不足以保证原子;④ 规格**根本没有 `token_multicall`**(只有单 token transfer_batch)= 新共识指令 + 规格新增。两条实作路径:(A)保守=新 `TokenOp{Transfer,Mint,Burn}`+纯内存模拟全 op 校验再写(opcode 24,23 留给 permit #766),带 hook 的 token 在 multicall 原子拒绝;(B)通用=造引擎级快照/还原原语(可顺手修 transfer_batch,但大型共识关键超范围)。**结论:需设计裁定 + 大概率 CIP-20 规格修正(定义无回滚模型下 batch 原子语义),park 在 Backlog。**
+
+---
+
+## 🔻 2026-06-19(实时复核)— §2026-06-18 整批 node 交付已 reconcile 为 Done + merged→devnet
+
+重新对 Linear COW 团队跑全量查询(`state ∉ {completed,canceled} ∧ assignee ∈ {PL,未指派}`,非缓存)+ 回 `origin/devnet` 逐 commit 核 merge 状态。**结论:§2026-06-18 记为"In Review / needs_human / 待 flag-day"的整批 node PR 已全部 merge 进 devnet 并关单 Done;分档结构无需重排,无新增 FEASIBLE-NOW。**
+
+**① 池 574 → 563(净 −11)。** 这 −11 即 §2026-06-18 的交付批关单——下列 11 条现状全部 **Done**(此前记 In Review / needs_human / PASS-待-merge),`origin/devnet` 逐条核到 merge commit:
+
+| Issue | PR(均已 merge→devnet) | commit |
+|---|---|---|
+| COW-2291(id/repr/hash 身份面) | #763 | `b7951a5b` |
+| COW-1074(allowance part1 + permit part2) | #764 + **#766** | `9274c75b` / `8d80cd31` |
+| COW-1748(CIP-17 缺键 exclusion proof) | #767 | `5bb58e47` |
+| COW-1754(CIP-17 §5.2 handler 集成测试) | #768 | `10501ed6` |
+| COW-1232(WP §17.3 gas 一致性断言) | #769 | `9a8bf238` |
+| COW-2328(CIP-17 §5.3 客户端 exclusion 验证 + e2e) | #770 + #774 | `3ef10645` / `1130cc96` |
+| COW-2329(proof-verifier MMR 修复 + grafting 覆盖) | #772 + **#775** | `bfc4318c` / `d2c29071` |
+| COW-177(tx 协议版本字节) | #776 | `911171dc` |
+| COW-1260(WP §8.2 通脹曲線) | #778 | `8f92999b` |
+| COW-2088(per-tx fanout 1024 cap) | #779 | `162dc706` |
+| COW-2331(async actor asyncio deploy 挂) | #781 | `984122d7` |
+| COW-117(/estimate_gas dual-gas) | #782 | `9461a5b7` |
+
+> 纠偏 §2026-06-18 两处过时描述:① **COW-1074 permit(#766)已 merge→devnet**(原记"In Review,未上 devnet");② **COW-2329 grafting-height 覆盖 follow-up 已补**(node **#775** `d2c29071`,原记"码未改"),proof-verifier 闭环彻底完成。tx 编码/版本字节簇(#742/#776)与各共识 PR 已落 devnet,flag-day 协调上线属运维侧,不再阻塞本档。
+
+**② COW-95(per-actor storage byte quota)→ ✅ 已 merged→devnet(2026-06-19)。** node PR **#780** squash-merge 进 devnet(commit `d37fc5f7`,Linear **Done**)——共识变更,挨着既有 `MAX_ACTOR_KV_COUNT` cap 的单点 check、复用既有 `kv_bytes` accumulator(无 backfill),系统 actor 豁免、quota 拒绝=优雅失败 tx(详见 §2026-06-18)。合并前核验 `mergeStateStatus=CLEAN` + 含 #776 tx-version 等近期共识变更 ancestor。**至此 PL 名下零 open PR、零 in-flight。**
+
+**③ 1804/1818/1945 确认 Canceled。** §2026-06-18 荐 Cancel 的 cip-audit stale-premise 三票已落 Canceled(用户授权后)。
+
+**④ 仍 open 的 comment-only / 设计裁定票(无变化,均非易批):**
+- **COW-1306 / COW-1307**(gas 计量前提驳倒)→ Backlog,荐 Cancel/re-scope(已发英文证据评论)。
+- **COW-175**(storage 实时追踪)→ Todo,refute 荐 Cancel(kv_bytes/kv_count 早已是)。
+- **COW-2089**(§3.3 dedup_window)→ Backlog,前提误诊已纠正、真修=大型共识特性与 2090 重叠。
+- **COW-1076**(multicall)→ Backlog,B-3 设计裁定 + 大概率 CIP-20 规格修正。
+- **COW-2327**(token_transfer_batch 非原子)→ Backlog,新建 bug 票(MED,CIP-20),待 1076 设计裁定一并处理。
+- **COW-1239**(per-call heap 10MiB)/ **COW-1259**(validator reward minting)→ Backlog,前者深 pvm/(无分配计数器)、后者卡 validator-set 不可见(pre-COW-1028)。
+
+**⑤ 其余 node open PR 全为他团队**(非 PL,不计入本档可行性池):CIP-11 WS 簇(#760/761/762/765/771/773)、CIP-23 v3 TEE(#784,配套 runner runner-tee 在途)、CIP-31 account-storage-reserve/rent 簇(#783/785/786,**新出现**)、CIP-24 inbound-verify(#729)、CIP-27 fork(#722)、CIP-33 Trading Post(#700)、ManifestCommitted 事件(#681,COW-921/894)。cbss/cbfs/runner/cowboy 自 2026-06-18 起的提交亦全为他团队(logan cbss codec、CIP-23 runner-tee、cowboy CIP-1 docs)。
+
+**⑥ read-path / 纯加法甄别扫描(2026-06-19,确认 read-path 矿脉已近枯竭)。** 对 563 条开放池按 read-path/RPC/query/metric/trace/doc-consistency/test/proof 关键词圈出 83 条候选,逐条回 `origin/devnet` 核验。**结论:除 COW-1405 外无新 FEASIBLE-NOW**——83 条里其余全部确认为共识 / 绿地 / harness / 设计裁定:
+> - **共识**(改 accept/reject 或 gas→receipt):963(per-bytecode 动态 surcharge=改 gas.rs 常数)、1373(JobSpec 正性校验=改 dispatch 接受面)、1920(sync-fire subscriber writeset commit 行为)、1230(epoch 边界处理顺序)、137(storage batch read 影响 read 计量)。
+> - **绿地 / CIP 子系统**:1815(CIP-21 DEX query 方法)、1543(runner session chain-event subscriber)、1282(CIP-30 per-actor storage_root 端点,卡 CIP-30 共识 state-root)、CIP-23 TEE 簇(1098-1114/1301/1576/1577/1845/1847)、gateway CIP-19 簇(877/878/882/886/920/927)。
+> - **设计裁定 / 非本地**:1256(CIP-4↔CIP-9 rent epoch 对齐,"decide policy")、1083(SDK allowance 分页,需 prefix-range RPC 不存在)、1347(CLI 兼容追踪伞,无具体交付)。
+>
+> **唯一产出:COW-1405(§5.4/CIP-17 缺键 exclusion proof)→ ✅ 已 Done(2026-06-19,用户授权)**——票面前提"stubbed to HTTP 501、只 wired inclusion"已被 COW-1748(#767)彻底解决:`origin/devnet:rpc/src/handlers/proof.rs:420-426` 现为缺键返 `200 + value:null + absent:true + exclusion_proof`(非 501),带 `spec_cip17_absent_key_response_shape_has_exclusion_proof` + live handler 测试。属 cip-audit-2026-05 stale-premise 同类(同 1818/1804/1945),已发英文证据评论关单。
+
+**⑦ 三张已驗證 stale 票 → ✅ 已 Canceled(2026-06-19,用户授权,各发英文证据评论)。** §2026-06-18 荐 Cancel 的 gas 簇 + refute:
+> - **COW-1306**(secp256k1 verify opcode 未计费)= wrong-premise:`CRYPTO_SECP256K1_VERIFY_CYCLES=10_000`(gas.rs:392)定义+测但**无 actor host syscall 消费**;host 只暴露 ed25519_verify,secp256k1 仅协议层 ecrecover(transaction.rs)→ 荐 Cancel。
+> - **COW-1307**(return-data Cell 未计量)= stale:顶层 actor_instruction.rs:955 + sub-call pvm_host.rs:1641(2238/2273)均已计量,per_byte=1 → 荐 Cancel。
+> - **COW-175**(storage 实时追踪)= refute:`kv_bytes` 增量追踪进 state_root(accounts.rs:222-234)早已是 → 荐 Cancel。
+
+> 复核记:−11 全数对应 §2026-06-18 交付批关单,池缩水主因仍是本团队交付而非新易票出现。**易档(F-0/1/2/3)依旧全空;read-path 矿脉经 2026-06-19 全量扫描确认近枯竭(仅 1405 一条 close 候选);自动 batch-loop fodder 仍为零。** COW-95(#780)已 merged→devnet,**PL 名下现零 open PR / 零 in-flight**。往后仍纯靠用户逐个点名重票(B-3 设计 / B-4 共识 / B-5 绿地 / B-6 非本地)。
+
+---
+
+## 🔻 2026-06-19(续:易档空后逐个起手重票)— COW-1029 交付 + read-path/already-fixed 甄别
+
+易档/审计池清空后,按用户指引从开放池**逐个点名挑重票起手**(非 batch-loop)。本轮规律:**重票里仍藏着"非共识、可乾净交付"的子项,和"已修但票未关"的 stale 票,必须回 `origin/devnet` 逐条核验才能分辨**(标题/票面前提系统性过时)。
+
+**✅ COW-1029(Foundation/system-deployer 分离强制,CIP-12 §2)→ node PR #788 MERGED→devnet(`49ea9cd7`,Marshal PASS run 268)。**
+- 从 CIP-12 governance 簇挑出的乾净 guard 票。新增 optional `foundation_addresses` genesis 字段 + 拒绝 Foundation 地址出现在 `system_deployers`,在 `validate()` **和**生产载入路径 `from_file` 双重强制。
+- **scope 纠正**:票面假设"runtime tx update 时校验"是错的——`system_deployers` genesis-immutable(无 runtime 变更指令),守卫落 genesis 校验期。**默认空字段→对现存 genesis 零行为变更→非共识、向后兼容**(deterministic load-time check,不碰 state-transition/root)。
+- TDD 4 测试 + chain 210 测试 + workspace build + fmt 全绿;Marshal 5/5 econ 不变量 PASS + 6 维对抗 review 无高危;CI CLEAN 后合并。**经验:tier=high(chain 路径)≠ 必然共识;genesis 载入校验是 chain 簇里可乾净非共识交付的一类(类比 CIP-17 read-path)。审 cap/quota/guard 票先查它守的状态是 genesis-immutable 还是 runtime-mutable——决定守卫落 validate() 还是 tx handler。**
+
+**已修但票未关(verify+close 候选,回 devnet 实证)——`test_*_constant` 测试名常是"已修"信号:**
+- **COW-701(M-16 unbounded spawned tasks,`chain/src/indexer.rs`)= 已修**:`MAX_CONCURRENT_UPLOADS=16` + `Arc<Semaphore>`(spawn 前 acquire permit 绑活跃数、满则 drop+warn)+ `UPLOAD_TIMEOUT=30s` per task,两常数有测试钉死;PR #296(`7c11b40b`)已落 devnet。ticket 仍 Todo → close 候选(待点名授权)。
+
+**逐个甄别中确认非干净的重票(本轮)**:COW-1138(whitelist)=CIP-28 绿地(card 基建不存在);COW-1012(session chain-id)=跨仓 + 需先定 production 值;timer 1457/1458/1460=高危执行顺序语义;1373=dispatcher 接受面(共识);1241/1239=pvm/ 运行时。
+
+> 小结:本轮乾净交付 **COW-1029(#788)** 一条;发现 **COW-701** 已修待关。重票池继续靠逐个点名 + 回 devnet 核验前提(别信票面)。
+
+### 3-agent 全量 triage sweep(266 候选,回 origin/devnet 逐条核验)— 乾净池确认枯竭
+
+为终结"逐个串行踩 stale/绿地票"的低效,派 3 个并行 agent 对 266 条 node-relevant 候选(已剔明显 gateway/builder/前端/CIP-2x 绿地)逐条回 `origin/devnet` 核验分类。**结论:乾净可实作池实质枯竭——剔除他团队 CIP(2/3/4)+ 共识 + 绿地后,只剩 COW-1407 一条 maybe;2026-06-19 验 feasibility 后亦否(前提错+设计裁定,见下)→ 乾净池归零。**
+
+**① CLEAN 可实作(非共识、本地可测)——仅 2 条,且都有保留:**
+- **COW-1407**(CIP-17 §8.2 batch-proof 跨 key 节点去重)→ **2026-06-19 验 feasibility = 前提错,退回(发英文 scoping 评论,保持 open)**。回权威 CIP-17 spec(`cowboy/docs/cips/cip-17-verifiable-state-read.md`):**根本无 §8.2 dedup 条款**(§8=Relationship to Other CIPs);combined-proof batch read 明列为 **v1 non-goal(§4)+ Future Work(§11)**,**无 normative wire format**。现有 `/proof/multi` 已返独立可验 per-key proof(超出 CIP-17 v1)。做 dedup 需 ①**设计** combined-proof 格式(未指定)②server dedup ③扩 proof-verifier 客户端重构每 key(COW-2329 那段易错 MMR 重构)= **设计裁定 + 中型 server+client 改,非 spec-conformance 缺口**。荐 re-scope 成设计票或标 Future Work。**=B-3 设计裁定,非乾净实作。**
+- **COW-2268**(CIP-3 §2.2.2 doc 把 put_blob/file.write 改成真实 HostApi 名)= docs-only 乾净,但 **CIP-3 是他团队**(本团队回避令),**不取**。
+
+**② ALREADY-FIXED(已修但票未关,verify+close 候选;均带 file:line 证据,抽查 220/1267/1374 命中):**
+> COW-220(access_list 字段+bounds`types/src/execution.rs:97`/`constants.rs:33-34`)· COW-720(L-22 非原子 commit=已记录 accepted-risk`blockchain_storage.rs:714`)· COW-1002(paid-mode billing`stream_key_manager.rs:55/371`)· COW-119(snapshot 优化`pvm_host.rs:45`)· COW-1234(genesis 系统 actor 代码`genesis.rs:1697`测试)· COW-1261(Treasury 0x08 live)· COW-1266(genesis governance 参数`genesis.rs:622`)· COW-1267(Entitlement Registry 0x07`entitlement/`)· COW-1374(candidates_snapshot_root`dispatcher.rs:2986`)· COW-1375(VRF seed block_height`dispatcher.rs:1936`)· COW-1637/1640/1642(circuit-breaker handler`system_instruction.rs:997`)· COW-701(M-16 已修,见上)。
+> **保留**(agent 标已修但需逐条深核才能关,勿批量关):1457/1458/1460(timer,核每个 §-item)、1254/1255(blob 定价,核 40-cycle 常数)、938(CIP-31 wiring 部分)、1228(STORAGE_EPOCH_BLOCKS 需对 spec)。
+> **2026-06-19/20 深核 timer 簇(1457/1458/1460)结论**:实为 **CIP-5**(Globalbox EOB timers,非 CIP-1)。precharge→execute→refund roundtrip **已实作+测**(`spec_cip5_timer_precharge_refund_roundtrip`、`spec_timer_fire_one_refund_one_burn_one_event`;`speculative.rs:1338` Model B.3 atomic pre-charge=同块原子、非跨块预扣)。三票全都 hinge 在 **EOB 执行顺序**(inline-interleaved 逐 timer vs enqueued-deferred-set)是否偏离 CIP-5 设计文档——且 1458 的"cancel 退下次 fire 预扣"假设了 impl 不用的「跨块 next-fire 预扣」模型(impl 是同块原子 precharge/refund)。**= 共识关键顺序判定,须对权威 CIP-5 spec + 慎重分析,非快速 close/scope;不在低置信度下动共识 timer 码。** 1254/1255=CIP-3(他团队)、938/1228=CIP-31(他团队)→ 本团队不深做。
+
+**③ HEAVY(余下绝大多数)**:共识(gas 计量 963/964/970/1397-1402、accept/reject 1372/1373/2113/2114/2152、receipt schema 1147、events CIP-29 1917-1924、tx-canonical 残留 spec 偏离 1934-1944)、绿地子系统(CIP-30 storage_root 1275-1284、CIP-10 容器、CIP-11 QUIC、CIP-15/16 routing、CIP-18 bank、CIP-19 MCP、CIP-25 跨链)、pvm/ 运行时(1199/1240/1241/62/94/105)、fast-sync 接线(1403/2100/2177)、需设计/值裁定(1012/1259/1265/1265)。
+
+> **总结论(2026-06-19 sweep 后)**:**本团队可乾净非共识交付的票池已枯竭**(仅 COW-1407 一条 maybe)。开放池现状=已修待关批(需授权)+ 共识 flag-day 重票(逐个点名慎做)+ 绿地/他团队(做不了)。往后要么授权清"已修"批做 backlog hygiene,要么明确选一条共识重票协调 flag-day 上线。
+
+**④ 已修批清单已落地(2026-06-19,用户授权)→ 11 票 Done、3 票 hold。** 关单前逐条回 devnet 复核(纪律:别只信 agent 的 already-fixed 断言):
+> **Done(11,各发英文证据评论)**:COW-701/220/720/1002/119/1234/1266/1267/1374/1375/1642。
+> **HOLD(3,复核发现实为 partial,发英文纠正评论保持 open)**:COW-1261(有 SubmitTreasuryProposal 提款路径但**无 TreasuryState 结构/inbound-flow 记账**)、COW-1637(circuit-breaker **无 body_ref**)、COW-1640(CircuitBreaker 只 Pause/Unpause,**无 RatifyExtend/Cancel**)。**教训:agent 的"core done"断言对带 §-子项的票要逐项核——本批 3/14 over-claim。**
+> 池 557 → **546**(−11)。
 
 ---
 
@@ -240,8 +430,8 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 代表簇:
 - **CBFS 链上 RAS**(`node/execution/src/ras.rs`):2113/2114/2152/2184/921/894/927/929/938/1544/1545/1546;**PoR**:2112/917/918/919/2183
 - **Economics/Genesis**:1259/1260/1261/1265/1266/1267/2019/2020/2021
-- **tx/derivation**:~~1212(chain_id 签名)~~ → **2026-06-16 折入 node PR #742**(tx-canonical 簇,待 flag-day);177(tx version)/1944/1935/1934
-- **token 新指令**:1074(permit)/1076(multicall)/1798(ICIP20)
+- **tx/derivation**:~~1212(chain_id 签名)~~ → node PR #742(tx-canonical 簇,已 merge→devnet);~~177(tx version)~~ → **node PR #776 MERGED→devnet**(`911171dc`,Done);1944/1935/1934 仍未起
+- **token 新指令**:~~1074(allowance+permit)~~ → **node PR #764 + #766 均 MERGED→devnet**(allowance `9274c75b` + permit `8d80cd31`,**Done**);1076(multicall,B-3 设计裁定)/1798(ICIP20) 仍未起;新衍生 bug 2327(transfer_batch 非原子,Backlog)
 - **timer**:1457/1458/1460;**governance**:1028/1029/1012;**session escrow**:1542
 - **PVM 执行语义**(改 accept/reject 或 gas→receipt):94/119/137/1239/1240/1241/1248/1249/1255/2054/2055
 - **CBSS 链上态**:1056/1058/1894/1895;**事件基建**:2235/2178
@@ -285,7 +475,11 @@ COW-1310/1311/1312/1315/1316/1317/1318/1319/1320/1321/1322/1323/1324/1325/1326/1
 
 ## 一句话
 
-> **2026-06-17 终态**:易档(F-0/1/2/3)早已清空;6-16 五仓审计起的 **7 条 HIGH(C1–C7)+ 10 条 MED/LOW 已全部修复交付**(15 PR,见 §2026-06-17 段;runner #120 已 merged、其余 In Review)。**node 侧可乾净本地交付的审计票至此耗尽**;cbfs 2304 投毒(#53)、cbss 2306 预分配放大(#30)均已干净拿下(Marshal PASS)。审计池仅剩残留:cbss 2306 的 per-IP 限流/客户端认证、cbss 2310、pvm 2291・2293・2292 —— 全需协议/wire 改、设计裁定或 pvm/ CI 盲区。共识修复一律 needs_human 等 flag-day。
+> **2026-06-19 终态(实时复核后)**:§2026-06-18 的整批 node 交付(**12 PR / 11 issue**:COW-2291/1074/1748/1754/1232/2328/2329/177/1260/2088/2331/117)已**全部 merge→devnet 并关单 Done**;含 §2026-06-18 原记"In Review/未上 devnet"的 permit(#766)与新补的 proof-verifier grafting 覆盖(#775)。池 **574→563(reconcile −11)→558(COW-95 交付 + 4 张 stale 清帐 −5)**。**COW-95(node #780)本会话已 merged→devnet(`d37fc5f7`),PL 名下现零 open PR / 零 in-flight。** read-path 全量扫描确认矿脉近枯竭(仅 COW-1405 一条 close 候选,已 Done)。1804/1818/1945 + 本会话 175/1306/1307 已 Canceled。易档(F-0/1/2/3)仍全空、自动 batch-loop fodder 仍为零;其余 node open PR(CIP-11/23/24/27/31/33)全为他团队。详见 §2026-06-19。
+>
+> **2026-06-18 增补**:审计池清空后转 CIP-20 token 新指令——COW-1074 allowance(node **#764**)+ permit(**#766**)起手 B-4 token 簇;COW-2291(**#763**)上 devnet。详见 §2026-06-18。
+>
+> **2026-06-17 终态(实时复核后)**:易档(F-0/1/2/3)早已清空;6-16 五仓审计起的 **7 条 HIGH(C1–C7)+ 12 条 MED/LOW 已全部修复并关单 Done**(见 §2026-06-17 + §2026-06-17(实时复核);原"In Review 待人工 merge"已 reconcile 为 Done)。**池 619→574(−45);6-14 以来 96 条 Done(91 PL)**;新入池 7 条全为审计衍生,落 B-1 LOW / B-2 pvm 运行时 / B-3-B4 共识 / B-6 非本地——**无新增 FEASIBLE-NOW**。cbfs 2304 投毒(#53)、cbss 2306 预分配放大(#30)、cbss 2310 重叠仪式(#31)、node 2292 actor I/O import gate(#757)均已拿下(前三 Marshal PASS,#757 needs_human=共识 flag-day)。审计池仅剩残留:cbss 2306 的 per-IP 限流/客户端认证、pvm 2291(id/repr/hash 身份面,运行时)+ 2293 残留(运行时 int 物化守卫)—— 全需协议/wire 改、设计裁定或 pvm/ CI 盲区。共识修复一律 needs_human 等 flag-day。
 
 ~~真正现在能本地交付的只有 ~26 条(10 close + 9 易 + 7 中)外加 24 example~~ —— **2026-06-15 修正:这个估计仍偏乐观。** 实测后 F-0/F-1/F-2 三个易档全部清空或核实为非干净:本轮真正干净交付的只有 **3 条代码批**(COW-202/231/363,2 个 PR 已 merge)+ **2 条原生关闭**(COW-400/501)。F-0 已无可关。
 
