@@ -95,6 +95,12 @@
   .find .fix{border-left:3px solid var(--ok);padding:8px 12px;margin-top:10px;background:rgba(63,185,80,.06);border-radius:0 8px 8px 0;font-size:14.5px}
   .find .fix b{color:var(--ok)}
   .committee{display:flex;gap:12px;align-items:center;justify-content:center;margin:8px 0}
+  .fig{margin:22px 0;border:1px solid var(--line);border-radius:12px;padding:14px 16px 8px;background:var(--panel)}
+  .fig svg{width:100%;height:auto;display:block}
+  .fig .cap{color:var(--muted);font-size:13px;margin:10px 4px 4px;line-height:1.7}
+  .fig .cap b{color:var(--ink)}
+  .fig .cap .lg{display:inline-block;margin-right:12px;white-space:nowrap}
+  .fig .cap .nb{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--accent);color:#04121f;font-size:10.5px;font-weight:700;margin-right:3px}
   .kv{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
   .kv span{font-size:12.5px;font-family:var(--mono);background:#0b0e12;border:1px solid var(--line);border-radius:6px;padding:3px 9px}
   hr{border:0;border-top:1px solid var(--line);margin:34px 0}
@@ -203,6 +209,88 @@
   </div>
   <p>三個外部系統在這裡協作:<b>CBSS(0x04)</b>管授權與委員會,<b>CBFS(CIP-9)</b>存加密密文,<b>runner(CIP-2)</b>是鏈下執行者。密鑰明文<b>只在 runner 沙箱裡、只在步驟⑤那一瞬間</b>存在。</p>
 
+  <figure class="fig">
+    <svg viewBox="0 0 940 470" role="img" aria-label="CBSS 系統架構圖" style="font-family:-apple-system,'Noto Sans TC','PingFang TC',sans-serif">
+      <defs>
+        <marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6b7a88"/></marker>
+        <marker id="arAd" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#4aa3ff"/></marker>
+      </defs>
+      <!-- Owner -->
+      <rect x="40" y="46" width="180" height="66" rx="10" fill="#1c232d" stroke="#2a333d"/>
+      <text x="130" y="76" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">Owner / 帳戶</text>
+      <text x="130" y="96" text-anchor="middle" fill="#9aa7b4" font-size="11.5">K_root(冷金鑰)</text>
+      <!-- CBFS -->
+      <rect x="40" y="352" width="180" height="84" rx="10" fill="#1c232d" stroke="#2a333d"/>
+      <text x="130" y="383" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">CBFS · CIP-9</text>
+      <text x="130" y="403" text-anchor="middle" fill="#9aa7b4" font-size="11.5">加密密文本體</text>
+      <text x="130" y="420" text-anchor="middle" fill="#9aa7b4" font-size="11.5">(分散式儲存)</text>
+      <!-- CBSS container -->
+      <rect x="300" y="40" width="340" height="398" rx="12" fill="#12171d" stroke="#2a333d"/>
+      <text x="470" y="65" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">CBSS · 0x04(鏈上秘密管理)</text>
+      <rect x="320" y="80" width="300" height="46" rx="8" fill="#0e1620" stroke="#26424f"/>
+      <text x="470" y="101" text-anchor="middle" fill="#7ee0c0" font-size="12.5">SecretVersion → wrapped_dek</text>
+      <text x="470" y="117" text-anchor="middle" fill="#9aa7b4" font-size="10.5">IBE 封套(指向 CBFS 密文)</text>
+      <rect x="320" y="136" width="300" height="42" rx="8" fill="#0e1620" stroke="#2a333d"/>
+      <text x="470" y="162" text-anchor="middle" fill="#e6edf3" font-size="12">AccountReleaseKey(MPK + committee)</text>
+      <rect x="320" y="188" width="150" height="44" rx="8" fill="#0e1620" stroke="#2a333d"/>
+      <text x="395" y="210" text-anchor="middle" fill="#e6edf3" font-size="12">SecretPolicy</text>
+      <text x="395" y="225" text-anchor="middle" fill="#9aa7b4" font-size="10">actors / tee</text>
+      <rect x="476" y="188" width="144" height="44" rx="8" fill="#10202e" stroke="#4aa3ff"/>
+      <text x="548" y="208" text-anchor="middle" fill="#8fd0ff" font-size="11.5">OperatorGrant</text>
+      <text x="548" y="223" text-anchor="middle" fill="#4aa3ff" font-size="10">★ 修正案新增</text>
+      <rect x="320" y="242" width="300" height="34" rx="8" fill="#0e1620" stroke="#2a333d"/>
+      <text x="470" y="263" text-anchor="middle" fill="#e6edf3" font-size="11.5">CbssProxy ×5(委員會註冊 + 質押)</text>
+      <text x="320" y="299" fill="#9aa7b4" font-size="10.5">釋放時 CBSS 還會查:</text>
+      <rect x="320" y="306" width="96" height="30" rx="7" fill="#161b22" stroke="#2a333d"/>
+      <text x="368" y="325" text-anchor="middle" fill="#9aa7b4" font-size="10.5">0x01 Registry</text>
+      <rect x="422" y="306" width="96" height="30" rx="7" fill="#161b22" stroke="#2a333d"/>
+      <text x="470" y="325" text-anchor="middle" fill="#9aa7b4" font-size="10.5">0x02 Dispatch</text>
+      <rect x="524" y="306" width="96" height="30" rx="7" fill="#161b22" stroke="#2a333d"/>
+      <text x="572" y="325" text-anchor="middle" fill="#9aa7b4" font-size="10.5">0x05 TEE</text>
+      <!-- Committee -->
+      <rect x="700" y="46" width="200" height="150" rx="12" fill="#12171d" stroke="#2a333d"/>
+      <text x="800" y="70" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">委員會(鏈下)</text>
+      <circle cx="732" cy="116" r="15" fill="#1c2b25" stroke="#3fb950"/>
+      <circle cx="768" cy="116" r="15" fill="#1c2b25" stroke="#3fb950"/>
+      <circle cx="804" cy="116" r="15" fill="#1c2b25" stroke="#3fb950"/>
+      <circle cx="840" cy="116" r="15" fill="#1c2b25" stroke="#3fb950"/>
+      <circle cx="800" cy="150" r="15" fill="#23201c" stroke="#5a4a2a"/>
+      <text x="800" y="182" text-anchor="middle" fill="#9aa7b4" font-size="11">5 proxies · 門檻 4</text>
+      <!-- Service -->
+      <rect x="700" y="300" width="200" height="112" rx="12" fill="#1c232d" stroke="#2a333d"/>
+      <text x="800" y="331" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Runner / 常駐服務</text>
+      <text x="800" y="351" text-anchor="middle" fill="#9aa7b4" font-size="11">鏈下沙箱(K_auth)</text>
+      <text x="800" y="371" text-anchor="middle" fill="#f2c14e" font-size="10.5">明文只在此瞬時出現</text>
+      <!-- edges -->
+      <line x1="220" y1="72" x2="298" y2="95" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="258" cy="82" r="9" fill="#4aa3ff"/><text x="258" y="85.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">1</text>
+      <line x1="130" y1="112" x2="130" y2="350" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="130" cy="232" r="9" fill="#4aa3ff"/><text x="130" y="235.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">2</text>
+      <line x1="300" y1="404" x2="224" y2="392" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="262" cy="398" r="9" fill="#4aa3ff"/><text x="262" y="401.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">3</text>
+      <line x1="792" y1="300" x2="792" y2="198" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <line x1="808" y1="198" x2="808" y2="300" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="800" cy="250" r="9" fill="#4aa3ff"/><text x="800" y="253.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">4</text>
+      <path d="M700,392 L660,452 L250,452 L224,436" fill="none" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="455" cy="452" r="9" fill="#4aa3ff"/><text x="455" y="455.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">5</text>
+      <line x1="700" y1="332" x2="642" y2="318" stroke="#6b7a88" marker-end="url(#arA)"/>
+      <circle cx="672" cy="323" r="9" fill="#4aa3ff"/><text x="672" y="326.5" text-anchor="middle" fill="#04121f" font-size="10" font-weight="700">6</text>
+      <line x1="700" y1="150" x2="644" y2="255" stroke="#4aa3ff" stroke-dasharray="5 4" marker-end="url(#arAd)"/>
+      <circle cx="670" cy="203" r="9" fill="#0f1216" stroke="#4aa3ff"/><text x="670" y="206.5" text-anchor="middle" fill="#4aa3ff" font-size="10" font-weight="700">7</text>
+    </svg>
+    <figcaption class="cap">
+      <b>圖 A — CBSS 系統架構(誰跟誰對話)。</b>藍點是流程步驟:
+      <span class="lg"><span class="nb">1</span>存秘密 / 發憑證(SetSecret·RegisterGrant)</span>
+      <span class="lg"><span class="nb">2</span>上傳密文到 CBFS</span>
+      <span class="lg"><span class="nb">3</span>0x04 記錄密文指標</span>
+      <span class="lg"><span class="nb">4</span>服務 ↔ 委員會:請求 / σ_i partials</span>
+      <span class="lg"><span class="nb">5</span>服務取回密文</span>
+      <span class="lg"><span class="nb">6</span>服務向 0x04 校驗授權 + 提交 receipt</span>
+      <span class="lg"><span class="nb">7</span>委員會在 0x04 註冊 / 質押</span>
+      <br><b style="color:#8fd0ff">★</b> 藍框 <code>OperatorGrant</code> 是本修正案唯一新增的資料結構;其餘皆 CIP-24 既有。
+    </figcaption>
+  </figure>
+
   <h3 id="cbss-committee">委員會 · DKG · 為何不是「重建金鑰」</h3>
   <div class="box info">
     <div class="h">🏛 委員會怎麼「共同持有」一把主鑰</div>
@@ -221,6 +309,38 @@
     <div class="h">🧩 比喻</div>
     委員會不是「保管你的鑰匙」,而是「4 個人各自在你這份特定文件上蓋一個章;4 個章湊齊,文件才能打開」。他們蓋的章<b>只對這一份文件(這個身分 <code>I</code>)有效</b>,換一份就得重蓋。所以委員會從頭到尾沒看過你的明文秘密。
   </div>
+
+  <figure class="fig">
+    <svg viewBox="0 0 760 250" role="img" aria-label="門檻釋放示意圖" style="font-family:-apple-system,'Noto Sans TC','PingFang TC',sans-serif">
+      <defs><marker id="arB" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#7ee0c0"/></marker></defs>
+      <text x="30" y="30" fill="#9aa7b4" font-size="12">委員會 5 名 proxy,各持一片 share。任一片對身分 I 產出 partial σ_i:</text>
+      <!-- proxies -->
+      <g>
+        <circle cx="70"  cy="72" r="26" fill="#14241b" stroke="#3fb950" stroke-width="1.5"/><text x="70"  y="70" text-anchor="middle" fill="#7ee0c0" font-size="13" font-weight="600">P1</text><text x="70"  y="86" text-anchor="middle" fill="#5a7a63" font-size="9">σ₁</text>
+        <circle cx="185" cy="72" r="26" fill="#14241b" stroke="#3fb950" stroke-width="1.5"/><text x="185" y="70" text-anchor="middle" fill="#7ee0c0" font-size="13" font-weight="600">P2</text><text x="185" y="86" text-anchor="middle" fill="#5a7a63" font-size="9">σ₂</text>
+        <circle cx="300" cy="72" r="26" fill="#14241b" stroke="#3fb950" stroke-width="1.5"/><text x="300" y="70" text-anchor="middle" fill="#7ee0c0" font-size="13" font-weight="600">P3</text><text x="300" y="86" text-anchor="middle" fill="#5a7a63" font-size="9">σ₃</text>
+        <circle cx="415" cy="72" r="26" fill="#14241b" stroke="#3fb950" stroke-width="1.5"/><text x="415" y="70" text-anchor="middle" fill="#7ee0c0" font-size="13" font-weight="600">P4</text><text x="415" y="86" text-anchor="middle" fill="#5a7a63" font-size="9">σ₄</text>
+        <circle cx="640" cy="72" r="26" fill="#191d22" stroke="#4a5560" stroke-width="1.5" stroke-dasharray="4 3"/><text x="640" y="70" text-anchor="middle" fill="#6b7a88" font-size="13" font-weight="600">P5</text><text x="640" y="87" text-anchor="middle" fill="#6b7a88" font-size="9">缺席</text>
+      </g>
+      <!-- lines to combine -->
+      <line x1="70"  y1="98" x2="290" y2="150" stroke="#3fb950" stroke-width="1.2" opacity=".8"/>
+      <line x1="185" y1="98" x2="310" y2="150" stroke="#3fb950" stroke-width="1.2" opacity=".8"/>
+      <line x1="300" y1="98" x2="330" y2="150" stroke="#3fb950" stroke-width="1.2" opacity=".8"/>
+      <line x1="415" y1="98" x2="350" y2="150" stroke="#3fb950" stroke-width="1.2" opacity=".8"/>
+      <line x1="640" y1="98" x2="380" y2="152" stroke="#4a5560" stroke-width="1" stroke-dasharray="4 3" opacity=".5"/>
+      <!-- combine -->
+      <rect x="230" y="150" width="190" height="56" rx="10" fill="#10202e" stroke="#4aa3ff"/>
+      <text x="325" y="174" text-anchor="middle" fill="#8fd0ff" font-size="12.5" font-weight="600">Lagrange 組合 ≥4 片</text>
+      <text x="325" y="192" text-anchor="middle" fill="#9aa7b4" font-size="11">→ σ = MSK·I</text>
+      <!-- arrow to unlock -->
+      <line x1="420" y1="178" x2="466" y2="178" stroke="#7ee0c0" stroke-width="1.5" marker-end="url(#arB)"/>
+      <rect x="470" y="150" width="260" height="56" rx="10" fill="#14241b" stroke="#3fb950"/>
+      <text x="600" y="174" text-anchor="middle" fill="#7ee0c0" font-size="12.5" font-weight="600">解出 DEK → 取回明文秘密</text>
+      <text x="600" y="192" text-anchor="middle" fill="#9aa7b4" font-size="11">請求方本地完成,委員會看不到明文</text>
+      <text x="30" y="235" fill="#f2c14e" font-size="12">任 4 片即可組出 σ · 3 片以下什麼都得不到 · 沒有單點能私自解密</text>
+    </svg>
+    <figcaption class="cap"><b>圖 B — 門檻(t-of-n)釋放。</b>委員會不「重建金鑰」,而是各自對你這份特定身分 <code>I</code> 蓋一片「章」σ_i;湊齊 4 片,請求方本地組出 σ、解出秘密。少一個成員(P5)不影響。</figcaption>
+  </figure>
 
   <h3 id="cbss-modes">CBSS 現有的兩扇門(釋放模式)</h3>
   <div class="doors">
@@ -283,6 +403,39 @@
     <tr><td class="mono">§9.5 / 0x05 TEE</td><td>若要 <code>tee_required</code>,需一份新的跨倉 companion(§6a)——見審計 F7</td><td><span class="sev med" style="font-size:11px">跨倉依賴</span></td></tr>
   </table>
   <p style="color:var(--muted);font-size:14.5px">由此可見:修正案的「爆炸半徑」被刻意限制在<b>授權層</b>。唯一的跨倉牽動是可選的 TEE 路徑(§6a),所以預設(非-TEE)路徑是可獨立發布的核心。這也是 Marshal 審計反覆確認的一點:<b>密碼學中立</b>。</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 900 360" role="img" aria-label="模組關係圖" style="font-family:-apple-system,'Noto Sans TC','PingFang TC',sans-serif">
+      <defs><marker id="arC" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6b7a88"/></marker></defs>
+      <text x="132" y="26" text-anchor="middle" fill="#9aa7b4" font-size="12">授權「前端」(三扇門)</text>
+      <text x="410" y="26" text-anchor="middle" fill="#9aa7b4" font-size="12">各自讀的授權來源</text>
+      <text x="642" y="26" text-anchor="middle" fill="#9aa7b4" font-size="12">同一份秘密</text>
+      <text x="812" y="26" text-anchor="middle" fill="#9aa7b4" font-size="12">共用密碼學後端</text>
+      <!-- paths -->
+      <rect x="34" y="46" width="196" height="56" rx="10" fill="#1c232d" stroke="#2a333d"/><text x="132" y="70" text-anchor="middle" fill="#e6edf3" font-size="13">🔒 Runner 路徑</text><text x="132" y="88" text-anchor="middle" fill="#9aa7b4" font-size="10.5">既有 · §3.4.3</text>
+      <rect x="34" y="158" width="196" height="56" rx="10" fill="#1c232d" stroke="#2a333d"/><text x="132" y="182" text-anchor="middle" fill="#e6edf3" font-size="13">⏰ tlock 路徑</text><text x="132" y="200" text-anchor="middle" fill="#9aa7b4" font-size="10.5">既有 · §3.4.6</text>
+      <rect x="34" y="270" width="196" height="56" rx="10" fill="#10202e" stroke="#4aa3ff"/><text x="132" y="294" text-anchor="middle" fill="#8fd0ff" font-size="13">🧑‍💼 Operator 路徑</text><text x="132" y="312" text-anchor="middle" fill="#4aa3ff" font-size="10.5">★ 修正案新增</text>
+      <!-- auth sources -->
+      <rect x="300" y="46" width="220" height="56" rx="10" fill="#161b22" stroke="#2a333d"/><text x="410" y="70" text-anchor="middle" fill="#e6edf3" font-size="11.5">job 指派 + manifest</text><text x="410" y="88" text-anchor="middle" fill="#9aa7b4" font-size="10.5">+ SecretPolicy(0x01/0x02)</text>
+      <rect x="300" y="158" width="220" height="56" rx="10" fill="#161b22" stroke="#2a333d"/><text x="410" y="182" text-anchor="middle" fill="#e6edf3" font-size="11.5">TlockRequest</text><text x="410" y="200" text-anchor="middle" fill="#9aa7b4" font-size="10.5">+ 到達目標高度(無許可)</text>
+      <rect x="300" y="270" width="220" height="56" rx="10" fill="#10202e" stroke="#4aa3ff"/><text x="410" y="294" text-anchor="middle" fill="#8fd0ff" font-size="11.5">OperatorGrant ★</text><text x="410" y="312" text-anchor="middle" fill="#4aa3ff" font-size="10.5">+ K_auth 簽名</text>
+      <!-- shared secret -->
+      <rect x="576" y="148" width="132" height="80" rx="10" fill="#0e1620" stroke="#26424f"/><text x="642" y="180" text-anchor="middle" fill="#7ee0c0" font-size="12">SecretVersion</text><text x="642" y="198" text-anchor="middle" fill="#7ee0c0" font-size="12">wrapped_dek</text><text x="642" y="216" text-anchor="middle" fill="#9aa7b4" font-size="10">同一份秘密</text>
+      <!-- crypto core -->
+      <rect x="736" y="136" width="150" height="104" rx="10" fill="#12171d" stroke="#3fb950"/><text x="811" y="166" text-anchor="middle" fill="#7ee0c0" font-size="12" font-weight="600">密碼學核心</text><text x="811" y="186" text-anchor="middle" fill="#9aa7b4" font-size="10.5">同一委員會 · MPK</text><text x="811" y="203" text-anchor="middle" fill="#9aa7b4" font-size="10.5">cbss/ibe/v1</text><text x="811" y="220" text-anchor="middle" fill="#9aa7b4" font-size="10.5">配對檢查 · 封套</text>
+      <!-- edges path->auth -->
+      <line x1="230" y1="74"  x2="298" y2="74"  stroke="#6b7a88" marker-end="url(#arC)"/>
+      <line x1="230" y1="186" x2="298" y2="186" stroke="#6b7a88" marker-end="url(#arC)"/>
+      <line x1="230" y1="298" x2="298" y2="298" stroke="#4aa3ff" marker-end="url(#arC)"/>
+      <!-- edges auth->secret -->
+      <line x1="520" y1="74"  x2="574" y2="172" stroke="#6b7a88" marker-end="url(#arC)"/>
+      <line x1="520" y1="186" x2="574" y2="188" stroke="#6b7a88" marker-end="url(#arC)"/>
+      <line x1="520" y1="298" x2="574" y2="204" stroke="#4aa3ff" marker-end="url(#arC)"/>
+      <!-- secret->core -->
+      <line x1="708" y1="188" x2="734" y2="188" stroke="#6b7a88" marker-end="url(#arC)"/>
+    </svg>
+    <figcaption class="cap"><b>圖 C — 模組關係(附加性一目了然)。</b>三扇門是不同的<b>授權前端</b>,但全部匯入<b>同一份秘密</b>與<b>同一個密碼學後端</b>。修正案只加了藍色那條路徑與 <code>OperatorGrant</code>——後端一行未動,這就是「密碼學中立」。</figcaption>
+  </figure>
 
   <h3>那,為什麼原本兩扇門不夠?</h3>
   <p>回顧第 ② 節結尾:常駐 operator 服務<b>不是</b>被指派的 runner(沒 job、沒 dispatcher、不是部署的 actor),也<b>不是</b>「到點公開」的 tlock 消費者(它的金鑰必須<b>始終保密</b>)。兩扇門都不接受它——所以需要<b>第三扇門</b>,這正是下一節。</p>
@@ -364,6 +517,52 @@
     <div class="step"><b>簽名 → 立刻抹除</b><span>K_sign、DEK、σ 全部歸零</span></div>
   </div>
   <p>與 runner 路徑相比,唯一差別是:<b>沒有 dispatcher 查詢、不用 runner 註冊金鑰</b>——principal 就是 operator 的常駐服務,用 <code>K_auth</code> 認證。而所有<b>密碼學驗證步驟</b>(配對檢查、recipient 一致性、去重、quorum 上限、付款)<b>與 runner 路徑逐位元組相同</b>。付款從<b>owner 帳戶</b>扣,每個 proxy 收一次費,上限為門檻 <code>t</code>。</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 880 460" role="img" aria-label="Operator 常駐拉取時序圖" style="font-family:-apple-system,'Noto Sans TC','PingFang TC',sans-serif">
+      <defs>
+        <marker id="arD" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8fd0ff"/></marker>
+        <marker id="arDr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6b7a88"/></marker>
+      </defs>
+      <!-- lifeline heads -->
+      <rect x="60"  y="18" width="140" height="42" rx="9" fill="#1c232d" stroke="#f2c14e"/><text x="130" y="44" text-anchor="middle" fill="#f2c14e" font-size="12.5" font-weight="600">常駐服務 K_auth</text>
+      <rect x="290" y="18" width="140" height="42" rx="9" fill="#1c232d" stroke="#2a333d"/><text x="360" y="44" text-anchor="middle" fill="#e6edf3" font-size="12.5" font-weight="600">委員會 t 個 proxy</text>
+      <rect x="520" y="18" width="140" height="42" rx="9" fill="#1c232d" stroke="#2a333d"/><text x="590" y="44" text-anchor="middle" fill="#e6edf3" font-size="12.5" font-weight="600">鏈 · 0x04</text>
+      <rect x="740" y="18" width="120" height="42" rx="9" fill="#1c232d" stroke="#2a333d"/><text x="800" y="44" text-anchor="middle" fill="#e6edf3" font-size="12.5" font-weight="600">CBFS</text>
+      <!-- lifelines -->
+      <line x1="130" y1="60" x2="130" y2="436" stroke="#2a333d" stroke-dasharray="3 4"/>
+      <line x1="360" y1="60" x2="360" y2="436" stroke="#2a333d" stroke-dasharray="3 4"/>
+      <line x1="590" y1="60" x2="590" y2="436" stroke="#2a333d" stroke-dasharray="3 4"/>
+      <line x1="800" y1="60" x2="800" y2="436" stroke="#2a333d" stroke-dasharray="3 4"/>
+      <!-- self1 -->
+      <rect x="50" y="74" width="160" height="24" rx="6" fill="#23201c" stroke="#5a4a2a"/><text x="130" y="90" text-anchor="middle" fill="#f2c14e" font-size="11">組請求 + K_auth 簽名</text>
+      <!-- msg1 -->
+      <text x="245" y="120" text-anchor="middle" fill="#9aa7b4" font-size="11">① SignedOperatorReleaseRequest</text>
+      <line x1="132" y1="126" x2="356" y2="126" stroke="#8fd0ff" marker-end="url(#arD)"/>
+      <!-- msg2 -->
+      <text x="475" y="154" text-anchor="middle" fill="#9aa7b4" font-size="11">② 讀 0x04 校驗 grant(§3.7.1)</text>
+      <line x1="362" y1="160" x2="586" y2="160" stroke="#6b7a88" stroke-dasharray="5 4" marker-end="url(#arDr)"/>
+      <!-- self2 -->
+      <rect x="280" y="174" width="160" height="24" rx="6" fill="#1c232d" stroke="#2a333d"/><text x="360" y="190" text-anchor="middle" fill="#e6edf3" font-size="11">校驗通過 → 計算 σ_i</text>
+      <!-- msg3 -->
+      <text x="245" y="224" text-anchor="middle" fill="#9aa7b4" font-size="11">③ σ_i partials ×4</text>
+      <line x1="358" y1="230" x2="134" y2="230" stroke="#8fd0ff" marker-end="url(#arD)"/>
+      <!-- self3 -->
+      <rect x="50" y="246" width="160" height="24" rx="6" fill="#1c232d" stroke="#2a333d"/><text x="130" y="262" text-anchor="middle" fill="#e6edf3" font-size="11">④ 組 σ → 推導 K</text>
+      <!-- msg5 -->
+      <text x="465" y="296" text-anchor="middle" fill="#9aa7b4" font-size="11">⑤ 取密文</text>
+      <line x1="132" y1="302" x2="796" y2="302" stroke="#8fd0ff" marker-end="url(#arD)"/>
+      <!-- msg6 -->
+      <text x="465" y="326" text-anchor="middle" fill="#9aa7b4" font-size="11">⑥ 密文(返回)</text>
+      <line x1="798" y1="332" x2="134" y2="332" stroke="#6b7a88" stroke-dasharray="5 4" marker-end="url(#arDr)"/>
+      <!-- self4 -->
+      <rect x="38" y="352" width="184" height="26" rx="6" fill="#2a1a1a" stroke="#6e2b28"/><text x="130" y="369" text-anchor="middle" fill="#ff9d8a" font-size="11">⑦ 解 K_sign → 簽名 → 立即抹除</text>
+      <!-- msg8 -->
+      <text x="475" y="404" text-anchor="middle" fill="#9aa7b4" font-size="11">⑧ SubmitReleaseReceipt(付款 / 審計)</text>
+      <line x1="362" y1="410" x2="586" y2="410" stroke="#6b7a88" marker-end="url(#arDr)"/>
+    </svg>
+    <figcaption class="cap"><b>圖 D — Operator 常駐拉取時序。</b>與 runner 路徑唯一差別:<b>②</b> 校驗的是 <code>OperatorReleaseGrant</code> + <code>K_auth</code> 簽名(而非 dispatcher job 指派 + manifest);其餘皆相同。<b style="color:#ff9d8a">⑦</b> 是「瞬時重建」發生的唯一時點——非 TEE 路徑下明文此刻在服務記憶體中(見第 ⑤ 節限制)。</figcaption>
+  </figure>
 </section>
 
 <!-- LIMITS -->
