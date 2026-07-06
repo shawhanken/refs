@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CIP-24 Operator-Principal 釋放類 · 解讀與原理</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2a333d; --accent:#4aa3ff; --accent2:#7ee0c0; --gold:#f2c14e;
+    --ok:#3fb950; --warn:#d29922; --danger:#f85149; --purple:#bc8cff;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;font-size:16.5px}
+  .wrap{display:grid;grid-template-columns:260px 1fr;max-width:1240px;margin:0 auto;gap:0}
+  /* sidebar */
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:26px 18px;border-right:1px solid var(--line);background:var(--panel)}
+  nav h2{font-size:13px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin:0 0 12px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:7px;font-size:14px;border-left:2px solid transparent}
+  nav a:hover{color:var(--ink);background:var(--panel2)}
+  nav a.sub{padding-left:24px;font-size:13px}
+  nav a.active{color:var(--accent);border-left-color:var(--accent);background:var(--panel2)}
+  nav .tag{display:inline-block;margin-top:16px;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:3px 10px}
+  /* content */
+  main{padding:40px 52px 120px;min-width:0}
+  header.hero{border:1px solid var(--line);border-radius:16px;padding:30px 32px;margin-bottom:34px;
+    background:radial-gradient(1200px 300px at 0% 0%,rgba(74,163,255,.10),transparent 60%),var(--panel)}
+  header.hero .kick{color:var(--accent2);font-family:var(--mono);font-size:13px;letter-spacing:.05em}
+  header.hero h1{margin:8px 0 6px;font-size:29px;line-height:1.25}
+  header.hero p{margin:6px 0 0;color:var(--muted)}
+  header.hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+  section{margin:0 0 44px;scroll-margin-top:18px}
+  h2.sec{font-size:22px;margin:0 0 4px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2.sec .n{color:var(--accent);font-family:var(--mono);font-size:16px;margin-right:10px}
+  h3{font-size:17.5px;margin:26px 0 8px;color:#fff}
+  p{margin:12px 0}
+  code{font-family:var(--mono);background:#0b0e12;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.9em;color:var(--accent2)}
+  strong{color:#fff}
+  .lead{font-size:17.5px;color:#cfd8e0}
+  /* callouts */
+  .box{border-radius:12px;padding:16px 18px;margin:18px 0;border:1px solid var(--line);background:var(--panel)}
+  .box .h{font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .box.info{border-color:#1f4b73;background:linear-gradient(180deg,rgba(74,163,255,.08),transparent)}
+  .box.ok{border-color:#1f5b32;background:linear-gradient(180deg,rgba(63,185,80,.08),transparent)}
+  .box.warn{border-color:#6b551a;background:linear-gradient(180deg,rgba(210,153,34,.08),transparent)}
+  .box.danger{border-color:#6e2b28;background:linear-gradient(180deg,rgba(248,81,73,.08),transparent)}
+  .box.analogy{border-color:#4a3a6b;background:linear-gradient(180deg,rgba(188,140,255,.09),transparent)}
+  .ico{width:18px;height:18px;flex:0 0 auto}
+  /* key cards */
+  .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+  .kc{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel2)}
+  .kc .t{font-family:var(--mono);font-size:15px;font-weight:700}
+  .kc .temp{font-size:12px;border-radius:20px;padding:2px 10px;display:inline-block;margin-top:6px}
+  .kc.cold .t{color:#8fd0ff}.kc.cold .temp{background:rgba(74,163,255,.14);color:#8fd0ff;border:1px solid #1f4b73}
+  .kc.warm .t{color:var(--gold)}.kc.warm .temp{background:rgba(242,193,78,.14);color:var(--gold);border:1px solid #6b551a}
+  .kc.hot .t{color:#ff9d8a}.kc.hot .temp{background:rgba(248,81,73,.14);color:#ff9d8a;border:1px solid #6e2b28}
+  .kc p{margin:9px 0 0;font-size:14px;color:var(--muted)}
+  /* three doors */
+  .doors{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+  .door{border:1px solid var(--line);border-radius:12px;padding:15px;background:var(--panel)}
+  .door.new{border-color:var(--accent);box-shadow:0 0 0 1px rgba(74,163,255,.25) inset}
+  .door h4{margin:0 0 8px;font-size:15px}
+  .door .row{font-size:13px;color:var(--muted);margin:5px 0;display:flex;gap:6px}
+  .door .row b{color:var(--ink);font-weight:600;min-width:52px;display:inline-block}
+  .badge-new{font-size:11px;background:var(--accent);color:#04121f;border-radius:6px;padding:1px 7px;font-weight:700;margin-left:6px}
+  /* flow */
+  .flow{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0;counter-reset:step}
+  .step{flex:1 1 150px;border:1px solid var(--line);border-radius:10px;padding:12px 13px;background:var(--panel2);position:relative;min-width:150px}
+  .step::before{counter-increment:step;content:counter(step);position:absolute;top:-10px;left:-10px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#04121f;font-weight:700;font-size:13px;display:grid;place-items:center}
+  .step b{display:block;font-size:13.5px;margin-bottom:3px}
+  .step span{font-size:12.5px;color:var(--muted)}
+  /* table */
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#fff;font-weight:600}
+  td.mono,th.mono{font-family:var(--mono);font-size:13px}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .chk{color:var(--ok);font-weight:700}.crx{color:var(--danger);font-weight:700}
+  /* severity chips */
+  .sev{font-family:var(--mono);font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .sev.med{background:rgba(210,153,34,.16);color:var(--gold);border:1px solid #6b551a}
+  .sev.low{background:rgba(126,224,192,.14);color:var(--accent2);border:1px solid #1f5b4a}
+  .sev.high{background:rgba(248,81,73,.16);color:#ff9d8a;border:1px solid #6e2b28}
+  details{border:1px solid var(--line);border-radius:10px;padding:2px 16px;margin:14px 0;background:var(--panel)}
+  details[open]{background:var(--panel2)}
+  summary{cursor:pointer;font-weight:600;padding:12px 0;color:var(--accent2)}
+  summary::marker{color:var(--accent)}
+  .find{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;background:var(--panel)}
+  .find .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .find .id{font-family:var(--mono);font-weight:700;color:#fff}
+  .find .fix{border-left:3px solid var(--ok);padding:8px 12px;margin-top:10px;background:rgba(63,185,80,.06);border-radius:0 8px 8px 0;font-size:14.5px}
+  .find .fix b{color:var(--ok)}
+  .committee{display:flex;gap:12px;align-items:center;justify-content:center;margin:8px 0}
+  .kv{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .kv span{font-size:12.5px;font-family:var(--mono);background:#0b0e12;border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+  hr{border:0;border-top:1px solid var(--line);margin:34px 0}
+  .foot{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:18px;margin-top:40px}
+  a.ref{color:var(--accent)}
+  @media(max-width:920px){.wrap{grid-template-columns:1fr}nav{display:none}main{padding:26px 18px 90px}.keys,.doors{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav id="toc">
+  <h2>目錄</h2>
+  <a href="#tldr">一分鐘導讀</a>
+  <a href="#problem" >① 問題:金鑰躺在硬碟上</a>
+  <a href="#cbss">② CIP-24 / CBSS 全景(從零)</a>
+  <a href="#cbss-why" class="sub">它原本要解決什麼</a>
+  <a href="#cbss-life" class="sub">一個秘密的完整生命週期</a>
+  <a href="#cbss-committee" class="sub">委員會 · DKG · 為何不是重建金鑰</a>
+  <a href="#cbss-modes" class="sub">兩扇現有的門</a>
+  <a href="#cbss-trust" class="sub">信任模型(非 TEE-rooted)</a>
+  <a href="#relation">③ 本修正案 ⟷ CIP-24 的關係</a>
+  <a href="#design">④ 第三扇門:本修正案</a>
+  <a href="#design-core" class="sub">核心:不動密碼學</a>
+  <a href="#design-keys" class="sub">三金鑰分離</a>
+  <a href="#design-grant" class="sub">授權憑證 Grant</a>
+  <a href="#design-flow" class="sub">常駐拉取流程</a>
+  <a href="#limits">⑤ 誠實的限制</a>
+  <a href="#audit">⑥ 壓力測試:Marshal 審計</a>
+  <a href="#summary">⑦ 一句話總結</a>
+  <a href="#glossary">名詞表</a>
+  <span class="tag">繁體中文 · 離線可讀</span>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="kick">CIP-24 · Cowboy Secret Service</div>
+  <h1>讓常駐服務安全地保管簽名金鑰<br>Operator-Principal 釋放類 — 解讀與原理</h1>
+  <p>把 <code>refs/analysis/2026-07-06-cip24-operator-principal-release-amendment-draft.md</code> 這份修正案草稿,翻成人話。</p>
+  <div class="meta">
+    <span class="pill">草稿狀態:DRAFT</span>
+    <span class="pill">純授權層 · 不動密碼學</span>
+    <span class="pill">Marshal 審計:run 548 · needs_human</span>
+    <span class="pill">對應 Model A</span>
+  </div>
+</header>
+
+<!-- TLDR -->
+<section id="tldr">
+  <h2 class="sec"><span class="n">TL;DR</span>一分鐘導讀</h2>
+  <p class="lead">CIP-34 demo 裡,operator(部署者)的伺服器 <code>server.js</code> 把一把簽名私鑰 <b>明文</b>存在 <code>.cowboy/key</code>,每次幫用戶簽交易都用它。硬碟被偷 = 金鑰永久失竊。</p>
+  <p>這份修正案讓這把金鑰改由 <b>CBSS 密碼學委員會</b>保管:平時鏈上只有一份加密封套,伺服器要簽名時,臨時向委員會請求「釋放」,用完即抹除。好處是:<span class="chk">金鑰不再明文落地、可撤銷、有門檻保護、有審計軌跡</span>。</p>
+  <div class="box analogy">
+    <div class="h">🔑 一句比喻</div>
+    現況像把家門鑰匙<b>用膠帶貼在門口</b>——誰路過都能撕走複製。這份修正案把鑰匙換成:平時鎖進<b>需要 5 人裡 4 人同時點頭才能開的保險庫</b>,你要用的時候才臨時取出,而且庫房會記帳、你隨時能吊銷取用權。<br>
+    <span style="color:var(--muted);font-size:14px">但注意:鑰匙<b>取出來的那一刻</b>還是會出現在你手上——這一點任何保管服務都躲不掉,除非用 TEE 保險箱(見 <a class="ref" href="#limits">第 ⑤ 節</a>)。</span>
+  </div>
+  <div class="box info">
+    <div class="h">📎 這份解讀檔涵蓋兩份東西</div>
+    你若<b>完全沒接觸過 CBSS</b>,請從 <a class="ref" href="#cbss">第 ② 節</a>開始——那是 <b>CIP-24 原始文檔(CBSS 全系統)</b>的從零導讀。第 ② 節把整套系統講清楚後,<a class="ref" href="#relation">第 ③ 節</a>再說明<b>本修正案與 CIP-24 是「附加/互補」關係</b>,以及它往原文檔的哪些章節插入了什麼。第 ④ 節之後才是修正案本身。
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <h2 class="sec"><span class="n">①</span>問題:金鑰躺在硬碟上</h2>
+  <p>Cowboy 上有一類越來越常見的角色:<b>常駐的鏈下服務</b>(standing off-chain service)。它握著一把<b>長壽命</b>的簽名金鑰,持續不斷地用它——不是為了某一筆「工作(job)」,而是它的日常。典型例子:</p>
+  <ul>
+    <li>CIP-34 聊天 demo 的 operator/deployer:<code>server.js</code> 幫每個用戶請求簽 Cowboy 交易。</li>
+    <li>跨鏈 bridge relayer:握著一把 EVM 金鑰。</li>
+    <li>幫 actor 轉接 LLM / API token 的服務。</li>
+  </ul>
+  <p>今天它們的金鑰都<b>明文存在單一機器上</b>。這帶來三個結構性弱點:</p>
+  <table>
+    <tr><th>維度</th><th>明文存硬碟(現況)</th></tr>
+    <tr><td>靜態風險</td><td>硬碟 / 備份 / 快照被偷 = 金鑰<b>永久</b>失竊</td></tr>
+    <tr><td>撤銷</td><td>做不到——金鑰是可複製的死物,偷走就收不回</td></tr>
+    <tr><td>審計</td><td>零軌跡——不知道被用過幾次、誰用的</td></tr>
+  </table>
+  <p>那為什麼不直接套用 Cowboy 現成的秘密管理系統(CBSS)?因為 CBSS 現有的兩條釋放路徑都<b>不接受</b>這種角色——這正是本修正案要補的縫。要看懂縫在哪,得先懂 CBSS 怎麼運作。</p>
+</section>
+
+<!-- CBSS -->
+<section id="cbss">
+  <h2 class="sec"><span class="n">②</span>CIP-24 / CBSS:從零開始的全景</h2>
+  <p class="lead">這一節完全獨立——把 <b>CIP-24 原始文檔</b>講清楚。看懂它,才看得懂修正案補了什麼。</p>
+  <p><b>CBSS(Cowboy Secret Service)</b>就是 <b>CIP-24</b> 這份規格定義的系統:一套「<b>門檻式秘密釋放</b>」服務。核心是一組經過質押的 <b>proxy 運營商</b>組成的<b>委員會</b>,預設 5 個成員、門檻 4(記作 <code>(n,t)=(5,4)</code>),住在系統位址 <code>0x04</code>。</p>
+
+  <h3 id="cbss-why">它原本要解決什麼問題</h3>
+  <p>Cowboy 是個「AI 原生」的鏈:鏈上的 <b>actor</b>(智能合約)常常需要呼叫鏈下的東西——LLM、HTTP API、MCP 工具。這些呼叫幾乎都需要一把<b>密鑰</b>(<code>OPENAI_API_KEY</code>、<code>SLACK_TOKEN</code>、<code>STRIPE_LIVE_KEY</code>…)。</p>
+  <div class="box warn">
+    <div class="h">🎯 兩難</div>
+    密鑰<b>不能明文放上鏈</b>(鏈上資料全公開);但實際去呼叫 API 的是鏈下的 <b>runner</b>,它<b>必須</b>在某個瞬間拿到明文密鑰才能發請求。<b>怎麼把明文只在「該用的時候、交給該用的人」?</b>這就是 CIP-24 要解決的問題。
+  </div>
+  <p>CIP-24 的答案:密鑰以<b>加密封套</b>存在鏈上,真正的解密能力被<b>切成碎片、分散</b>在委員會手裡。只有當一個「被授權的請求」到來,委員會裡足夠多的成員才會各自吐出一片,讓請求方臨時組出解密能力、用完即抹。<b>沒有任何單點</b>(包括委員會裡的少數幾人)能私自解出密鑰。</p>
+
+  <h3 id="cbss-life">一個秘密的完整生命週期</h3>
+  <p>以「actor 要用 <code>SLACK_API_KEY</code> 發訊息」為例,從頭到尾:</p>
+  <div class="flow">
+    <div class="step"><b>① 存(SetSecret)</b><span>owner 產生一把資料金鑰 DEK,用委員會主公鑰 MPK 做 IBE 加密,得 <code>wrapped_dek</code> 存上鏈;密文本體存 CBFS(分散式儲存)</span></div>
+    <div class="step"><b>② 授權</b><span>actor 的 CIP-6 manifest 宣告 <code>secrets.read: [SLACK_API_KEY]</code>;owner 設 <code>SecretPolicy</code> 允許哪些 actor</span></div>
+    <div class="step"><b>③ 請求</b><span>actor 執行到 <code>runner.http(..., secrets=[...])</code>,被指派的 runner 用自己的註冊金鑰簽一份釋放請求</span></div>
+    <div class="step"><b>④ 委員會釋放</b><span>runner 發給 4/5 個 proxy,每個 proxy 校驗(§3.7)後吐出一片 partial <code>σ_i</code></span></div>
+    <div class="step"><b>⑤ 組合 · 解密 · 使用</b><span>runner 組出 σ → 解出 DEK → 從 CBFS 解出明文密鑰 → 填進 HTTP 請求發出</span></div>
+    <div class="step"><b>⑥ 抹除 · 記帳</b><span>runner 把明文/DEK/σ 歸零;每個參與的 proxy 各自提交一份鏈上 <code>release_receipt</code>(付款 + 審計)</span></div>
+  </div>
+  <p>三個外部系統在這裡協作:<b>CBSS(0x04)</b>管授權與委員會,<b>CBFS(CIP-9)</b>存加密密文,<b>runner(CIP-2)</b>是鏈下執行者。密鑰明文<b>只在 runner 沙箱裡、只在步驟⑤那一瞬間</b>存在。</p>
+
+  <h3 id="cbss-committee">委員會 · DKG · 為何不是「重建金鑰」</h3>
+  <div class="box info">
+    <div class="h">🏛 委員會怎麼「共同持有」一把主鑰</div>
+    透過 <b>DKG(分散式金鑰生成)</b>,5 個成員各自持有主秘鑰 <code>MSK</code> 的一「片」<b>share</b>。任何 <b>4 片</b>可以聯合完成一次密碼運算;<b>3 片以下什麼都做不了</b>。沒有任何單一成員、甚至任何 3 人小圈子,能單獨還原 <code>MSK</code>。<br>
+    <span style="color:var(--muted);font-size:14px">底層是 BLS12-381 曲線上的門檻 IBE(Boneh–Franklin)+ tlock,drand / Filecoin / 以太坊生態的成熟庫。CBSS 自己不造密碼學。</span>
+  </div>
+
+  <h3 id="cbss-share">為何不是「把金鑰重建出來」,而是「釋放一個 token」</h3>
+  <p>這是最容易誤解的一點。委員會<b>不會</b>把你的秘密拼回來再交給你。實際流程是:</p>
+  <ul>
+    <li>你的秘密(DEK,資料加密金鑰)在鏈上是一份 <b>IBE 加密封套</b> <code>wrapped_dek</code>,綁定到一個「身分」<code>I</code>(由 <code>秘密ID + 版本 + wrap_epoch</code> 算出)。</li>
+    <li>要解封,需要對這個身分 <code>I</code> 的一個<b>門檻簽章</b> <code>σ = MSK·I</code>。</li>
+    <li>委員會每個成員只吐出自己的一「片」<b>partial</b> <code>σ_i = s_i·I</code>;請求方蒐集 ≥4 片,用 Lagrange 內插自行組出 <code>σ</code>,再本地推導出解封金鑰、解出 DEK。</li>
+  </ul>
+  <div class="box analogy">
+    <div class="h">🧩 比喻</div>
+    委員會不是「保管你的鑰匙」,而是「4 個人各自在你這份特定文件上蓋一個章;4 個章湊齊,文件才能打開」。他們蓋的章<b>只對這一份文件(這個身分 <code>I</code>)有效</b>,換一份就得重蓋。所以委員會從頭到尾沒看過你的明文秘密。
+  </div>
+
+  <h3 id="cbss-modes">CBSS 現有的兩扇門(釋放模式)</h3>
+  <div class="doors">
+    <div class="door">
+      <h4>🔒 機密釋放 <span style="color:var(--muted);font-weight:400">§3.4.3</span></h4>
+      <div class="row"><b>域</b><span><code>cbss/ibe/v1</code></span></div>
+      <div class="row"><b>觸發</b><span>runner 簽名請求,<b>ACL 把關</b></span></div>
+      <div class="row"><b>誰能拿</b><span>被指派到某 job 的 runner</span></div>
+      <div class="row"><b>保護</b><span>機密性(存取控制)</span></div>
+    </div>
+    <div class="door">
+      <h4>⏰ 時間鎖釋放 <span style="color:var(--muted);font-weight:400">§3.4.6</span></h4>
+      <div class="row"><b>域</b><span><code>cbss/tlock/v1</code></span></div>
+      <div class="row"><b>觸發</b><span>鏈高度到點,<b>無需許可</b></span></div>
+      <div class="row"><b>誰能拿</b><span>任何人(公開)</span></div>
+      <div class="row"><b>保護</b><span>時間(到某高度前保密)</span></div>
+    </div>
+    <div class="door" style="border-style:dashed;opacity:.75">
+      <h4>❓ 常駐 operator</h4>
+      <div class="row"><span style="color:var(--danger)">兩扇門都不接受它</span></div>
+      <div class="row"><span>不是被指派的 runner</span></div>
+      <div class="row"><span>不是「到點公開」的消費者</span></div>
+      <div class="row"><span>也不是有 manifest 的 actor</span></div>
+    </div>
+  </div>
+  <p><b>機密釋放</b>那扇門,要求請求者是「被 dispatcher 指派到某個 job、且該 actor 的 manifest 宣告了 <code>secrets.read</code> 權限」的 runner。<b>時間鎖</b>那扇門則是「到點對所有人公開」。這兩扇門是 CIP-24 原始文檔<b>已經有</b>的全部釋放方式。</p>
+
+  <h3 id="cbss-trust">信任模型:靠「不合謀 + 質押」,而非硬體</h3>
+  <p>CIP-24 有一個刻意的設計選擇:它的信任根<b>不是</b> CPU 廠商的 TEE(可信硬體),而是 <b>t-of-n 的經濟賽局</b>。</p>
+  <table>
+    <tr><th></th><th>TEE-rooted 釋放</th><th>CBSS(CIP-24 選這條)</th></tr>
+    <tr><td>信任根</td><td>CPU 廠商證明(Intel/AMD)</td><td><b>t-of-n proxy 不合謀 + 質押罰沒</b></td></tr>
+    <tr><td>失效模式</td><td>TEE 被破 → 所有秘密可回溯外洩</td><td>t 人合謀 → 僅其任期內觀察到的秘密</td></tr>
+    <tr><td>硬體需求</td><td>需 TEE 硬體</td><td>一般硬體</td></tr>
+  </table>
+  <div class="box info">
+    <div class="h">🛡 這代表什麼</div>
+    要偷一把秘密,攻擊者得<b>同時</b>攻陷 5 個裡的 4 個特定 proxy(且它們分屬不同司法管轄、軟體版本、組織)。委員會成員還會<b>定期 reshare</b>(輪換手中的碎片、換血成員),提高「必須同時、持續」合謀的難度。任何洩露披露後,治理可罰沒質押並永久除名。TEE 在 CIP-24 裡是<b>可選的加分項</b>(<code>tee_required</code>),不是信任根——這一點在修正案裡會再遇到。
+  </div>
+</section>
+
+<!-- RELATION -->
+<section id="relation">
+  <h2 class="sec"><span class="n">③</span>本修正案 ⟷ CIP-24 是什麼關係</h2>
+  <div class="box ok">
+    <div class="h"><span class="chk">✔</span> 一句話:<b>附加(additive)/ 互補</b>,不是替代</div>
+    這份草稿是 CIP-24 的一個「<b>v1 amendment(修正案)</b>」。它<b>不改動、不移除</b> CIP-24 任何既有內容;它<b>插入</b>一種新的釋放模式,並<b>完全重用</b>第 ② 節講的委員會、DKG、密碼學、封套。原本的 runner 路徑與 tlock 路徑<b>原封不動</b>。
+  </div>
+  <p>換句話說,第 ② 節那套 CBSS 系統照舊運轉;這份修正案只是在它旁邊<b>多開一扇門</b>,給一種 CIP-24 原本服務不到的角色(常駐 operator 服務)。因為修正案的章節本身就是「插進 CIP-24 §3.1 / §3.5 / §3.7 …」,所以<b>它離開 CIP-24 無法獨立存在或理解</b>——這就是為什麼這份解讀檔必須先講完整個 CIP-24。</p>
+
+  <h3>它往 CIP-24 的哪些地方插入了什麼</h3>
+  <table>
+    <tr><th>CIP-24 章節</th><th>修正案做的事</th><th>性質</th></tr>
+    <tr><td class="mono">§3.4 密碼學</td><td>什麼都不動——重用同一個 <code>cbss/ibe/v1</code> 身分空間、MPK、shares、封套</td><td><span class="chk">重用</span></td></tr>
+    <tr><td class="mono">§3.1 資料結構</td><td>新增 <code>OperatorReleaseGrant</code>(授權憑證)</td><td><span style="color:var(--accent)">新增</span></td></tr>
+    <tr><td class="mono">§3.5 指令</td><td>新增 <code>Register/RevokeOperatorReleaseGrant</code>;把釋放請求泛化成 runner / operator 雙 arm</td><td><span style="color:var(--accent)">新增</span></td></tr>
+    <tr><td class="mono">§3.7 proxy 校驗</td><td>加一條 operator 分支(用 Grant 取代 job 指派 + manifest 權限)</td><td><span style="color:var(--accent)">新增分支</span></td></tr>
+    <tr><td class="mono">§3.8 拉取流程</td><td>加常駐服務版流程(無 dispatcher、用 K_auth)</td><td><span style="color:var(--accent)">新增分支</span></td></tr>
+    <tr><td class="mono">§8 安全</td><td>加 §8.9(常駐授權的威脅模型)</td><td><span style="color:var(--accent)">新增</span></td></tr>
+    <tr><td class="mono">§9.5 / 0x05 TEE</td><td>若要 <code>tee_required</code>,需一份新的跨倉 companion(§6a)——見審計 F7</td><td><span class="sev med" style="font-size:11px">跨倉依賴</span></td></tr>
+  </table>
+  <p style="color:var(--muted);font-size:14.5px">由此可見:修正案的「爆炸半徑」被刻意限制在<b>授權層</b>。唯一的跨倉牽動是可選的 TEE 路徑(§6a),所以預設(非-TEE)路徑是可獨立發布的核心。這也是 Marshal 審計反覆確認的一點:<b>密碼學中立</b>。</p>
+
+  <h3>那,為什麼原本兩扇門不夠?</h3>
+  <p>回顧第 ② 節結尾:常駐 operator 服務<b>不是</b>被指派的 runner(沒 job、沒 dispatcher、不是部署的 actor),也<b>不是</b>「到點公開」的 tlock 消費者(它的金鑰必須<b>始終保密</b>)。兩扇門都不接受它——所以需要<b>第三扇門</b>,這正是下一節。</p>
+</section>
+
+<!-- DESIGN -->
+<section id="design">
+  <h2 class="sec"><span class="n">④</span>第三扇門:Operator-Principal 釋放類</h2>
+  <div class="doors">
+    <div class="door"><h4>🔒 機密釋放</h4><div class="row"><b>認證</b><span>runner 金鑰 + job 指派</span></div><div class="row"><b>誰</b><span>job 裡的 runner</span></div></div>
+    <div class="door"><h4>⏰ 時間鎖</h4><div class="row"><b>認證</b><span>無(公開)</span></div><div class="row"><b>誰</b><span>任何人</span></div></div>
+    <div class="door new"><h4>🧑‍💼 Operator-Principal<span class="badge-new">新</span></h4>
+      <div class="row"><b>域</b><span><code>cbss/ibe/v1</code>(同機密釋放)</span></div>
+      <div class="row"><b>認證</b><span>鏈上 Grant + <code>K_auth</code> 簽名</span></div>
+      <div class="row"><b>誰</b><span>owner 註冊的常駐服務</span></div>
+      <div class="row"><b>保護</b><span>機密性(仍然鎖著)</span></div>
+    </div>
+  </div>
+
+  <h3 id="design-core">核心洞見:這是純授權層變更,<u>不動任何密碼學</u></h3>
+  <p>新的這扇門,釋放的是一個<b>普通的機密秘密</b>(operator 的簽名金鑰)。因為它<b>始終保密</b>,所以必須留在跟機密釋放<b>同一個身分空間</b> <code>cbss/ibe/v1</code>——重用委員會既有的 <code>MPK</code>、shares、DKG,加密封套格式一字不改。</p>
+  <div class="box ok">
+    <div class="h"><span class="chk">✔</span> 與 tlock 的關鍵分野</div>
+    tlock 之所以需要<b>另開</b>一個域 <code>cbss/tlock/v1</code>,是因為它的金鑰<b>到點會變公開</b>——必須跟機密秘密的身分空間隔離,免得公開釋放意外解出機密。<br>
+    而 operator 金鑰<b>永遠不公開</b>,所以<b>不需要</b>新域。它變的<b>只有一件事:誰被授權請求釋放、以及他怎麼認證自己</b>。密碼學(配對檢查、身分綁定、封套)完全沒動。
+  </div>
+  <p>具體來說,新的授權方式<b>替換</b>掉舊機密路徑的「三件套」:</p>
+  <table>
+    <tr><th>機密釋放(runner 路徑)需要…</th><th>→</th><th>Operator 路徑改成…</th></tr>
+    <tr><td>dispatcher 把 runner 指派到某 job</td><td>→</td><td rowspan="3"><b>一張鏈上憑證 <code>OperatorReleaseGrant</code></b><br>+ 用 <code>K_auth</code> 簽的請求</td></tr>
+    <tr><td>actor 的 CIP-6 manifest 宣告 <code>secrets.read</code></td><td>→</td></tr>
+    <tr><td><code>SecretPolicy.actors</code> 允許該 actor</td><td>→</td></tr>
+  </table>
+
+  <h3 id="design-keys">三金鑰分離:把「一個檔案」拆成三種溫度</h3>
+  <p>現況把三種角色全塞進一個 <code>.cowboy/key</code> 檔。這份修正案刻意把它們拆開:</p>
+  <div class="keys">
+    <div class="kc cold">
+      <div class="t">K_root</div><div class="temp">🧊 冷 · 離線</div>
+      <p><b>帳戶根金鑰</b>。負責<b>發放/撤銷</b>憑證(Grant)。平時離線收好,幾乎不動。</p>
+    </div>
+    <div class="kc warm">
+      <div class="t">K_auth</div><div class="temp">🌡 暖 · 在服務上</div>
+      <p><b>釋放授權金鑰</b>。常駐服務用它<b>對每次釋放請求簽名</b>。它<b>只能授權釋放,不是簽名金鑰本身,也不能控制帳戶</b>。</p>
+    </div>
+    <div class="kc hot">
+      <div class="t">K_sign</div><div class="temp">🔥 瞬時 · 用完即抹</div>
+      <p><b>被保管的秘密</b>(真正的簽名金鑰)。平時是鏈上加密封套;要用時才<b>臨時重建</b>在記憶體,用完立刻抹除。</p>
+    </div>
+  </div>
+  <div class="box info">
+    <div class="h">💡 為什麼這樣分很關鍵</div>
+    暴露在網路上的暖服務,手裡<b>只有 <code>K_auth</code></b>——既不是帳戶根金鑰,也不是(靜態的)簽名金鑰。<br>
+    <code>K_auth</code> 若被偷,攻擊者拿到的是「<b>限速、可撤銷、有審計</b>的釋放能力」,<b>不是金鑰檔本身,也不是帳戶控制權</b>。這比現況「偷走檔案 = 永久竊得金鑰」窄得多。
+  </div>
+
+  <h3 id="design-grant">授權憑證:<code>OperatorReleaseGrant</code></h3>
+  <p>owner 用冷金鑰 <code>K_root</code> 在鏈上(<code>0x04</code>)發一張憑證,指名「哪個暖金鑰 <code>K_auth</code> 可以釋放我的哪個秘密」。它是「actor manifest 權限 + ACL + job 指派」三件套的<b>帳戶版對應物</b>,收攏成一張 owner 簽發的記錄。重點欄位:</p>
+  <div class="kv">
+    <span>secret_id — 你自己的秘密</span>
+    <span>auth_pubkey — K_auth 公鑰</span>
+    <span>version_pin — 釘版本 or 跟隨最新</span>
+    <span>tee_required — 是否要 enclave</span>
+    <span>max_releases_per_hour — 限速</span>
+    <span>expiry — 自動過期</span>
+  </div>
+  <div class="box warn">
+    <div class="h">⚠ 一個刻意的邊界:僅限本帳戶</div>
+    Grant <b>只能授權自己帳戶的秘密</b>(<code>secret_id.account == 發起人</code>)。不像 ACL 可以跨帳戶授權給別人的 actor——這是為了避免 operator 路徑變成第二條、更弱的跨帳戶通道。
+  </div>
+
+  <h3 id="design-flow">常駐拉取流程(一次簽名發生了什麼)</h3>
+  <div class="flow">
+    <div class="step"><b>服務需要簽名</b><span>例如要簽一筆 Cowboy 交易</span></div>
+    <div class="step"><b>組請求 + K_auth 簽名</b><span>帶 nonce、鏈高度、目標 epoch</span></div>
+    <div class="step"><b>發給 4/5 個 proxy</b><span>每個 proxy 依 §3.7.1 校驗憑證</span></div>
+    <div class="step"><b>收集 partials 組 σ</b><span>本地 Lagrange 內插</span></div>
+    <div class="step"><b>解出 K_sign</b><span>推導金鑰 → 解封 DEK → 取 CBFS 明文</span></div>
+    <div class="step"><b>簽名 → 立刻抹除</b><span>K_sign、DEK、σ 全部歸零</span></div>
+  </div>
+  <p>與 runner 路徑相比,唯一差別是:<b>沒有 dispatcher 查詢、不用 runner 註冊金鑰</b>——principal 就是 operator 的常駐服務,用 <code>K_auth</code> 認證。而所有<b>密碼學驗證步驟</b>(配對檢查、recipient 一致性、去重、quorum 上限、付款)<b>與 runner 路徑逐位元組相同</b>。付款從<b>owner 帳戶</b>扣,每個 proxy 收一次費,上限為門檻 <code>t</code>。</p>
+</section>
+
+<!-- LIMITS -->
+<section id="limits">
+  <h2 class="sec"><span class="n">⑤</span>誠實的限制:這扇門<u>不能</u>做什麼</h2>
+  <p>這份草稿刻意不誇大。三個限制必須講清楚,否則會給人虛假的安全感。</p>
+
+  <div class="box danger">
+    <div class="h">🔥 限制一:保管<b>不</b>消除「瞬時重建」</div>
+    簽名發生的那一刻,<code>K_sign</code> 必然被<b>重建在服務自己的記憶體裡</b>——門檻釋放的本質就是「把明文交給被授權的請求方」。此刻若主機被入侵,攻擊者仍看得到它。<br>
+    <b>只有 TEE(<code>tee_required</code>)能移除這一點</b>:讓重建發生在<b>enclave 保險箱</b>內,明文不進主機記憶體。所以這份修正案在預設路徑上只敢宣稱「<b>消除明文靜態存儲 + 可撤銷 + 門檻保護 + 審計</b>」;「消除瞬時重建」是<b>有條件的</b>,而且那個 TEE 路徑本身是一項尚待落地的<b>跨倉依賴</b>(見審計 F7)。
+  </div>
+
+  <div class="box warn">
+    <div class="h">⏳ 限制二:撤銷是「停未來」,不是「retroactive 封印」</div>
+    撤銷 Grant 後,在 <b>finality + proxy 快取 TTL</b> 這段窗口內,若所有 4 個 proxy 都還握著陳舊快取,攻擊者<b>仍能湊齊一次完整釋放</b>——鏈端的撤銷檢查只擋<b>付款</b>,擋不住<b>重建</b>。<br>
+    更關鍵:<code>K_sign</code> 是<b>長壽命</b>金鑰,只要被釋放<b>一次</b>就<b>永久洩露</b>。撤銷只能停下一次釋放,<b>不能讓已洩露的金鑰復原</b>。正確的事故處置是<b>輪換 <code>K_sign</code>(部署新版本)+ 撤銷,兩者都做</b>。
+  </div>
+
+  <div class="box warn">
+    <div class="h">💸 限制三:限速是「成本/騷擾」界,不是「金鑰暴露」界</div>
+    <code>max_releases_per_hour</code> 是 <b>proxy 本地、鏈下、諮詢性</b>的——鏈上不強制。它管的是<b>花錢和騷擾</b>,不是金鑰暴露(反正一次釋放就已洩露)。而且它<b>雙面刃</b>:若把限速設成服務真實簽名速率,被偷的 <code>K_auth</code> 可以<b>燒光額度</b>,讓誠實服務簽不了名 → 甚至拖累帳戶進入 delinquent、<b>全帳戶 JobSubmit 被拒</b>。硬性的鏈上界其實只有 overdraft 上限。
+  </div>
+  <div class="box ok">
+    <div class="h"><span class="chk">✔</span> 淨結論</div>
+    這扇門把「<b>永久、無聲、不可撤</b>的金鑰失竊」變成「<b>可撤銷、有審計</b>的釋放能力」——是實打實的進步。但代價是:撤銷有個有界的完整釋放寬限窗、長壽金鑰洩露後必須<b>輪換</b>而非只撤銷、以及 <code>K_auth</code> 濫用下的一種可用性故障。它<b>不會</b>讓一個暴露在網路上的簽名服務變得無條件安全。
+  </div>
+</section>
+
+<!-- AUDIT -->
+<section id="audit">
+  <h2 class="sec"><span class="n">⑥</span>壓力測試:Marshal 深度審計</h2>
+  <p>這份草稿經過 Marshal(分級 + 對抗式 review + 逃逸棘輪的本地質量門禁)深審,<b>兩路獨立對抗式審查</b>(自審 + 獨立 reviewer 各一遍,預設懷疑、專攻機密性/授權這種「不變量測試抓不到」的否定性屬性)。結論收斂:</p>
+  <div class="box ok">
+    <div class="h"><span class="chk">✔</span> 核心判定:密碼學中立性穩固,無 HIGH</div>
+    真·授權層純變更、正確重用 <code>cbss/ibe/v1</code>、保留 recipient/配對/去重共識檢查。<b>無共識分叉、無金鑰混淆漏洞</b>。被<b>駁倒</b>的攻擊假設:跨協議簽名重放、release_id 碰撞、recipient/MPK 混淆、determinism fork。<br>
+    真正的弱點<b>不是密碼學,是「宣稱的準確性」</b>——以下 6 條已全部折進修訂版。
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">F7</span><span class="sev med">MED ↗</span><b>TEE 路徑是未言明的跨倉 schema 變更</b></div>
+    <p>草稿把 <code>tee_required</code> 說成「keyed by grant_id / 復用 §9.5」,但現行 <code>0x05</code> 的 attestation 記錄與簽名載荷<b>全綁 job_id + runner</b>;而 operator 服務兩者皆無。偏偏 §1.2/§8.9 最強的安全宣稱(TEE 消除瞬時重建)就靠這條最欠規格的路徑。</p>
+    <div class="fix"><b>修法:</b>新增 <b>§6a</b> 完整規格化一份 grant-scoped 的 <code>0x05</code> companion(<code>tee_att_op:{grant_id}</code> 記錄、<code>SubmitOperatorTeeAttestation</code> 指令、<code>cbss/operator-tee-attestation/v1</code> 新載荷);全文改為「非復用、落地前 fail-closed、宣稱有條件」,並給了「索性把 <code>tee_required</code> 移出作 follow-up」的替代路。</div>
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">F5</span><span class="sev med">MED</span><b>撤銷寬限窗可放出「完整」釋放</b></div>
+    <p>原文「one last partial」暗示只是單個無害 straggler,實則全部 <code>t</code> 個 proxy 各服務一次陳舊 partial = 撤銷後仍湊齊完整 σ;且長壽金鑰一次釋放即永久洩露。</p>
+    <div class="fix"><b>修法:</b>§3.2 重寫為「窗口內可湊完整 quorum → 完整釋放,鏈只 gate 付款不 gate 重建」;明說疑洩後正解是<b>輪換 K_sign + 撤銷</b>;§1.1 表格與 §8.9 同步。</div>
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">F6</span><span class="sev med">MED</span><b>限速非鏈上強制,且收緊即 DoS</b></div>
+    <p>限速是 proxy 本地/諮詢性、可跨 proxy 子集扇出放大 ~n/t×、且不在計費處;而 §8.9 建議的收緊本身就是對誠實服務的 DoS 槓桿。</p>
+    <div class="fix"><b>修法:</b>§8.9 明確區分軟(proxy 節流)vs 硬(overdraft/delinquency);揭露 DoS-via-tightening → 帳戶級 JobSubmit 全拒;點明限速管成本/騷擾、非金鑰暴露。</div>
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">F4</span><span class="sev low">LOW-MED</span><b>輪換金鑰對被偷的 K_auth 是 no-op;lockdown 不覆蓋 Grant</b></div>
+    <p><code>version_pin=None</code> 自動跟隨所有未來版本 → 單純輪換秘密擋不住 compromised K_auth(只有撤銷有效);<code>SecretPolicy.actors=Some([])</code> 緊急鎖定只關 actor 那扇門、不覆蓋 Grant。</p>
+    <div class="fix"><b>修法:</b>§3.1 欄位註解 + §8.9 明寫這兩個腳槍;完整 lockdown 須枚舉 Revoke 所有 Grant。</div>
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">M1</span><span class="sev low">LOW-MED</span><b>Principal enum 判別式須規範化 + 經認證</b></div>
+    <p>原文把 runner/operator 兩 arm 的序列化留到「impl time 和解」。簽名 domain 前綴只擋簽名重放,擋不住共識關鍵路徑上對 arm 的<b>派發歧義</b>。</p>
+    <div class="fix"><b>修法:</b>§3.3 規範:判別式須<b>前導、經認證的 1-byte tag</b> 入 <code>request_hash</code> 原像;domain 字串與驗簽金鑰都從<b>已認證的 in-body arm tag</b> 選,非外層 codec framing。</div>
+  </div>
+
+  <div class="find">
+    <div class="top"><span class="id">L1</span><span class="sev low">LOW</span><b>release_id 加 principal 域字節(縱深防禦)</b></div>
+    <p>keccak256 抗碰撞使今日跨 arm 碰撞不可行(原像 164B vs 124B),但兩構造共用同一去重/quorum 命名空間,值得一個顯式 arm tag 防未來欄寬變更。</p>
+    <div class="fix"><b>修法:</b>§3.3 兩 arm 各加前導 <code>u8</code>(runner <code>0x00</code> / operator <code>0x01</code>)。</div>
+  </div>
+
+  <details>
+    <summary>被駁倒的攻擊假設(為什麼核心是穩固的)</summary>
+    <table>
+      <tr><th>假設</th><th>判定</th><th>理由</th></tr>
+      <tr><td>跨協議簽名重放</td><td class="chk">駁倒</td><td>三重分離:domain 前綴不同 + 驗簽金鑰源不同 + 經認證的 arm tag</td></tr>
+      <tr><td>release_id 碰撞</td><td class="chk">駁倒</td><td>原像長度與佈局皆異(164B vs 124B),要碰撞需破 keccak256,且含 32B CSPRNG nonce</td></tr>
+      <tr><td>recipient/MPK 混淆</td><td class="chk">駁倒</td><td>operator arm 保留 <code>RecipientMismatch</code> 檢查(§3.6 逐位元組相同)</td></tr>
+      <tr><td>determinism fork</td><td class="chk">駁倒</td><td>鏈層驗證全讀 current head 且確定;<code>service_label</code>/限速/TTL 皆鏈下,不入共識派生</td></tr>
+    </table>
+  </details>
+  <p style="color:var(--muted);font-size:14px">Gate 判決 <code>needs_human</code>:規格層 + 機密性屬性依鐵律終審歸人;建議先修 F7、更正 F5/F6 措辭,再考慮 lift 進 canonical CIP-24。以上 6 條已全部折入 v2。</p>
+</section>
+
+<!-- SUMMARY -->
+<section id="summary">
+  <h2 class="sec"><span class="n">⑦</span>一句話總結</h2>
+  <div class="box info" style="font-size:17px">
+    這份修正案給 CBSS 開了<b>第三扇門</b>:讓帳戶用一張鏈上憑證 + 一把獨立的暖授權金鑰,授權自己的<b>常駐服務</b>把<b>自己的機密簽名金鑰</b>臨時釋放出來用——<b>不需要 job、不需要 dispatcher、不需要部署 actor</b>,而且<b>完全不動密碼學</b>(因為秘密仍機密,留在同一 IBE 身分空間)。<br><br>
+    它把「明文躺硬碟」升級成「可撤銷、門檻保護、有審計」;但誠實地不宣稱消除<b>瞬時重建</b>(那要 TEE,且 TEE 路徑是尚待落地的跨倉依賴)。經 Marshal 兩路對抗審計,密碼學核心判定穩固,6 條「宣稱準確性」發現已全部修入。
+  </div>
+</section>
+
+<!-- GLOSSARY -->
+<section id="glossary">
+  <h2 class="sec">名詞表</h2>
+  <table>
+    <tr><th class="mono">CBSS</th><td>Cowboy Secret Service(CIP-24)。質押 proxy 委員會提供的門檻式秘密釋放服務。系統 actor 位址 <code>0x04</code>。</td></tr>
+    <tr><th class="mono">門檻 IBE</th><td>Threshold Identity-Based Encryption。加密到一個「身分」,解密金鑰是委員會對該身分的門檻 BLS 簽章。底層 BLS12-381 / Boneh–Franklin。</td></tr>
+    <tr><th class="mono">(n,t)=(5,4)</th><td>委員會 5 人,任 4 人可完成一次釋放,3 人以下無效。</td></tr>
+    <tr><th class="mono">MSK / MPK</th><td>委員會共同持有的主秘鑰 / 對應主公鑰。透過 DKG 生成,沒人單獨持有 MSK。</td></tr>
+    <tr><th class="mono">partial σ_i</th><td>單一 proxy 用自己的 share 對身分 <code>I</code> 產出的「一片」;≥t 片可組出完整 <code>σ</code>。</td></tr>
+    <tr><th class="mono">DEK</th><td>Data Encryption Key。實際加密資料的對稱金鑰;它本身被 IBE 封套 <code>wrapped_dek</code> 包住存在鏈上。</td></tr>
+    <tr><th class="mono">K_root / K_auth / K_sign</th><td>本修正案的三金鑰分離:冷根金鑰(發撤憑證)/ 暖授權金鑰(簽釋放請求)/ 被保管的秘密簽名金鑰(瞬時重建)。</td></tr>
+    <tr><th class="mono">Grant</th><td><code>OperatorReleaseGrant</code>。owner 在鏈上發的憑證,指名某 <code>K_auth</code> 可釋放某秘密。</td></tr>
+    <tr><th class="mono">tlock</th><td>時間鎖釋放(§3.4.6)。到某鏈高度後對所有人公開,用於 CIP-34 sealed-bid 拍賣。與本修正案<b>不同域、不相干</b>。</td></tr>
+    <tr><th class="mono">TEE</th><td>可信執行環境(CIP-23)。enclave 保險箱;本修正案唯一能移除「瞬時重建」的手段,但需 §6a 跨倉 companion 落地。</td></tr>
+    <tr><th class="mono">0x04 / 0x05</th><td>系統 actor:CBSS Secrets Manager / TEE Verifier。</td></tr>
+  </table>
+  <div class="foot">
+    來源文件:<code>refs/analysis/2026-07-06-cip24-operator-principal-release-amendment-draft.md</code><br>
+    背景評估(Model A):<code>refs/analysis/2026-07-06-cbss-operator-signing-evaluation.md</code> ·
+    規格權威:<code>cowboy/docs/cips/cip-24-secrets-manager.md</code><br>
+    本解讀檔為輔助閱讀用,如與規格原文/修正案草稿衝突,以後者為準。
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+// scroll-spy TOC highlight
+const links=[...document.querySelectorAll('#toc a')];
+const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+const obs=new IntersectionObserver((es)=>{
+  es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));
+    const a=map.get(e.target.id); if(a)a.classList.add('active');}});
+},{rootMargin:'-10% 0px -80% 0px',threshold:0});
+document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
