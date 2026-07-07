@@ -129,8 +129,7 @@
   <a href="#design-grant" class="sub">授權憑證 Grant</a>
   <a href="#design-flow" class="sub">常駐拉取流程</a>
   <a href="#limits">⑤ 誠實的限制</a>
-  <a href="#audit">⑥ 壓力測試:Marshal 審計</a>
-  <a href="#summary">⑦ 一句話總結</a>
+  <a href="#summary">⑥ 一句話總結</a>
   <a href="#glossary">名詞表</a>
   <span class="tag">繁體中文 · 離線可讀</span>
 </nav>
@@ -143,7 +142,7 @@
   <div class="meta">
     <span class="pill">草稿狀態:DRAFT</span>
     <span class="pill">純授權層 · 不動密碼學</span>
-    <span class="pill">Marshal 審計:run 548 · needs_human</span>
+    <span class="pill">同一 cbss/ibe/v1 身分空間</span>
     <span class="pill">對應 Model A</span>
   </div>
 </header>
@@ -402,7 +401,7 @@
     <tr><td class="mono">§8 安全</td><td>加 §8.9(常駐授權的威脅模型)</td><td><span style="color:var(--accent)">新增</span></td></tr>
     <tr><td class="mono">§9.5 / 0x05 TEE</td><td>若要 <code>tee_required</code>,需一份新的跨倉 companion(§6a)——見審計 F7</td><td><span class="sev med" style="font-size:11px">跨倉依賴</span></td></tr>
   </table>
-  <p style="color:var(--muted);font-size:14.5px">由此可見:修正案的「爆炸半徑」被刻意限制在<b>授權層</b>。唯一的跨倉牽動是可選的 TEE 路徑(§6a),所以預設(非-TEE)路徑是可獨立發布的核心。這也是 Marshal 審計反覆確認的一點:<b>密碼學中立</b>。</p>
+  <p style="color:var(--muted);font-size:14.5px">由此可見:修正案的「爆炸半徑」被刻意限制在<b>授權層</b>。唯一的跨倉牽動是可選的 TEE 路徑(§6a),所以預設(非-TEE)路徑是可獨立發布的核心。這正是本修正案的核心性質:<b>密碼學中立</b>。</p>
 
   <figure class="fig">
     <svg viewBox="0 0 900 360" role="img" aria-label="模組關係圖" style="font-family:-apple-system,'Noto Sans TC','PingFang TC',sans-serif">
@@ -592,71 +591,12 @@
   </div>
 </section>
 
-<!-- AUDIT -->
-<section id="audit">
-  <h2 class="sec"><span class="n">⑥</span>壓力測試:Marshal 深度審計</h2>
-  <p>這份草稿經過 Marshal(分級 + 對抗式 review + 逃逸棘輪的本地質量門禁)深審,<b>兩路獨立對抗式審查</b>(自審 + 獨立 reviewer 各一遍,預設懷疑、專攻機密性/授權這種「不變量測試抓不到」的否定性屬性)。結論收斂:</p>
-  <div class="box ok">
-    <div class="h"><span class="chk">✔</span> 核心判定:密碼學中立性穩固,無 HIGH</div>
-    真·授權層純變更、正確重用 <code>cbss/ibe/v1</code>、保留 recipient/配對/去重共識檢查。<b>無共識分叉、無金鑰混淆漏洞</b>。被<b>駁倒</b>的攻擊假設:跨協議簽名重放、release_id 碰撞、recipient/MPK 混淆、determinism fork。<br>
-    真正的弱點<b>不是密碼學,是「宣稱的準確性」</b>——以下 6 條已全部折進修訂版。
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">F7</span><span class="sev med">MED ↗</span><b>TEE 路徑是未言明的跨倉 schema 變更</b></div>
-    <p>草稿把 <code>tee_required</code> 說成「keyed by grant_id / 復用 §9.5」,但現行 <code>0x05</code> 的 attestation 記錄與簽名載荷<b>全綁 job_id + runner</b>;而 operator 服務兩者皆無。偏偏 §1.2/§8.9 最強的安全宣稱(TEE 消除瞬時重建)就靠這條最欠規格的路徑。</p>
-    <div class="fix"><b>修法:</b>新增 <b>§6a</b> 完整規格化一份 grant-scoped 的 <code>0x05</code> companion(<code>tee_att_op:{grant_id}</code> 記錄、<code>SubmitOperatorTeeAttestation</code> 指令、<code>cbss/operator-tee-attestation/v1</code> 新載荷);全文改為「非復用、落地前 fail-closed、宣稱有條件」,並給了「索性把 <code>tee_required</code> 移出作 follow-up」的替代路。</div>
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">F5</span><span class="sev med">MED</span><b>撤銷寬限窗可放出「完整」釋放</b></div>
-    <p>原文「one last partial」暗示只是單個無害 straggler,實則全部 <code>t</code> 個 proxy 各服務一次陳舊 partial = 撤銷後仍湊齊完整 σ;且長壽金鑰一次釋放即永久洩露。</p>
-    <div class="fix"><b>修法:</b>§3.2 重寫為「窗口內可湊完整 quorum → 完整釋放,鏈只 gate 付款不 gate 重建」;明說疑洩後正解是<b>輪換 K_sign + 撤銷</b>;§1.1 表格與 §8.9 同步。</div>
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">F6</span><span class="sev med">MED</span><b>限速非鏈上強制,且收緊即 DoS</b></div>
-    <p>限速是 proxy 本地/諮詢性、可跨 proxy 子集扇出放大 ~n/t×、且不在計費處;而 §8.9 建議的收緊本身就是對誠實服務的 DoS 槓桿。</p>
-    <div class="fix"><b>修法:</b>§8.9 明確區分軟(proxy 節流)vs 硬(overdraft/delinquency);揭露 DoS-via-tightening → 帳戶級 JobSubmit 全拒;點明限速管成本/騷擾、非金鑰暴露。</div>
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">F4</span><span class="sev low">LOW-MED</span><b>輪換金鑰對被偷的 K_auth 是 no-op;lockdown 不覆蓋 Grant</b></div>
-    <p><code>version_pin=None</code> 自動跟隨所有未來版本 → 單純輪換秘密擋不住 compromised K_auth(只有撤銷有效);<code>SecretPolicy.actors=Some([])</code> 緊急鎖定只關 actor 那扇門、不覆蓋 Grant。</p>
-    <div class="fix"><b>修法:</b>§3.1 欄位註解 + §8.9 明寫這兩個腳槍;完整 lockdown 須枚舉 Revoke 所有 Grant。</div>
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">M1</span><span class="sev low">LOW-MED</span><b>Principal enum 判別式須規範化 + 經認證</b></div>
-    <p>原文把 runner/operator 兩 arm 的序列化留到「impl time 和解」。簽名 domain 前綴只擋簽名重放,擋不住共識關鍵路徑上對 arm 的<b>派發歧義</b>。</p>
-    <div class="fix"><b>修法:</b>§3.3 規範:判別式須<b>前導、經認證的 1-byte tag</b> 入 <code>request_hash</code> 原像;domain 字串與驗簽金鑰都從<b>已認證的 in-body arm tag</b> 選,非外層 codec framing。</div>
-  </div>
-
-  <div class="find">
-    <div class="top"><span class="id">L1</span><span class="sev low">LOW</span><b>release_id 加 principal 域字節(縱深防禦)</b></div>
-    <p>keccak256 抗碰撞使今日跨 arm 碰撞不可行(原像 164B vs 124B),但兩構造共用同一去重/quorum 命名空間,值得一個顯式 arm tag 防未來欄寬變更。</p>
-    <div class="fix"><b>修法:</b>§3.3 兩 arm 各加前導 <code>u8</code>(runner <code>0x00</code> / operator <code>0x01</code>)。</div>
-  </div>
-
-  <details>
-    <summary>被駁倒的攻擊假設(為什麼核心是穩固的)</summary>
-    <table>
-      <tr><th>假設</th><th>判定</th><th>理由</th></tr>
-      <tr><td>跨協議簽名重放</td><td class="chk">駁倒</td><td>三重分離:domain 前綴不同 + 驗簽金鑰源不同 + 經認證的 arm tag</td></tr>
-      <tr><td>release_id 碰撞</td><td class="chk">駁倒</td><td>原像長度與佈局皆異(164B vs 124B),要碰撞需破 keccak256,且含 32B CSPRNG nonce</td></tr>
-      <tr><td>recipient/MPK 混淆</td><td class="chk">駁倒</td><td>operator arm 保留 <code>RecipientMismatch</code> 檢查(§3.6 逐位元組相同)</td></tr>
-      <tr><td>determinism fork</td><td class="chk">駁倒</td><td>鏈層驗證全讀 current head 且確定;<code>service_label</code>/限速/TTL 皆鏈下,不入共識派生</td></tr>
-    </table>
-  </details>
-  <p style="color:var(--muted);font-size:14px">Gate 判決 <code>needs_human</code>:規格層 + 機密性屬性依鐵律終審歸人;建議先修 F7、更正 F5/F6 措辭,再考慮 lift 進 canonical CIP-24。以上 6 條已全部折入 v2。</p>
-</section>
-
 <!-- SUMMARY -->
 <section id="summary">
-  <h2 class="sec"><span class="n">⑦</span>一句話總結</h2>
+  <h2 class="sec"><span class="n">⑥</span>一句話總結</h2>
   <div class="box info" style="font-size:17px">
     這份修正案給 CBSS 開了<b>第三扇門</b>:讓帳戶用一張鏈上憑證 + 一把獨立的暖授權金鑰,授權自己的<b>常駐服務</b>把<b>自己的機密簽名金鑰</b>臨時釋放出來用——<b>不需要 job、不需要 dispatcher、不需要部署 actor</b>,而且<b>完全不動密碼學</b>(因為秘密仍機密,留在同一 IBE 身分空間)。<br><br>
-    它把「明文躺硬碟」升級成「可撤銷、門檻保護、有審計」;但誠實地不宣稱消除<b>瞬時重建</b>(那要 TEE,且 TEE 路徑是尚待落地的跨倉依賴)。經 Marshal 兩路對抗審計,密碼學核心判定穩固,6 條「宣稱準確性」發現已全部修入。
+    它把「明文躺硬碟」升級成「可撤銷、門檻保護、有審計」;但誠實地不宣稱消除<b>瞬時重建</b>(那要 TEE,且 TEE 路徑是尚待落地的跨倉依賴)。密碼學後端一行未動,只在授權層新增一條路徑。
   </div>
 </section>
 
