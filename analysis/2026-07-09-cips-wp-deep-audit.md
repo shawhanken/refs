@@ -577,7 +577,9 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 **A 收尾(Marshal 標的兩條殘留 — 調查後判定「已被既有代碼/測試覆蓋」,不加冗餘;僅補一條真缺的覆蓋):**
 - **H-1 self-unbond/config 殘留 → 撤回(非 gap)**:runner 持有委託時無法降自質押破比例——full deregister 已被 `RunnerHasActiveDelegations` guard 擋(`registry.rs:284`,測試 `runner_deregister_blocked_by_active_delegations`),且**無部分自 unbond 路徑**(`self_stake_unbonding_claimable_at` 從不設 Some);config `max_delegated_stake` 不影響比例。
 - **H-11 `TimerListFull`@(h+1) drop 殘留 → 撤回(已覆蓋)**:產生 `TimerListFull` 的 cap 已於 `timers.rs:419` 單測;Preserve drop arm 與已上鏈的 retry arm(COW-2298)結構相同。
-- **真缺的覆蓋 → 已補**:H-1 測試原只覆蓋 delegate(`is_increase=false`);新增 `increase_self_bond_floor_enforced` 鎖住 increase 路徑 = **[node#1006](https://github.com/cowboyinc/node/pull/1006)**(test-only)。
+- **真缺的覆蓋 → 已補**:H-1 測試原只覆蓋 delegate(`is_increase=false`);新增 `increase_self_bond_floor_enforced` 鎖住 increase 路徑 = **[node#1006](https://github.com/cowboyinc/node/pull/1006) 已 merged**(devnet 1a1def69)。
+
+**終態:15 條 HIGH 全數落地** — 規格 10 條(#239+#240 merged)、代碼 2 條(#1004/#1005 merged,TDD+Marshal pass)、覆蓋補強 1 條(#1006 merged);餘 3 條 decision(#236/237/238)待團隊裁決。
 
 ### C. 須團隊定奪(3 條)— 經濟/密碼/跨 CIP 設計,不替裁
 
