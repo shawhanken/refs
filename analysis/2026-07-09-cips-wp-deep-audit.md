@@ -592,3 +592,26 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 | H-10 | ~~CIP-31 儲存費 per-MiB vs 代碼 per-byte~~ **已解決**:devnet 代碼(`cowboy-protocol-types@0aa46e1`)`STORAGE_FEE_PER_MIB_PER_EPOCH = 450` = 規格;per-byte 常量全刪 | **[#237](https://github.com/cowboyinc/cowboy/issues/237) 已 closed(completed)** · 文檔 `...2026-07-12-cip31-storage-fee-denomination-RESOLVED.md` |
 | H-14 | CBSS `MIN_PROXY_STAKE` 規格 10k vs 代碼 1k(10× Sybil)。建議方案 a(代碼調高至 10k,單位基準須釘)+ 綁 COW-2497 | [#238](https://github.com/cowboyinc/cowboy/issues/238) · 方案文檔 `refs/analysis/2026-07-12-cbss-min-proxy-stake-decision.md` |
 
+
+---
+
+## 9. Security MEDIUM 逐條驗證 triage(2026-07-12,vs current devnet/main)
+
+18 條 security-維度 MEDIUM 全部回**當前源**核實。結論:**0 個 live 可利用 bug**——多數已解決(審計基於陳舊 base)、或代碼正確而規格沉默、或機制未上鏈。
+
+| # | 條目 | 當前狀態 | 處置 |
+|---|------|---------|------|
+| 1 | CIP-31 challenge pool 下溢 | 代碼已正確 cap(`ras.rs:1212-1217`,`min(bounty,available,epoch_cap)`,無下溢) | ✅ **spec 補全 [cowboy#241](https://github.com/cowboyinc/cowboy/pull/241)** |
+| 2 | CIP-34 Intent 簽名 chain_id | **已解決**:r7 spec + 代碼(`settlement.rs:705`)綁**節點自身 chain_id**,非 tx.chain_id | 無需動作(stale) |
+| 3 | CIP-34 RevealAuction wedge | **已解決**:r7 改為 `CancelledNoValidBid` cancel,不 wedge | 無需動作(stale) |
+| 4 | CIP-12 CircuitBreaker 7-of-9 auth | **已解決**:`council.rs` 實作 Security Council 7-of-9 | 無需動作(stale) |
+| 5 | CIP-16 Frozen-ACTIVE | 代碼正確:resolver 用 `expires_at <= block_height` 判 serveable,不看 stored status→過期綁定 resolve None,不可利用 | 低優先 spec 補全 |
+| 6 | CIP-15 SSRF route_serving_endpoint | gateway 代碼已硬化(scheme guard+redirect-off+private-IP,gateway#35) | 低優先 spec 補全 |
+| 7 | CIP-10 非-TEE billing full escrow | shipped-as-designed(測試 `container_billing_dispute_charges_full_escrow` 斷言此行為) | 設計 review,非 bug |
+| 8 | CIP-10 CAP_NET_BIND_SERVICE 誤認 | 文檔/註解措辭問題 | 低優先 doc 修 |
+| 9 | CIP-23 UpdateCollateral 無 ROOT_UPDATE_DELAY | **可能 live**:`handle_update_collateral` 只查 `effective_at` 與 snapshot 一致,無 `effective_at >= block+DELAY` 最小延遲 floor→治理(0x09)可即時推 collateral | ⚠️ **待 CIP-23 owner 確認**是否須強制延遲(治理信任層,非外部攻擊) |
+| 10-14 | CIP-12 §7.4.b unlimited-gas migration / CIP-18 method=cowboy chain_id / CIP-22 double-finalize / div-zero / front-run | **機制未上鏈**(§7.4.b external;payments/auctions handler 未建) | spec-design:實作前先在規格加安全要求 |
+| 15-17 | CIP-28 locked_after_transfer / fee_payer_override wire / CIP-33 IBE label | **未上鏈**(cards/trading-post 未建) | spec-design,實作前補 |
+| 18 | secrets-WP HEALTH_RECOVERY_BPS_PER_BLOCK | 確認代碼**未實作** | doc-status:標未實作 or 補實作 |
+
+**唯一需進一步看的**:#9 CIP-23 UpdateCollateral 的最小延遲(治理信任 MEDIUM)。其餘要麼已解決、要麼代碼正確、要麼未上鏈(spec-design,待實作時處理)。
