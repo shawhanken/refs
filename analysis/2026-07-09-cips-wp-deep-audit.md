@@ -585,7 +585,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 | # | 判定 / 建議 | 追蹤 |
 |---|-----------|------|
-| H-8 | CIP-30 O(1) fork vs CIP-27 sealed 排除不可調和。建議方案 b(on_fork 刪 sealed),須兩份 CIP 協同 | **[cowboy#236](https://github.com/cowboyinc/cowboy/issues/236)** |
-| H-10 | CIP-31 儲存費 per-MiB(#231 最新)vs 代碼 per-byte ~23,301×。代碼待跟上 #231,目標 $/GiB/年 須經濟簽核 | **[cowboy#237](https://github.com/cowboyinc/cowboy/issues/237)** |
-| H-14 | CBSS `MIN_PROXY_STAKE` 規格 10k vs 代碼 1k(10× Sybil)。須安全+經濟定調高/調低 | **[cowboy#238](https://github.com/cowboyinc/cowboy/issues/238)** |
+| H-8 | CIP-30 O(1) fork vs CIP-27 sealed 排除不可調和。建議方案 b(**runtime**(非 on_fork)刪 manifest-declared sealed keys),須兩份 CIP 協同 | [#236](https://github.com/cowboyinc/cowboy/issues/236) · 方案文檔 `refs/analysis/2026-07-12-cip30-cip27-fork-sealed-exclusion-decision.md` |
+| H-10 | ~~CIP-31 儲存費 per-MiB vs 代碼 per-byte~~ **已解決**:devnet 代碼(`cowboy-protocol-types@0aa46e1`)`STORAGE_FEE_PER_MIB_PER_EPOCH = 450` = 規格;per-byte 常量全刪 → **建議關閉 #237** | [#237](https://github.com/cowboyinc/cowboy/issues/237) · 文檔 `refs/analysis/2026-07-12-cip31-storage-fee-denomination-RESOLVED.md` |
+| H-14 | CBSS `MIN_PROXY_STAKE` 規格 10k vs 代碼 1k(10× Sybil)。建議方案 a(代碼調高至 10k,單位基準須釘)+ 綁 COW-2497 | [#238](https://github.com/cowboyinc/cowboy/issues/238) · 方案文檔 `refs/analysis/2026-07-12-cbss-min-proxy-stake-decision.md` |
 
