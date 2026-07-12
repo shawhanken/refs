@@ -10,12 +10,15 @@ _多代理獨立審計,2026-07-09/10。兩趟工作流:(1) 39 份文件逐份獨
 - **對抗階段駁回:** 134 條候選被反駁丟棄(63 條 HIGH 層 + 71 條 MED/LOW)。另有 50 條驗證者意見分歧(需人工裁定,含數條 CRITICAL/HIGH 安全項)。
 - **核心結論:** 規格已與上鏈代碼**系統性脫節**——312 條確認中 123 條是漂移。常量、opcode 編號、系統 actor 地址、record schema、費用計價單位、error 語義,在 CIP/白皮書與 node/runner/cbfs/cbss 之間全線對不上。**照數份規格原文獨立實作出的 client 會使鏈分叉。**
 
-### 最嚴重的 5 項
-- **[cip-3-fee-model]** §2.2.3 lane budget 表 8× 錯(10M vs 上鏈 80M;System 5% vs 50%)——amendment 未涵蓋;獨立 client 直接分叉。
-- **[cip-31-cbfs-rent-schedule]** 儲存費計價單位不符:規格 per-MiB(450 nano-CBY)vs 代碼 per-byte(10)——約 **23,301× 費率差**;外加拆分 10/1/89(規格)vs 10/2/88(代碼與其他所有文件)。
-- **[cip-13-runner-delegation]** `MIN_SELF_BOND_BPS`(10% skin-in-the-game)定義了卻在任何委託 handler 都不強制——低資本 runner 可吸無限委託質押。
-- **[cip-8-mpp-session]** §12 規範性聲稱 session handler 不是 SystemInstruction、不持 opcode——**錯**;代碼以 opcode 52–57 作為 SystemInstruction 變體上鏈(且 uniqueness 測試有漏)。
-- **[cip-3-fee-model]** 4096-bit 整數守衛在 VM 字節碼層可繞過;§2.2.4.9 寫了 MUST 但只由部署期靜態分析強制——活的 DoS 面。
+### 最嚴重的 5 項(附 2026-07-12 當前狀態)
+
+> 下列是審計當時的 top-5;經後續處理與**回一手源核實**,4 項已閉環、第 5 項核出精確殘留。
+
+1. **[cip-3-fee-model]** §2.2.3 lane budget 表 8× 錯(10M vs 上鏈 80M)。 → ✅ **已修**(H-6,規格改 80M,#239 merged)。
+2. **[cip-31-cbfs-rent-schedule]** 儲存費計價 per-MiB vs per-byte ~23,301× + 拆分 10/1/89 vs 10/2/88。 → ✅ **兩部分全解**:拆分改 10/2/88(#239+#240 merged);**計價核實已解決**——devnet 代碼(`cowboy-protocol-types@0aa46e1`)`STORAGE_FEE_PER_MIB_PER_EPOCH = 450` 恰=規格,per-byte 常量全刪(#237 已 close)。*審計此條基於陳舊 base,實際代碼早已 per-MiB。*
+3. **[cip-13-runner-delegation]** `MIN_SELF_BOND_BPS` 定義卻零強制。 → ✅ **已修**(H-1 代碼 #1004 merged + increase 路徑測試 #1006 merged)。
+4. **[cip-8-mpp-session]** §12 謊稱 session handler 無 opcode(實為 52–57)。 → ✅ **規格已修**(#239 merged);**opcode 碰撞核實已被編譯期守衛覆蓋**:codec `Read for Instruction` 上 `#[deny(unreachable_patterns)]` + 字面量 decode arm(`52 =>`…`57 =>`),任何撞號=編譯錯。node 手工 `sys_opcode_uniqueness` list 漏 52–57 屬冗餘檢查的完整性小缺、**無實際暴露**(可選補列)。
+5. **[cip-3-fee-model]** 4096-bit 整數守衛可繞過。 → ⚠️ **規格已誠實化(MUST→SHOULD,#239 merged);但運行期殘留經實測確認**:守衛是純 Python preamble(`_builtins.int = _GuardedInt`,只覆寫算術運算子、對**結果** `_check()`)。**construction 不檢查 + `pow()` builtin 未 rebind** → 實測 `int.from_bytes(4809-bit)`、`int("9"*2000)`、`pow(2,10000)` **全部繞過**(control `int(2)**10000` 正常被擋)。性質:**確定性(全 validator 一致→無分叉)、gas 有界(產生大整數付比例 gas)→ LOW–MEDIUM 健全性/DoS,非 critical**。bare-literal `**`/`<<` 已由 COW-2293 deploy 靜態堵住;airtight 需 **VM 層(Rust)強制**(int_overflow.rs 註解已標「另案追蹤」)。
 
 ---
 
