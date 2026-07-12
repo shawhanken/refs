@@ -550,7 +550,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 ## 8. 15 條 HIGH 的逐條處置(2026-07-10)
 
-每條經回一手規格+代碼原文研判,分三類。規格修訂 **[cowboy#239](https://github.com/cowboyinc/cowboy/pull/239) 已 merged**(main `0fab9ab`);後續小修 §5 pro-rata `0.89 → 0.88`(H-9 grep 漏的小數寫法)= **[cowboy#240](https://github.com/cowboyinc/cowboy/pull/240)**。
+每條經回一手規格+代碼原文研判,分三類。規格修訂 **[cowboy#239](https://github.com/cowboyinc/cowboy/pull/239) 已 merged**(main `0fab9ab`);後續小修 §5 pro-rata `0.89 → 0.88`(H-9 grep 漏的小數寫法)= **[cowboy#240](https://github.com/cowboyinc/cowboy/pull/240) 已 merged**。兩條代碼修復 **node#1004(H-1)、node#1005(H-11)皆 TDD + Marshal `pass`(run557/558)後 merged 入 `devnet`**(ae1c1540 / 474d2c85)。
 
 ### A. 已直接修規格(10 條)— 代碼為既成部署事實,規格寫錯/缺失
 
@@ -567,12 +567,17 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 | H-3 | cip-20 | 補述三個上鏈指令 IncreaseAllowance/DecreaseAllowance/Permit(opcode 21–23、err 1413–1415、chain_id 綁定) |
 | H-15 | storage-WP Create | 加 errata:DEK 封裝實為 CBSS 門限-IBE(committee epoch + release-key hash @ 0x04),非 HKDF |
 
-### B. 須改代碼、規格是對的(2 條)— 未動規格,已開 node issue
+### B. 須改代碼、規格是對的(2 條)— 已 TDD 修復 + Marshal 通過 + merged
 
-| # | 判定 | Issue |
+| # | 判定 | 交付 |
 |---|------|-------|
-| H-1 | CIP-13 `MIN_SELF_BOND_BPS` 定義卻零強制 → delegation handler 補 self-bond 校驗(TDD,flag-day) | issue [node#991](https://github.com/cowboyinc/node/issues/991) → **PR [node#1004](https://github.com/cowboyinc/node/pull/1004)**(base devnet,mergeable) |
-| H-11 | CIP-5 超預算 carry-forward timer 遺失 → Preserve rebucket 到 `current_height+1`(TDD,flag-day) | issue [node#992](https://github.com/cowboyinc/node/issues/992) → **PR [node#1005](https://github.com/cowboyinc/node/pull/1005)**(base devnet,mergeable) |
+| H-1 | CIP-13 `MIN_SELF_BOND_BPS` 定義卻零強制 → delegation handler 補 self-bond 校驗(precondition 3b,u128 saturating,`cip13.min_self_bond_bps` governance-tunable;flag-day) | [node#991](https://github.com/cowboyinc/node/issues/991) → **[node#1004](https://github.com/cowboyinc/node/pull/1004) merged**(devnet ae1c1540) |
+| H-11 | CIP-5 超預算 carry-forward timer 遺失 → Preserve `remove_timer`+rebucket 到 `current_height+1`(照 COW-2333 retry idiom;flag-day) | [node#992](https://github.com/cowboyinc/node/issues/992) → **[node#1005](https://github.com/cowboyinc/node/pull/1005) merged**(devnet 474d2c85) |
+
+**A 收尾(Marshal 標的兩條殘留 — 調查後判定「已被既有代碼/測試覆蓋」,不加冗餘;僅補一條真缺的覆蓋):**
+- **H-1 self-unbond/config 殘留 → 撤回(非 gap)**:runner 持有委託時無法降自質押破比例——full deregister 已被 `RunnerHasActiveDelegations` guard 擋(`registry.rs:284`,測試 `runner_deregister_blocked_by_active_delegations`),且**無部分自 unbond 路徑**(`self_stake_unbonding_claimable_at` 從不設 Some);config `max_delegated_stake` 不影響比例。
+- **H-11 `TimerListFull`@(h+1) drop 殘留 → 撤回(已覆蓋)**:產生 `TimerListFull` 的 cap 已於 `timers.rs:419` 單測;Preserve drop arm 與已上鏈的 retry arm(COW-2298)結構相同。
+- **真缺的覆蓋 → 已補**:H-1 測試原只覆蓋 delegate(`is_increase=false`);新增 `increase_self_bond_floor_enforced` 鎖住 increase 路徑 = **[node#1006](https://github.com/cowboyinc/node/pull/1006)**(test-only)。
 
 ### C. 須團隊定奪(3 條)— 經濟/密碼/跨 CIP 設計,不替裁
 
