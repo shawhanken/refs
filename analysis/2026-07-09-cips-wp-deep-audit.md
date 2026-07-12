@@ -609,7 +609,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 | 6 | CIP-15 SSRF route_serving_endpoint | gateway 代碼已硬化(scheme guard+redirect-off+private-IP,gateway#35) | 低優先 spec 補全 |
 | 7 | CIP-10 非-TEE billing full escrow | shipped-as-designed(測試 `container_billing_dispute_charges_full_escrow` 斷言此行為) | 設計 review,非 bug |
 | 8 | CIP-10 CAP_NET_BIND_SERVICE 誤認 | 文檔/註解措辭問題 | 低優先 doc 修 |
-| 9 | CIP-23 UpdateCollateral 無 ROOT_UPDATE_DELAY | **可能 live**:`handle_update_collateral` 只查 `effective_at` 與 snapshot 一致,無 `effective_at >= block+DELAY` 最小延遲 floor→治理(0x09)可即時推 collateral | ⚠️ **待 CIP-23 owner 確認**是否須強制延遲(治理信任層,非外部攻擊) |
+| 9 | CIP-23 UpdateCollateral 無 ROOT_UPDATE_DELAY | ✅ **CONFIRMED live**(深挖):spec 三處 mandate `ROOT_UPDATE_DELAY`(§3.8.4/opcode126 表/Parameters「1 week」)但代碼**零強制**(常量不存在、handler 無 `effective_at >= block+delay`);system_deployers 可即時換 collateral,塌掉「UpdateCollateral 慢 / DeprecateBinding 快」兩層設計。**H-1 同型**(spec 安全參數定義卻不強制) | 🔧 **[node#1010](https://github.com/cowboyinc/node/issues/1010)**(flag-day;修法=加 `ROOT_UPDATE_DELAY_BLOCKS` gov 參數 + handler 檢查 + 穿 block_height) |
 | 10-14 | CIP-12 §7.4.b unlimited-gas migration / CIP-18 method=cowboy chain_id / CIP-22 double-finalize / div-zero / front-run | **機制未上鏈**(§7.4.b external;payments/auctions handler 未建) | spec-design:實作前先在規格加安全要求 |
 | 15-17 | CIP-28 locked_after_transfer / fee_payer_override wire / CIP-33 IBE label | **未上鏈**(cards/trading-post 未建) | spec-design,實作前補 |
 | 18 | secrets-WP HEALTH_RECOVERY_BPS_PER_BLOCK | 確認代碼**未實作** | doc-status:標未實作 or 補實作 |
