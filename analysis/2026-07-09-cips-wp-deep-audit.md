@@ -550,7 +550,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 ## 8. 15 條 HIGH 的逐條處置(2026-07-10)
 
-每條經回一手規格+代碼原文研判,分三類。規格修訂已提 PR:**[cowboy#239](https://github.com/cowboyinc/cowboy/pull/239)**(分支 `docs/cip-wp-audit-remediation`,commit `dedfdd9`)。
+每條經回一手規格+代碼原文研判,分三類。規格修訂 **[cowboy#239](https://github.com/cowboyinc/cowboy/pull/239) 已 merged**(main `0fab9ab`);後續小修 §5 pro-rata `0.89 → 0.88`(H-9 grep 漏的小數寫法)= **[cowboy#240](https://github.com/cowboyinc/cowboy/pull/240)**。
 
 ### A. 已直接修規格(10 條)— 代碼為既成部署事實,規格寫錯/缺失
 
@@ -571,8 +571,8 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 | # | 判定 | Issue |
 |---|------|-------|
-| H-1 | CIP-13 `MIN_SELF_BOND_BPS` 定義卻零強制 → 在 delegation handler 補 self-bond 比例校驗(flag-day) | **[node#991](https://github.com/cowboyinc/node/issues/991)** |
-| H-11 | CIP-5 超預算 carry-forward timer 遺失 → Preserve 路徑 rebucket 到 `current_height+1`+dead-letter(flag-day) | **[node#992](https://github.com/cowboyinc/node/issues/992)** |
+| H-1 | CIP-13 `MIN_SELF_BOND_BPS` 定義卻零強制 → delegation handler 補 self-bond 校驗(TDD,flag-day) | issue [node#991](https://github.com/cowboyinc/node/issues/991) → **PR [node#1004](https://github.com/cowboyinc/node/pull/1004)**(base devnet,mergeable) |
+| H-11 | CIP-5 超預算 carry-forward timer 遺失 → Preserve rebucket 到 `current_height+1`(TDD,flag-day) | issue [node#992](https://github.com/cowboyinc/node/issues/992) → **PR [node#1005](https://github.com/cowboyinc/node/pull/1005)**(base devnet,mergeable) |
 
 ### C. 須團隊定奪(3 條)— 經濟/密碼/跨 CIP 設計,不替裁
 
