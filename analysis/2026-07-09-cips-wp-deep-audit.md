@@ -756,7 +756,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 - **15 HIGH**(§8)+ **top-5**= 前期已閉環(#239/#240/#1004/#1005/#1006/#1008/#1009/#1011)。
 
 ### 待團隊 follow-up(不替裁)
-- **CIP-31 §4 fee split re-reconcile 10/2/88→10/1/89**(code PR#231 移動;#252 storage-WP 已 errata flag)。
+- **CIP-31 §4 fee split re-reconcile 10/2/88→10/1/89** → **[cowboy#253](https://github.com/cowboyinc/cowboy/issues/253)**(code 現 10/1/89,經 COW-938/#957 已 governance-tunable;#252 storage-WP 已 errata flag;含 CIP-31 逐處行號 + CIP-9 §5.6 + 決策項「89/1 是否 intended target」)。
 - **3 decision**(#236 CIP-30/27 fork、#238 MIN_PROXY_STAKE、~~#237 已 closed~~)。
 - BankActor(CIP-28)地址重分配(#247 WP §9.1 flag)。
 - CIP-10 Container=0x11×7 待 owner 修(迴避令)。
