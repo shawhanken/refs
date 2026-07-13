@@ -709,8 +709,17 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 **教訓:治理這種「大量 spec 是設計、少量已上鏈」的 CIP,agent 的 [LIVE-DRIFT]/[NOT-IMPL]/[STALE-AUDIT] 三分類最關鍵;修法=inline 修 live-drift 值 + 加 on-chain-status callout 標 not-impl,別刪設計(是 intended future);not-impl 的 security 項(unlimited-gas migration)把要求寫進 spec 供未來實作**。
 
+**CIP-16 + CIP-2 群(cowboy#251,並行雙 agent)**:
+- **CIP-16**:DomainBinding = 9-field code struct(enum serde 字串非 u8);**NamespaceKind={Actor,Gateway}**(routing-target)非 {COWBOY_NETWORK/FIRST_PARTY/EXTERNAL}(後者是 TldKind);owner/registered_at/expires_at 在**分離的 TldLabelRecord**(cip16:label:<fqdn>)非 binding;settlement key=`system:cip16_registry_settlement`;registry=19 entries(非 14→17,ingress.http 已部署);Frozen-ACTIVE [STALE-AUDIT] 不可利用(resolver lazy 查 TldLabelRecord.expires_at,external reverify 未上鏈)。修 Part II schema+§12 constants(Part I 是 verbatim v1 歷史記錄,靠 conflict rule 不動)。
+- **CIP-2**:CrashAttestation → **SubmitCrashAttestation instruction(opcode97,{job_id,crash_signal})** 無獨立 struct(runner=tx.from);§7.2 EntitlementGrant/Delegate/CreateRole 用 typed Scope/Action/Constraints 非 Vec<u8>(codec 核實 opcode30);**aggregator_timeout_blocks 不存在**(fallback 走 JobSpec.timeout_blocks,AggregatorConfig 僅 {eligibility_percentile,bonus_bps});補 opcode 94-100 枚舉(94 Reputation/95 Aggregator/96 Slash/97 CrashAttest[runner]/98 NonReveal/99 Committee/100 SemanticSim,gov-only 除 97)。
+
+**CIP-12 §1 abstract 一致性 follow-up(補進 #250)**:§7.2 修 allowlist 後,§1 abstract 仍說「0x0E-0x13 not yet in code」矛盾→改為部署 registry 實況(0x01-0x11 code-deployed,0x13/14/1D/1E 亦部署)。**教訓:改地址範圍時掃全 CIP 同一 CIP 的其他 section(abstract/table/prose)避免自相矛盾;linter frontmatter 會顯示舊版是因 checkout 別分支,非丟失**。
+
+### §3 drift 交付累計(本 session)
+- **#248** CIP-4 state-layout + CIP-29 prefix · **#249** CIP-24 CBSS · **#250** CIP-12 governance(+abstract) · **#251** CIP-16 + CIP-2 · **#243**(既有 OPEN)CIP-3 KV + CIP-24 GOV_REVIEW
+
 ### §3 drift 長尾剩餘(未做,供後續)
-仍有 ~28 條 §3 MEDIUM drift:**CIP-16**(NamespaceKind enum、DomainBinding schema)、**CIP-2**(CrashAttestation struct、EntitlementGrant wire)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議續按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
+主要剩 **cross-topic ~28 條**(secrets-WP gas 表比代碼差 15-70×、storage-WP 值、technical-WP max_tx_size 128KiB vs 1MiB、mailbox 容量、emit_event gas 等——多為 WP↔code 值 drift,部分經濟值標決策)。單一 CIP 的 §3 drift 大體處理完(CIP-1/7/9/11/15/21/22/23/26/27/28/33 等零星項未逐一過,多為 API/事件名/單值)。建議 cross-topic WP 群再開一趟(一個 agent 抽 WP-vs-code 常量表),或按報告 §3 交團隊 spec-cleanup。
 
 ### §3 drift 本 session 交付彙整
 - **cowboy#248**:CIP-4 state-layout(9)+ CIP-29 prefix(3)
