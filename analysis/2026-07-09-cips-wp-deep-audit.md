@@ -701,8 +701,16 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 **教訓:CBSS 這種「多值 12× + 一個 interop domain + 缺 opcode body」混合群,仍是一個 agent 抽全 ground truth 最省;RotateCommittee domain 這種跨實作簽名不相容=比純值 drift 高一級,務必修**。
 
+**CIP-12 governance(cowboy#250)= 第三群。headline:spec 描述的治理系統遠比部署豐富——migration upgrade + stake-weighted voting 未上鏈,tally fail-closed(讀 spec 會嚴重高估 live)**:
+- **[STALE-AUDIT 駁回]**:地址範圍 code 用 allowlist `{04,05,06,07,08,0C,0D,0E,0F,10,13,14,1D,1E}`(pause.rs is_pausable_actor,含已部署 0x0E-0x10/0x1E),非 audit 說的 0x01-0x0D;CircuitBreaker 7-of-9 已上鏈(council.rs,genesis SignerSet)非 external(audit 看的是 stale code 註解)。
+- **[LIVE-DRIFT 修]**:ProposalId u64 單調計數(非 bytes32)、BasefeeConfig@0x06/system:basefee_config(非 0x09.params)、UpgradeSystemActor payload 僅 {target,new_code_hash,activation_delay,rollback_window}(無 code_ref/migration/spec_ref)、無 governance-specific error codes(僅 generic 1211/1213/1219)。
+- **[NOT-IMPL 標註]**:§7.4.b migration 路徑整個未上鏈(enact 僅寫 code_hash pointer)→補 normative gas-cap 要求(禁 unlimited gas,防無窮迴圈停產);§6 stake snapshot 未接(COW-1028)→voting_snapshot_total=0→resolve fail-closed Defeated(治理 inert)+ tally 是 1-per-address 非 stake-weighted;§5.2 timing demo-scale(TEMP_CHECK=100/timelock 5-14 blocks)。
+- 加多個「⚠️ On-chain status」callout(§6/§7.1/§7.4.b/§5.2)標 deployed vs 設計。
+
+**教訓:治理這種「大量 spec 是設計、少量已上鏈」的 CIP,agent 的 [LIVE-DRIFT]/[NOT-IMPL]/[STALE-AUDIT] 三分類最關鍵;修法=inline 修 live-drift 值 + 加 on-chain-status callout 標 not-impl,別刪設計(是 intended future);not-impl 的 security 項(unlimited-gas migration)把要求寫進 spec 供未來實作**。
+
 ### §3 drift 長尾剩餘(未做,供後續)
-仍有 ~35+ 條 §3 MEDIUM drift:**CIP-12 governance**(CircuitBreaker 寫死地址、Proposal ID bytes32 vs u64、payload 缺欄)、**CIP-16**(NamespaceKind enum、DomainBinding schema)、**CIP-2**(CrashAttestation struct、EntitlementGrant wire)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議續按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
+仍有 ~28 條 §3 MEDIUM drift:**CIP-16**(NamespaceKind enum、DomainBinding schema)、**CIP-2**(CrashAttestation struct、EntitlementGrant wire)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議續按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
 
 ### §3 drift 本 session 交付彙整
 - **cowboy#248**:CIP-4 state-layout(9)+ CIP-29 prefix(3)
