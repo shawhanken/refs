@@ -615,3 +615,61 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 | 18 | secrets-WP HEALTH_RECOVERY_BPS_PER_BLOCK | 確認代碼**未實作** | doc-status:標未實作 or 補實作 |
 
 **唯一需進一步看的**:#9 CIP-23 UpdateCollateral 的最小延遲(治理信任 MEDIUM)。其餘要麼已解決、要麼代碼正確、要麼未上鏈(spec-design,待實作時處理)。
+
+---
+
+## 10. §5 需人工裁定 — CRITICAL/HIGH 逐條破驗證者分歧(2026-07-13,vs current devnet/main)
+
+§5 的 50 條驗證者分歧中,報告明文標「含數條 CRITICAL/HIGH 安全項,優先人工看」。對其中 **2 條 CRITICAL + 15 條 HIGH** 全部回**當前源**(node devnet `1a1def69` / cowboy main `d8a5d44`)以雙視角深挖破分歧。結論:**0 個 live 可利用 CRITICAL/HIGH bug**——最嚴重的兩條 CRITICAL 一條是 spec 殘留(errata 漏一節)、一條機制未上鏈;HIGH 全部落在「代碼正確 spec 過度承諾 / 已被 read-time 防護 / 未上鏈 / 決策值漂移」四類。**本輪產出 6 處 spec 修正**(cowboy repo),無代碼 bug 待修。
+
+### A. 2 條 CRITICAL
+
+| # | 條目 | 裁定 | 處置 |
+|---|------|------|------|
+| C25 | runner 委員會 attestation 未認證 `state_root` | **NOT-ON-CHAIN**:CIP-25 L1 anchor 路徑(`IChainAnchor`/`BlockCommitment`/`Anchor.v1` 簽名)node/runner **零實作**;唯一跨鏈 inbound(CIP-34 `IntentCreditDeposit` opcode 151)是 stub 回 `UnsupportedInstruction`(`system_instruction.rs:1307`)。`state_root` 在 spec 是 opt-in by-design;無部署代碼可偽造。但發現一條真的 spec 缺陷:`IChainAnchor.commitment()` 回傳 `stateRoot`,而 §1.5 的 `Anchor.v1` preimage 卻不含它——**若某 deployment 發佈 state_root,委員會簽名不認證它=可偽造**。 | ✅ **spec 修**:CIP-25 §1.5 加 normative 條款「preimage MUST 綁定 deployment 發佈的每個 root(`… ‖ receipt_root ‖ state_root ‖ parent_hash`,只 append 實際發佈者)」+ 標明未上鏈=build-time 要求。留給 M2/v2 實作者的 review gate。 |
+| storage-WP | `account_secret` 未定義,DEK 封裝模型不可實作 | **RESIDUAL-GAP**:與 H-15 同根,但 H-15 errata(line 398)只覆蓋「Create」節,**漏了 §3.1 DEK generation(line 729)** 那條獨立 normative MUST——仍引用未定義的 `account_secret` HKDF。鏈上實為 CBSS 門限-IBE(`ras.rs`)。 | ✅ **spec 修**:§3.1:729 加 superseded marker(對齊 line 398 errata,指向 CBSS committee key material),劃掉 HKDF/account_secret 句。 |
+
+### B. 深挖的 6 條 HIGH
+
+| # | 條目 | 裁定 | 處置 |
+|---|------|------|------|
+| C2 | EconomicBond 目標驗證未實作 | **SPEC-OVERSTATES**:代碼 as-designed(`verifier.rs:1409` trust-first 單結果,`runners_to_slash` 恆空;dispatch 有 1.5× stake 過濾但非 per-result bond)。CIP-2 §729 已誠實記錄,唯技術 WP §9.2 表仍寫「Objective checks」。 | ✅ **spec 修**:技術 WP §9.2 `economic_bond` 行改 trust-first + errata 註,對齊 CIP-2 §729。 |
+| C5 | inline timer manifest / proposer-selection 規格缺 | **CONFIRMED-GAP(部分)**,MED-HIGH drift:無「proposer 選擇」自由(firing 是 state-deterministic FIFO,已由 §5.1/§6.5/§7 覆蓋),但 **(a) inline timer manifest**(`inline_timer_ids` 進 block digest preimage,`speculative.rs:1444`)+ **(b) carry-forward `skip_count` rebucket→next height + dead-letter@256**(進 state_root,H-11/#1005 修的)**CIP-5 完全沒寫**→spec-only client 對不上 block hash / state。 | ✅ **spec 修**:CIP-5 加 §7.1「Inline Timer Manifest(block-digest commitment)」+ §6.5 補 carry-forward/rebucket/dead-letter(`TIMER_MAX_CARRY_FORWARD=256`/`MAX_INLINE_TIMER_MANIFEST_IDS=4096`)。 |
+| C15-gw | static_volumes deploy-time 所有權驗證未實作 | **PARTIAL/DEFENSE-IN-DEPTH → 降 MED/LOW**:deploy-time TODO 屬實(`system_instruction.rs:5181`,`validate_route_volumes` 已寫未接線),但 read-time 已擋跨 owner 私有資料攻擊:gateway 用**發佈 actor 自身 owner** 派生 volume_id(`gateway-server/lib.rs:1218`)+ **Public-only gate**(`gateway-cbfs/lib.rs:402`)。已被 escape `cow1293-sec-6-8` 追蹤,合理 blocked(binding 無鏈上表示)。 | 無需動作(降級記錄);unblock 後接 `validate_route_volumes`。 |
+| storage-WP | 私有 volume PoR shard-inclusion proof 不可驗 | **STALE/REFUTED**:安全宣稱破產。鏈上 PoR 錨在 `StorageCommitment.shard_root`(密文 `chunk_root` 的 keyed sparse Merkle,`por.rs:271`/`ras.rs:3670`)**非** `manifest_root`;因 `encrypt→erasure→hash`,所有 proof 輸入皆公開密文承諾→**私有 volume PoR 無需 DEK 完全可驗**。但 WP PoR 散文(§7.3/lines 527-540)仍寫 `manifest_root` 兩層鏈=真的 doc-drift。 | ✅ **spec 修**:WP PoR 節改為 `shard_root` over `chunk_root` accumulator + note 澄清密文承諾/DEK-independent。 |
+| secrets-WP | PROXY_SOAK_PERIOD 規格 86,400 vs 代碼 100 | **DECISION-VALUE-DRIFT**:代碼 `cbss.rs:85`=100,CBSS flag-flip 治理提案明釘 100 為 launch 值→代碼=治理決定;WP 86,400 與 §3 audit 引的 216,000 皆 stale narrative。同 MIN_PROXY_STAKE(#238)家族的反-Sybil 經濟參數,**不替裁**。 | ✅ **spec 修(僅記漂移不改值)**:secrets-WP §13 表頭加 value-drift errata(PROXY_SOAK=100 deployed / MIN_PROXY_STAKE=1000 deployed 綁 #238),標「部署值 authoritative,mainnet 目標待治理」。 |
+
+### C. 批次 triage 的 9 條 HIGH(未上鏈 / 決策)— 逐條回 grep 定性
+
+- **C18 ×3**(BridgeEvidence single-sig / credit_inbound unbacked mint / Query 雙重服務)= **NOT-ON-CHAIN**:`BridgeEvidence`/`facilitator`/`credit_inbound` 在 node/runner 源碼**零命中**;PaymentGate `0x12` 僅地址保留(`system_actors.rs:71`),無 handler/opcode。CIP-34 `IntentCreditDeposit` 是**另一機制**且為 stub。
+- **C21 ×2**(hook gas cap 不可強制 / AMM 原語未實作)= **NOT-ON-CHAIN**:`liquidity_pool`/`amm`/`pool_hook`/`Swap` 源碼零命中(勿與已實作的 CIP-20 `token_hook_max_cycles=50_000` 混淆)。
+- **C28**(CloseCard 繞過 Frozen)= **NOT-ON-CHAIN**:`CloseCard`/`agent_bank` 零命中(`card` 命中皆 rate-**card** 誤判)。
+- **C10**(opcode 160-164 + Container Registry 0x11 缺)= **confirmed-absent(drift 準確)**:最高 System opcode 是 159;Container Registry 實在 **0x13 非 0x11**(0x11=VALIDATOR_SET)。
+- **C14**(PREMIUM/MIN_GATEWAY_STAKE 無預設)= **NOT-ON-CHAIN(真 spec gap 但功能未建)**:`MIN_GATEWAY_STAKE` 源碼零命中,無 `register_gateway` handler,`GATEWAY_REGISTRY 0x0F` 無寫入路徑。
+- **C19**(x402_compat vs CIP-18 §13.6)= **NOT-ON-CHAIN spec-vs-spec**:`x402` 零命中;兩份規格皆未實作,紙面 reconcile 即可。
+
+**處置**:未上鏈群依 §9 先例(spec-design,實作前先在規格加安全要求),於各自 CIP 實作 PR 的 review gate 處理,本輪不預先改 spec。C14 gateway 若近期上線需先釘 `MIN_GATEWAY_STAKE`/PREMIUM 預設。
+
+### 終態
+- **6 處 spec 修正**(cowboy repo):storage-WP §3.1 + PoR 節、技術 WP §9.2、CIP-25 §1.5、CIP-5 §6.5+§7.1、secrets-WP §13 errata。
+- **0 條代碼 bug**(對比 §9 抓出的 #9 CIP-23 live bug,本 §5 CRITICAL/HIGH 批次無 live 代碼缺陷)。
+- **1 條降級**(C15-gw HIGH→MED/LOW,已 escape 追蹤)。
+- **未上鏈群**(C18/C21/C28/C10/C14/C19)= spec-design,待各功能實作時在 PR review 補安全要求;C25/C5 的 build-time 要求已寫進 spec 供未來實作者。
+- 剩 §5 的 MED/LOW(~30 條)未在本輪範圍。
+
+---
+
+## 11. §6 碰撞掃描收口(2026-07-13,cheap CI-diff 法,零 agent)
+
+依 §6 建議「別再花一趟驗證,改從 `cowboy-protocol-codec`+`system_actors.rs` 生成權威表在 CI diff」。已實作:`refs/analysis/check_alloc.py`(自含,workspace root 跑,對每份 CIP 掃 opcode/地址數字宣稱 diff 權威源,exit≠0 on mismatch=**可直接當 CI gate**)。
+
+**權威源自身零碰撞**:143 個 SYS_ opcode(range 0–159,`#[deny(unreachable_patterns)]` 編譯期保證)+ 21 個 system actor 地址,皆無重號。故 §6 的 130 候選確為良性 per-CIP 枚舉重用(人讀已判)。
+
+**撈出 1 條真跨-spec 碰撞**(§6 未驗批的真發現):**WP §9.1「canonical」地址表 vs 部署代碼在 `0x11`/`0x13` 系統性衝突** —— 表寫 `0x11`=Container Registry / `0x13`=BankActor,代碼實為 `0x11`=**VALIDATOR_SET**(genesis 部署)/ `0x13`=**CONTAINER_REGISTRY**(Council-pausable),且 VALIDATOR_SET 整個不在表內;cip-10/14/16/18/34 全跟著誤放 Container=0x11。方向由 WP §9.1 自身 note 1/2 鎖定(部署 registry=source of truth、deployed claim wins)→**spec 須跟上**。**已修**:WP §9.1 錨表 + cip-14/16/18/34(Container 0x11→0x13、補 VALIDATOR_SET 列)。**CIP-10 迴避令→留 owner 修**(7 處,唯一殘留 holdout,已在 WP reconciliation callout 標明)。**BankActor(CIP-28)撞 0x13→須重分配**(unbuilt,建議 0x16 留 0x15 給已 penciled 的 EventListener,但確切 slot=CIP-28 決策不替裁)。詳:`refs/analysis/2026-07-13-system-actor-address-reconciliation.md`。
+
+**其餘掃描項=良性/已知**:`SYS_VALIDATOR_*`(cip-11)/`SYS_SESSION_*`(cip-8)是正確 prose(前明說不存在/後須納入測試);`SYS_FETCH_SECRET_METADATA`(cip-24)是 host syscall 非 wire opcode;dual cip-15 + CIP-10 opcode 61-64 vs 160-164 已在 §2/§3 記錄。
+
+### §6 終態
+- **checker 落地**(check_alloc.py)= CI seed,現跑綠(CIP-10 holdout+benign 例外已標註)。
+- **7 處 spec 修正**(WP §9.1 + cip-14/16/18/34 地址 + reconciliation doc)= 本輪第二個 cowboy PR。
+- **1 條 owner-待修**(CIP-10 Container=0x11×7,迴避令)+ **1 條決策**(BankActor 重分配,CIP-28)。
