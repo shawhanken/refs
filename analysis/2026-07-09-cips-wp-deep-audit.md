@@ -1,5 +1,7 @@
 # Cowboy CIP 與白皮書 — 深度審計最終報告
 
+> **📌 狀態(2026-07-13):後續處理 campaign 已落地。** 8 個 spec-reconciliation PR 全數 MERGED 進 `origin/main`(#241/#243/#247/#248/#249/#250/#251/#252,含 §5/§6/§9 及 §3 主 drift 群 CIP-4/24/12/16/2 + 三 WP;詳見 §13 ledger)。前期 15 HIGH + top-5 亦已閉環(#239/#240/#1004-1006/#1008/#1009/#1011)。**待團隊 decision(OPEN):** #236(CIP-30/27 fork)、#238(MIN_PROXY_STAKE)、#253(CIP-31 fee split 10/2/88→10/1/89);#237 已 closed。剩單一 CIP 零星 LOW 長尾交團隊 spec-cleanup。_
+
 _多代理獨立審計,2026-07-09/10。兩趟工作流:(1) 39 份文件逐份獨立審計 + 確定性碰撞掃描 + 6 個主題跨文件代理 + 對 HIGH/CRITICAL 的雙視角對抗驗證;(2) 對 334 條 MEDIUM/LOW 發現補跑雙視角驗證。共 ~1,211 個子代理、~44.8M token。技術識別碼、`檔案:行號`、常量名、opcode 一律保留原文。_
 
 ## 1. 摘要
@@ -582,7 +584,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 - **H-11 `TimerListFull`@(h+1) drop 殘留 → 撤回(已覆蓋)**:產生 `TimerListFull` 的 cap 已於 `timers.rs:419` 單測;Preserve drop arm 與已上鏈的 retry arm(COW-2298)結構相同。
 - **真缺的覆蓋 → 已補**:H-1 測試原只覆蓋 delegate(`is_increase=false`);新增 `increase_self_bond_floor_enforced` 鎖住 increase 路徑 = **[node#1006](https://github.com/cowboyinc/node/pull/1006) 已 merged**(devnet 1a1def69)。
 
-**終態:15 條 HIGH 全數落地** — 規格 10 條(#239+#240 merged)、代碼 2 條(#1004/#1005 merged,TDD+Marshal pass)、覆蓋補強 1 條(#1006 merged);餘 3 條 decision(#236/237/238)待團隊裁決。
+**終態:15 條 HIGH 全數落地** — 規格 10 條(#239+#240 merged)、代碼 2 條(#1004/#1005 merged,TDD+Marshal pass)、覆蓋補強 1 條(#1006 merged);餘 decision:#237 已 closed(resolved)、#236/#238 OPEN 待團隊裁決。
 
 ### C. 須團隊定奪(3 條)— 經濟/密碼/跨 CIP 設計,不替裁
 
@@ -601,7 +603,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 | # | 條目 | 當前狀態 | 處置 |
 |---|------|---------|------|
-| 1 | CIP-31 challenge pool 下溢 | 代碼已正確 cap(`ras.rs:1212-1217`,`min(bounty,available,epoch_cap)`,無下溢) | ✅ **spec 補全 [cowboy#241](https://github.com/cowboyinc/cowboy/pull/241)** |
+| 1 | CIP-31 challenge pool 下溢 | 代碼已正確 cap(`ras.rs:1212-1219`,`min(bounty, pool−reserve, epoch_cap−paid)`,無下溢/無 mint) | ✅ **spec 補全 [cowboy#241](https://github.com/cowboyinc/cowboy/pull/241) MERGED**(Marshal deep PASS run563;advisory:新行沿用 CIP-31 慣例 key `system:cbfs:*`,code 實為 `cip31.cbfs.*`@0x09=既有全域 namespace drift) |
 | 2 | CIP-34 Intent 簽名 chain_id | **已解決**:r7 spec + 代碼(`settlement.rs:705`)綁**節點自身 chain_id**,非 tx.chain_id | 無需動作(stale) |
 | 3 | CIP-34 RevealAuction wedge | **已解決**:r7 改為 `CancelledNoValidBid` cancel,不 wedge | 無需動作(stale) |
 | 4 | CIP-12 CircuitBreaker 7-of-9 auth | **已解決**:`council.rs` 實作 Security Council 7-of-9 | 無需動作(stale) |
@@ -716,7 +718,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 **CIP-12 §1 abstract 一致性 follow-up(補進 #250)**:§7.2 修 allowlist 後,§1 abstract 仍說「0x0E-0x13 not yet in code」矛盾→改為部署 registry 實況(0x01-0x11 code-deployed,0x13/14/1D/1E 亦部署)。**教訓:改地址範圍時掃全 CIP 同一 CIP 的其他 section(abstract/table/prose)避免自相矛盾;linter frontmatter 會顯示舊版是因 checkout 別分支,非丟失**。
 
 ### §3 drift 交付累計(本 session)
-- **#248** CIP-4 state-layout + CIP-29 prefix · **#249** CIP-24 CBSS · **#250** CIP-12 governance(+abstract) · **#251** CIP-16 + CIP-2 · **#243**(既有 OPEN)CIP-3 KV + CIP-24 GOV_REVIEW
+- **#248** CIP-4 state-layout + CIP-29 prefix · **#249** CIP-24 CBSS · **#250** CIP-12 governance(+abstract) · **#251** CIP-16 + CIP-2 · **#243** CIP-3 KV + CIP-24 GOV_REVIEW(**全數 MERGED**,見 §13 ledger)
 
 **cross-topic WP-vs-code 群(cowboy#252,並行三 agent,stacked on #247)**:三份白皮書(secrets/storage/technical)全量抽 WP 宣稱常量 vs 代碼實值:
 - **secrets-WP**:§8 gas 表整表修(CBSS_GAS_* 實值,舊值高 4-80×);MAX_SECRETS 1024→256、MAX_VERSIONS 256→32;health §9.2 LIVENESS_UNANSWERED 250→100、slash health 2500→per-class(500/500/5000)、HEALTH_RECOVERY not-impl;§13 LIVENESS_CHALLENGE_MAX_AGE 86400→480、RESHARE 86400→1,296,000、DKG_FINALIZE~2h;標 not-impl(HEALTH_RECOVERY/SLASH_WINDOW=permanent tombstone/PROXY_UNBOND=immediate/MAX_COMMITTEE_N=unenforced)。
@@ -737,16 +739,19 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 深度審計後續處理 campaign 收尾。**方法定型:每群一個(或並行多個)agent 回當前 devnet 抽 ground truth → 逐條四分類(LIVE-DRIFT 值修 / NOT-IMPL 標註 / STALE-AUDIT 略 / DECISION-VALUE errata 不替裁)→ spec 修 → PR + 報告回填**。
 
-### 全部 PR(cowboy,皆 OPEN,docs-only,無代碼行為變更)
-| PR | 範圍 | base |
+### 全部 PR(cowboy,docs-only,無代碼行為變更)— **8/8 已 MERGED(2026-07-13)**
+| PR | 範圍 | 狀態 |
 |----|------|------|
-| #247 | §5 CRITICAL/HIGH(6 修)+ §6 地址表(7 修)+ WP errata base | main |
-| #248 | §3 CIP-4 state-layout(9)+ CIP-29 prefix(3) | main |
-| #249 | §3 CIP-24 CBSS(值 4 + RotateCommittee domain + opcode 82-84 body) | main |
-| #250 | §3 CIP-12 governance(live-drift 4 + not-impl 標註 + §1 abstract) | main |
-| #251 | §3 CIP-16 domain schema + CIP-2 wire/opcode | main |
-| #252 | §3 cross-topic 三 WP 常量(stacked) | #247 分支 |
-| #243 | §3 CIP-3 KV + CIP-24 GOVERNANCE_REVIEW(既有) | main |
+| #247 | §5 CRITICAL/HIGH(6 修)+ §6 地址表(7 修)+ WP errata base | ✅ MERGED |
+| #248 | §3 CIP-4 state-layout(9)+ CIP-29 prefix(3) | ✅ MERGED |
+| #249 | §3 CIP-24 CBSS(值 4 + RotateCommittee domain + opcode 82-84 body) | ✅ MERGED |
+| #250 | §3 CIP-12 governance(live-drift 4 + not-impl 標註 + §1 abstract) | ✅ MERGED |
+| #251 | §3 CIP-16 domain schema + CIP-2 wire/opcode | ✅ MERGED |
+| #252 | §3 cross-topic 三 WP 常量(原 stacked on #247→#247 merge 後 rebase onto main) | ✅ MERGED |
+| #243 | §3 CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW | ✅ MERGED(Marshal deep PASS run562) |
+| #241 | §9 CIP-31 §7 pool-bounded challenger bounty(補全 challenge-pool underflow) | ✅ MERGED(Marshal deep PASS run563) |
+
+**全部併入 origin/main。** #243↔#249 都改 cip-24 但不同行=零衝突並存。#252 rebase 手法:`git rebase --onto origin/main <old-#247-tip>` 只重放 WP commit + `gh api PATCH pulls/252 base=main`。
 
 ### 已處理範圍
 - **§5**(2 CRITICAL + 15 HIGH 驗證者分歧)= 0 live bug,全 spec 修/降級/未上鏈標註。
