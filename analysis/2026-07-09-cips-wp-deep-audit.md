@@ -692,5 +692,20 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 **交付 cowboy#248**(cip-4 + cip-29,base main)。**教訓:state-layout 這種同子系統多條 drift,派一個 agent 抽全 prefix/常量權威表比逐條跑更省;prefix 表是 light-client fork-class 最高值**。
 
+**CIP-24 secrets(CBSS 群,cowboy#249)= 第二群,同法一個 agent 抽全 CBSS 常量/domain/opcode ground truth 後修**:
+- **1s/block 確認**(BLOCKS_PER_YEAR=31,536,000、1天=86,400):多條 12× drift 根因=spec 用 12s/block 算 block 數。加 §4.2 normative 基準註。
+- **機械值修**(code 權威):REQUEST_FRESHNESS 32→384(=32×12,同 wall-clock)、LIVENESS_RESPONSE 100→64;重算 MIN_CHALLENGE_DELAY=416/MAX_AGE=480 註解。
+- **決策 errata 不改值**:PROXY_SOAK code=100(devnet-short)、RESHARE_INTERVAL code=1,296,000(demo ~15天,prod 目標 ~6mo)、MIN_PROXY_STAKE=1,000(#238)、GOVERNANCE_REVIEW=2,592,000(#243 處理,不重編)。
+- **interop 修(最高值)**:RotateCommittee 簽名 spec 用兩 domain(cbss/dkg-commit/v1+cbss/reshare-zeroize/v1,u64_le)→code 用**單一 `cbss/rotate-committee/v1`** 兩委員會同簽一個 BE `rotate_hash`;照 spec 實作簽名不驗=跨實作不相容。修 canonical-payloads 節+兩處 struct field。
+- **completeness**:補 opcode 82(ExpireLivenessChallenge,permissionless)/83(RequestReshare,owner-only)/84(ForcedDeregisterCbssProxy,gov-only)的 §3.5 body。
+
+**教訓:CBSS 這種「多值 12× + 一個 interop domain + 缺 opcode body」混合群,仍是一個 agent 抽全 ground truth 最省;RotateCommittee domain 這種跨實作簽名不相容=比純值 drift 高一級,務必修**。
+
 ### §3 drift 長尾剩餘(未做,供後續)
-仍有 ~40+ 條 §3 MEDIUM drift 分散各 CIP:**CIP-24 secrets**(REQUEST_FRESHNESS 32 vs 384、LIVENESS_RESPONSE 100 vs 64、RotateCommittee domain 等值/協議 drift,部分是 CBSS 經濟決策)、**CIP-12 governance**(CircuitBreaker 寫死地址、Proposal ID bytes32 vs u64、payload 缺欄)、**CIP-16**(NamespaceKind enum、DomainBinding schema)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
+仍有 ~35+ 條 §3 MEDIUM drift:**CIP-12 governance**(CircuitBreaker 寫死地址、Proposal ID bytes32 vs u64、payload 缺欄)、**CIP-16**(NamespaceKind enum、DomainBinding schema)、**CIP-2**(CrashAttestation struct、EntitlementGrant wire)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議續按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
+
+### §3 drift 本 session 交付彙整
+- **cowboy#248**:CIP-4 state-layout(9)+ CIP-29 prefix(3)
+- **cowboy#249**:CIP-24 CBSS(值 4 + domain 1 + opcode body 3)
+- **cowboy#243**(既有 OPEN):CIP-3 KV + CIP-24 GOVERNANCE_REVIEW
+- 決策/errata 標記:PROXY_SOAK、RESHARE_INTERVAL、MIN_PROXY_STAKE(#238)、rent_rate(經濟)
