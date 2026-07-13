@@ -731,8 +731,36 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 ### §3 drift 長尾剩餘(未做,供後續)
 單一 CIP 零星項(CIP-1/7/9/11/21/22/23/26/28/33 的 API 名/事件名/單值 drift,多為 §3/§4 LOW)未逐一過。主要 drift 群(CIP-4/24/12/16/2/state-layout + 三 WP)已全數處理。餘為長尾 LOW,建議交團隊照報告 §3/§4 spec-cleanup 或按需單點。
 
-### §3 drift 本 session 交付彙整
-- **cowboy#248**:CIP-4 state-layout(9)+ CIP-29 prefix(3)
-- **cowboy#249**:CIP-24 CBSS(值 4 + domain 1 + opcode body 3)
-- **cowboy#243**(既有 OPEN):CIP-3 KV + CIP-24 GOVERNANCE_REVIEW
-- 決策/errata 標記:PROXY_SOAK、RESHARE_INTERVAL、MIN_PROXY_STAKE(#238)、rent_rate(經濟)
+---
+
+## 13. Campaign 收尾(2026-07-13)
+
+深度審計後續處理 campaign 收尾。**方法定型:每群一個(或並行多個)agent 回當前 devnet 抽 ground truth → 逐條四分類(LIVE-DRIFT 值修 / NOT-IMPL 標註 / STALE-AUDIT 略 / DECISION-VALUE errata 不替裁)→ spec 修 → PR + 報告回填**。
+
+### 全部 PR(cowboy,皆 OPEN,docs-only,無代碼行為變更)
+| PR | 範圍 | base |
+|----|------|------|
+| #247 | §5 CRITICAL/HIGH(6 修)+ §6 地址表(7 修)+ WP errata base | main |
+| #248 | §3 CIP-4 state-layout(9)+ CIP-29 prefix(3) | main |
+| #249 | §3 CIP-24 CBSS(值 4 + RotateCommittee domain + opcode 82-84 body) | main |
+| #250 | §3 CIP-12 governance(live-drift 4 + not-impl 標註 + §1 abstract) | main |
+| #251 | §3 CIP-16 domain schema + CIP-2 wire/opcode | main |
+| #252 | §3 cross-topic 三 WP 常量(stacked) | #247 分支 |
+| #243 | §3 CIP-3 KV + CIP-24 GOVERNANCE_REVIEW(既有) | main |
+
+### 已處理範圍
+- **§5**(2 CRITICAL + 15 HIGH 驗證者分歧)= 0 live bug,全 spec 修/降級/未上鏈標註。
+- **§6**(碰撞掃描)= CI-seed checker `check_alloc.py` + 撈出 0x11/0x13 地址表真碰撞並修。
+- **§9**(18 security MEDIUM)= 0 live bug 除 CIP-23 UpdateCollateral(node#1011 已 TDD 修)。
+- **§3 主 drift 群**(CIP-4/24/12/16/2 + 三 WP + state-layout)= 全數處理。
+- **15 HIGH**(§8)+ **top-5**= 前期已閉環(#239/#240/#1004/#1005/#1006/#1008/#1009/#1011)。
+
+### 待團隊 follow-up(不替裁)
+- **CIP-31 §4 fee split re-reconcile 10/2/88→10/1/89**(code PR#231 移動;#252 storage-WP 已 errata flag)。
+- **3 decision**(#236 CIP-30/27 fork、#238 MIN_PROXY_STAKE、~~#237 已 closed~~)。
+- BankActor(CIP-28)地址重分配(#247 WP §9.1 flag)。
+- CIP-10 Container=0x11×7 待 owner 修(迴避令)。
+- 單一 CIP 零星 LOW 長尾(API/事件名/單值)交團隊 spec-cleanup。
+
+### 前期彙整(存查)
+- #248:CIP-4 state-layout(9)+ CIP-29 prefix(3);#249:CIP-24 CBSS;#243(既有):CIP-3 KV + CIP-24 GOVERNANCE_REVIEW。決策/errata:PROXY_SOAK、RESHARE_INTERVAL、MIN_PROXY_STAKE(#238)、rent_rate、fee-split(經濟)。
