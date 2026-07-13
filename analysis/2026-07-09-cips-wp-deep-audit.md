@@ -673,3 +673,24 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 - **checker 落地**(check_alloc.py)= CI seed,現跑綠(CIP-10 holdout+benign 例外已標註)。
 - **7 處 spec 修正**(WP §9.1 + cip-14/16/18/34 地址 + reconciliation doc)= 本輪第二個 cowboy PR。
 - **1 條 owner-待修**(CIP-10 Container=0x11×7,迴避令)+ **1 條決策**(BankActor 重分配,CIP-28)。
+
+---
+
+## 12. §3 drift 長尾 — state-layout 群(2026-07-13,cowboy#248)
+
+§3 drift 長尾教訓:**每條回當前源核實**(審計 base 陳舊,值可能早改)。優先 fork-class。
+
+**CIP-4 storage(9 條 §3 drift + 1 條 §4 LOW,全 code-verified 為當前值非 stale)= 最高值,一個 agent 抽全子系統 ground truth(權威源=`node/storage/src/state_key.rs::StatePrefix` enum 0x01–0x1D 28 個,**無 0x00**)後逐條修**:
+- §4.2 prefix 表整表換(舊 0x00–0x0D 錯位→權威 0x01–0x1D,補齊 16 個缺的 0x0E–0x1D):actor code content-addressed@0x0F(非 per-addr)、timer index=keccak256(height)(非 raw)、Account=0x01、SystemState=0x0A。
+- §4.1/§2:key layout `[1B][20B addr][33B slot]`(20-byte 非 21-byte)。
+- §4.3:mailbox=individually-keyed FIFO ring(0x04‖be(seq))+head(0x10)/tail(0x11)指標,非 VecDeque blob。
+- §5.3:receipt_root=commonware-codec `encode()` 非 RLP(merkle_utils.rs)。
+- §11:SNAPSHOT_INTERVAL_BLOCKS=100_000 非 1024。
+- §12.5:rent 參數=單一 merged `RentConfig` blob@`system:cip4:rent_config`(非五 key);部署 rent_rate_atto=2_739_726_027_397_260(≈1 CBY/byte/year=舊 0.001 的 ~1000×,WP §13.1 已認;經濟目標由監控帶治理)+補第六欄 bond_rate_atto。
+
+**CIP-29 event-hooks(prefix drift,用同一 ground truth 直接修)**:EventSub/EventSubIndex 實為 **0x18/0x19**(非 0x14/0x15=CIP-26 Library/ActorLibPin);prefix 分配到 0x1D(非 0x13)。
+
+**交付 cowboy#248**(cip-4 + cip-29,base main)。**教訓:state-layout 這種同子系統多條 drift,派一個 agent 抽全 prefix/常量權威表比逐條跑更省;prefix 表是 light-client fork-class 最高值**。
+
+### §3 drift 長尾剩餘(未做,供後續)
+仍有 ~40+ 條 §3 MEDIUM drift 分散各 CIP:**CIP-24 secrets**(REQUEST_FRESHNESS 32 vs 384、LIVENESS_RESPONSE 100 vs 64、RotateCommittee domain 等值/協議 drift,部分是 CBSS 經濟決策)、**CIP-12 governance**(CircuitBreaker 寫死地址、Proposal ID bytes32 vs u64、payload 缺欄)、**CIP-16**(NamespaceKind enum、DomainBinding schema)、**cross-topic 28 條**(gas 表、mailbox 容量、max_tx_size 等值 drift)。#243(CIP-3 KV read + CIP-24 GOVERNANCE_REVIEW)仍 OPEN。建議按 CIP 分群、每群一 agent 抽 ground truth 再改,經濟值 drift 標決策不替裁。
