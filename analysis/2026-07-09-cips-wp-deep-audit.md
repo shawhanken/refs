@@ -718,8 +718,18 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 ### §3 drift 交付累計(本 session)
 - **#248** CIP-4 state-layout + CIP-29 prefix · **#249** CIP-24 CBSS · **#250** CIP-12 governance(+abstract) · **#251** CIP-16 + CIP-2 · **#243**(既有 OPEN)CIP-3 KV + CIP-24 GOV_REVIEW
 
+**cross-topic WP-vs-code 群(cowboy#252,並行三 agent,stacked on #247)**:三份白皮書(secrets/storage/technical)全量抽 WP 宣稱常量 vs 代碼實值:
+- **secrets-WP**:§8 gas 表整表修(CBSS_GAS_* 實值,舊值高 4-80×);MAX_SECRETS 1024→256、MAX_VERSIONS 256→32;health §9.2 LIVENESS_UNANSWERED 250→100、slash health 2500→per-class(500/500/5000)、HEALTH_RECOVERY not-impl;§13 LIVENESS_CHALLENGE_MAX_AGE 86400→480、RESHARE 86400→1,296,000、DKG_FINALIZE~2h;標 not-impl(HEALTH_RECOVERY/SLASH_WINDOW=permanent tombstone/PROXY_UNBOND=immediate/MAX_COMMITTEE_N=unenforced)。
+- **storage-WP**:CapToken TTL 300s→900s/14400s→86400s、clock-skew ±60→±30(+WP 內部矛盾);**fee-split errata:code 現 10/1/89(PR#231@2026-07-10)→WP 90%/2% stale,且 CIP-31 §4(#240 的 10/2/88)反被弄 stale,須 re-reconcile 到 10/1/89**;STORAGE_GRACE_EPOCHS=1 epoch(非 7200 blocks)、POR_CHALLENGE_INTERVAL 600→7200、MAX_VOLUME_NAME 64→256、DEK client-generated(chain 只驗 wrapped_dek)、block-time+erasure errata(7200 blocks=~2h 非 24h;on-chain gate 收 K=1/K+M≤32,cbfs-lib 嚴界僅 client)。
+- **technical-WP**:max_tx_size 128KiB→1MiB、per_actor_per_block_cycles not-enforced、emit_event 0cyc+1cell/byte(audit 說 neither 於 cells 是 stale)、mailbox 1M bytes→1000 messages、dedup 10000-block→500000 LRU、§13 lane% 5/20/25/50→50/27.8/11.1/11.1、challenge window 15min→75 blocks(~75s)、補 §3.1 PVM 4096-bit int cap(MAX_INT_BITS)。
+
+**教訓**:(1)WP gas/常量表整表 stale 是常態,一個 agent 抽全 WP-vs-code 對照最省;(2)**經濟值會移動**——fee split code 從 88/2 又改成 89/1(PR#231),我之前 #240 把 CIP-31 改成 88/2 反成 stale=**别追移动的经济值,标 errata+coordination flag 让治理定**;(3)audit 的「code charges neither」可能自身 stale(emit_event 現收 1 cell/byte);(4)stacked PR:base=#247 分支 diff 才只顯示 WP delta,#247 merge 後 rebase onto main。
+
+### ⚠️ 待 follow-up
+- **CIP-31 §4 fee split re-reconcile 10/2/88→10/1/89**(code PR#231 移動;經濟值,交團隊協調,#252 只在 storage-WP 加 errata flag,未動 CIP-31)。
+
 ### §3 drift 長尾剩餘(未做,供後續)
-主要剩 **cross-topic ~28 條**(secrets-WP gas 表比代碼差 15-70×、storage-WP 值、technical-WP max_tx_size 128KiB vs 1MiB、mailbox 容量、emit_event gas 等——多為 WP↔code 值 drift,部分經濟值標決策)。單一 CIP 的 §3 drift 大體處理完(CIP-1/7/9/11/15/21/22/23/26/27/28/33 等零星項未逐一過,多為 API/事件名/單值)。建議 cross-topic WP 群再開一趟(一個 agent 抽 WP-vs-code 常量表),或按報告 §3 交團隊 spec-cleanup。
+單一 CIP 零星項(CIP-1/7/9/11/21/22/23/26/28/33 的 API 名/事件名/單值 drift,多為 §3/§4 LOW)未逐一過。主要 drift 群(CIP-4/24/12/16/2/state-layout + 三 WP)已全數處理。餘為長尾 LOW,建議交團隊照報告 §3/§4 spec-cleanup 或按需單點。
 
 ### §3 drift 本 session 交付彙整
 - **cowboy#248**:CIP-4 state-layout(9)+ CIP-29 prefix(3)
