@@ -821,3 +821,23 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 **教訓**:(1)**CIP-17 整份 pre-impl 草稿**——feature 已 ship(#767 系列)但 spec 從未更新,全條 LIVE-DRIFT,proof wire schema 差最遠(MPT vs QMDB/MMR),light-client fork-class 值最高、務必抽 code struct 整塊換;(2)**A2 spec-internal 矛盾(120% 拆分、div-zero、寫反的述詞、dead ref、不存在的 API)不需 code 在鏈上即可修**——與「未上鏈就別碰」的 drift/安全先例不同,是文檔自身缺陷;(3)**not-on-chain 的 illustrative pseudocode(CIP-21/22)**:concrete bug(div-zero/double-finalize/factual 數字)照修,但不存在的 timer API 用 correction banner 而非注入大段未測試 rewrite(surgical,別 over-author);(4)多處 ⚠️ FLAG(CIP-14 權重、CIP-22 factory 回傳型、CIP-25 §B.2 分支)= 修 arithmetic/引用缺陷但把 economic/interface 決策留 owner。
 
 **交付 cowboy#258**(10 CIP,docs-only,base main)。CIP-7 全 STALE-AUDIT 不動(見 14a)。
+
+### 14c. §4 LOW/INFO 長尾(127 條)+ CIP-7 code bug(2026-07-14,cowboy#259 + node#1028)
+
+清 §4 表 127 條 LOW/INFO。**8 agent 並行**(一 group/CIP),回當前 devnet 抽 ground truth 四分類,**working tree 已含 #257+#258**(batch3 branch octopus-merge 兩者,故編當前版)。已 fixed/STALE 逐條丟棄;DECISION(經濟/密碼值、factory 回傳型、committee-cap 衝突)只標 errata。**CIP-10 迴避令排除**。
+
+**涵蓋 23 CIP + 3 WP**(擇要,LIVE-DRIFT 除非註明):
+- **CIP-2/3/13/34**:NonReveal key 慣例(單 JSON blob)、slash 單位 `_cby→_wei`、JAIL_EXIT_FLOOR 靜態(非動態 median)、lane-mult floor(mult=0 DoS)、**VRF weight=linear stake×√reputation 非 log2**(真 drift 在 CIP-13 非 CIP-2)、delegation lifecycle events(cip13.* namespace,settlement events 延後)、SubmitSealedBid check order+E1749-1752、EIP-712-"style" 非 wire-format。
+- **CIP-14/15/16**:gateway slashing NOT-IMPL、routes rate-limit NOT-IMPL、§6.5→§6.8、AMEND 2-A/2-B 已部署、未記錄 state transitions、SUSPENDED→503、EXTERNAL_REVERIFY_FEE floor。
+- **CIP-17/18/19**:`at_block` 已上鏈(height-pinned `/state/at/{height}`)、stale `rpc.rs:168-213`、Runner exposure NOT-IMPL、PaymentBinding 定義、`/_cowboy/mcp`→CIP-18 §17、verb=ANY→POST rationale。
+- **CIP-20/21/22**:opcode 表 10-23、刪 stale hook-cap warning、created_at=height、cell-cost 公式、input 約束;TWAP label、Sync-emit、error 表;Requires CIP-1/5、`_get_release_amount` 定義、BlockCleared+currency_raised、can_claim anti-trap、example duration。
+- **CIP-23/26/27/28/29**:nonce-beacon producer-side MUST(chain 不可驗)、OperatorRootRef wire、CIP-26 error 表+§2.4→§2.2.4+ASCII names、fee_payer_override de-pin、EMIT_SAME_TOPIC_REENTRY hardcoded、SUBSCRIPTION_CELL_COST_HINT、zombie-reap no-refund;CIP-27 sealed-storage=#236 不動。
+- **CIP-4/5/6/31/33**:proof rate-limit、`_payload` raw-JSON 非 base64、timer opcodes 48/49/50、`--no-init` front-run、checkpoint=production、STORAGE_GRACE_EPOCHS=1 epoch、griefing 1/6、TradingPost 0x1E、CIP-13 depends-on、Paused-renew。
+- **CIP-7/8/9/12**:SealRequestExpired 欄、Settle 嚴格 `>`、escrow=balance account、chainId=1 caveat、event wire pin、CapToken reserved 欄、Foundation charter 澄清。
+- **CIP-25+WP**:nonce/replay scope 統一 `(src,sender,dst,nonce)`、RECLAIM_GRACE "mirrors" 軟化;timer lane ~11%(非 20%)、SemanticSimilarity trust row、relay-handshake domain tag `cbfs:relay-handshake:`、committee-cap 15-vs-16 衝突 flag。
+
+**CIP-7 code bug(附帶,node#1028)**:`cli/actors/stream_actor.py:30` SKM addr `0x12→0x0D`(canonical `ras/src/system_actors.rs`)。範例的兩個 call_actor fallback 打錯 actor;權威 host-fn 路徑不受影響。example-only。
+
+**教訓**:(1)**batch3 stacked on #257+#258**:§4 跨兩 PR 已改的檔,octopus-merge 兩 branch 進 batch3 才編當前版,PR 標 stacked、待兩者 merge 後 rebase 成 §4-only(同 #252→#247 手法);(2)**STALE-AUDIT 佔比極高**:127 條裡大量已被 #248/#252/#257/#258 修或本就正確(CIP-4 20-byte、CIP-5 remove-before-exec、多數 WP 常量)——長尾務必回一手源+讀當前 spec 自檢 done,別重工;(3)**真 drift 常在鄰居 CIP**:C13 log2 那條 audit 掛在 CIP-2,實際 CIP-2 早正確、drift 在 CIP-13;核 drift 要順藤摸到真正 stale 的那份;(4)並行 8 agent 抽全 §4 一趟最省,但 apply 是瓶頸(逐條回源核 verbatim 字串);機械字串用 python sweep,多行 insert 用 Edit。
+
+**交付 cowboy#259**(32 檔 docs-only,base main,stacked)+ **node#1028**(CIP-7 code)。**§4 主體清完**;殘留極少數(changelog 歷史條目、secrets-WP §1.8 domain-separator 8 條需再核、bond-framing errata)價值最低,交團隊 spec-cleanup。
