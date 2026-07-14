@@ -1,6 +1,6 @@
 # Cowboy CIP 與白皮書 — 深度審計最終報告
 
-> **📌 狀態(2026-07-13):後續處理 campaign 已落地。** 8 個 spec-reconciliation PR 全數 MERGED 進 `origin/main`(#241/#243/#247/#248/#249/#250/#251/#252,含 §5/§6/§9 及 §3 主 drift 群 CIP-4/24/12/16/2 + 三 WP;詳見 §13 ledger)。前期 15 HIGH + top-5 亦已閉環(#239/#240/#1004-1006/#1008/#1009/#1011)。**待團隊 decision(OPEN):** #236(CIP-30/27 fork)、#238(MIN_PROXY_STAKE)、#253(CIP-31 fee split 10/2/88→10/1/89);#237 已 closed。剩單一 CIP 零星 LOW 長尾交團隊 spec-cleanup。_
+> **📌 狀態(2026-07-13):後續處理 campaign 已落地。** 8 個 spec-reconciliation PR 全數 MERGED 進 `origin/main`(#241/#243/#247/#248/#249/#250/#251/#252,含 §5/§6/§9 及 §3 主 drift 群 CIP-4/24/12/16/2 + 三 WP;詳見 §13 ledger)。前期 15 HIGH + top-5 亦已閉環(#239/#240/#1004-1006/#1008/#1009/#1011)。**待團隊 decision(OPEN,2026-07-14 複核未變):** #236(CIP-30/27 fork)、#238(MIN_PROXY_STAKE)、#253(CIP-31 fee split 10/2/88→10/1/89);#237 已 closed。**單一 CIP 零星 LOW/MED 長尾:2026-07-14 起接手處理(§14),同法一 agent/CIP 抽 devnet ground truth → 四分類 → spec 修。**_
 
 _多代理獨立審計,2026-07-09/10。兩趟工作流:(1) 39 份文件逐份獨立審計 + 確定性碰撞掃描 + 6 個主題跨文件代理 + 對 HIGH/CRITICAL 的雙視角對抗驗證;(2) 對 334 條 MEDIUM/LOW 發現補跑雙視角驗證。共 ~1,211 個子代理、~44.8M token。技術識別碼、`檔案:行號`、常量名、opcode 一律保留原文。_
 
@@ -769,3 +769,33 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 ### 前期彙整(存查)
 - #248:CIP-4 state-layout(9)+ CIP-29 prefix(3);#249:CIP-24 CBSS;#243(既有):CIP-3 KV + CIP-24 GOVERNANCE_REVIEW。決策/errata:PROXY_SOAK、RESHARE_INTERVAL、MIN_PROXY_STAKE(#238)、rent_rate、fee-split(經濟)。
+
+---
+
+## 14. §3 drift 單一-CIP 長尾(2026-07-14,on-chain CIP 群)
+
+§13 遺留的「單一 CIP 零星 §3/§4 drift」長尾接手。同法:**每 on-chain CIP 一 agent 回當前 devnet(node `2bb1eddd`)抽 ground truth → 四分類 → spec 修**。**scope 判準:只做機制已上鏈的 CIP**(CIP-1/7/9/11/23/26);未上鏈的 CIP-21(AMM)/22(拍賣)/28(銀行卡)/33(trading-post)依 §9/§10 先例留 spec-design、實作時在 PR review 補;**CIP-10 迴避令不碰**。
+
+### 交付(cowboy branch `cbd/cip-longtail-drift-reconcile`,base main `1f15ac1`,docs-only)
+| CIP | 處置 | 分類 |
+|-----|------|------|
+| **CIP-1** 排程器 | LANE_TIMER_CYCLES `2,000,000→8,888,890`(live,FIFO 路徑實用);刪「governance-tunable via TimerConfig」偽稱(TimerConfig 無 lane 欄=compile-time 常量);gov key namespace `system:cip1:*→system:gov:param:cip1.*`(gov_param_key 慣例)×3;加**一則合併「Implementation status」callout** 標 v3 auction 整組 gated-off(`H_v3=u64::MAX`):p50 tip 未接線、custom bid 未上 Python binding、三層物理結構未實作、schedule/fire-time basefee gate + 三 error code 未上鏈、W(actor) median 實走 competing-set | 2 LIVE-DRIFT 值 + 5 NOT-IMPL(合併 callout) |
+| **CIP-7** stream | **無修**:SUBSCRIBER_PAID 路徑**完整上鏈**(`stream_key_manager.rs:263 acquire_epoch_access` + host fn `pvm_host.rs:4248` + SDK + 回歸測試 `cip7_stream_sdk.rs`),host/SDK 簽名與 spec §163-166 逐字一致 | STALE-AUDIT(駁回) |
+| **CIP-9** runner storage | `RelayNodeProfile` schema 整塊重寫對齊 `node/ras/src/types.rs`(`stake_amount u256→u128`、`region_hint bytes4→region Option<string>`、`last_heartbeat→updated_epoch`、刪 `health:u8`→`status:RelayStatus`、補 owner/node_id/pubkey/endpoint/epoch/drain/rebalance 12+ 欄);health-decay 模型從未部署→改述 status+heartbeat-freshness+auto-drain(§5.2/§5.3);`STORAGE_GRACE_EPOCHS 86,400→1`(單位 epoch 非 block)+ `VOLUME_DELETE_GRACE_EPOCHS`;repair/orphan 常量 `_SECS` 化(300s/86,400s,off-chain wall-clock 非 block);mermaid「health decay→drain policy」 | 4 LIVE-DRIFT |
+| **CIP-11** connectivity | `LIVENESS_TIMEOUT_BLOCKS=100` 更正為**生產 per-job timeout 預設**(非 test fixture);`mru_key`/`MruRecord` 加 NOT-IMPL callout(§9.2 present-first v3 已上鏈但 mru 遞歸權重未部署)| 1 LIVE-DRIFT + 1 NOT-IMPL;`PresenceInput` 塊欄/`SubmitPresenceCertificate` opcode/`ConsumedSeedsV1` MinPk 三項 STALE-AUDIT(spec 本已正確:PresenceInputV1 已上鏈共識欄、Mode-A/MinPk 皆已標 deferred+scheme_id 遷移)|
+| **CIP-23** TEE | 加 §3.4「Wire encoding」normative 註:**無 `TeeAttested` enum tag**——TEE 走 `tee_required:bool`+`required_tee_type`,`TeeAttested`/`Deterministic` 是 philosophy 非 VerificationMode tag(tags `None=0..SemanticSimilarity=5`)| 1 LIVE-DRIFT;UpdateCollateral ROOT_UPDATE_DELAY 已 node#1011 修=STALE-AUDIT/RESOLVED |
+| **CIP-26** libraries | `cells_per_pin §3.4 32→64`(對齊 §3.6+`gas.rs`);`code_size u64→u32`;§3.6 補 `MAX_LIBRARY_CODE_BYTES=131_072`/`MAX_TOTAL_LIB_BYTES=131_072` normative 上限 + `LibCapExceeded`;§3.7 補 `LibraryRemoved` event wire layout;§8 傳遞性 import overclaim 更正(§3.4 只掃 actor 自身 AST,library 私有依賴不自動解析)| 5 LIVE-DRIFT(2 值 + 3 doc-gap/overclaim)|
+| **WP**(technical)| 殘留:abstract line 71「15-minute challenge window」→`DISPUTE_WINDOW_BLOCKS=75`(WP §5/§8 早已 reconcile,此為漏網 abstract 一處)| LIVE-DRIFT |
+
+### 附帶撈出(非 spec,交團隊)
+- **CIP-7 code bug**:CLI 範例 actor `node/cli/actors/stream_actor.py:30` 寫死 `STREAM_KEY_MANAGER_ADDR=0x12`,canonical SKM=`0x0D`(`node/ras/src/system_actors.rs:22`)。只影響該範例的直接 `call_actor` fallback(權威 `acquire_epoch_access` 走 host fn 繞過);非 spec drift,建議另開 code ticket。
+
+### 教訓
+- **on-chain-status callout 合併優於散點**:CIP-1 v3 auction 整組 gated-off,一則 abstract 後的合併 callout(標 `H_v3=u64::MAX`)比 6 處散注乾淨,且照 CIP-12 先例「別刪設計、標 not-impl」。
+- **STALE-AUDIT 佔比高**:CIP-7 全條、CIP-11 三/四條、CIP-23 一條駁回——首過 Sonnet audit 對「已上鏈但 base 陳舊」與「spec 本已標 deferred」誤報率不低,長尾務必回一手源逐條核。
+- **struct schema drift 是 wire/light-client class**:CIP-9 RelayNodeProfile 差 12+ 欄+3 型別=照 spec 反序列化必失敗,值最高;抽 Rust struct 原文整塊換最省。
+
+### 剩餘(交團隊)
+- 未上鏈 CIP-21/22/28/33 的 §3 drift + 安全項:實作時 PR review 補(§9/§10 先例)。
+- CIP-10 §3 drift(opcode 160-164 / Container 0x11):迴避令,owner 修。
+- CIP-7 範例 code bug(上「附帶撈出」):另開 code ticket。
