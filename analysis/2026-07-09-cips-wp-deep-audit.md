@@ -1,6 +1,10 @@
 # Cowboy CIP 與白皮書 — 深度審計最終報告
 
-> **📌 狀態(2026-07-13):後續處理 campaign 已落地。** 8 個 spec-reconciliation PR 全數 MERGED 進 `origin/main`(#241/#243/#247/#248/#249/#250/#251/#252,含 §5/§6/§9 及 §3 主 drift 群 CIP-4/24/12/16/2 + 三 WP;詳見 §13 ledger)。前期 15 HIGH + top-5 亦已閉環(#239/#240/#1004-1006/#1008/#1009/#1011)。**待團隊 decision(OPEN,2026-07-14 複核未變):** #236(CIP-30/27 fork)、#238(MIN_PROXY_STAKE)、#253(CIP-31 fee split 10/2/88→10/1/89);#237 已 closed。**單一 CIP 零星 LOW/MED 長尾:2026-07-14 起接手處理(§14),同法一 agent/CIP 抽 devnet ground truth → 四分類 → spec 修。**_
+> **📌 狀態(2026-07-14):主 campaign + 長尾全數落地。**
+> **(A) 前期主 campaign(已 MERGED):** 8 個 spec-reconciliation PR 進 `origin/main`(#241/#243/#247/#248/#249/#250/#251/#252,含 §5/§6/§9 + §3 主 drift 群 CIP-4/24/12/16/2 + 三 WP;§13 ledger)+ 15 HIGH + top-5 閉環(#239/#240/#1004-1006/#1008/#1009/#1011)。
+> **(B) 長尾 campaign(2026-07-14,§14,OPEN 待 review):** 一 agent/CIP 抽 devnet ground truth → 四分類 → spec 修,分三批 docs-only PR:**cowboy#257**(§14a:CIP-1/9/11/23/26+WP)、**cowboy#258**(§14b:CIP-5/6/14/17/19/20/21/22/25/29)、**cowboy#259**(§14c:§4 LOW/INFO 127 條 across 23 CIP+3 WP + BankActor 0x16 + WP §9.1);**node#1028**(CIP-7 stream_actor SKM 0x0D code fix);**cowboy#260**(CIP-10 Container 0x11→0x13 地址勘誤,owner-authorized)。#259 stacked on #257+#258(merge 序:257/258→rebase 259;各 PR 已標)。
+> **(C) system-actor 地址表:全部與部署代碼一致、零殘留**(權威源 `node/runner/src/system_actors.rs`;0x11=VALIDATOR_SET / 0x13=CONTAINER_REGISTRY / 0x14=INTENT_SETTLEMENT / 0x15=EventListener reserved / 0x16=BankActor / next free 0x17)。
+> **(D) 待團隊 decision(仍 OPEN):** #236(CIP-30/27 fork)、#238(MIN_PROXY_STAKE)、#253(CIP-31 fee split 10/2/88→10/1/89);#237 已 closed。**§3/§4 主體清完**;殘留極少長尾(changelog 歷史條目、secrets-WP §1.8 domain-sep 待核、bond-framing errata)價值最低,交團隊 spec-cleanup。_
 
 _多代理獨立審計,2026-07-09/10。兩趟工作流:(1) 39 份文件逐份獨立審計 + 確定性碰撞掃描 + 6 個主題跨文件代理 + 對 HIGH/CRITICAL 的雙視角對抗驗證;(2) 對 334 條 MEDIUM/LOW 發現補跑雙視角驗證。共 ~1,211 個子代理、~44.8M token。技術識別碼、`檔案:行號`、常量名、opcode 一律保留原文。_
 
