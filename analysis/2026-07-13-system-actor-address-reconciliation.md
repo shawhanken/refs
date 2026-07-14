@@ -44,8 +44,12 @@ Direction is **not** a governance choice: `VALIDATOR_SET @ 0x11` is a genesis-al
 ### Left for the CIP-10 owner (not edited — CIP-10 out of scope for this actor)
 `cip-10-runner-containers.md` states Container Registry at `0x11` in **7 places** (frontmatter `description`, header §1 title, §1 body :1059, tables :1070/:1095/:1107, and the intro callout :14). These are the Container Registry's **own** CIP and must be corrected to `0x13` by its owner. Flagged in the WP §9.1 reconciliation callout. **This is the only remaining `Container=0x11` holdout after this pass** (verified by grep).
 
-### Decision (not arbitrated) — BankActor (CIP-28) address
-BankActor was penciled at `0x13`, now occupied by the deployed Container Registry. BankActor (CIP-28 agent-banking) is **unbuilt on-chain**. It MUST take a next-free address per the §9.1.3 rule. Candidate next-free slots (occupied: `0x01`–`0x11`, `0x13`, `0x14`, `0x1D`, `0x1E`; reserved: `0x12` PaymentGate; penciled: `0x15` deferred EventListener per CIP-34): **`0x15` or `0x16`**. Recommendation: assign BankActor `0x16` (leaving `0x15` for the already-penciled EventListener) — but the exact slot is a **CIP-28 / governance decision**, not made here. When CIP-28 is drafted for implementation, it MUST bind its slot in the WP §9.1 table in the same change.
+### Decision — BankActor (CIP-28) address → `0x16` (RESOLVED 2026-07-14)
+BankActor was penciled at `0x13`, now occupied by the deployed Container Registry. BankActor (CIP-28 agent-banking) is **unbuilt on-chain** and MUST take a next-free address per the §9.1.3 rule. Candidate next-free slots (occupied: `0x01`–`0x11`, `0x13`, `0x14`, `0x1D`, `0x1E`; reserved: `0x12` PaymentGate; penciled: `0x15` deferred EventListener per CIP-34): `0x15` or `0x16`.
+
+**✅ RESOLVED (2026-07-14, owner-approved): BankActor = `0x16`**, leaving `0x15` reserved for the already-penciled EventListener, keeping the dense sequence intact (next free is now `0x17`). Landed docs-only (**cowboy#259**):
+- **WP §9.1**: added `0x15` (EventListener, spec-reserved) + `0x16` (BankActor, spec-allocated) rows; resolved the `0x13` collision callout to ✅; updated the next-free note to `0x17` and the EventListener prose; marked `0x12` PaymentGate as spec-allocated with no deployed handler.
+- **CIP-28**: retargeted the BankActor address `0x13` → `0x16` throughout (r1.2 revision note; historical `0x0D`→`0x13` narrative retained). When CIP-28 is drafted for implementation, `0x16` is the bound slot; the reserved-band-vs-interception activation choice remains deferred to that PR.
 
 ## 4. Everything else the scan flagged = benign / already-known (no action)
 - **Opcode source-of-truth: zero duplicate values** (143 constants, compile-time-guarded). The 130 §6 "collision candidates" are per-CIP local enumeration reuse (e.g. `0x01`–`0x05` reused across many local instruction enums) — benign, confirmed by the human read in §6.
