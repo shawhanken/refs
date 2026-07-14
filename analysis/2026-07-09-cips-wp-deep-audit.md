@@ -667,14 +667,14 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 **權威源自身零碰撞**:143 個 SYS_ opcode(range 0–159,`#[deny(unreachable_patterns)]` 編譯期保證)+ 21 個 system actor 地址,皆無重號。故 §6 的 130 候選確為良性 per-CIP 枚舉重用(人讀已判)。
 
-**撈出 1 條真跨-spec 碰撞**(§6 未驗批的真發現):**WP §9.1「canonical」地址表 vs 部署代碼在 `0x11`/`0x13` 系統性衝突** —— 表寫 `0x11`=Container Registry / `0x13`=BankActor,代碼實為 `0x11`=**VALIDATOR_SET**(genesis 部署)/ `0x13`=**CONTAINER_REGISTRY**(Council-pausable),且 VALIDATOR_SET 整個不在表內;cip-10/14/16/18/34 全跟著誤放 Container=0x11。方向由 WP §9.1 自身 note 1/2 鎖定(部署 registry=source of truth、deployed claim wins)→**spec 須跟上**。**已修**:WP §9.1 錨表 + cip-14/16/18/34(Container 0x11→0x13、補 VALIDATOR_SET 列)。**CIP-10 迴避令→留 owner 修**(7 處,唯一殘留 holdout,已在 WP reconciliation callout 標明)。**BankActor(CIP-28)撞 0x13→已重分配 0x16**(✅ RESOLVED 2026-07-14 owner-approved;留 0x15 給 penciled EventListener,next free=0x17;WP §9.1 + CIP-28 已修 = cowboy#259)。詳:`refs/analysis/2026-07-13-system-actor-address-reconciliation.md`。
+**撈出 1 條真跨-spec 碰撞**(§6 未驗批的真發現):**WP §9.1「canonical」地址表 vs 部署代碼在 `0x11`/`0x13` 系統性衝突** —— 表寫 `0x11`=Container Registry / `0x13`=BankActor,代碼實為 `0x11`=**VALIDATOR_SET**(genesis 部署)/ `0x13`=**CONTAINER_REGISTRY**(Council-pausable),且 VALIDATOR_SET 整個不在表內;cip-10/14/16/18/34 全跟著誤放 Container=0x11。方向由 WP §9.1 自身 note 1/2 鎖定(部署 registry=source of truth、deployed claim wins)→**spec 須跟上**。**已修**:WP §9.1 錨表 + cip-14/16/18/34(Container 0x11→0x13、補 VALIDATOR_SET 列)。**CIP-10 Container=0x11×8→已修 0x13**(✅ RESOLVED 2026-07-14 owner-authorized 破例 = cowboy#260;最後一個 holdout 閉合)。**BankActor(CIP-28)撞 0x13→已重分配 0x16**(✅ RESOLVED 2026-07-14 owner-approved;留 0x15 給 penciled EventListener,next free=0x17;WP §9.1 + CIP-28 已修 = cowboy#259)。詳:`refs/analysis/2026-07-13-system-actor-address-reconciliation.md`。
 
 **其餘掃描項=良性/已知**:`SYS_VALIDATOR_*`(cip-11)/`SYS_SESSION_*`(cip-8)是正確 prose(前明說不存在/後須納入測試);`SYS_FETCH_SECRET_METADATA`(cip-24)是 host syscall 非 wire opcode;dual cip-15 + CIP-10 opcode 61-64 vs 160-164 已在 §2/§3 記錄。
 
 ### §6 終態
 - **checker 落地**(check_alloc.py)= CI seed,現跑綠(CIP-10 holdout+benign 例外已標註)。
 - **7 處 spec 修正**(WP §9.1 + cip-14/16/18/34 地址 + reconciliation doc)= 本輪第二個 cowboy PR。
-- **1 條 owner-待修**(CIP-10 Container=0x11×7,迴避令);**BankActor 重分配決策已閉環**(0x16,2026-07-14,cowboy#259)。
+- **CIP-10 Container=0x11×8 已修**(0x13,cowboy#260,owner-authorized);**BankActor 重分配已閉環**(0x16,cowboy#259)。地址表全部與部署代碼一致。
 
 ---
 
@@ -764,7 +764,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 - **CIP-31 §4 fee split re-reconcile 10/2/88→10/1/89** → **[cowboy#253](https://github.com/cowboyinc/cowboy/issues/253)**(code 現 10/1/89,經 COW-938/#957 已 governance-tunable;#252 storage-WP 已 errata flag;含 CIP-31 逐處行號 + CIP-9 §5.6 + 決策項「89/1 是否 intended target」)。
 - **3 decision**(#236 CIP-30/27 fork、#238 MIN_PROXY_STAKE、~~#237 已 closed~~)。
 - ~~BankActor(CIP-28)地址重分配~~ ✅ **已決 0x16**(2026-07-14 owner-approved;WP §9.1 + CIP-28 = cowboy#259;0x15 留 EventListener)。
-- CIP-10 Container=0x11×7 待 owner 修(迴避令)。
+- ~~CIP-10 Container=0x11×7 待 owner 修~~ ✅ **已修 0x13**(2026-07-14 owner-authorized,cowboy#260)。
 - 單一 CIP 零星 LOW 長尾(API/事件名/單值)交團隊 spec-cleanup。
 
 ### 前期彙整(存查)
