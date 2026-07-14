@@ -799,3 +799,25 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 - 未上鏈 CIP-21/22/28/33 的 §3 drift + 安全項:實作時 PR review 補(§9/§10 先例)。
 - CIP-10 §3 drift(opcode 160-164 / Container 0x11):迴避令,owner 修。
 - CIP-7 範例 code bug(上「附帶撈出」):另開 code ticket。
+
+### 14b. A1(on-chain drift)+ A2(spec-internal 矛盾)批次(2026-07-14,cowboy#258)
+
+接續 14a,清「on-chain CIP 剩餘 drift(A1)」+「純 spec-internal 矛盾(A2,不依賴代碼)」。並行 6 agent,同四分類法。**docs-only**。
+
+**A1 — on-chain drift(改 spec 對齊代碼):**
+- **CIP-5** — Timer struct 補 4 個序列化上鏈欄(skip_count/retry_count/max_fee_per_cycle/max_priority_fee_per_cycle);codec 註更正(v5,前向相容 read,無需 wipe);schedule_timer_ex 補 2 host fee 參數(Python binding 層 NOT-IMPL)。
+- **CIP-6** — 幽靈 entitlement `bank.transfer→econ.transfer`(單處)。
+- **CIP-17** — spec 是**部署前 MPT 草稿**,全 5 條 LIVE-DRIFT:§5.2 proof schema 重寫為部署的 QMDB/MMR `SerializableStateProof`+`encoded_operation`;補互斥 `exclusion_proof`(span/empty);`state_root`=全域統一 QMDB root(無 per-actor trie);§5.3 verification 重寫為 MMR op-proof;§5.4 error + §9 rate-limit 更正;清除全部 MPT/「storage trie」引用(CIP-4 是 QMDB)。**light-client fork-class 最高值**。
+- **CIP-20** — batch 拒 hooked token(TokenBatchHookedUnsupported);pre-hook vs post-hook gas-cap revert 語義;`MAX_TOKEN_SUPPLY=1e30 wei` 協議上限;body `u256→u128` 全掃(除歷史 Warning 塊)。
+- **CIP-29** — unsubscribe/force refund 是 Phase-1 accounting-only(status 註,不刪 intended-economics 表);EventSub/Index key 是 keccak+zero-pad 到 54-byte StateKey(非 raw 33B);§6.3 P1-A/P1-B/P2-D 標 resolved-and-implemented;修陳舊行號註。**0x18/0x19 prefix + 0x12/0x13 quota 已對=STALE-AUDIT 不動**。
+
+**A2 — spec-internal 矛盾(不依賴代碼):**
+- **CIP-14** — Part I 註冊費拆分**加總 120%**→burn 前先減 gateway_pool_share(10/20/70)。⚠️ flag:衍生 burn 權重 + 部署的 registry settlement 實為兩方(treasury+burn,無 gateway pool)須 owner/治理定。
+- **CIP-19** — §9 廣告 listChanged:true 但 §4/§8 延後 server-initiated→改 false+延後註。
+- **CIP-25** — §1.6 finality 述詞寫反(→`H ≤ finalized_height`);`GET /chain/finality` 不存在(NOT-IMPL,交 backend);dead ref `Delta 9 §16.z`→WP §16.2;補 §1.6/App-B revocation-set 檢查(isRevoked)+ L2-Deployment-Isolation 綁定(dst_mailbox 欄 + address(this) 檢查)到 CrossChainMessage/deliver()。
+- **CIP-21** — V3 hook「same as V2」軟化(V3-specific 簽名);`schedule_timer(interval=,handler=)`/`trigger_type="state"` 不存在→真 one-shot height API + illustrative-pattern banner。
+- **CIP-22** — `_remaining_demand` 最終塊 div-by-zero(`+1`);`_finalize_auction` idempotency guard(double-finalize);不存在的 timer kwargs→one-shot height + self-re-arm;Factory `get_or_create_*→get_*/create_*`(address-vs-handle flag);zero-slippage LP-seeding 操縱註;「reserves 20% block capacity」→`LANE_TIMER_CYCLES=8,888,890 ≈ 11.1%`。
+
+**教訓**:(1)**CIP-17 整份 pre-impl 草稿**——feature 已 ship(#767 系列)但 spec 從未更新,全條 LIVE-DRIFT,proof wire schema 差最遠(MPT vs QMDB/MMR),light-client fork-class 值最高、務必抽 code struct 整塊換;(2)**A2 spec-internal 矛盾(120% 拆分、div-zero、寫反的述詞、dead ref、不存在的 API)不需 code 在鏈上即可修**——與「未上鏈就別碰」的 drift/安全先例不同,是文檔自身缺陷;(3)**not-on-chain 的 illustrative pseudocode(CIP-21/22)**:concrete bug(div-zero/double-finalize/factual 數字)照修,但不存在的 timer API 用 correction banner 而非注入大段未測試 rewrite(surgical,別 over-author);(4)多處 ⚠️ FLAG(CIP-14 權重、CIP-22 factory 回傳型、CIP-25 §B.2 分支)= 修 arithmetic/引用缺陷但把 economic/interface 決策留 owner。
+
+**交付 cowboy#258**(10 CIP,docs-only,base main)。CIP-7 全 STALE-AUDIT 不動(見 14a)。
