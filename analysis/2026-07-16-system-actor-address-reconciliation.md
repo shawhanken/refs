@@ -47,36 +47,34 @@ contradiction remains in the `0x01`–`0x1E` allocation itself.
 
 ---
 
-## 2. LIVE / UNRESOLVED — CIP-31 CBFS params: 0x09 vs 0x0B  ⚠️ needs human decision
+## 2. RESOLVED — CIP-31 CBFS params: as-built confirms **0x09**  ✅ (fix in cowboy#273)
 
-`storage_fee_per_mib_per_epoch` is assigned **two different addresses inside the one CIP-31 document**:
+CIP-31 assigned `storage_fee_per_mib_per_epoch` to **two different addresses inside the one
+document**: §1 (`cip-31:39`) said `0x09`; §10/§11 (`cip-31:143-183`) said `0x0B` under a
+`system:cbfs:` prefix. Every other CBFS param in §10/§11 was at `0x0B`; only §1 said `0x09`.
 
-- `cip-31-cbfs-rent-schedule.md:39` (§1) — stored at **`0x09`** (Tier-0 governance param).
-- `cip-31:143-149` (§10 "Parameter Storage at **0x0B** Relay Registry" + §11 table) — the same
-  key is listed among the **`0x0B`** keys, read by Storage Manager `0x0A`.
+**Resolved by as-built verification (COW-1163) — §1 is correct, §10/§11 was the error.**
+The node code stores CBFS rent parameters at **`0x09` Governance**, not `0x0B`:
 
-Every other CBFS parameter in CIP-31 (§2:49, §3:59, §4:68, §7:115-116, §8:137, §10 block, §11
-table :167-183) is at `0x0B`. Only §1 line 39 says `0x09`.
+- All 14 rent/slashing params live at `GOVERNANCE_SYSTEM_ACTOR` (`0x09`) in the CIP-12
+  centralized param store, key **`system:gov:param:cip31.cbfs.<name>`** — seeded at genesis
+  (`node/chain/src/genesis.rs:929`, test `:2363`), read at settlement
+  (`node/storage/src/storage_settlement.rs:59-138`), governance-tunable
+  (`node/execution/src/execution/gov_enact.rs:193-222`).
+- The `system:cbfs:` prefix from §10/§11 **exists nowhere in the code** (zero hits); no
+  parameter is stored at `0x0B`.
+- `0x0B` (Relay Registry) holds only **state** — challenge-pool balance, escrowed challenge
+  bonds, per-epoch counters — under `ras:*` keys (`node/storage/src/accounts.rs:196-219`,
+  `node/ras/src/storage_keys.rs:445-499`).
 
-**The two candidate resolutions point in OPPOSITE directions — do not auto-fix:**
+So the two readings collapse: the earlier "spec-text weight → 0x0B" was an artifact of the wrong
+§10/§11 wording; the as-built code and the governance decision (behind the retracted #267-269)
+both say **0x09**. Note this is the OPPOSITE direction from #267/#268/#269, which pushed §1's
+`0x09` → `0x0B` (against as-built) and were retracted as unauthorized.
 
-- **Spec-text weight → 0x0B.** §10/§11 body is unambiguous; wp §9.1 role of `0x0B` is exactly
-  "Relay Registry / PoR challenges" (wp:808); the wp §13.1 catalogue of `0x09` governance keys
-  (wp:902-960) contains **no** `system:cbfs:` entry; CIP-12 §4.2 (cip-12:112) says structured
-  per-actor configs live at their owning actor, not `0x09`. On text alone, §1 line 39 is the
-  outlier and would be corrected to `0x0B`.
-
-- **Governance decision → 0x09.** Per the closes of cowboy PRs #267/#268/#269 (2026-07-16,
-  shawhanken): CBFS rent **parameters** reconcile to governance actor **`0x09`** under the
-  `cip31.cbfs.*` namespace (matching the as-built COW-1163 path); **`0x0B` holds
-  escrow/pool/bond state only**. On this reading, §10/§11's parameter-storage wording is what
-  needs correcting, not §1 line 39. Those three PRs (which pushed §1's `0x09` → `0x0B`) were
-  retracted as unauthorized AND wrong-direction; the correct reconciliation is to be opened
-  separately by a human.
-
-**Action:** hold for human ruling on which address owns CBFS **parameters** (vs escrow/pool/bond
-state at `0x0B`). Whichever way it lands, CIP-31 must be made internally consistent — right now
-§1 and §10/§11 contradict each other regardless of the answer.
+**Fix:** cowboy **#273** reconciles §10/§11 to §1 + as-built (params at `0x09` under
+`cip31.cbfs.*`; state stays at `0x0B`; all `system:cbfs:<name>` key literals →
+`cip31.cbfs.<name>`). Tracked in **COW-2679**.
 
 ---
 
