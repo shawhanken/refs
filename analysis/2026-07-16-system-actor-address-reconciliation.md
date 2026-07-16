@@ -93,8 +93,11 @@ both say **0x09**. Note this is the OPPOSITE direction from #267/#268/#269, whic
   spec wins, loser renumbers.
 
 There is **no `0x9X` "runner-system" band** anywhere in the specs — the runner system actors are
-`0x01`/`0x02`/`0x03`/`0x04`/`0x05` in the low band. (The `0x91`–`0x95` values are node
-`constants.rs` implementation addresses, NOT spec addresses; out of scope for this doc.)
+`0x01`/`0x02`/`0x03`/`0x04`/`0x05` in the low band, and the compiled code agrees (node
+`runner/src/system_actors.rs`, runner `crates/chain-client/src/rpc.rs`, both with unit tests
+asserting the low bytes). The `0x91`–`0x95` values were never spec addresses and do **not** exist
+in the compiled system-actor registry; they lingered only as stale references in the runner repo's
+diagnostic scripts and `CLAUDE.md` (corrected in runner#180), out of scope for this doc.
 
 ---
 
