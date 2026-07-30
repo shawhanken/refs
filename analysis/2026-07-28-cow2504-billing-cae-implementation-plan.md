@@ -202,6 +202,17 @@ Ran spec-correctness / anti-spoof / consensus-determinism / blast-radius lenses 
 
 Net verdict: the plan's *shape* (reuse light verify, dormant gate, anti-spoof invariant, 3-PR slicing) survives review; F1 and F2 were genuine defects that would have broken the producer/verifier contract or endangered the shipped job path, now corrected. No finding changes the scope or the slicing.
 
+## 7b. PR-1 review dispositions (Marshal PASS advisories, 2026-07-28)
+
+Both PR-1 halves (node #1168, runner #194) got a Marshal deep-review **PASS**. Advisory dispositions:
+
+- **Scope note (CAE JSON size) — FIXED in PR-1.** `tee_attestation: Option<Vec<u8>>` serialized as a `serde_json` int array (~4-6×); a CAE is multi-KB. Locked a compact **lowercase-hex string** wire encoding (`cae_hex` serde, byte-identical both stacks, pinned to `"cafebabe"`) **now, while the field is always `None`** — so PR-2 populates an already-sized format with no wire-format change. Hex is the original `tee_signature` encoding.
+- **A1 (cross-repo golden drift) — documented limitation + follow-up.** The two golden literals are independent copies (same shape as the `cip11_wire` mirror). The clean single-source fix (move the preimage into a crate both repos share) is **currently blocked**: node and runner pin **different** `cowboy-protocol-codec` revs (`1c3a560` vs `577e054`), so unifying is a risky lockstep out of scope for a dormant PR-1. **Follow-up:** either a runner-CI step that fetches node's `tee.rs` golden with the existing `cowboyinc` git credential and asserts equality, or single-source once the codec revs converge. Recorded, not blocking (drift surfaces as a failing billing verify, and PR-3's cross-check will catch it).
+- **A2 (container-e2e skipped) — offline-covered.** The label-gated live round-trip did not run; the field is `None` in PR-1 and the serde decode/degradation is covered offline (round-trip + back-compat + split-deploy tests). A labelled e2e is the direct evidence for PR-2 when the field is populated.
+- **A3 (merge order) — documented.** PR descriptions state the explicit order **node #1168 → runner #194**; a split deploy degrades to current behavior (no `deny_unknown_fields`, `Option` missing-field → `None`), so out-of-order is safe but not preferred.
+
+**PR-2 carry-forward:** size the populated CAE against the result-channel inline-blob cap (hex halves the array bloat but a large TDX quote is still KBs); the encoding is now hex-locked.
+
 ## 8. Anchors (verified 2026-07-28)
 
 `CompositeAttestation`/`attest_digest`/`reportdata_billing`/`empty_req_hash` — `node/types/src/tee.rs:224,279,292,274`. `verify_result_cae_light` — `cbss.rs:4203`; `verify_service_sig` — `cbss.rs:4066`; `handle_verify_cae` (Full, out of scope) — `cbss.rs:2317`; `VerifyCae` opcode 125 — `cowboy-protocol-codec/src/instruction.rs:200`. `cae_result_hash` — `verifier.rs:1832`; `settle_container_compute` — `verifier.rs:1065`; `finalize_container_settlements` — `verifier.rs:1275`; anti-spoof comment/test — `verifier.rs:1088,8981`. `DisputeContainerBilling` — `system_instruction.rs:5694` (opcode `SYS_DISPUTE_CONTAINER_BILLING=165`). `BillingAttestation` — `node/runner/src/types.rs:3014`; `PendingContainerSettlement` — `:3063`. Runner producer — `runner-container/src/executor.rs:237-252`; `result_attestor`/`assemble_nitro_cae` — `runner-tee/src/result_attestor.rs:68`, `nitro_cae.rs:162`. Gates — `constants.rs:779,787`; Container Registry `0x13` — `system_actors.rs:72`; stale `0x11` comment — `runner-common/src/types.rs:270`.
