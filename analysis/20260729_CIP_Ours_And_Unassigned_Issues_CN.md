@@ -76,6 +76,40 @@ COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 
 - **审「订阅/注册/共用常量」**：subscribe 只收费不鉴权(COW-1150)；一个 chain_id 常量同时要「绑链」与「跨链 portable」目标相反(COW-1012)。
 - **pvm_host 层 dormant-gate**：给 PvmExecutionContext 加字段 + engine post-new 设（不改 async new 签名）。
 
+---
+
+## 2026-07-31 更新（续 overlay 2：ToB/穩健性四 PR 批 —— 3 merged / 1 closed）
+
+> 本节接续上面的 overlay，记录一轮从「20260729 分析檔找新簇」出发的批量交付与逐 PR 裁决。全部经 marshal gate + Almanax + state/econ 不变量核实；两个 PR 的初判被深审推翻。
+
+### 交付 / PR 终态（node，base=devnet）
+
+| Issue | CIP | PR | 终态 | 说明 |
+|---|---|---|---|---|
+| COW-2699 | CIP-9 | **#1194** | ✅ MERGED · Done | `/proof/multi` 取 read lock **前**加 `dry_run_admission_permits` admission 限流（饱和 429），照 `/actor/read` 范式；纯 RPC 零共识 |
+| COW-2701 | CIP-3 | **#1194** | ✅ MERGED · Done | fee-settlement 的 PVM cycle fold 抽 `fold_pvm_cycles`，clamp 回 `cycles_limit`（今日 price=0 精确 no-op，metering 激活后封 TOB-25 溢出）；proptest 证 `out≤limit` |
+| COW-2721 | CIP-? | **#1195** | ✅ MERGED · Done | validator `main.rs` `try_join_all(vec![p2p,engine])` → first-completion（`await_first_task_exit`/`select`）；修「死共识+活 gossip」zombie。**MED-1 顺延**：致命臂 exit 0 → systemd `Restart=on-failure` 不重启，建议 `process::exit(1)`（独立 PR） |
+| COW-2700 | CIP-1 | **#1196** | ✅ MERGED · Done | **深审推翻 per-sender quota**（见下），改为**只留 H1 engine-materialized mailbox leak 修复**：`collect_deferred` 把 engine-materialized 移除提前到 receipt 解析前，堵住 timer/zero-origin（`origin=Some(ZERO)` 无 receipt）永久 stranded 的既存 leak。单檔 collect 重排，共识面（bundle mainnet flag-day） |
+| COW-1150 | CIP-29 | ~~#1193~~ | 🚫 **CLOSED won't-do** · Canceled | subscribe_event manifest 门禁：深审 escalate 4 activation-blocking HIGH，**机制是错工具**（见下），无可保留底层价值 |
+
+### 逐 PR 深审裁决（初判被推翻的两个）
+
+- **#1196 / COW-2700**：初判 marshal PASS（dormant quota），**sweep 深审推翻→escalate（2 HIGH + 6/6 mutation SURVIVED）**。命门发现：`collect_deferred_transactions_excluding` **只扫本块 pending**，每条消息非 promote+remove、即 dead-letter+remove → **mailbox 每块排空、不跨块累积**。故 per-sender *mailbox* quota 只能界**块内**占用＝与全局 `MailboxFull` 同类（都计块内 enqueue），代价是合法同块扇出误伤（H2）；且 timer 消息 `origin=Some(ZERO)` 在 receipt-miss `continue` 早于 remove → 计数器**只增不减 → 256 次后永久锁死**（H1）。跨块累积**唯一**来源就是 H1 那个既存 leak。**结论（用户拍板）：去 quota、只留 H1 leak 修复**（有独立价值），弃错误机制。
+- **#1193 / COW-1150**：dormant（flag-day=u64::MAX，devnet byte-identical、CI 绿、mergeable=CLEAN）**≠ 可 merge**——合进去是埋哑雷。一手核实：**HIGH-1** `events.subscribe` 不在 `types/src/registry.rs`、PR 没加 → 激活即对所有带 manifest actor **永久移除** subscribe_event（连声明都 `UnknownId`）；**HIGH-3** `manifest_gate.rs` `None=>Ok(None)`＋manifest 部署可选 → **manifest-less 部署完全绕过**（Almanax 050899f3 已淘汰的自宣告模式）；**HIGH-4** 无 CIP 依据＋反 CIP-29（emitter 不付费/payload 已公开/已有 `MIN_SUBSCRIPTION_GAS_PREPAID`+`SUBSCRIPTION_REGISTRATION_FEE`+`MAX_SUBSCRIBERS_PER_TOPIC` 反 spam）。四条 HIGH 全属**治理/CIP 决策**（加 entitlement registry=治理门控；机制需改 emitter-curated allowlist+CIP 修正案），**不可我单方加固**。**结论（用户拍板）：关 won't-do**。
+
+### 同簇 de-scope / 顺延
+
+- **COW-2722**（CIP-follower chain-identity marker 稳健性）：premise 重核后 de-scope——A1（MED）已被 `chain/src/chain_identity.rs` 重构解决（marker 刻意置 partitions 外＋`mismatch_message` 已列全 on-disk 布局）；A2→COW-2723；A3/A6 是 height 无法区分的**已载明 TOFU 限制**；A4（LOW）仅测试可达（`GenesisConfig::default()` 在 `cfg(not(test))` panic → engine.rs `None` 分支生产不可达）。已移回 Backlog。
+- **COW-2700 quota 顺延项**（曾判「需 storage migration 较重」）→ 最终**整个 quota 方法被否定**，见上。
+
+### 深审沉淀（本轮新教训）
+
+- **改「per-X 配额/计数」持久状态前**：①确认所有「进得去出不来」的 enqueue 来源（此处零 origin 的 timer 路径）；②确认 decrement 的**触发频率**（每块一次≠每 tx 一次，决定配额真实粒度）；③确认 X 是否**跨块留存**——不留存则「跨块配额」无意义（mailbox 每块排空→quota 沦为块内版 MailboxFull）。
+- **门禁全绿是弱证据**：#1196 十条不变量+Almanax 全绿、4 新测试 pass，但两条 activation-blocking 缺陷全在门禁盲区；**6/6 mutation SURVIVED**（测试全 `rollback_batch` 不 `commit_batch` → 计数器根本没进 merkle root 也照过）。commit-based 测试是必需的。
+- **dormant ≠ 可 merge**：dormant 只保证 state byte-identical，激活即坏的特性合进去是哑雷；加 entitlement registry / 改共识投递行为都要走 flag-day + 治理。
+- **承诺功能深审可能推翻整个方法**：保留底层真修复（#1196 leak）、弃错误机制（quota）；无底层价值可留的就关 won't-do（#1193）。
+- **clippy CI 陷阱**：dormant activation-height 若在 storage 层用编译期 const `u64::MAX` 直接 `h>=CONST` 比较，撞 deny 级 `absurd_extreme_comparisons`（COW-1150 用 runtime 字段天然避开）；验 dormant PR 前须跑 `cargo clippy --workspace --all-targets`（test 绿 clippy 才红）。
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
