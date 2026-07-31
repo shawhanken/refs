@@ -48,6 +48,34 @@
 
 **本轮教训**：成熟 backlog 的剩余「Backlog」多为 stale-done / 大 build / spec-blocked；单票 probing 低产。真 bug（如 COW-2114 live spec-violation）来自定向 spec-vs-code 不变量审计，非逐票扫。
 
+---
+
+## 2026-07-31 更新（续 overlay：CIP-11/8/29 triage + 交付 + Linear routing）
+
+### 交付 / PR 状态（node，base=devnet）
+
+| Issue | CIP | PR | 状态 | 说明 |
+|---|---|---|---|---|
+| COW-2609 | CIP-9 | #1187 | ✅ MERGED | write-relayer 可诊断（加固后：转发 chain revert_reason→422、408→202 pending） |
+| COW-2828 | CIP-9 | #1188 | ✅ MERGED | per-gate reject 指标 |
+| COW-2114 | CIP-9 | #1189 | ✅ MERGED | finalize owner-authority（dormant） |
+| **COW-1150** | CIP-29 | **#1193** | 新开 | subscribe_event 加 `events.subscribe` entitlement 门禁（dormant coarse-gate）；**activation 前置=生态迁移**（现存 subscriber 须重部署带上 entitlement） |
+| **COW-2552** | CIP-11 | ~~#1190~~ | **CLOSED** | defer-then-slash 深审判**殺好人放壞人**（HIGH-1 forecloses honest reveal-race loser→误 slash）；完整解方(C1 结算后接受+验证遲到揭示以区分)会碰 COW-2286 escrow-terminality guard、为中低 griefing 不成比例；**判 low-severity，reputation-only 上限，不实作** |
+
+### Triage 结论（本地 + Linear 直读核实）
+
+- **CIP-8 session 簇**：**COW-1012（pin session chain_id）= 真 replay gap 但 launch-gated + 设计冲突**——voucher EIP-712 chain_id 硬编码=1、与真 chain_id 解耦 + caller-supplied session_id → 跨链 voucher 重放;但同常量被 CIP-9 volume-DEK 故意用作**跨链 portable** 身份（cbss.rs:832-838），不能简单改值，须**拆分两用途**。单链 devnet 不可利用；第二条链前必修。cross-repo + dormant。design note: `2026-07-31-cow1012-session-chainid-binding.md`。其余：COW-1013(dispute 路径 spec=future work)、COW-1542(feature)、COW-1543(runner infra)。
+- **CIP-29 事件订阅簇**（Linear 直读）：**COW-1922/1923 = Done**（close 候选，关前 spot-check）；**COW-1150 已交付 #1193**；COW-1917(EmitResult 未 surface=改 SDK-in-binary 契约=共识面,大)、COW-1147(receipt causality=改 receipt_root)、COW-1152(schema 校验 opt-in)皆共识面 feature work。
+
+### Linear routing（用 team API key,仅贴 comment 未改状态）
+COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 refs 分析檔）。COW-2114 已 Done、其 CIP-9 spec follow-up 在 PR#1189,无需 route。
+
+### 深审沉淀（本轮新教训）
+- **审「分类/惩罚」机制必问「无辜者与作恶者能否区分」**（COW-2552:foreclosed-honest 与 refused 同形,都不存 result→defer-then-slash 错杀多数派）。
+- **修低 severity 别碰资金守恒关键路径**（COW-2552 碰 COW-2286 escrow-terminality）；**「完整/尽善尽美」方案也要深审——过度工程本身是缺陷**。
+- **审「订阅/注册/共用常量」**：subscribe 只收费不鉴权(COW-1150)；一个 chain_id 常量同时要「绑链」与「跨链 portable」目标相反(COW-1012)。
+- **pvm_host 层 dormant-gate**：给 PvmExecutionContext 加字段 + engine post-new 设（不改 async new 签名）。
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
