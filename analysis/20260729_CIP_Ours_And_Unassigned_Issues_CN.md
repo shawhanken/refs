@@ -146,6 +146,48 @@ COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 
 - **审「已实作但未 wire」的 CIP**：查①字段是否只占位②有无 consumer 误当真值用；computation 已测+dormant = 激活就绪非 bug（CIP-30）。
 - **结论**：核心共识面（资金守恒/授权/不可变性/确定性/gas 计量/命名正规化/dormant-gate）经 10-CIP 覆盖，高度确认健全；边际产出递减，剩余面多未建成/在 gateway 仓/spec-blocked。
 
+## 2026-08-01 更新（续 overlay 4：审计扩展至 25 CIP 面 —— 再找 3 处 live 缺陷含 1 HIGH，#1203 按 Marshal review 加固）
+
+> 接 overlay 3 的 10-CIP，继续把定向 spec-vs-code 审计推到**价值流转 / 授权 / 确定性 / 跨链**全部 devnet-live 面（累计 25 CIP 面）。产出 5 新 issue（1 HIGH）+ 2 PR，并对 #1203 按其 Marshal deep review 逐条加固。全程纪律：判 HIGH 前回查一手源，confirm/refute 都留证据。
+
+### 交付 / PR（audit 产出，累计）
+
+| Issue | CIP | PR | 状态 | 说明 |
+|---|---|---|---|---|
+| **COW-2891** | CIP-2 | **#1203** | ✅ dormant→devnet · **已加固** | **结算给被 slash 的 dissenter 照发等额报酬**：payout 的 `consensus_runners` 未过滤 `to_slash_set`，而 reputation/MRU/aggregator/EMA 四处**都**排除——唯独 payout 漏。少数派同时被扣 stake 又领 balance，且稀释诚实 runner。非守恒破坏（misallocation）、确定性故不分叉。修=dormant filter（`DISSENTER_PAYOUT_EXCLUSION_ACTIVATION_HEIGHT`）。**Marshal deep review escalate→加固 `c555cf68`**：HIGH-1/3=高度做成 ExecutionEngine injectable→full-path 测试跑**有限高度**（legacy MajorityVote 分支、只此 gate live）；HIGH-1 pin=新 dormant full-path 测试用默认 engine 断言 dissenter 仍被付→翻 const 即 FAIL；HIGH-2=doc 改 cash-only+container lane 故意不滤（喂单-runner CAE 门）→COW-2897；M-1=`num_runners==0` refund-to-submitter 防无主销毁；M-2/M-3=dormant test 钉字节等同+burn leg 断言 |
+| **COW-2892** | CIP-18 | — | Backlog（待团队定语义） | **actor-funded budget deduct 漏 §18 分派**：`deduct_budget` 只减无背书计数器、不 credit 任何账户；而 per-request/pass/subscription 都调 `distribute_revenue` 收 protocol_fee。§18 明写「same fees apply」→扣的 CBY（deposit 时已移出流通）永久烧毁、gateway 没收到、protocol fee 没收。修需先定 actor-funded 分派语义（payer==actor 时 actor_fee 归谁） |
+| **COW-2894** ⚠️ **HIGH** | CIP-12 | — | Backlog | **tier-shopping：system-actor 代码热替换可用 Tier 0 提交**。proposal 的 `tier` 由 proposer 自选、**无 per-payload 最小-tier 强制**（submit+execute 均无）。spec §5.1 定 hot-swap PVM bytecode=**Tier 3**，但可用 Tier 0：quorum 15%→**5%**、approval 60%→**50%**、跳过 endorsement、deposit 25k→1k。绕过宪法级控制的最强治理操作。修=加 `payload_kind→min_tier` 映射，submit+ExecuteProposal 双查 |
+| **COW-2895** | CIP-31 | — | Backlog（经济不完整） | **§8 relay 罚没无牙**：relay 注册 `stake_amount=0` 且无 Stake 指令从 owner 借记初始质押→slash 分 `min(penalty,0)=0`，威慑对已注册 relay 经济上无效。**非守恒/共识 bug**（守恒闭环已验：`credit-out ≤ Σ debit-in` 无铸币/双花）——是 feature 未接线，供接线质押时参考 |
+| **COW-2897** | CIP-2 | — | Backlog（#1203 follow-up）| **container-compute lane 同形未修**：`compute_runners` 同样未滤 slashed，但该 list 喂单-runner CAE 即时结算门，call-site 过滤会误触→须在 `distribute_container_settlement` payout 时滤。激活 #1203 前置 |
+
+### 15-CIP 追加审计结果（累计 25 CIP 面）
+
+| CIP | 结果 |
+|---|---|
+| CIP-13 delegation | ✅ SAFE：CBY 守恒**五路径精确**（delegate `balance−=amount`=tranche=totals；undelegate Active→Unbonding 保额、部分拆分 `old=new+remaining`；claim 贷记 post-slash 额、totals 不双减；cascade_slash 写回=路由 treasury/burn；settle_split `runner_payout+Σpayouts=base` 恒等余数补最低 id）；is_slashable/is_claimable 边界无重叠无缝隙 |
+| CIP-34 settlement (0x14) | ✅ SAFE：`conservation_surplus` 强制 per-token `Σdiff≤0`（拒铸币）surplus→solver；每 intent diffs 只动自身、signed→recover==signer/unsigned→resting；**`intent_signing_preimage` 绑全字段+chain_id+域标**（不可换 diffs/跨链重放）；deposit/withdraw custody 守恒+compute-then-commit；auction open 绑 request_id 真 originator 防抢占 |
+| CIP-33 trading post | ✅ SAFE：`ensure_conserved` 强制 Σcredits==amount；custody **真 Account 背书**（`apply_native_custody_payment` 先查 balance≥debit）；`available_balance=prepaid−reserved` 护 reserved；`split_credits` 守恒（dust→first、shares>1e4 拒）；settle_per_call **生产 hard-reject**（Cip8 stub `#[cfg(not(test))]`，COW-2336 barrier） |
+| CIP-28 banking (0x16) | ✅ SAFE（核心价值路径）：**fiat mint spec-compliant**（signature+voucher_id 防重放+marker-first 防双铸+`handle_token_mint` mint_authority==0x16+MAX_SUPPLY）；deposit/withdraw owner-only+余额 checked。**「缺 chain_id」经 spec §11 REFUTE**（明标 per-chain distinct signer keys 替代）。genesis-gated（=10 非 dormant）；scope=mint/deposit/withdraw |
+| CIP-7 stream key-delivery | ✅ SAFE：threshold-proxy 聚合全备——seal id/block 界/identity_bytes 绑定+**proxy 委员会 position+index 防伪造**+dedup 防单委员多计+**proxy 签名 recover==operator over 绑全字段的 cip7_partial_sig_hash**；threshold 个互异委员才 Ready |
+| CIP-4 §12 state rent | ✅ SAFE：**rent 烧毁符 §12.1**（`balance−=paid` 无 credit=deflationary sink）；eviction（debt>threshold+blob_hash commitment+bond forfeit）/restoration（repay `debt×(1+catchup)`+验 blob）；系统 actor 豁免；rate-stamping 防 rate-hike trap。（rent.rs 实为 CIP-4 §12，非 CIP-31 CBFS storage fees） |
+| CIP-31 CBFS fee/slash | ✅ 原语 SAFE + relay-stake **托管闭环已验**：`split_storage_fee`/`distribute_by_weight`/`distribute_slashed_stake` 守恒-exact（dust 显式路由）；slash 应用从 clamped penalty 正确 credit；relay-stake `credit-out ≤ Σ(owner drain-bond 借记)` 无铸币、forfeit=clean burn、单计数器无双花。storage-fee 10/1/89 split **未 wire**（纯原语）；见 COW-2895 惰化观察 |
+| CIP-11 connectivity | ✅ SAFE：committee 成员计算**全确定性无 wall-clock**——epoch=`block_height/period`、staleness=`current_block−last_heartbeat>TIMEOUT`（block-height 非墙钟）、compute_committee/HHI/EMA 整数作用于 order-independent 聚合；committee.rs 只算尺寸、成员在 dispatch VRF 抽 |
+| CIP-24 CBSS release | ✅ SAFE：release 授权**六层全绑 on-chain state**——runner 须真被派 job+**purpose 从存储 JobSpec 派生**（非请求方自称，阻拉未声明 secret）+manifest 声明+ACL+CIP-33 lease gate+TEE binding；**份额 re-encrypt 到 recipient**（未授权方见份额亦无法解密）；submit 前置 chain_id/freshness/dedup/proxy 委员+VSS 验证/threshold |
+| CIP-8 MPP session (0x0C) | ✅ SAFE（PoC）：open escrow+拒重复 session_id+runner 须注册；settle monotonic nonce+`cumulative>spent`+**`cumulative≤deposit` 防超支**+**payer 签名 EIP-712**+escrow 借记=split 守恒；finalize refund `deposit−spent`+不删条目→无同链重放。**「placeholder chain_id 跨链重放」经 spec §7.2 REFUTE**（明标 `PoC:1 (V-13)` 已追踪，cross-chain 是 follow-on） |
+| CIP-25 cross-chain bridge | ✅ **高危 inbound 面不在 devnet**：types 无任何 bridge/inbound SystemInstruction→外链→Cowboy 铸币无 consensus dispatch；eth-lightclient 在 **feature branch**（Marshal #1200 已审 3 HIGH）。devnet live 跨链=CIP-34（已 SAFE）+proof-verifier（纯 OUTBOUND、execution 不依赖、storage 仅 test 用）。relay/drain 是 CBFS 存储 relay 非跨链 |
+
+### 审计方法论沉淀（overlay 4 新教训）
+
+- **洞的形状高度一致**：全部是**非对称遗漏**（CIP-2 payout/CIP-18 deduct 漏调共同分派原语）、**不可信输入自选特权**（CIP-12 proposer 自选 tier 无 floor）、**资源隔离只界一种 meter**（CIP-29 cells）、**机制未接线致惰化**（CIP-31 stake）——非核心逻辑错误。
+- **有显式守恒原语/capability 授权/域分隔签名/block-height 确定性**的面一律 clean（CIP-34/33/28/11/34 `conservation_surplus`、CIP-12 `SystemOrigin` sealed ZST、CIP-7/24/34 域分隔签名、CIP-11 block-height staleness）。
+- **审「多主体结算/分配」必对拍每条路径是否一致调用共同的守恒/分派原语**（CIP-2 settle_payment 调 distribute_revenue 而 deduct_budget 不调=非对称）。
+- **审「分级授权」必查级别是否由不可信输入自选 + 有无 per-操作最小级别 floor**（CIP-12 tier 是宪法绑定非 advisory）。
+- **审「罚没/分配」必确认 source 真被资助过**——否则 mechanism 经济惰化（CIP-31 stake=0）；off-ledger 计数器守恒看 `credit-out ≤ Σ debit-in` 不必须 escrow Account。
+- **审签名 preimage「缺 X」前必回 spec 核 X 是否 spec-mandated / 已知 V-gap**——本轮 **3 次疑似缺陷回查一手源后 refute**（CIP-5 fee_payer、CIP-28 fiat chain_id、CIP-8 session chain_id→V-13），零误报。
+- **审「bridge」先分 inbound（高危铸币）vs outbound（低危自证）+ 查有无 consensus 级 dispatch**；名为「relay」的可能是存储 relay 非跨链。
+- **dormant 修复的加固**（#1203 Marshal review）：injectable 高度让测试跑有限高度（避 u64::MAX 选到不同算法分支+退化 EMA）；dormant full-path 测试用默认 engine 钉死常数（翻 const 即 FAIL）；`num_runners==0` 类 latent 分支给 refund-to-submitter 防无主销毁。
+- **总结论**：devnet-live 的价值流转/授权/确定性/跨链结算面经 25-CIP 覆盖高度确认健全；找到的 6 处缺陷全属**非对称遗漏/特权自选/未接线**（已开票/交付/加固），高危 inbound bridge 在 feature-branch（#1200 覆盖）。consensus 面已基本审尽。
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
