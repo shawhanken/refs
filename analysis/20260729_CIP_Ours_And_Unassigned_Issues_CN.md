@@ -110,6 +110,42 @@ COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 
 - **承诺功能深审可能推翻整个方法**：保留底层真修复（#1196 leak）、弃错误机制（quota）；无底层价值可留的就关 won't-do（#1193）。
 - **clippy CI 陷阱**：dormant activation-height 若在 storage 层用编译期 const `u64::MAX` 直接 `h>=CONST` 比较，撞 deny 级 `absurd_extreme_comparisons`（COW-1150 用 runtime 字段天然避开）；验 dormant PR 前须跑 `cargo clippy --workspace --all-targets`（test 绿 clippy 才红）。
 
+---
+
+## 2026-08-01 更新（续 overlay 3：定向 spec-vs-code 不变量审计 —— 10 CIP，找到并修 1 处 live 洞）
+
+> backlog 撿空后（合格码簇剩 stale-done/大 build/spec-治理门控/attestation 糸缠，见下），转用**定向 spec-vs-code 不变量审计**找 live bug（COW-2114 曾这么找到并 #1189 merged）。逐条对 `cowboy/docs/cips` 权威 spec 核码，全程审计纪律：核一手源、confirm/refute 都留证据、不误报。
+
+### 交付 / PR（audit 产出）
+
+| Issue | CIP | PR | 状态 | 说明 |
+|---|---|---|---|---|
+| **COW-2884**（新开，审计产出）| CIP-29 | **#1198** | ✅ MERGED · 回 Backlog 追全修 | **审 CIP-29 event-fire 找到 live §2.3 gas-isolation 洞**：`event_fire.rs` 的 fire **cycles** 被 sub.gas_remaining 界、**cells** 只被 emitter pool 界（`fire_cells=pool_cells`）→ 单 subscriber 可写满 emitter 整个 deferred cells 池（emitter 减少退款实付、对 sub 免费、饿死同批 subs），违反「emitter pays no cells under any path」。交 backstop (a)：`fire_cells=min(pool_cells, MAX_FIRE_CELLS=20_000)`，dormant 于 `EVENT_FIRE_CELLS_CAP_ACTIVATION_HEIGHT=u64::MAX`（activation 作**参数**传避 clippy absurd）；cap 抽 `fire_cells_budget` 纯函数单测。**全 §2.3 关闭（emitter 付 0 cells）= CIP-29 修正案**（b:cells 折算扣 gas_remaining / c:subscription 加 cells 预算），留 COW-2884 |
+
+### 10-CIP 审计结果
+
+| CIP | 结果 |
+|---|---|
+| CIP-3 fee | ✅ SAFE：tip=min(tip,max−basefee)/burn=used×basefee；basefee 几何更新+clamp 方向正确；lane mult∈[1,1e9]拒0；Phase-2a `pvm_per_instr_gas` 排除 receipt_root（主 receipt Write 不写该栏,只在 Observation sidecar）；burn→ZERO sink |
+| CIP-1 scheduler | ✅ SAFE：line 98「本块排 timer 不本块 fire」由 `schedule_timer_ex` `height<=block_height→InvalidInput` 强制；auction §§6-8 正确 dormant（H_v3=u64::MAX，p50 未接线是 gated-off no-op） |
+| CIP-20 token | ✅ SAFE：can_transfer 前置/on_transfer 后置 ignored；金额不可变（no fee-on-transfer）；hook 双 cap cycles+cells；**self-transfer 无铸币**（to_balance 在 debit 后再读）；permit 用 `self.chain_id` 非 `tx.chain_id` 反跨链重放 |
+| CIP-5 timer fee_payer | ✅ SAFE（**假设经严核 refute**）：假设「嵌套 B 用 timer 抽血 caller A」（tx.origin vs msg.sender），但**分层防御挡住**——schedule 用 ctx.sender=immediate caller 放行 {B,A}，flush defense-in-depth 用 **tx-level sender S(tx.origin)** 只放 {B,S}，交集={B} 仅自资 |
+| CIP-6 SDK read_only | ✅ SAFE：全部 handler 可达变更 host call 都 `deny_if_read_only`；read_only 跨 call 继承（switch_to_callee 原地不重置）无法洗白。**COW-2824 = CONFIRMED**（`_compiler.py:445/526` save_cont 无 guard_keys、`guards.py:239` 注释掉 → guard 验证 inert）；修复=共识面（cowboy_sdk 随二进制），须 flag-day+dormant-gate+actor 兼容 |
+| CIP-26 libraries | ✅ SAFE：账户作用域（`get_library(sender)`）；hash-pin 不可变（`load_actor_pins_sync` 按冻结 code_hash 内容寻址、re-publish 不影响已部署 actor）；caps（8/128KB/128KB）强制 |
+| CIP-27 fork | ✅ SAFE：🔑 **balance/token 不克隆守恒**（Actor 记录无 balance 字段、balance 在 Account ledger 按地址、child 新地址默认 0）；code_hash/manifest/ActorLibPin 继承、nonce/children_count 重置、storage_root:=parent；endowment `stage_balance_delta` 经 overlay rollback 安全、on_fork 失败→完整 rollback。CIP-24-sealed 排除=latent（feature 未实作 moot） |
+| CIP-30 storage-root | ✅ SAFE（**dormant，激活就绪**）：SMT 计算（`types/src/storage_root.rs`）完全匹配 §3.2，`EMPTY_STORAGE_ROOT=D_256` 经**递归重推 conformance 测试**验证；storage_root 不随写重算（所有 actor=D_256 占位、进 state_root 但确定性、无 live consumer 读它当真根）→ 无 live bug；激活（COW-1277 wire+node-GC+gas）前置 spec §7 已载 |
+| CIP-16 route registry | ✅ SAFE（首方 TLD live，external DNS 死代码未审）：注册 self-only+ingress.http 强制+**防 hijack**（LIVE label 不可重注册、仅过期 reclaim）；renew/transfer/update owner-only；resolution ACTIVE-only；**`normalize_fqdn` 用 `idna::domain_to_ascii`（UTS-46 规范：小写+punycode+拒无效 Unicode）** → 大小写/同形映同一键、无正规化不一致 hijack |
+
+### 审计方法论沉淀（本轮新教训）
+
+- **真 live 洞出在较不显眼面**：核心/重审区（fee/token/scheduler/read_only/libraries/fork/storage-root/route）10 个 CIP 一律 clean 或经严核 refute；唯一 live 洞在 CIP-29 event-fire 的 **cells 非对称隔离**（cycles 界了 cells 没界）。
+- **审「资源隔离」必对每种 meter（cycles/cells）分别核 cap+charge 主体**——非对称即隔离洞（CIP-29）。
+- **审「授权用哪个 sender」必查有无第二道 flush/settle 检查用更权威的 sender 兜底**——单看一道略宽不等于洞（CIP-5：schedule 用 msg.sender 略宽，flush 用 tx.origin 兜住）。
+- **审 clone/copy 类必查「按地址键的 CBY/token ledger 是否被误拷=铸币」**——CIP-27 安全因 balance/token 不在 actor storage。
+- **审「命名注册」必查正规化是否规范一致**——否则同形（大小写/Unicode）绕过所有权（CIP-16 用 idna UTS-46 兜住）。
+- **审「已实作但未 wire」的 CIP**：查①字段是否只占位②有无 consumer 误当真值用；computation 已测+dormant = 激活就绪非 bug（CIP-30）。
+- **结论**：核心共识面（资金守恒/授权/不可变性/确定性/gas 计量/命名正规化/dormant-gate）经 10-CIP 覆盖，高度确认健全；边际产出递减，剩余面多未建成/在 gateway 仓/spec-blocked。
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
