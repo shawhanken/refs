@@ -277,6 +277,50 @@ COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 
 
 ---
 
+## 2026-08-03 更新(续 overlay 7:定向不变量审计 → PVM 确定性/原子性/RCE/egress 四簇 4 PR 全 MERGED + 全仓同步后的清单 reconciliation)
+
+> 两段。**A 段**:从本分析档「找新簇」出发,做一轮定向四路并行不变量审计(mempool / gas-lane / PVM-reset / actor-arm),找到并交付 4 个 PR(全经 Marshal deep-review + 再审加固 pass,已合入 devnet)。**B 段**:按用户提醒「清单里的 issue 不只我在修,同事修完未必更新档」——`git fetch --all` 全仓后,交叉比对 devnet merge log 与本档 44/103 表,列出**已落地但档未反映**的项(避免误当 open 重做)。
+
+### A 段:本轮定向审计交付(node,base=devnet,全 MERGED)
+
+| Issue/PR | CIP | 一句话 | 门禁 |
+|---|---|---|---|
+| **#1224** | CIP-3/PVM | PVM warm-pool 跨-tx `sys.set{trace,profile,switchinterval,coroutine_depth,asyncgen_hooks,int_max_str_digits}` 洩漏(settrace/profile/asyncgen hook **在下一 actor 执行**=fork);dormant 于 host_value_determinism 旗 | escalate→**加固 pass**(F1:清洩漏时 drop 上一 actor hook→`__del__` 在 guard 前跑,改 deferred-drop 到 enter 外) |
+| **#1226** | CIP-1/deferred | swallow 的跨-call 失败漏回子树:callee 成功 sub-call 的 `sync_called_*`+副作用队列没回滚=值创造/token 洩漏/fork-child brick;dormant `CROSS_CALL_SUBTREE_ROLLBACK_ACTIVATION_HEIGHT`。**是 Actor-arm 原子性,补 COW-2810(#1169 System-arm)的另一半** | **pass**(model dormant atomicity fix) |
+| **#1227** | CIP-?/PVM | **COW-2898 actor RCE 确认 live**:根因=import 快取短路+poison 只作用黑名单→`import posix`→`posix.system`(libc)+`_posixsubprocess.fork_exec`+`_imp.create_builtin` 通用绕道;deny-root + gate create_builtin | escalate→**加固 pass**(H4:黑名单再扩 pwd/resource/mmap/_posixshmem/_multiprocessing/syslog/termios;H2:`create_builtin("array")` 一行停链改 best-effort)。⚠️**RCE 不能 dormant-gate,production 部署必须 lockstep 非 rolling** |
+| **#1228** | PVM | actor 网路 egress/SSRF:`_socket.socket().connect()` 打云端 metadata + 分叉;Rust backstop gate socket 建构+DNS+socketpair+close/dup;dormant 于 host_value_determinism 旗(消 rolling 分叉) | escalate→**加固 pass**(H1:改 dormant gate;H2:DNS 弱化 below-activation byte-identical;M3:close/dup) |
+
+**方法**:consensus 面「审尽」后,四路并行审计只 PVM-reset 出簇(mempool/gas-lane/actor-arm CLEAN 附证据)。⚠️ **审 PVM 除 halt/thread/refcount,枚举「每-tx reset 集」外全部 `sys.set*`/绕过 import 的工厂原语(`_imp.create_builtin`)/每个 precache native 是否在黑名单**。⚠️ **审「native libc/host 面」先追 guard override 是否遮蔽**(`_socket` 白名单必留=asyncio 需要,只能 Rust backstop gate 危险操作,不能 blacklist)。
+
+### B 段:全仓同步后清单 reconciliation(⚠️ 已落地/档未反映,别当 open 重做)
+
+| 档表 issue | CIP | 落地 | 作者 | 备注 |
+|---|---|---|---|---|
+| COW-1308 | CIP-2 | #1178 | freemanhuke | CIP-2 v3 e2e 经济范例(档「我方」记 Todo→**已合**) |
+| COW-1845 / COW-1846 | CIP-23 | #1183 / #1184 | 我(往期) | VerifyCae 差异 gas budget(§3.8.7)/ CAE attest_digest 审计(§3.7),**均 dormant 已合**(档「尚未指派」记 Backlog→stale) |
+| COW-1923 | CIP-29 | #1179 | freemanhuke | test 钉 upgrade_self 保 event subscriptions(§6.3 P1-E) |
+| COW-2894 | CIP-12 | #1205 | 我(往期) | **tier-shopping HIGH**(overlay 4 我开的 HIGH)→ per-payload min-tier dormant **已合**(档 Backlog→stale) |
+| COW-2552 | CIP-11 | #1204 | freemanhuke | ⚠️ deferred non-reveal 分类 **另解已合**——与 overlay 的 `#1190 CLOSED won't-do`(我判 reputation-only 不实作)**不同路线,同事采了实作解**;档 stale |
+| COW-2810 | CIP-?/STF | #1169 | logan | System-arm per-tx 原子性 savepoint 已合(#1226 是其 Actor-arm 补全) |
+| COW-2486 / COW-2727 / COW-2770 | CIP-13/-/CIP-5 | #1173 / #1109 / #1202 | 各同事 | 地址正规化 / add-follower crash-safe / golden CBOR vectors,均已合 |
+| CIP-25 §1.4 | CIP-25 | #1021 | 我 | native ETH→Cowboy LC 验证 crate 已合(档 COW-1896/1897/1900/1115 CIP-25 簇的底座) |
+| **pvm-sandbox** | 隔离 | #1215(Slices 1a+1b)/#1225(B1 Checkpoint)/#1230(B2 broker fail-closed) | freemanhuke | ⚠️ **OS-level seccomp/landlock/namespaces worker 正在落地(toggle 仍 OFF)**——这是 COW-2898 RCE/egress 类的 **durable containment**(#1227/#1228 是 Python-level 止血);档 overlay 6 只把 #1215 triage 成「escalate 交作者」,现已合 |
+
+**⚠️ 重要**:上表非穷举 Linear 状态(无 Linear 直读),是 **devnet merge log 与本档 COW 号交叉比对**的可验证事实(已合 PR)。用户提醒属实:**动手前先 `git fetch --all` + 查 devnet 是否已有解**,勿照档表当 open 重做——尤其 CIP-23(1845/1846)、CIP-2(1308)、CIP-12(2894)、CIP-11(2552)。
+
+### COW-2898 剩余 follow-up(#1227/#1228 已止血,非 blocker)
+
+- whitelist-based `create_builtin` gate(架构根修,现为 deny-list 缓解)· `_io.FileIO/open` host 文件(io wrapper 需 _io→stub 非 blacklist)· `marshal` · **`_ssl.RAND_bytes`(#1228 H4,live fork,两行可达)** · resume 路径重白名单 os/posix(现 dead code:67/67 `message_id=None`)。
+- **durable = pvm-sandbox(#1215/1225/1230)作预设 fail-closed** + poison 改「null 全部非白名单 precache」。
+
+### 深审沉淀(overlay 7 新教训)
+
+- ⚠️ **加固后再审拦下我漏的**:#1224 F1(deferred-drop,__del__ 在 guard 前跑)、#1227 H2(array 一行停链)、#1228 H1(rolling 分叉→dormant gate)——**Marshal deep-review 的完整性 critic 反复抓到「非对称遗漏」**(socketpair 绕 _init、asyncgen finalizer 变异 SURVIVED)。
+- ⚠️ **安全修复的 gate 选择**:egress 可 dormant-gate(共识安全、egress 留到激活),RCE **不能**(会留 RCE live)→ 只能 lockstep 部署。
+- ⚠️ **端到端 commit-path 测试必需**(#1226):机制测试(直接调 capture/restore)过但漏 wiring;变异删 call_actor restore,只有 `execute_transaction` 真 A→B→D 端到端臂翻红。
+
+---
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
