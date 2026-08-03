@@ -212,6 +212,71 @@ COW-2552 / COW-1012 / COW-1150 均已贴 decision-ready comment（英文,指向 
 - **审「TEE 信任根」查**：硬件 quote sig+measurement 白名单+binding 绑具体 runner+sig 绑 result_hash/job_id+freshness/replay；verify_strict 防 malleability（CIP-23）。
 - **最终总账（28 CIP 面）**：23 SAFE/非 live 高危 + 6 缺陷（1 HIGH COW-2894、3 MED COW-2891✓merged/2892/2897、1 econ-gap COW-2895、+CIP-29 COW-2884✓merged）+ **3 次 spec-refute 零误报**（CIP-5/28/8）。价值守恒/授权/确定性/跨链/TEE 信任根/资源隔离全系统覆盖。**consensus 面审尽**；剩余仅未部署（14）/RPC（17）/gateway 仓（19）/已覆盖重叠（36）。
 
+## 2026-08-03 更新（续 overlay 6：overlay 3-5 审计发现的 dormant 修复交付批 + 全 open-PR 队列系统性 review/裁决）
+
+> 两段。**A 段（0802）**：把 overlay 3/4/5 定向审计开出的缺陷做成 **dormant-gated 修复 PR** 合入 devnet（byte-identical below flag-day）。**B 段（0803）**：不再是「我方 CIP-backlog 交付」，而是对 **cowboyinc/node 整个 open-PR 队列**（各作者）做系统性审查——安全的 merge、冗余/陈旧的关、带证据交回作者。全程纪律：每个 merge/close/交回前**重比对当前 base**（verdict 与 CI 双向都会过时）。
+
+### A 段：审计发现 → dormant 修复（node，base=devnet，全 flag-day dormant）
+
+| Issue | CIP | PR | 状态 | 一句话 |
+|---|---|---|---|---|
+| COW-2910 | CIP-1/deferred | **#1219** | ✅ MERGED | **跨塊 deferred 重放=资金翻倍（live HIGH 双花）**：origin 收據永久授权→Byzantine proposer 重納已执行 deferred tx；gate `DEFERRED_RECEIPT_AUTH_REMOVAL_ACTIVATION_HEIGHT`（重審揭出「诚实 proposer 也能触发」→改「同塊 created 或 in_pending」）|
+| COW-2913 | CIP-28/36 | **#1220** | ✅ MERGED | fiat/issuance voucher preimage 漏 chain_id→跨網雙鑄 CUSD；v2/v3 preimage 綁 `self.chain_id`，gate 各自 const。⚠️鏈下 gateway 須先改簽 |
+| COW-2908/2909 | CIP-3/PVM | **#1217** | ✅ MERGED | `_thread.get_ident`/`sys.getrefcount` 洩 process-local→分叉；gate `PVM_HOST_VALUE_DETERMINISM_ACTIVATION_HEIGHT`（值型变更需 gate；#1218 併入关闭）|
+| COW-2907 | CIP-5/timer | **#1216** | ✅ MERGED | EOB timer 預扣用 raw balance 觸 vesting-floor→永久停鏈；storage 層自建 spendable helper |
+| COW-2905 | CIP-24/CBSS | **#1213** | ✅ MERGED | `ExpireDkgPending` tip 用常量 SLASH 非 `min(bond,SLASH)`→bond=0 憑空鑄；tip 出自可能為 0 的 pool 必用 `min(actual,const)` |
+| COW-2906 | CIP-3/PVM | **#1214** | ✅ MERGED | `x*=n` 繞記憶體守衛（`match op` 漏 InplaceMultiply）|
+| COW-2903/2904 | PVM halt | #1211/#1212 | ✅ MERGED | surrogatepass 自旋 / sre 正則回溯 wall-clock 停機→确定性上限（**halt 修復無需 gate**）|
+| COW-2901 | CIP-2 | #1209 | ✅ MERGED | §8 slash 分配 `distribute_relay_slash` 走 10/1/89 |
+| COW-2895 | CIP-31 | #1208 | ✅ MERGED | §6 relay 最低質押（dormant）|
+| COW-2891 | CIP-2 | #1203 | ✅ MERGED | dissenter 被 slash 仍照發報酬（overlay 4/5 已記）|
+| COW-2902 | CIP-24 | ~~#1210~~ | 🚫 撤回/blocked | CBSS unbond：43B `cbss_proxy:` key 超扫描上限→sweep 永久 no-op（TestStore 假绿）；卡 CIP-24 spec 缺口，转 Backlog |
+
+### B 段：全 open-PR 队列裁决（0803）
+
+**① 安全 merge 进 devnet（本轮 sweep，6 个；判准=无共识面或 provably-inert）**
+
+| PR | 作者 | CIP/Issue | 安全依据 |
+|---|---|---|---|
+| **#1173** | bixler | CIP-13 / COW-2486 | 地址输入规范化：`delegation.py` 模块级 `import urllib.request`、`socket` 在 actor 黑名单→**actor 无法 import=链下工具不可达共识**；str 输入逐字节 verbatim；主/mirror md5 一致 |
+| **#1202** | bixler | CIP-5 codec / COW-2770 | CBOR golden vectors：`codec.py` **仅 docstring**（编码器 byte-identical，`_HAS_CBOR_HOST` provably dead）；`actor_execution()` `stdlib_hash=None`→源不入共识哈希 |
+| **#1109** | nhussein | COW-2727 | validator `add-follower` crash-safe peers.yaml 写入 + genesis 校验：纯 provisioning 工具、无共识面 |
+| **#1114** | nhussein | CI | nextest 给 `test_200` `threads-required=num-cpus`→治 ~14% 超时 flake（曾 flake 掉 #1111）|
+| **#1102** | logan | CIP-3/PVM | box `PvmError.detail` 治 `large_enum_variant`；⚠️ rebase 后 `--workspace` 才现 3 个 unboxed test 站点=llvm-cov 真因，`.map(Box::new)` 修 |
+| **#1021** | CalMan | CIP-25 | native ETH→Cowboy LC 验证 crate：独立 workspace member、无 node crate 依赖=不可达共识（旧 escalate 已被 7/29 PASS 超越）|
+
+**② 关闭（8 个）**
+
+| PR | 类别 | 依据 |
+|---|---|---|
+| #956 | superseded | 服务端 keep-alive 已因 almanax 0559005b 安全否决（COW-2581 改客户端）；merge=回归漏洞 |
+| #1059 | superseded | cowboy-protocol pin 已被 devnet `1c3a560f` 超越（含该 serde 修复）；merge=降级丢 48 commit |
+| #1002 | superseded | RAS owner-auth CIP-9 canonical 签名早已在 main（其 base）落地 |
+| #1218 | superseded | COW-2909 getrefcount 併入 #1217 |
+| #787 | 陈旧废弃 | `[DO NOT MERGE]` 应急草稿 2.5 月未动 |
+| #896 | 陈旧 housekeeping | CIP-15 on-chain CORS，402 behind——**非超越**（`cors_config.rs`/`UpdateCorsConfig` 两端皆无），复活对 devnet 开新 PR |
+| #943 | 陈旧 housekeeping | CIP-25 LC anchor，338 behind，HIGH digest-drift（漏 `presence_input`）未解——非超越，复活开新 |
+| #1138 | 陈旧 housekeeping | CIP-28 M5-gov `RegisterBank`（对应 **COW-1143** §3.4）136 behind——非超越（devnet 无 governance-gated RegisterBank），复活开新 |
+
+**③ 带证据交回作者(仍 open)** —— #1199/#1155/#1154（bixler frozen-SDK ungated 共识变更，需作者加 gate；#1155 还须先过 CIP-5 §4.2 修正案）、#1157（CIP-11 heartbeat clamp 是 no-op，base=main）、#1201（devnet→main 促销 body 谎称 byte-identical，漏 3 活修复）、#1158/#1200/#1191（CIP-25/SDK stacked 待底座）、#1108/#1111（base=main / 作者设计未定）、#1105/#1106（fmt 已修待 CI）、#1215（PVM sandbox，作者自理）。
+
+**④ ⚠️ CIP-31 系列 live 共识 hazard（cby-inc/jw，两 PR 均裸改共识面无 gate，已贴深审、不可并）**
+
+- **#1221**（CIP-31 rename burn→treasury/platform）：①真编译错（`gov_enact.rs` param `platform_bps` 但 body 引用未定义 `treasury_bps`=Lint/llvm-cov 红真因）；②**改活治理键名**`cip31.cbfs.fee_split.burn_bps`→`platform_bps`,`load_ras_fee_config`（speculative.rs:1043 每 epoch live）读→已 governance-set 旧键的链升级后 fallback 编译默认=静默丢治理值→首塊结算分叉；③**「route to treasury」根本没接线**（`settle_storage_epoch_and_writeback` 未動,首份額仍 `total_burned` 烧掉,只加 `PLATFORM_FEE=0x18` 地址没 credit）。
+- **#1222**（CIP-31 reprice 7 个 relay 经济安全常量 ~6.6×,对应 **COW-1620** §13 constants）：裸 `const` 改无 activation gate;这些常量在**活的 per-epoch relay 结算/PoR slash 路径**被读（`settle_relay_epoch_and_writeback` speculative.rs:1070、slash ras.rs:1120/1359/1434/1518）→滚动升级新旧值算出不同 slash/stake→state_root 分叉。CI 两 shard 红=测试钉旧值未更。修=height-gate 每个值。~6.6× 均匀缩放保持内部比例（设计连贯,问题纯在 ungated rollout）。
+
+### 深审沉淀（overlay 6 新教训）
+
+- **verdict/CI 双向都会过时,merge/close/交回前必重比对当前 base**：旧 PASS 可能因 devnet 前进作废（#956 安全否决、#1059 pin 超越）、旧 escalate 可能被 PASS 超越（#1021）、旧 CI fail 可能是 404 老 commit（#1102 rebase 后 `--workspace` 才现真编译错）。
+- **别为凑 merge 数给冻结 SDK 硬塞 block_height gate=分叉险**：生产无 `current_block()` host 方法,`get_block_height()` fallback 0;gate 只在 **Rust 侧有可靠 block_height** 时安全(我的 A 段 dormant 修復都在 Rust 侧)。冻结 SDK 可观测输出变更(#1199 wire 字节)除非 Rust-side gate 否则归作者。
+- **「能安全 perfect+merge」判据=有无共识面**：纯 CI/测试/运维工具(#1114/1109)、链下 client SDK(#1173,靠 import 黑名单证不可达)、docstring/`stdlib_hash=None`(#1202)可做;共识路径类归作者。
+- **feature PR 的 supersession 查其独有新符号**(模块/指令/存储键)在 base 是否存在,别被同名不同层误判(#896 链上 CORS vs RPC HTTP CORS);base=main 的陈旧 PR 比 **main** 现状不是 devnet(#1002 canonical 签名随 promotion 已上 main)。
+- **CIP-31/治理键/经济常量 PR 先问「该值/键是否在 live 结算路径被读?有无 activation gate?」**——cby-inc 的 CIP-31 系列(#1221 rename/#1222 reprice)反复裸改共识面。
+- **系统洞**:`origin/main` 缺 `pvm/Cargo.lock`(devnet 有)→所有 base=main PR 的 `Test (pvm simulation suite)` 都同样 build-break(#1103 只进 devnet,需 backport);审 base=main PR 的 pvm-sim 红先排除这个。
+- **给别人 PR 加固走 fixups-PR base=作者分支**,不推人家分支;关别人 PR 前区分**技术冗余(超越)**vs**路线图取舍(陈旧非超越)**,后者明确标「未超越、复活开新」不冒充判弃。
+
+---
+
 ## 我方负责 · 44 条
 
 | Issue | CIP 项目 | 状态 | 标题 |
