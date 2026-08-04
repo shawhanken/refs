@@ -29,6 +29,19 @@ The orchestrator's per-ceremony `CeremonyState` stores the **new** committee in 
 
 Net: for a reshare, the DEALER pool must be `prior_committee`, not `committee`; the current code conflates the two.
 
+### 4a. DEEPER finding (2026-08-04, during implementation) — the fix is a state-machine refactor, not a routing change
+
+Reading `qualify_dealers` (`orchestrator.rs:180-236`) and `ingest` (`:238-303`) in full shows the ceremony state **stores recipients and dealers in the same maps**, so `dealer_pool()` routing alone is insufficient:
+
+- **`self.round1` holds RECIPIENT (new-committee) announcements** for reshare — `start_encrypted_reshare_shared` (new members) → `ingest_reshare` Round1 → `state.ingest(_, round1=true, _)` → `insert_unique(&mut self.round1, from_proxy=new_member, …)`. So `round1` is keyed by **new** committee, while `round2` (dealer deals) is keyed by **old** signers.
+- But `qualify_dealers` treats `round1` as the DEALER set: it requires `qualified_dealers.iter().all(|d| self.round1.contains_key(d))` (`:203-208`) — old dealers are not in `round1` (recipients are), so this fails for a disjoint reshare — and then `self.round1.retain(|p,_| qualified_dealers.contains(p))` (`:214-215`) **deletes every recipient announcement** whose proxy isn't an old dealer (i.e. all of them, for a disjoint new committee).
+- The phase transitions compare mismatched cardinalities: `round1.len() == active_dealers().len()` (`:221`, `:277`) pits recipient-count against dealer-count.
+- `ingest`'s top-level `ensure_proxy` (`:247` → `self.committee`) rejects an old dealer's Round2/Commit before it is recorded, whenever the dealer ∉ new committee.
+
+So a correct fix must **separate recipient-tracking from dealer-tracking** for reshare: `round1`/recipient-announcements keyed and counted against the **new** committee; `round2`/`commits`/`qualified_dealers` keyed and counted against the **old** committee (`prior_committee`); `qualify_dealers` validating dealers ⊆ `prior_committee` and NOT requiring them in `round1`; the `retain`s scoped to the right map; and `ingest` gating Round1 by recipient-membership and Round2/Commit by dealer-membership. This touches ~6 methods of the ceremony state machine.
+
+**Risk reassessment:** this is materially larger and more security-sensitive than §5's routing sketch — a subtly wrong recipient/dealer split can accept a Round2 deal from a proxy that should not shift the share polynomial. It wants a crypto-owner review and both a happy-path disjoint e2e AND negative tests (Round2 from a non-old proxy rejected; recipient announcements not deleted by qualify). Recommend NOT landing it as a same-session drive-by; the MPK-preservation + VSS-consistency backstop (§6) is a necessary but not sufficient oracle.
+
 ## 5. Fix approach
 
 Introduce a ceremony-kind-aware **dealer pool** and route all dealer-side checks through it:
