@@ -60,6 +60,15 @@ Scope note for the tracking ticket: reframe the COW-2889 follow-up from "authent
 - **Liveness coupling:** any anchor that can fail-closed (no quorum, stale root, unverifiable header) must withhold, not sign — and withholding interacts with CIP-34 `AUCTION_GRACE`. Ensure the anchor's availability budget is well inside the grace window, or auctions get cancelled (the same failure mode the `/logs`-decoupling fix just removed).
 - **Determinism:** the reveal-height boundary must stay byte-identical to the node's `current_block < target_height` gate (`node/execution/src/cbss.rs`), regardless of anchor.
 
+## 5a. Sibling liveness/scale gaps in the same read path (not auth, but same owner should see them)
+
+Surfaced by the deep-gate review of the `/logs`-decoupling fix; tracked here so the whole cluster is visible:
+
+- **Due-set route has the same cap-vs-growth shape** the `/logs` decoupling fixed. `tlock_requests()` fetches `/cbss/tlock-requests/{proxy}` with no `limit` under a 4 MiB client cap; the node caps at `CBSS_TLOCK_RESPONSE_LIMIT = 5_000`, each entry ~1 KB (`vss_commitments` = threshold × compressed-G2 hex) ⇒ ~4.7 MiB > cap at saturation. On overflow the signer returns before the gate is consulted, at `debug` only. A COW-2889 incident manufactures the backlog that then defeats recovery. Scale bound (~5 000 due requests), not near-term. **Fix shape:** paginate/bound the due-set fetch, or raise the client cap with a truncation signal.
+- **Unasserted cross-repo constant coupling.** cbssd hardcodes `/logs?offset=0&limit=1000` and relies on node's `MAX_ACTOR_EVENTS = 1_000` staying ≤ `MAX_LIMIT`; nothing asserts the relation. Raising `MAX_ACTOR_EVENTS` silently makes the `block_height > from_height` filter yield empty forever and the watcher goes inert with no error. Same family on `/cbss/{volume,cip7}-seal-requests` (`limit=10000`, node clamps to 5 000, no truncation flag). **Fix shape:** a cross-repo pinned constant or a truncation flag the client checks.
+
+These are availability/scale, not the confidentiality anchor of §1–§4; they can be fixed independently of the auth work.
+
 ## 6. Test approach
 
 - Negative (identity): a due-set entry with a `tag` absent from the anchored state → withheld; positive: a registered `(scope,tag,target)` → signed.
