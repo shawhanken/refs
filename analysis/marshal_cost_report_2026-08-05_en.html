@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marshal Sweep · Token &amp; Cost Accounting</title>
+<style>
+  :root{
+    --ground:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb;
+    --ink:#191e29; --muted:#5b6675; --faint:#8a94a3;
+    --hair:#e0e5ec; --hair-strong:#cdd4de;
+    --accent:#0d6f79; --accent-soft:#d4e7e8;
+    --cread:#0d6f79;  --cwrite:#4d9aa1;  --output:#c07a2c;  --input:#aeb7c3;
+    --note:#9a5b12; --note-bg:#f8efe0; --note-hair:#e8d5b0;
+    --good:#1f7a52; --spike-bg:#fbf2e6;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 8px 24px -12px rgba(20,30,45,.14);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0f131a; --surface:#171c25; --surface-2:#1c222d;
+      --ink:#e7ebf1; --muted:#9aa4b3; --faint:#6c7686;
+      --hair:#262d38; --hair-strong:#333c49;
+      --accent:#3fb0b8; --accent-soft:#1b3a3d;
+      --cread:#3fb0b8; --cwrite:#2f7a80; --output:#d69248; --input:#525c6b;
+      --note:#e0b672; --note-bg:#241d0f; --note-hair:#4a3c1e;
+      --good:#4cc38a; --spike-bg:#211a0e;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb;
+    --ink:#191e29; --muted:#5b6675; --faint:#8a94a3;
+    --hair:#e0e5ec; --hair-strong:#cdd4de;
+    --accent:#0d6f79; --accent-soft:#d4e7e8;
+    --cread:#0d6f79; --cwrite:#4d9aa1; --output:#c07a2c; --input:#aeb7c3;
+    --note:#9a5b12; --note-bg:#f8efe0; --note-hair:#e8d5b0; --good:#1f7a52; --spike-bg:#fbf2e6;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 8px 24px -12px rgba(20,30,45,.14);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0f131a; --surface:#171c25; --surface-2:#1c222d;
+    --ink:#e7ebf1; --muted:#9aa4b3; --faint:#6c7686;
+    --hair:#262d38; --hair-strong:#333c49;
+    --accent:#3fb0b8; --accent-soft:#1b3a3d;
+    --cread:#3fb0b8; --cwrite:#2f7a80; --output:#d69248; --input:#525c6b;
+    --note:#e0b672; --note-bg:#241d0f; --note-hair:#4a3c1e; --good:#4cc38a; --spike-bg:#211a0e;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{background:var(--ground); color:var(--ink); font-family:var(--sans); line-height:1.62; -webkit-font-smoothing:antialiased; padding:clamp(20px,5vw,64px) clamp(16px,4vw,40px)}
+  .page{max-width:980px; margin:0 auto}
+  .tnum{font-variant-numeric:tabular-nums}
+  .mono{font-family:var(--mono)}
+
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:10px; margin:0 0 14px}
+  .eyebrow::before{content:""; width:26px; height:2px; background:var(--accent); display:inline-block}
+  h1{font-size:clamp(26px,4.4vw,40px); line-height:1.12; letter-spacing:-.015em; margin:0 0 12px; font-weight:680; text-wrap:balance; max-width:22ch}
+  .sub{color:var(--muted); font-size:15px; max-width:66ch; margin:0}
+  .meta{margin-top:18px; display:flex; flex-wrap:wrap; gap:8px 22px; font-size:12.5px; color:var(--faint); font-family:var(--mono)}
+  .meta b{color:var(--muted); font-weight:500}
+
+  .readfirst{margin-top:26px; background:var(--surface); border:1px solid var(--hair); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow)}
+  .readfirst .rh{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:0 0 14px}
+  .readfirst ol{margin:0; padding:0; list-style:none; display:grid; gap:12px}
+  .readfirst li{display:flex; gap:13px; font-size:13.5px; color:var(--ink); line-height:1.55}
+  .readfirst .num{flex:none; width:24px; height:24px; border-radius:7px; background:var(--accent-soft); color:var(--accent); font-family:var(--mono); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center}
+  .readfirst b{font-weight:640}
+
+  section{margin-top:clamp(30px,5vw,52px)}
+  .sh{display:flex; align-items:baseline; gap:12px; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--hair)}
+  .sh .n{font-family:var(--mono); font-size:12px; color:var(--faint); letter-spacing:.05em}
+  .sh h2{font-size:17px; margin:0; font-weight:640; letter-spacing:-.01em}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  .card{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:18px 18px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .card.hero{grid-column:span 2; border-color:var(--accent-soft)}
+  .card .k{font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  .card .v{font-size:clamp(22px,3.2vw,30px); font-weight:680; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums}
+  .card.hero .v{font-size:clamp(30px,5vw,44px); color:var(--accent)}
+  .card .u{font-size:12.5px; color:var(--faint); margin-top:7px; font-variant-numeric:tabular-nums}
+  .card .u b{color:var(--muted); font-weight:600}
+  @media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)} .card.hero{grid-column:span 2}}
+  @media (max-width:440px){.stats{grid-template-columns:1fr} .card.hero{grid-column:span 1}}
+
+  .infonote{margin-top:16px; font-size:12.5px; color:var(--muted); line-height:1.6; background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:13px 15px}
+  .infonote b{color:var(--ink); font-weight:640}
+  .infonote .q{color:var(--accent); font-weight:640}
+  .infonote code,.corr code,.qa code,.note code,.depthwhy code{font-family:var(--mono); font-size:11px; background:rgba(128,128,128,.14); padding:1px 5px; border-radius:5px}
+
+  .compbar{display:flex; height:38px; border-radius:9px; overflow:hidden; border:1px solid var(--hair); background:var(--surface)}
+  .compbar span{display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--mono); font-size:12px; font-weight:600; min-width:0}
+  .compbar span.sm{font-size:0}
+  .barcap{display:flex; justify-content:space-between; font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:6px; letter-spacing:.03em}
+  .legend{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px}
+  .legend .it{background:var(--surface); border:1px solid var(--hair); border-radius:10px; padding:12px 13px}
+  .legend .row1{display:flex; align-items:center; gap:8px; margin-bottom:7px}
+  .legend .dot{width:10px; height:10px; border-radius:3px; flex:none}
+  .legend .lbl{font-size:12.5px; color:var(--muted); font-weight:600}
+  .legend .amt{font-size:19px; font-weight:680; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .legend .det{font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:4px; line-height:1.5}
+  @media (max-width:640px){.legend{grid-template-columns:repeat(2,1fr)}}
+
+  .tscroll{overflow-x:auto; border:1px solid var(--hair); border-radius:12px; background:var(--surface); box-shadow:var(--shadow)}
+  table{border-collapse:collapse; width:100%; min-width:700px; font-size:13px}
+  thead th{font-family:var(--mono); font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); font-weight:600; text-align:right; padding:12px 14px; border-bottom:1px solid var(--hair-strong); background:var(--surface-2)}
+  thead th:first-child{text-align:left}
+  tbody td{padding:8px 14px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--hair)}
+  tbody td:first-child{text-align:left; font-family:var(--mono); font-size:12px; color:var(--muted)}
+  tbody tr:hover td{background:var(--surface-2)}
+  tbody tr.zero td{color:var(--faint)}
+  tbody tr.spike td{background:var(--spike-bg)}
+  tbody tr.spike td:first-child{color:var(--note); font-weight:700}
+  .costcell{display:inline-flex; align-items:center; gap:9px; justify-content:flex-end; width:100%}
+  .costcell .bar{height:7px; border-radius:4px; background:var(--accent); opacity:.85; flex:none}
+  .costcell .amt{min-width:60px; text-align:right}
+  .tpa{color:var(--note); font-weight:600}
+  tfoot td{padding:12px 14px; text-align:right; font-weight:680; font-variant-numeric:tabular-nums; border-top:2px solid var(--hair-strong); background:var(--surface-2)}
+  tfoot td:first-child{text-align:left; font-family:var(--sans)}
+
+  .depthgrid{display:grid; grid-template-columns:1.1fr .9fr; gap:22px; align-items:start}
+  @media (max-width:760px){.depthgrid{grid-template-columns:1fr}}
+  .minitable{width:100%; border-collapse:collapse; font-size:12.5px; background:var(--surface); border:1px solid var(--hair); border-radius:12px; overflow:hidden; box-shadow:var(--shadow)}
+  .minitable th{font-family:var(--mono); font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); text-align:right; padding:10px 12px; background:var(--surface-2); border-bottom:1px solid var(--hair-strong)}
+  .minitable th:first-child{text-align:left}
+  .minitable td{padding:9px 12px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--hair)}
+  .minitable td:first-child{text-align:left; color:var(--muted)}
+  .minitable tr.after td{background:var(--spike-bg)}
+  .minitable .big{font-weight:700; color:var(--ink)}
+  .minitable tr.after .big{color:var(--note)}
+  .depthwhy p{margin:0 0 12px; font-size:13.5px; color:var(--ink); line-height:1.6}
+  .depthwhy .lead{font-weight:640}
+  .depthwhy ul{margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--muted); line-height:1.7}
+  .formula{font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--hair); border-radius:9px; padding:11px 14px; color:var(--ink); margin:14px 0}
+  .formula b{color:var(--note)}
+  .takeaway{margin-top:16px; background:var(--accent-soft); border-radius:10px; padding:13px 16px; font-size:13px; color:var(--ink); line-height:1.55}
+  .takeaway b{color:var(--accent)}
+
+  .corr{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px}
+  .corr .c{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px 17px; box-shadow:var(--shadow)}
+  .corr .tag{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); margin:0 0 10px}
+  .corr .fromto{display:flex; align-items:center; gap:10px; font-variant-numeric:tabular-nums; margin-bottom:8px}
+  .corr .from{color:var(--faint); text-decoration:line-through; font-size:15px}
+  .corr .to{color:var(--ink); font-size:22px; font-weight:700; letter-spacing:-.01em}
+  .corr .arw{color:var(--accent); font-weight:700}
+  .corr p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.5}
+  .corr .c.ok{border-color:var(--accent-soft)}
+  .corr .c.ok .to{color:var(--good)}
+  @media (max-width:640px){.corr{grid-template-columns:1fr}}
+
+  .faq{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media (max-width:640px){.faq{grid-template-columns:1fr}}
+  .qa{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow)}
+  .qa .q{font-size:13.5px; font-weight:640; color:var(--ink); margin:0 0 8px; display:flex; gap:8px}
+  .qa .q .mk{color:var(--accent); font-family:var(--mono); font-weight:700; flex:none}
+  .qa .a{font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; padding-left:20px}
+
+  .note{background:var(--note-bg); border:1px solid var(--note-hair); border-left:3px solid var(--note); border-radius:12px; padding:18px 20px; margin-top:6px}
+  .note h3{margin:0 0 8px; font-size:14.5px; color:var(--note); display:flex; align-items:center; gap:9px}
+  .note h3 .badge{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; border:1px solid var(--note); color:var(--note); padding:2px 7px; border-radius:20px}
+  .note p{margin:0; font-size:13.5px; color:var(--ink); line-height:1.62}
+  .note p + p{margin-top:9px}
+  .note code{font-size:12px; padding:1px 6px}
+  .tiers{display:flex; flex-wrap:wrap; gap:12px; margin-top:16px}
+  .tier{flex:1; min-width:230px; background:var(--surface); border:1px solid var(--hair); border-radius:11px; padding:14px 16px}
+  .tier .th{font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:4px}
+  .tier .tv{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .tier .td{font-family:var(--mono); font-size:11px; color:var(--faint); margin-top:3px}
+
+  .foot{margin-top:44px; padding-top:16px; border-top:1px solid var(--hair); font-family:var(--mono); font-size:11.5px; color:var(--faint); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  .kicker{font-size:14px; color:var(--muted); max-width:70ch; margin:0 0 4px}
+  .kicker b{color:var(--ink); font-weight:640}
+</style>
+</head>
+<body>
+
+<div class="wrap"><div class="page">
+
+  <p class="eyebrow">Marshal · Metrics Accounting</p>
+  <h1>Token &amp; Cost Breakdown of the Automated PR Sweep</h1>
+  <p class="sub">A measured accounting of the <b style="color:var(--ink)">marshal-pr-sweep</b> cron over the past month. All dollar figures are <b style="color:var(--ink)">API list-price equivalent</b>, not a real bill.</p>
+  <div class="meta">
+    <span><b>Period</b> 2026-07-17 → 08-05 · ~19 days</span>
+    <span><b>Source</b> cron transcripts · usage · deduped by message id</span>
+    <span><b>Pricing</b> Opus 4.x standard tier</span>
+  </div>
+
+  <div class="readfirst">
+    <p class="rh">Read this first · three traps</p>
+    <ol>
+      <li><span class="num">1</span><span><b>The dollars are "what it would cost on the metered API," not a real bill.</b> This machine is on a subscription (Claude Max); nothing was charged per token. <span class="mono">/usage</span> being far smaller is normal and correct.</span></li>
+      <li><span class="num">2</span><span><b>"$14.90 per audit" is a whole-period average</b> — individual audits run ~$5 (early) to ~$30 (deep-review peaks). See 04.</span></li>
+      <li><span class="num">3</span><span><b>Cost is almost all "context re-reads," not "output."</b> More rounds → more re-reads → a more expensive audit. It's super-linear. See 04.</span></li>
+    </ol>
+  </div>
+
+  <section>
+    <div class="sh"><span class="n">01</span><h2>Summary</h2></div>
+    <div class="stats">
+      <div class="card hero">
+        <p class="k">Per deep review · avg</p>
+        <div class="v">$14.90</div>
+        <p class="u"><b>6.07M</b> tokens/audit · ~$5 early, ~$30 peak</p>
+      </div>
+      <div class="card"><p class="k">Monthly total · API-equiv</p><div class="v" style="font-size:clamp(20px,3vw,27px)">$5.1k–10.3k</div><p class="u"><b>standard $5,142</b> ~ 1M premium ceiling</p></div>
+      <div class="card"><p class="k">Total tokens</p><div class="v">2.09B</div><p class="u">deduped</p></div>
+      <div class="card"><p class="k">Audits</p><div class="v">345</div><p class="u"><b>442</b> runs · incl. multi-round</p></div>
+      <div class="card"><p class="k">Per sweep run</p><div class="v">$11.63</div><p class="u">incl. empty queues</p></div>
+    </div>
+    <div class="infonote"><span class="q">What is "per audit"?</span> One sweep run typically reviews 2–3 PRs and shares one <b>find_targets discovery + a closing summary</b> as fixed overhead. "Per audit" = whole-run tokens ÷ that run's audits, so the <b>shared overhead is amortized in</b> — not the net cost of one isolated PR, but the amortized cost per audit.</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">02</span><h2>Cost composition</h2></div>
+    <div class="compbar" role="img" aria-label="Cost share: cache-read 60%, cache-write 22%, output 18%, input 0%">
+      <span style="flex:59.6; background:var(--cread)">cache-read 60%</span>
+      <span style="flex:22.3; background:var(--cwrite)">22%</span>
+      <span style="flex:18.1; background:var(--output)">18%</span>
+      <span class="sm" style="flex:.5; background:var(--input)">·</span>
+    </div>
+    <div class="barcap"><span>← share of DOLLARS spent</span><span>input ~0%</span></div>
+    <div class="legend">
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--cread)"></span><span class="lbl">cache-read</span></div><div class="amt tnum">$3,065</div><div class="det">2.04B tok · $1.5/M<br>97.6% tokens · 59.6% cost</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--cwrite)"></span><span class="lbl">cache-write</span></div><div class="amt tnum">$1,144</div><div class="det">38.1M tok · $30/M<br>1.8% tokens · 22.3% cost</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--output)"></span><span class="lbl">output</span></div><div class="amt tnum">$931</div><div class="det">12.4M tok · $75/M<br>0.6% tokens · 18.1% cost</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--input)"></span><span class="lbl">input</span></div><div class="amt tnum">$1</div><div class="det">63K tok · $15/M<br>0.0% tokens · 0.0% cost</div></div>
+    </div>
+    <div class="infonote"><span class="q">Why is cache-read 97% of tokens but only 60% of cost?</span> Unit prices differ <b>10–50×</b>: cache-read is $1.5/M, output 50× more ($75/M). <b>By token volume</b> → cache-read dominates; <b>by dollars</b> → it flattens to read 60% / write 22% / output 18%. Two different axes — don't conflate them.</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">03</span><h2>Itemized daily list</h2></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Date</th><th>Runs</th><th>Audits</th><th>Rounds/session</th><th>Tokens</th><th>Tokens/audit</th><th>Cost (API-equiv)</th></tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot><tr><td>Total / avg</td><td class="tnum">442</td><td class="tnum">345</td><td class="tnum">~45</td><td class="tnum">2,094,192,430</td><td class="tnum">6.1M</td><td class="tnum">$5,141.59</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="infonote"><b>Empty-queue runs still cost money</b> (e.g. <span class="mono">07-18</span> audited 0 but still spent $14 — every run fixed-runs find_targets + a summary). That's also <b>why audits 345 &lt; runs 442</b>. Note that from <span class="mono" style="color:var(--note)">07-26/27</span> both "rounds/session" and "tokens/audit" <b>jump together</b> → see 04.</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">04</span><h2>Why tokens spiked while audits didn't</h2></div>
+    <p class="kicker" style="margin-bottom:18px"><b>It's "each audit got deeper (rounds up 2–4×)," not "more audits," and not "a bigger context."</b> Three measured metrics make it clear:</p>
+    <div class="depthgrid">
+      <table class="minitable">
+        <thead><tr><th>Period</th><th>Baseline static ctx</th><th>Rounds/session</th><th>Tokens/audit</th></tr></thead>
+        <tbody>
+          <tr><td>07-20 · before</td><td class="tnum">17K</td><td class="tnum big">20</td><td class="tnum">2.7M</td></tr>
+          <tr><td>07-24 · before</td><td class="tnum">40K</td><td class="tnum big">17</td><td class="tnum">2.1M</td></tr>
+          <tr class="after"><td>07-27 · after</td><td class="tnum">18K</td><td class="tnum big">78</td><td class="tnum">9.5M</td></tr>
+          <tr class="after"><td>07-30 · after</td><td class="tnum">29K</td><td class="tnum big">57</td><td class="tnum">12.6M</td></tr>
+        </tbody>
+      </table>
+      <div class="depthwhy">
+        <p class="lead">Three lines of evidence:</p>
+        <p><b>① Not context bloat.</b> Baseline static context (system prompt + CLAUDE.md + memory + tools) stays steady at <b>17–41K, no growth</b>, and is even lower on 07-27.</p>
+        <p><b>② Not more audits.</b> Audits merely doubled; tokens/audit tripled–quadrupled.</p>
+        <p><b>③ Real cause = rounds/audit 15–20 → 45–78.</b> More rounds means <code>each round re-reads the whole accumulated session</code>, so cache-read/round rose 74K → 149K (round 60 re-reads rounds 1–59).</p>
+      </div>
+    </div>
+    <div class="formula">Super-linear: rounds <b>~2.5×</b> × per-round context <b>~2×</b> ≈ tokens/audit <b>~4–6×</b></div>
+    <p class="kicker"><b>Why rounds spiked — the PR mix changed.</b> Before mid/late July the queue was mostly shallow PRs (docs/examples cleanup); <b>from 07-26/27 it filled with deep, consensus-critical PRs</b>, each demanding heavy scout / prove / cross-repo grep / mutation reasoning / multi-lens adversarial verification:</p>
+    <div class="depthwhy" style="margin-top:10px"><ul>
+      <li><b>CBQS #290</b> (24 rounds of escalate over its life), denomination cluster cp#67/68 · cowboy#294/295</li>
+      <li><b>PVM lockdown series</b> (#1227/1228/1235/1237/1224/1232 — reading pvm source + cross-repo confirmation)</li>
+      <li><b>tx-contract slice</b> (#1244/1245/1246/1249, overlay + golden diffs)</li>
+      <li><b>eth-LC bridge #1200</b> (r5→r8, 2500-line diff + BLS/gindex attribution) · <b>runner blind-sign stack</b> (#200–205, multi-round)</li>
+    </ul></div>
+    <div class="takeaway"><b>Actionable:</b> per-audit cost of deep/multi-round PRs is <b>super-linear</b> — every extra round re-reads the whole session at cache-read rate. The cost lever is "<b>shorten rounds per audit</b>" (triage earlier, cap pointless scout), not "review fewer PRs."</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">05</span><h2>Accounting corrections</h2></div>
+    <p class="kicker" style="margin-bottom:16px">The first pass stacked two overestimates + one underestimate. After the fix: total halves, per-audit goes up.</p>
+    <div class="corr">
+      <div class="c"><p class="tag">Over · streaming double-count</p><div class="fromto"><span class="from tnum">$10,654</span><span class="arw">→</span><span class="to tnum">$5,142</span></div><p>Each message's usage is logged twice (partial + final, ~2×). Deduped by message id.</p></div>
+      <div class="c"><p class="tag">Over · audit-count inflation</p><div class="fromto"><span class="from tnum">1,137</span><span class="arw">→</span><span class="to tnum">345</span></div><p><code>gate-record</code> text appears ~3.3× per call (streaming + tool_result echo + summary refs).</p></div>
+      <div class="c ok"><p class="tag">Already right · multi-round</p><div class="fromto"><span class="to tnum">1.00×</span></div><p>Each push changes head → every re-review is a distinct sha, counted once. Multi-round PRs sum over rounds (#1200's 4 rounds ≈ $60).</p></div>
+    </div>
+    <p class="kicker" style="margin-top:16px">Net: total overstated <b>2×</b> (→ $5.1k); per-audit was in fact <b>underestimated</b> ($9.4 → $14.9) — the audit count was inflated more than the cost, dividing to a too-low unit price.</p>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">06</span><h2>FAQ</h2></div>
+    <div class="faq">
+      <div class="qa"><p class="q"><span class="mk">Q</span>Why $5.1k here but <code>/usage</code> shows far less?</p><p class="a">Different billing. You're on a <b>subscription</b> (flat monthly fee); nothing charged per token. This is a hypothetical "folded to API prices." <code>/usage</code> is the real bill — small is correct.</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>Why fewer audits (345) than runs (442)?</p><p class="a">Many runs had an <b>empty queue</b> (nothing to review / all at current head). Empty runs still run find_targets + a summary — small cost, 0 audits.</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>"$14.9/audit" vs 9.5M/audit in the table?</p><p class="a">$14.9 is a <b>whole-period average</b> hiding variance: shallow early PRs ~$5, deep peaks ~$25–30. The daily view is more precise (03, 04).</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>cache-read 97% tokens yet 60% cost — contradiction?</p><p class="a">No. cache-read has the lowest unit price ($1.5/M); output is 50× ($75/M). Token volume and dollars are two axes (02).</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>A PR reviewed many times — double-counted?</p><p class="a">Neither. Each round is at a <b>different head</b>, an independent audit (each burns tokens), counted separately in the 345. Total = sum over rounds.</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>Is "per-audit cost" one isolated PR?</p><p class="a">No. One run reviews 2–3 PRs sharing find_targets/summary; "per audit" = whole-run ÷ audits, shared overhead amortized in (01).</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">07</span><h2>Key caveat · API-equivalent ≠ actual spend</h2></div>
+    <div class="note">
+      <h3><span class="badge">Key</span>This is subscription billing, not per-token</h3>
+      <p>This machine runs on <b>OAuth subscription login (Claude Max)</b>, not a metered API key (config has no <code>apiKeyHelper</code>; <code>~/.claude/.credentials.json</code> is present).</p>
+      <p>Every dollar figure is a <b>reference equivalent</b> — "what it would fold to at API unit prices" — <b>not a real bill</b>. The subscription is a flat monthly fee; nothing was charged per token. That is why <code>/usage</code> shows a cost far below this report — that is the real, in-subscription figure and it is correct. This report gauges "how much API value / ROI this automation represents."</p>
+    </div>
+    <div class="tiers">
+      <div class="tier"><div class="th">Standard tier · primary (≤200K context)</div><div class="tv tnum">$5,142 <span style="font-size:13px;color:var(--faint)">/ mo</span></div><div class="td">in $15 · out $75 · 1h-write $30 · read $1.5 (per M)</div></div>
+      <div class="tier"><div class="th">1M premium · ceiling (&gt;200K ≈ 2×)</div><div class="tv tnum">≈ $10,300 <span style="font-size:13px;color:var(--faint)">/ mo</span></div><div class="td">most deep reviews near 200K · ~$29.8/audit · multipliers uncertain</div></div>
+    </div>
+    <div class="infonote"><span class="q">What does "1M premium ceiling" mean?</span> The model is Opus's million-token long-context variant (<code>claude-opus-4-8[1m]</code>). Anthropic bills any single request whose context exceeds 200K at roughly <b>2×</b>. So the same usage folds into two prices: <b>$5,142</b> = assume all requests at standard rate (lower bound); <b>$10,300</b> = assume every request lands in the premium tier (upper bound, essentially never fully hit). The real value sits <b>between</b>, closer to $5.1k — only the deep multi-round sessions that pass 200K pay the premium. It's a <b>range $5.1k–$10.3k</b>; the "ceiling" is a cap, not a second real number.</div>
+  </section>
+
+  <p class="kicker" style="margin-top:40px; font-size:15px; color:var(--ink)"><b>Bottom line</b> — one PR deep review ≈ <b>6.1M tokens / ~$15 API-equivalent</b> (cache-read is 60% of cost); over the past month, 442 cron runs and 345 audits ≈ <b>$5.1k</b> API-equivalent (range $5.1k–$10.3k). Per-audit cost rises <b>super-linearly with review depth (rounds)</b> — after the queue turned to deep consensus PRs in late July, each audit jumped 4–6×. Under subscription billing none of it is real spend; <span class="mono">/usage</span> is the actual figure.</p>
+
+  <div class="foot"><span>Marshal metrics accounting · marshal-pr-sweep</span><span>data through 2026-08-05 12:00 UTC</span></div>
+
+</div></div>
+
+<script>
+  var rows=[
+    ["07-17",18,44,27,50062853,"1.6M",155.57,0],["07-18",24,0,4,4180767,"—",14.18,0],
+    ["07-19",24,6,9,14453353,"2.9M",58.42,0],["07-20",24,19,20,41178022,"2.7M",141.48,0],
+    ["07-21",24,18,20,43125770,"2.4M",135.71,0],["07-22",24,5,10,14426004,"2.9M",52.71,0],
+    ["07-23",24,2,8,14170496,"7.1M",49.32,0],["07-24",24,19,17,35231536,"2.1M",120.46,0],
+    ["07-25",17,4,13,15751385,"3.9M",55.43,0],["07-26",11,7,52,94733563,"13.5M",188.99,1],
+    ["07-27",23,32,78,276482351,"9.5M",618.32,1],["07-28",24,31,59,195964900,"6.8M",471.60,0],
+    ["07-29",24,13,42,123489658,"9.5M",310.14,0],["07-30",24,17,57,213356284,"12.6M",468.94,0],
+    ["07-31",24,26,45,146446152,"5.9M",378.19,0],["08-01",24,6,24,74946753,"12.5M",182.42,0],
+    ["08-02",24,17,44,153345694,"10.2M",358.30,0],["08-03",24,37,68,241167804,"7.5M",598.70,0],
+    ["08-04",23,32,61,213544186,"6.7M",518.32,0],["08-05",14,10,58,128134899,"12.8M",264.37,0]
+  ];
+  var maxCost=Math.max.apply(null,rows.map(function(r){return r[6]}));
+  var body=document.getElementById("tbody");
+  rows.forEach(function(r){
+    var w=Math.max(3,(r[6]/maxCost*100)).toFixed(1);
+    var tr=document.createElement("tr");
+    tr.className=(r[7]?"spike":"")+(r[2]===0?" zero":"");
+    tr.innerHTML=
+      "<td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td>"+
+      "<td>"+r[4].toLocaleString("en-US")+"</td>"+
+      "<td class='tpa'>"+r[5]+"</td>"+
+      "<td><span class='costcell'><span class='bar' style='width:"+w+"px'></span>"+
+        "<span class='amt'>$"+r[6].toFixed(2)+"</span></span></td>";
+    body.appendChild(tr);
+  });
+</script>
+</body>
+</html>

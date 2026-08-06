@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Marshal 巡检 · Token 与成本核算</title>
+<style>
+  :root{
+    --ground:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb;
+    --ink:#191e29; --muted:#5b6675; --faint:#8a94a3;
+    --hair:#e0e5ec; --hair-strong:#cdd4de;
+    --accent:#0d6f79; --accent-soft:#d4e7e8;
+    --cread:#0d6f79;  --cwrite:#4d9aa1;  --output:#c07a2c;  --input:#aeb7c3;
+    --note:#9a5b12; --note-bg:#f8efe0; --note-hair:#e8d5b0;
+    --good:#1f7a52; --spike-bg:#fbf2e6;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 8px 24px -12px rgba(20,30,45,.14);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0f131a; --surface:#171c25; --surface-2:#1c222d;
+      --ink:#e7ebf1; --muted:#9aa4b3; --faint:#6c7686;
+      --hair:#262d38; --hair-strong:#333c49;
+      --accent:#3fb0b8; --accent-soft:#1b3a3d;
+      --cread:#3fb0b8; --cwrite:#2f7a80; --output:#d69248; --input:#525c6b;
+      --note:#e0b672; --note-bg:#241d0f; --note-hair:#4a3c1e;
+      --good:#4cc38a; --spike-bg:#211a0e;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb;
+    --ink:#191e29; --muted:#5b6675; --faint:#8a94a3;
+    --hair:#e0e5ec; --hair-strong:#cdd4de;
+    --accent:#0d6f79; --accent-soft:#d4e7e8;
+    --cread:#0d6f79; --cwrite:#4d9aa1; --output:#c07a2c; --input:#aeb7c3;
+    --note:#9a5b12; --note-bg:#f8efe0; --note-hair:#e8d5b0; --good:#1f7a52; --spike-bg:#fbf2e6;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 8px 24px -12px rgba(20,30,45,.14);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0f131a; --surface:#171c25; --surface-2:#1c222d;
+    --ink:#e7ebf1; --muted:#9aa4b3; --faint:#6c7686;
+    --hair:#262d38; --hair-strong:#333c49;
+    --accent:#3fb0b8; --accent-soft:#1b3a3d;
+    --cread:#3fb0b8; --cwrite:#2f7a80; --output:#d69248; --input:#525c6b;
+    --note:#e0b672; --note-bg:#241d0f; --note-hair:#4a3c1e; --good:#4cc38a; --spike-bg:#211a0e;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{
+    background:var(--ground); color:var(--ink); font-family:var(--sans);
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+    padding:clamp(20px,5vw,64px) clamp(16px,4vw,40px);
+  }
+  .page{max-width:960px; margin:0 auto}
+  .tnum{font-variant-numeric:tabular-nums}
+  .mono{font-family:var(--mono)}
+
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:10px; margin:0 0 14px}
+  .eyebrow::before{content:""; width:26px; height:2px; background:var(--accent); display:inline-block}
+  h1{font-size:clamp(26px,4.4vw,40px); line-height:1.12; letter-spacing:-.015em; margin:0 0 12px; font-weight:680; text-wrap:balance; max-width:20ch}
+  .sub{color:var(--muted); font-size:15px; max-width:64ch; margin:0}
+  .meta{margin-top:18px; display:flex; flex-wrap:wrap; gap:8px 22px; font-size:12.5px; color:var(--faint); font-family:var(--mono)}
+  .meta b{color:var(--muted); font-weight:500}
+
+  /* read-first */
+  .readfirst{margin-top:26px; background:var(--surface); border:1px solid var(--hair); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow)}
+  .readfirst .rh{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:0 0 14px}
+  .readfirst ol{margin:0; padding:0; list-style:none; display:grid; gap:12px}
+  .readfirst li{display:flex; gap:13px; font-size:13.5px; color:var(--ink); line-height:1.55}
+  .readfirst .num{flex:none; width:24px; height:24px; border-radius:7px; background:var(--accent-soft); color:var(--accent); font-family:var(--mono); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center}
+  .readfirst b{font-weight:640}
+
+  section{margin-top:clamp(30px,5vw,52px)}
+  .sh{display:flex; align-items:baseline; gap:12px; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--hair)}
+  .sh .n{font-family:var(--mono); font-size:12px; color:var(--faint); letter-spacing:.05em}
+  .sh h2{font-size:17px; margin:0; font-weight:640; letter-spacing:-.01em}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  .card{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:18px 18px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .card.hero{grid-column:span 2; border-color:var(--accent-soft)}
+  .card .k{font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  .card .v{font-size:clamp(22px,3.2vw,30px); font-weight:680; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums}
+  .card.hero .v{font-size:clamp(30px,5vw,44px); color:var(--accent)}
+  .card .u{font-size:12.5px; color:var(--faint); margin-top:7px; font-variant-numeric:tabular-nums}
+  .card .u b{color:var(--muted); font-weight:600}
+  @media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)} .card.hero{grid-column:span 2}}
+  @media (max-width:440px){.stats{grid-template-columns:1fr} .card.hero{grid-column:span 1}}
+
+  .infonote{margin-top:16px; font-size:12.5px; color:var(--muted); line-height:1.6; background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:13px 15px}
+  .infonote b{color:var(--ink); font-weight:640}
+  .infonote .q{color:var(--accent); font-weight:640}
+
+  .compbar{display:flex; height:38px; border-radius:9px; overflow:hidden; border:1px solid var(--hair); background:var(--surface)}
+  .compbar span{display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--mono); font-size:12px; font-weight:600; min-width:0}
+  .compbar span.sm{font-size:0}
+  .barcap{display:flex; justify-content:space-between; font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:6px; letter-spacing:.03em}
+  .legend{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px}
+  .legend .it{background:var(--surface); border:1px solid var(--hair); border-radius:10px; padding:12px 13px}
+  .legend .row1{display:flex; align-items:center; gap:8px; margin-bottom:7px}
+  .legend .dot{width:10px; height:10px; border-radius:3px; flex:none}
+  .legend .lbl{font-size:12.5px; color:var(--muted); font-weight:600}
+  .legend .amt{font-size:19px; font-weight:680; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .legend .det{font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:4px; line-height:1.5}
+  @media (max-width:640px){.legend{grid-template-columns:repeat(2,1fr)}}
+
+  .tscroll{overflow-x:auto; border:1px solid var(--hair); border-radius:12px; background:var(--surface); box-shadow:var(--shadow)}
+  table{border-collapse:collapse; width:100%; min-width:680px; font-size:13px}
+  thead th{font-family:var(--mono); font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); font-weight:600; text-align:right; padding:12px 14px; border-bottom:1px solid var(--hair-strong); background:var(--surface-2)}
+  thead th:first-child{text-align:left}
+  tbody td{padding:8px 14px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--hair)}
+  tbody td:first-child{text-align:left; font-family:var(--mono); font-size:12px; color:var(--muted)}
+  tbody tr:hover td{background:var(--surface-2)}
+  tbody tr.zero td{color:var(--faint)}
+  tbody tr.spike td{background:var(--spike-bg)}
+  tbody tr.spike td:first-child{color:var(--note); font-weight:700}
+  .costcell{display:inline-flex; align-items:center; gap:9px; justify-content:flex-end; width:100%}
+  .costcell .bar{height:7px; border-radius:4px; background:var(--accent); opacity:.85; flex:none}
+  .costcell .amt{min-width:60px; text-align:right}
+  .tpa{color:var(--note); font-weight:600}
+  tfoot td{padding:12px 14px; text-align:right; font-weight:680; font-variant-numeric:tabular-nums; border-top:2px solid var(--hair-strong); background:var(--surface-2)}
+  tfoot td:first-child{text-align:left; font-family:var(--sans)}
+
+  /* depth section */
+  .depthgrid{display:grid; grid-template-columns:1.1fr .9fr; gap:22px; align-items:start}
+  @media (max-width:760px){.depthgrid{grid-template-columns:1fr}}
+  .minitable{width:100%; border-collapse:collapse; font-size:12.5px; background:var(--surface); border:1px solid var(--hair); border-radius:12px; overflow:hidden; box-shadow:var(--shadow)}
+  .minitable th{font-family:var(--mono); font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); text-align:right; padding:10px 12px; background:var(--surface-2); border-bottom:1px solid var(--hair-strong)}
+  .minitable th:first-child{text-align:left}
+  .minitable td{padding:9px 12px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--hair)}
+  .minitable td:first-child{text-align:left; color:var(--muted)}
+  .minitable tr.after td{background:var(--spike-bg)}
+  .minitable .big{font-weight:700; color:var(--ink)}
+  .minitable tr.after .big{color:var(--note)}
+  .depthwhy p{margin:0 0 12px; font-size:13.5px; color:var(--ink); line-height:1.6}
+  .depthwhy .lead{font-weight:640}
+  .depthwhy ul{margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--muted); line-height:1.7}
+  .depthwhy code{font-family:var(--mono); font-size:11.5px; background:rgba(128,128,128,.14); padding:1px 5px; border-radius:5px}
+  .formula{font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--hair); border-radius:9px; padding:11px 14px; color:var(--ink); margin:14px 0}
+  .formula b{color:var(--note)}
+  .takeaway{margin-top:16px; background:var(--accent-soft); border-radius:10px; padding:13px 16px; font-size:13px; color:var(--ink); line-height:1.55}
+  .takeaway b{color:var(--accent)}
+
+  /* corrections */
+  .corr{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px}
+  .corr .c{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px 17px; box-shadow:var(--shadow)}
+  .corr .tag{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); margin:0 0 10px}
+  .corr .fromto{display:flex; align-items:center; gap:10px; font-variant-numeric:tabular-nums; margin-bottom:8px}
+  .corr .from{color:var(--faint); text-decoration:line-through; font-size:15px}
+  .corr .to{color:var(--ink); font-size:22px; font-weight:700; letter-spacing:-.01em}
+  .corr .arw{color:var(--accent); font-weight:700}
+  .corr p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.5}
+  .corr code{font-family:var(--mono); font-size:11px; background:rgba(128,128,128,.14); padding:1px 5px; border-radius:5px}
+  .corr .c.ok{border-color:var(--accent-soft)}
+  .corr .c.ok .to{color:var(--good)}
+  @media (max-width:640px){.corr{grid-template-columns:1fr}}
+
+  /* faq */
+  .faq{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media (max-width:640px){.faq{grid-template-columns:1fr}}
+  .qa{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow)}
+  .qa .q{font-size:13.5px; font-weight:640; color:var(--ink); margin:0 0 8px; display:flex; gap:8px}
+  .qa .q .mk{color:var(--accent); font-family:var(--mono); font-weight:700; flex:none}
+  .qa .a{font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; padding-left:20px}
+  .qa .a code{font-family:var(--mono); font-size:11px; background:rgba(128,128,128,.14); padding:1px 5px; border-radius:5px}
+
+  .note{background:var(--note-bg); border:1px solid var(--note-hair); border-left:3px solid var(--note); border-radius:12px; padding:18px 20px; margin-top:6px}
+  .note h3{margin:0 0 8px; font-size:14.5px; color:var(--note); display:flex; align-items:center; gap:9px}
+  .note h3 .badge{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; border:1px solid var(--note); color:var(--note); padding:2px 7px; border-radius:20px}
+  .note p{margin:0; font-size:13.5px; color:var(--ink); line-height:1.62}
+  .note p + p{margin-top:9px}
+  .note code{font-family:var(--mono); font-size:12px; background:rgba(128,128,128,.14); padding:1px 6px; border-radius:5px}
+  .tiers{display:flex; flex-wrap:wrap; gap:12px; margin-top:16px}
+  .tier{flex:1; min-width:220px; background:var(--surface); border:1px solid var(--hair); border-radius:11px; padding:14px 16px}
+  .tier .th{font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:4px}
+  .tier .tv{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .tier .td{font-family:var(--mono); font-size:11px; color:var(--faint); margin-top:3px}
+
+  .foot{margin-top:44px; padding-top:16px; border-top:1px solid var(--hair); font-family:var(--mono); font-size:11.5px; color:var(--faint); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  .kicker{font-size:14px; color:var(--muted); max-width:66ch; margin:0 0 4px}
+  .kicker b{color:var(--ink); font-weight:640}
+</style>
+
+<div class="wrap"><div class="page">
+
+  <p class="eyebrow">Marshal · 度量核算</p>
+  <h1>自动 PR 巡检的 Token 与成本明细</h1>
+  <p class="sub">对 <b style="color:var(--ink)">marshal-pr-sweep</b> 定时巡检近一个月的实测口径核算。金额为 <b style="color:var(--ink)">API 挂牌价等值</b>,非实际账单。</p>
+  <div class="meta">
+    <span><b>统计期</b> 2026-07-17 → 08-05 · 约 19 天</span>
+    <span><b>数据源</b> cron transcript · usage · 按 message id 去重</span>
+    <span><b>计价</b> Opus 4.x 标准档</span>
+  </div>
+
+  <div class="readfirst">
+    <p class="rh">读数前 · 三个不踩坑</p>
+    <ol>
+      <li><span class="num">1</span><span><b>金额是「假如按 API 付费的等值」,不是真实账单。</b> 本机是订阅(Claude Max),per-token 没被扣。<span class="mono">/usage</span> 远小于本报告是正常、对的。</span></li>
+      <li><span class="num">2</span><span><b>「每份 $14.90」是全期平均</b>,单份实际从早期 ~$5 到深审高峰 ~$30 波动极大(见 04)。</span></li>
+      <li><span class="num">3</span><span><b>成本几乎全是「上下文重读」,不是「产出」。</b> 深审越多轮,重读越多,单份越贵——超线性(见 04)。</span></li>
+    </ol>
+  </div>
+
+  <section>
+    <div class="sh"><span class="n">01</span><h2>汇总</h2></div>
+    <div class="stats">
+      <div class="card hero">
+        <p class="k">每份深审 · 全期平均</p>
+        <div class="v">$14.90</div>
+        <p class="u"><b>6.07M</b> tokens / 份 · 早期 ~$5、高峰 ~$30</p>
+      </div>
+      <div class="card"><p class="k">月度总额 · API 等值</p><div class="v" style="font-size:clamp(20px,3vw,27px)">$5.1k–10.3k</div><p class="u"><b>标准档 $5,142</b> ~ 1M 溢价档上限</p></div>
+      <div class="card"><p class="k">Token 合计</p><div class="v">2.09B</div><p class="u">20.9 亿 · 去重后</p></div>
+      <div class="card"><p class="k">审计份数</p><div class="v">345</div><p class="u"><b>442</b> 轮 · 含同 PR 多轮</p></div>
+      <div class="card"><p class="k">每轮巡检</p><div class="v">$11.63</div><p class="u">含空队列轮</p></div>
+    </div>
+    <div class="infonote"><span class="q">「每份审计」含什么?</span> 一轮 sweep 通常审 2–3 个 PR,并共享一次 <b>find_targets 发现 + 结尾小结</b>等固定开销。这里「每份」= 整轮 token ÷ 该轮份数,<b>已把共享开销摊入</b> —— 不是「纯一个 PR 的净成本」,是「摊薄后的每份」。</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">02</span><h2>成本构成</h2></div>
+    <div class="compbar" role="img" aria-label="成本占比:cache-read 60%, cache-write 22%, output 18%, input 0%">
+      <span style="flex:59.6; background:var(--cread)">cache-read 60%</span>
+      <span style="flex:22.3; background:var(--cwrite)">22%</span>
+      <span style="flex:18.1; background:var(--output)">18%</span>
+      <span class="sm" style="flex:.5; background:var(--input)">·</span>
+    </div>
+    <div class="barcap"><span>← 按「花的钱」占比</span><span>input ~0%</span></div>
+    <div class="legend">
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--cread)"></span><span class="lbl">cache-read</span></div><div class="amt tnum">$3,065</div><div class="det">2.04B tok · $1.5/M<br>token 97.6% · 成本 59.6%</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--cwrite)"></span><span class="lbl">cache-write</span></div><div class="amt tnum">$1,144</div><div class="det">38.1M tok · $30/M<br>token 1.8% · 成本 22.3%</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--output)"></span><span class="lbl">output</span></div><div class="amt tnum">$931</div><div class="det">12.4M tok · $75/M<br>token 0.6% · 成本 18.1%</div></div>
+      <div class="it"><div class="row1"><span class="dot" style="background:var(--input)"></span><span class="lbl">input</span></div><div class="amt tnum">$1</div><div class="det">63K tok · $15/M<br>token 0.0% · 成本 0.0%</div></div>
+    </div>
+    <div class="infonote"><span class="q">为什么 cache-read 占 97% 的 token,却只占 60% 的成本?</span> 因为单价差 <b>10–50 倍</b>:cache-read 只 $1.5/M,output 贵 50×($75/M)。<b>看 token 量</b> → cache-read 绝对主导;<b>看花的钱</b> → 被拉平成 read 60% / write 22% / output 18%。这两个「占比」是两回事,别混。</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">03</span><h2>明细清单 · 按日</h2></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>日期</th><th>巡检轮次</th><th>审计份数</th><th>轮/会话</th><th>Token</th><th>token/份</th><th>成本 (API 等值)</th></tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot><tr><td>合计 / 平均</td><td class="tnum">442</td><td class="tnum">345</td><td class="tnum">~45</td><td class="tnum">2,094,192,430</td><td class="tnum">6.1M</td><td class="tnum">$5,141.59</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="infonote"><b>空队列轮次也有成本</b>(如 <span class="mono">07-18</span> 审 0 份仍 $14,每轮固定跑 find_targets + 小结)—— 这也是<b>为什么份数 345 < 巡检轮数 442</b>(很多轮队列为空)。注意 <span class="mono" style="color:var(--note)">07-26/27</span> 起「轮/会话」与「token/份」<b>同时陡增</b> → 见 04。</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">04</span><h2>为什么 token 陡增,份数却没涨?</h2></div>
+    <p class="kicker" style="margin-bottom:18px"><b>是「每份审计变深(轮数翻 2–4 倍)」,不是「审得更多」,也不是「上下文变胖」。</b> 三个实测指标一对比就清楚:</p>
+    <div class="depthgrid">
+      <table class="minitable">
+        <thead><tr><th>时期</th><th>基线静态上下文</th><th>轮/会话</th><th>token/份</th></tr></thead>
+        <tbody>
+          <tr><td>07-20 分水岭前</td><td class="tnum">17K</td><td class="tnum big">20</td><td class="tnum">2.7M</td></tr>
+          <tr><td>07-24 分水岭前</td><td class="tnum">40K</td><td class="tnum big">17</td><td class="tnum">2.1M</td></tr>
+          <tr class="after"><td>07-27 分水岭后</td><td class="tnum">18K</td><td class="tnum big">78</td><td class="tnum">9.5M</td></tr>
+          <tr class="after"><td>07-30 分水岭后</td><td class="tnum">29K</td><td class="tnum big">57</td><td class="tnum">12.6M</td></tr>
+        </tbody>
+      </table>
+      <div class="depthwhy">
+        <p class="lead">三条证据链:</p>
+        <p><b>① 不是上下文膨胀。</b> 基线静态上下文(系统提示+CLAUDE.md+记忆+工具)全程稳定 <b>17–41K,没涨</b>,07-27 反而更低。</p>
+        <p><b>② 不是份数增长。</b> 份数只翻倍,token/份却翻 3–4 倍。</p>
+        <p><b>③ 真因 = 每份轮数 15–20 → 45–78。</b> 轮数一多,<code>每轮重读整段累积会话</code>,cache-read/轮 也从 74K 涨到 149K(第 60 轮要重读前 59 轮)。</p>
+      </div>
+    </div>
+    <div class="formula">超线性:轮数 <b>~2.5×</b> × 每轮上下文 <b>~2×</b> ≈ 每份 token <b>~4–6×</b></div>
+    <p class="kicker"><b>为什么轮数陡增 —— 队列的 PR 性质变了。</b> 7 月中下旬前多是浅 PR(docs/examples 清理),几轮审完;<b>07-26/27 起被深共识面 PR 填满</b>,每个都要大量 scout / prove / 跨仓 grep / 变异推理 / 多视角对抗验证:</p>
+    <div class="depthwhy" style="margin-top:10px"><ul>
+      <li><b>CBQS #290</b>(前后 24 轮 escalate)、计价单位族 cp#67/68 · cowboy#294/295</li>
+      <li><b>PVM lockdown 系列</b>(#1227/1228/1235/1237/1224/1232,读 pvm 源码 + 跨仓确认)</li>
+      <li><b>tx-contract slice</b>(#1244/1245/1246/1249,overlay + golden 差分)</li>
+      <li><b>eth-LC bridge #1200</b>(r5→r8,2500 行 diff + BLS/gindex 归因)· <b>runner 盲签栈</b>(#200–205 多轮)</li>
+    </ul></div>
+    <div class="takeaway"><b>可操作结论:</b> 深审/多轮 PR 单份成本<b>超线性</b>——每多一轮都按 cache-read 价重读整段会话。控成本的杠杆在「<b>缩短单份会话轮数</b>」(更早分诊、限无谓 scout),而非「少审几个 PR」。</div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">05</span><h2>口径修正</h2></div>
+    <p class="kicker" style="margin-bottom:16px">初版叠加两处高估 + 一处低估。修正后:总额降半,每份反而上修。</p>
+    <div class="corr">
+      <div class="c"><p class="tag">高估 · streaming 双计</p><div class="fromto"><span class="from tnum">$10,654</span><span class="arw">→</span><span class="to tnum">$5,142</span></div><p>每条 message 的 usage 记 partial+final 两次(~2×)。按 message id 去重消除。</p></div>
+      <div class="c"><p class="tag">高估 · 份数膨胀</p><div class="fromto"><span class="from tnum">1,137</span><span class="arw">→</span><span class="to tnum">345</span></div><p><code>gate-record</code> 文本在 transcript 出现约 3.3×(streaming + tool_result 回显 + 小结引用)。</p></div>
+      <div class="c ok"><p class="tag">已正确 · 同 PR 多轮</p><div class="fromto"><span class="to tnum">1.00×</span></div><p>每 push 换 head → 每轮 re-review 是不同 sha,各记一次。多轮 PR 按轮累加(#1200 审 4 轮 ≈ $60)。</p></div>
+    </div>
+    <p class="kicker" style="margin-top:16px">净效果:总额被高估 <b>2×</b>(→ $5.1k);每份此前被 <b>低估</b>($9.4 → $14.9)—— 份数比总额膨胀更狠,两错相除把单价压低了。</p>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">06</span><h2>常见困惑</h2></div>
+    <div class="faq">
+      <div class="qa"><p class="q"><span class="mk">Q</span>为什么报告 $5.1k,<code>/usage</code> 却小得多?</p><p class="a">计费模式不同。你是<b>订阅</b>(固定月费),per-token 没扣;本报告是「折合 API 单价」的假想值。<code>/usage</code> 是真实口径,它小是对的。</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>为什么审计份数(345)比巡检轮数(442)少?</p><p class="a">很多轮<b>队列为空</b>(没 PR / 都已在当前 head 审过)。空轮仍跑 find_targets + 小结,有小额成本但 0 份。</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>「每份 $14.9」和明细里 9.5M/份对不上?</p><p class="a">$14.9 是<b>全期平均</b>,掩盖巨大方差:早期浅 PR ~$5,深审高峰 ~$25–30。看单日更准(见 03、04)。</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>cache-read 占 97% token 却只 60% 成本,矛盾?</p><p class="a">不矛盾。cache-read 单价最低($1.5/M),output 贵 50×($75/M)。token 量和花的钱是两个维度(见 02)。</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>一个 PR 审好几轮,成本算重了吗?</p><p class="a">没算重也没漏。每轮在<b>不同 head</b>,各是独立审计(各烧 token),已分别计入 345。多轮 PR 总成本 = 轮数累加。</p></div>
+      <div class="qa"><p class="q"><span class="mk">Q</span>「每份成本」是纯一个 PR 的开销吗?</p><p class="a">不是。一轮审 2–3 个 PR 共享 find_targets/小结,「每份」= 整轮 ÷ 份数,已摊入共享开销(见 01)。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">07</span><h2>口径说明 · API 等值 ≠ 实际支出</h2></div>
+    <div class="note">
+      <h3><span class="badge">关键</span>这是订阅计费,不按 token 扣费</h3>
+      <p>本机为 <b>OAuth 订阅登录(Claude Max)</b>,非 API key 按量计费(配置无 <code>apiKeyHelper</code>,存在 <code>~/.claude/.credentials.json</code>)。</p>
+      <p>报告中所有金额是「<b>假如走 API 单价会折合多少</b>」的参考等值,<b>不是真实账单</b>。订阅为每月固定费,per-token 从未被扣。因此 <code>/usage</code> 显示的成本远小于本报告 —— 那是订阅额度内的真实口径,是对的;本报告用于评估这套自动化「相当于多少 API 价值 / ROI」。</p>
+    </div>
+    <div class="tiers">
+      <div class="tier"><div class="th">标准档 · 主口径(≤200K 上下文)</div><div class="tv tnum">$5,142 <span style="font-size:13px;color:var(--faint)">/ 月</span></div><div class="td">in $15 · out $75 · 1h-write $30 · read $1.5 (每 M)</div></div>
+      <div class="tier"><div class="th">1M 溢价档 · 上限(&gt;200K 约 2×)</div><div class="tv tnum">≈ $10,300 <span style="font-size:13px;color:var(--faint)">/ 月</span></div><div class="td">深审多在 200K 边界附近 · 每份 ≈ $29.8 · 乘数有不确定性</div></div>
+    </div>
+    <div class="infonote"><span class="q">「1M 溢价档上限」是什么意思?</span> 本机是 Opus 百万 token 长上下文版(<code style="font-family:var(--mono)">claude-opus-4-8[1m]</code>)。对<b>单次请求上下文 &gt;200K</b> 的部分,Anthropic 按<b>约 2×</b>溢价计费。于是同一批用量有两个折算价:<b>$5,142</b> = 假设全部按标准价(下限);<b>$10,300</b> = 假设每次都落进溢价档(上限,几乎不可能全中)。真实值在两者<b>之间</b>、更靠近 $5.1k —— 只有累积到 &gt;200K 的深度多轮会话才走溢价。即:这是个<b>区间 $5.1k~$10.3k</b>,「上限」是天花板,不是另一个真实数字。</div>
+  </section>
+
+  <p class="kicker" style="margin-top:40px; font-size:15px; color:var(--ink)"><b>一句话</b> —— 一份 PR 深审 ≈ <b>610 万 token / API 等值 $15</b>(cache-read 占 6 成成本);近一月 442 轮、345 份,API 等值 ≈ <b>$5.1k</b>。单份成本随<b>审查深度(轮数)超线性</b>上升,7 月底转深共识 PR 后每份翻 4–6 倍。订阅下均非真金白银支出,<span class="mono">/usage</span> 才是实际口径。</p>
+
+  <div class="foot"><span>Marshal 度量核算 · marshal-pr-sweep</span><span>数据截至 2026-08-05 12:00 UTC</span></div>
+
+</div></div>
+
+<script>
+  // date, runs, audits, turns, tokens, tokPerAuditLabel, cost, spike
+  var rows=[
+    ["07-17",18,44,27,50062853,"1.6M",155.57,0],["07-18",24,0,4,4180767,"—",14.18,0],
+    ["07-19",24,6,9,14453353,"2.9M",58.42,0],["07-20",24,19,20,41178022,"2.7M",141.48,0],
+    ["07-21",24,18,20,43125770,"2.4M",135.71,0],["07-22",24,5,10,14426004,"2.9M",52.71,0],
+    ["07-23",24,2,8,14170496,"7.1M",49.32,0],["07-24",24,19,17,35231536,"2.1M",120.46,0],
+    ["07-25",17,4,13,15751385,"3.9M",55.43,0],["07-26",11,7,52,94733563,"13.5M",188.99,1],
+    ["07-27",23,32,78,276482351,"9.5M",618.32,1],["07-28",24,31,59,195964900,"6.8M",471.60,0],
+    ["07-29",24,13,42,123489658,"9.5M",310.14,0],["07-30",24,17,57,213356284,"12.6M",468.94,0],
+    ["07-31",24,26,45,146446152,"5.9M",378.19,0],["08-01",24,6,24,74946753,"12.5M",182.42,0],
+    ["08-02",24,17,44,153345694,"10.2M",358.30,0],["08-03",24,37,68,241167804,"7.5M",598.70,0],
+    ["08-04",23,32,61,213544186,"6.7M",518.32,0],["08-05",14,10,58,128134899,"12.8M",264.37,0]
+  ];
+  var maxCost=Math.max.apply(null,rows.map(function(r){return r[6]}));
+  var body=document.getElementById("tbody");
+  rows.forEach(function(r){
+    var w=Math.max(3,(r[6]/maxCost*100)).toFixed(1);
+    var tr=document.createElement("tr");
+    tr.className=(r[7]?"spike":"")+(r[2]===0?" zero":"");
+    tr.innerHTML=
+      "<td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td>"+
+      "<td>"+r[4].toLocaleString("en-US")+"</td>"+
+      "<td class='tpa'>"+r[5]+"</td>"+
+      "<td><span class='costcell'><span class='bar' style='width:"+w+"px'></span>"+
+        "<span class='amt'>$"+r[6].toFixed(2)+"</span></span></td>";
+    body.appendChild(tr);
+  });
+</script>
+</body>
+</html>
