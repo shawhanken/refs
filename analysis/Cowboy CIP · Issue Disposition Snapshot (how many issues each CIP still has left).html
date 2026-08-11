@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<!-- saved from url=(0084)https://cb.ai-api.top/docs/webreport/20260805_CIP_Issue_Disposition_OursOnly_EN.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cowboy CIP · Issue Disposition Snapshot (how many issues each CIP still has left)</title>
+<style>
+  :root{
+    --plane:#f9f9f7; --surface:#fcfcfb;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --ring:rgba(11,11,11,.10);
+    --good:#0ca30c; --warn:#eda100; --serious:#ec835a; --crit:#d03b3b;
+    --track:#e8e7e1; --oos:#c2c1ba; --remn:#3987e5;
+    --accent:#2a78d6; --plan:#2563eb; --last:#7c3aed;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --plane:#0d0d0d; --surface:#1a1a19;
+      --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --ring:rgba(255,255,255,.10);
+      --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#e05656;
+      --track:#2c2c2a; --oos:#4a4a47; --remn:#4f97f0;
+      --accent:#3987e5; --plan:#4f97f0; --last:#9b7be8;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--plane); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.55; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px; margin:0 auto; padding:32px 20px 64px}
+  header.top{margin-bottom:24px}
+  h1{font-size:24px; margin:0 0 6px; letter-spacing:-.01em}
+  .sub{color:var(--ink2); font-size:14px; margin:0}
+  .scope{margin-top:14px; padding:12px 16px; background:var(--surface);
+    border:1px solid var(--ring); border-radius:10px; font-size:13px; color:var(--ink2)}
+  .scope b{color:var(--ink)}
+  .scope p{margin:5px 0}
+  code{background:var(--track); padding:0 4px; border-radius:4px; font-size:12px}
+
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:22px 0 8px}
+  .tile{background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:14px 16px}
+  .tile .n{font-size:29px; font-weight:700; letter-spacing:-.02em}
+  .tile .l{font-size:12px; color:var(--ink2); margin-top:2px}
+  .tile.g .n{color:var(--good)} .tile.w .n{color:var(--warn)}
+  .tile.s .n{color:var(--serious)} .tile.a .n{color:var(--accent)}
+
+  .legend{display:flex; flex-wrap:wrap; gap:16px; margin:12px 2px 24px; font-size:12.5px; color:var(--ink2)}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .sw{width:12px; height:12px; border-radius:3px; display:inline-block}
+  .sw.d{background:var(--good)} .sw.x{background:var(--oos)} .sw.r{background:var(--crit)} .sw.p{background:var(--plan)} .sw.l{background:var(--last)}
+
+  .hi{background:var(--surface); border:1px solid var(--ring); border-left:3px solid var(--serious);
+    border-radius:12px; padding:16px 18px; margin-bottom:28px}
+  .hi h2{font-size:15px; margin:0 0 10px}
+  .hi .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .hi .c{font-size:12.5px; padding:5px 11px; border-radius:20px; background:var(--track);
+    border:1px solid var(--ring); color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums}
+  .hi .c b{font-weight:700}
+  .hi .c .cnt{color:var(--serious); font-weight:700}
+  .hi .c .t{color:var(--muted); font-size:11px; margin-left:2px}
+
+  .board{margin-bottom:24px}
+  .board > h2{font-size:16px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .board > h2 .k{font-size:12px; color:var(--muted); font-weight:500}
+  .board > h2 .rt{margin-left:auto; font-size:12px; color:var(--ink2); font-weight:600}
+  .board > h2 .rt b{color:var(--serious)}
+  .board .desc{font-size:13px; color:var(--ink2); margin:0 0 12px}
+  .rows{background:var(--surface); border:1px solid var(--ring); border-radius:12px; overflow:hidden}
+
+  .row{display:grid; grid-template-columns:72px 1fr 236px; gap:14px; align-items:center;
+    padding:11px 16px; border-top:1px solid var(--grid)}
+  .row:first-child{border-top:none}
+  .row.np{color:var(--ink2)}
+  .cip{font-weight:700; font-size:13px; letter-spacing:-.01em}
+  .fn{font-size:13px}
+  .fn .note{display:block; color:var(--muted); font-size:11.5px; margin-top:2px}
+  .fn .plan{display:block; color:var(--plan); font-size:11.5px; font-weight:600; margin-top:3px}
+  .fn .lastwk{display:block; color:var(--last); font-size:11.5px; font-weight:600; margin-top:3px}
+  .req{font-size:12px; color:var(--ink2); font-variant-numeric:tabular-nums}
+  .req .dl{color:var(--ink); font-weight:600}
+
+  .meter{display:flex; align-items:center; gap:12px}
+  .sbar{flex:1; height:16px; background:var(--track); border-radius:5px; overflow:hidden; display:flex; min-width:76px}
+  .sbar i{height:100%}
+  .sbar i.d{background:var(--good)}
+  .sbar i.x{background:var(--oos)}
+  .sbar i.r.g, .sbar i.r.w, .sbar i.r.s, .sbar i.r.c{background:var(--crit)}
+  .sbar i.p{background:var(--plan)} .sbar i.l{background:var(--last)}
+  .planbox{margin:2px 2px 20px; padding:12px 15px; border:1px solid var(--plan); border-left:4px solid var(--plan); border-radius:9px; background:rgba(37,99,235,.07); font-size:13px; color:var(--ink); line-height:1.6}
+  .planbox .pn{display:block; margin-top:5px; font-size:12px; color:var(--muted)}
+  .rem{width:92px; text-align:right; font-size:12px; color:var(--ink2); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .rem b{font-size:17px; font-weight:700}
+  .rem small{color:var(--muted); font-weight:500}
+  .rem.g b, .rem.w b, .rem.s b, .rem.c b{color:var(--crit)}
+  .rem.done{color:var(--good); font-weight:700; font-size:12px}
+  .npnote{font-size:11.5px; color:var(--muted); font-style:italic}
+
+  footer{margin-top:34px; padding-top:18px; border-top:1px solid var(--grid); font-size:12px; color:var(--muted)}
+  footer p{margin:5px 0}
+  footer b{color:var(--ink2)}
+
+  @media (max-width:760px){
+    .tiles{grid-template-columns:repeat(2,1fr)}
+    .row{grid-template-columns:58px 1fr; gap:6px 12px}
+    .req{grid-column:2}
+    .meter{grid-column:1 / -1}
+    .rem{width:auto}
+  }
+
+  .xsec{margin-top:34px}
+  .xsec h2{font-size:19px;margin:0 0 4px}
+  .xsec .xs{font-size:13px;color:var(--ink2);margin:0 0 12px}
+  .xt{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--surface);
+      border:1px solid var(--ring);border-radius:10px;overflow:hidden}
+  .xtw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;border-radius:10px}
+  .xt th{background:var(--plane);text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+      color:var(--muted);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+  .xt td{padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.55}
+  .xt tr:last-child td{border-bottom:0}
+  .xt td.k{white-space:nowrap;font-weight:700}
+  .xt td.c{white-space:nowrap;color:var(--ink2)}
+  .xt td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+  .xt a{color:var(--accent);text-decoration:none;font-weight:700}
+  .xt a:hover{text-decoration:underline}
+  .xt .cbadge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--warn);
+      color:#231a00;font-size:10px;font-weight:800;white-space:nowrap}
+  .xsum td.g{font-weight:700;color:var(--ink)}
+  .xper{margin-top:10px;font-size:12px;color:var(--muted)}
+
+  .split{margin:14px 0 4px; font-size:13.5px; color:var(--ink2); line-height:2.1}
+  .split p{margin:0; display:flex; flex-wrap:wrap; align-items:center; gap:6px 2px}
+  .split p>b{margin-right:2px}
+  .split b{color:var(--ink); font-weight:700}
+  .split i{font-style:normal; display:inline-block; padding:2px 9px; border-radius:999px;
+      border:1px solid var(--ring); background:var(--surface); font-weight:600; color:var(--ink2);
+      white-space:normal; max-width:100%}
+  .split i b{font-variant-numeric:tabular-nums; margin-left:4px}
+  .split i.c b{color:var(--crit)} .split i.w b{color:var(--warn)} .split i.v b{color:var(--last)}
+  .split i.a b{color:var(--accent)} .split i.g b{color:var(--good)} .split i.m b{color:var(--muted)}
+  .split .op{margin:0 5px; color:var(--muted); font-weight:700}
+
+  /* keep any single run of content from widening the page */
+  html,body{max-width:100%}
+  .wrap{width:100%}
+  .xt td,.xt th{overflow-wrap:anywhere}
+
+  /* ===== Change-this-period summary band ===== */
+  .delta{margin:20px 0 4px; padding:16px 18px; background:var(--surface);
+    border:1px solid var(--ring); border-left:3px solid var(--last); border-radius:12px}
+  .delta h2{font-size:15px; margin:0 0 12px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .delta h2 .dw{font-size:12px; color:var(--muted); font-weight:500}
+  .dflow{display:flex; align-items:stretch; flex-wrap:wrap; gap:10px}
+  .dstep{flex:1 1 130px; min-width:120px; background:var(--plane); border:1px solid var(--ring);
+    border-radius:10px; padding:11px 12px; text-align:center}
+  .dstep .dv{display:block; font-size:27px; font-weight:700; letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums; line-height:1.15}
+  .dstep .dv em{font-style:normal; font-size:19px; color:var(--muted); margin-right:3px}
+  .dstep .dk{display:block; font-size:12px; color:var(--ink2); margin-top:3px; line-height:1.4}
+  .dstep.g .dv{color:var(--good)}
+  .dstep.n .dv{color:var(--accent)}
+  .dstep.now{border-color:var(--serious); background:rgba(236,131,90,.09)}
+  .dstep.now .dv{color:var(--serious)}
+  .dnet{flex:1 1 130px; min-width:120px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:11px 12px; border:1px dashed var(--good); border-radius:10px}
+  .dnet .dv{font-size:22px; font-weight:700; color:var(--good); font-variant-numeric:tabular-nums; line-height:1.2}
+  .dnet .dk{font-size:12px; color:var(--ink2); margin-top:3px; text-align:center; line-height:1.4}
+  .dnote{margin:12px 0 0; font-size:12.5px; color:var(--ink2); line-height:1.65}
+  .dnote b{color:var(--ink)}
+  @media (max-width:760px){
+    .dstep,.dnet{flex:1 1 44%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>Cowboy CIP · Issue Disposition — how many issues each CIP still has left</h1>
+    <p class="sub">By business board · CIP-list view · <b style="color:var(--ink)">Scope: ours/unassigned issues only, excludes client issues</b> · Data as of 2026-08-05 18:00 (Beijing) · internal reference</p>
+    <div class="scope">
+      <p><b>Scope:</b> this sheet counts <b>ours/unassigned issues only</b> — assignee is pavilionledger or nobody — and <b>excludes issues owned by the client</b> (<code>*@cowboy.inc</code>). For the version that includes client issues, see the companion "includes client issues" file.</p>
+      <p><b>As-of:</b> 2026-08-05 18:00 (Beijing), reconstructed by replaying Linear event timestamps.</p>
+      <p><b>Reporting period:</b> Sunday 2026-08-02 19:00 to Wednesday 2026-08-05 18:00, Beijing time. The purple "resolved this period" segment counts exactly the issues completed or canceled after review inside that window.</p>
+      <p><b>Reconciliation with the previous edition:</b> the previous edition (as of Aug 2, 19:00) reported <b>178 left</b>. This period resolved 14 issues and opened 3 new ones (COW-2911, COW-2914, COW-2915, all under CIP-31). 1 of those was both opened and completed inside this window, so it counts on both sides. Hence 178 − 14 + 3 = <b>167</b>.</p>
+    </div>
+  </header>
+
+  <section class="delta">
+    <h2>Change this period · actionable open issues <span class="dw">Reporting period 2026-08-02 19:00 → 2026-08-05 18:00 (Beijing)</span></h2>
+    <div class="dflow">
+      <div class="dstep"><span class="dv">120</span><span class="dk">Open at start (Aug 2)</span></div>
+      <div class="dstep g"><span class="dv"><em>−</em>14</span><span class="dk">Resolved this period</span></div>
+      <div class="dstep n"><span class="dv"><em>+</em>3</span><span class="dk">Opened this period</span></div>
+      <div class="dstep now"><span class="dv">109</span><span class="dk">Open now (Aug 5)</span></div>
+      <div class="dnet"><span class="dv">↓ 11</span><span class="dk">Net reduction</span></div>
+    </div>
+    <p class="dnote">"Resolved" means completed inside the period, or canceled after review; "opened" means newly filed inside the period (COW-2911, COW-2914, COW-2915, all under CIP-31), 1 of which was filed and completed inside the same window and therefore counts on both sides. The figures above cover <b>actionable</b> issues only. Counting also the 8 issues blocked on missing external prerequisites and the 50 deferred to after the November token launch, the overall remaining count went from <b>178</b> to <b>167</b> over the same period — that overall scope is what the numbers beside each board heading and beside each bar on this page refer to.</p>
+  </section>
+
+
+  <div class="tiles">
+    <div class="tile a"><div class="n">30<span style="font-size:15px;color:var(--muted)"> +5</span></div><div class="l">CIPs counted here (5 more sit outside this initiative)</div></div>
+    <div class="tile"><div class="n">1,123</div><div class="l">Issues · ours/unassigned · 30 CIP projects</div></div>
+    <div class="tile g"><div class="n">885</div><div class="l">Completed · plus 71 verified-canceled</div></div>
+    <div class="tile s"><div class="n">167</div><div class="l">Left (in progress + todo) · 84% done</div></div>
+  </div>
+  <div class="split">
+    <p><b>167 left</b> <span class="op">=</span> <i class="c">actionable <b>109</b></i><span class="op">+</span><i class="w">external prerequisites missing <b>8</b></i><span class="op">+</span><i class="v">deferred to November <b>50</b></i></p>
+    <p><b>109 actionable</b> <span class="op">=</span> <i class="a">ours <b>27</b></i><span class="op">+</span><i class="g">unassigned <b>82</b></i></p>
+  </div>
+  <div class="legend">
+    <span><i class="sw d"></i>Completed</span>
+    <span><i class="sw l"></i>Resolved this period (Aug 2–5)</span>
+    <span><i class="sw x"></i>Canceled</span>
+    <span><i class="sw r"></i>Left (todo + in progress)</span>
+    <span><i class="sw p"></i>Planned next period</span>
+    <span style="color:var(--muted)">number on the right = issues left / total for that CIP</span>
+  </div>
+
+  <!-- Board 1 -->
+  <section class="board">
+    <h2>1 · Core protocol base <span class="k">the layer everything else depends on</span> <span class="rt"><b>5</b> left</span></h2>
+    <p class="desc">Execution kernel, fees, storage, timers, SDK, state reads, governance; everything else depends on these.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-1</div><div class="fn">Messaging and execution ordering between on-chain programs (actors) — the execution kernel</div><div class="meter"><div class="sbar"><i class="d" style="width:100%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+      <div class="row"><div class="cip">CIP-3</div><div class="fn">Transactions metered on both compute and storage<span class="note">COW-1401 (deterministic GC), reopened during the previous period, was completed again this period</span><span class="lastwk">Resolved this period: 2 (1 done, 1 canceled) — COW-1399, COW-1401</span></div><div class="meter"><div class="sbar"><i class="d" style="width:91%"></i><i class="l" style="width:4%"></i><i class="x" style="width:5%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+      <div class="row"><div class="cip">CIP-4</div><div class="fn">On-chain data storage &amp; persistence<span class="lastwk">Resolved this period: 1 (1 done) — COW-2100</span><span class="plan">Next period (1): COW-1406</span></div><div class="meter"><div class="sbar"><i class="d" style="width:91%"></i><i class="l" style="width:3%"></i><i class="x" style="width:3%"></i><i class="p" style="width:3%"></i></div><div class="rem g"><b>1</b> left<small>/34</small></div></div></div>
+      <div class="row"><div class="cip">CIP-5</div><div class="fn">Let on-chain programs auto-fire at a target block (timers)<span class="plan">Next period (1): COW-1274</span></div><div class="meter"><div class="sbar"><i class="d" style="width:95%"></i><i class="x" style="width:4%"></i><i class="p" style="width:1%"></i></div><div class="rem g"><b>1</b> left<small>/75</small></div></div></div>
+      <div class="row"><div class="cip">CIP-6</div><div class="fn">In-PVM SDK for writing actors<span class="plan">Next period (1): COW-2824</span></div><div class="meter"><div class="sbar"><i class="d" style="width:94%"></i><i class="x" style="width:2%"></i><i class="p" style="width:2%"></i><i class="r g" style="width:2%"></i></div><div class="rem g"><b>2</b> left<small>/65</small></div></div></div>
+      <div class="row"><div class="cip">CIP-17</div><div class="fn">External state reads, verifiable as untampered</div><div class="meter"><div class="sbar"><i class="d" style="width:98%"></i><i class="x" style="width:2%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+      <div class="row"><div class="cip">CIP-26</div><div class="fn">Account-scoped shareable code libraries</div><div class="meter"><div class="sbar"><i class="d" style="width:89%"></i><i class="r g" style="width:11%"></i></div><div class="rem g"><b>1</b> left<small>/9</small></div></div></div>
+      <div class="row"><div class="cip">CIP-12</div><div class="fn">Full on-chain governance: proposals, voting, param changes, upgrades<span class="note">all issues done, but in production no proposal yet gets all the way from "passed the vote" to "actually executed" (an implementation-quality blocker)</span></div><div class="meter"><div class="sbar"><i class="d" style="width:97%"></i><i class="x" style="width:3%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+    </div>
+  </section>
+
+  <!-- Board 2 -->
+  <section class="board">
+    <h2>2 · Off-chain compute / Runner <span class="k">the core capability for selling AI inference</span> <span class="rt"><b>8</b> left</span></h2>
+    <p class="desc">Send compute-heavy tasks to off-chain runners, verify their results are trustworthy, and manage the runners' connectivity and stake.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-2</div><div class="fn">Offload AI inference &amp; compute to off-chain runners with verifiable results<span class="plan">Next period (2): COW-962, COW-1377</span></div><div class="meter"><div class="sbar"><i class="d" style="width:75%"></i><i class="x" style="width:19%"></i><i class="p" style="width:4%"></i><i class="r g" style="width:2%"></i></div><div class="rem g"><b>3</b> left<small>/48</small></div></div></div>
+      <div class="row"><div class="cip">CIP-11</div><div class="fn">How runners connect and how jobs are pushed to them (dispatch)<span class="note">91% done in our scope, 3 left; one of them (COW-2661) belongs to the external-prerequisites group (Canyon access sits with the client), and the other two have points the specification leaves open — we are implementing them on our own reading and will confirm them against the business requirements in the pre-launch test round</span></div><div class="meter"><div class="sbar"><i class="d" style="width:63%"></i><i class="x" style="width:31%"></i><i class="r g" style="width:6%"></i></div><div class="rem g"><b>3</b> left<small>/48</small></div></div></div>
+      <div class="row"><div class="cip">CIP-13</div><div class="fn">Runner / validator stake &amp; delegation</div><div class="meter"><div class="sbar"><i class="d" style="width:100%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+      <div class="row"><div class="cip">CIP-23</div><div class="fn">Hardware TEE attestation that runners executed as agreed — enables private inference<span class="lastwk">Resolved this period: 2 (1 done, 1 canceled) — COW-1301, COW-1850</span><span class="plan">Next period (1): COW-1103</span></div><div class="meter"><div class="sbar"><i class="d" style="width:74%"></i><i class="l" style="width:6%"></i><i class="x" style="width:14%"></i><i class="p" style="width:3%"></i><i class="r g" style="width:3%"></i></div><div class="rem g"><b>2</b> left<small>/36</small></div></div></div>
+    </div>
+  </section>
+
+  <!-- Board 3 -->
+  <section class="board">
+    <h2>3 · Naming &amp; external access <span class="k">reach on-chain resources by URL-like names, serve them over HTTP</span> <span class="rt"><b>36</b> left</span></h2>
+    <p class="desc">Remaining is concentrated in DNS addressing and custom domains.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-14</div><div class="fn">Find on-chain actors by URL-like names (DNS addressing)</div><div class="meter"><div class="sbar"><i class="d" style="width:58%"></i><i class="r w" style="width:42%"></i></div><div class="rem w"><b>16</b> left<small>/38</small></div></div></div>
+      <div class="row"><div class="cip">CIP-15</div><div class="fn">Serve on-chain assets over HTTP with routing<span class="note">our part nearly done; remainder mostly client-owned</span></div><div class="meter"><div class="sbar"><i class="d" style="width:86%"></i><i class="x" style="width:7%"></i><i class="r g" style="width:7%"></i></div><div class="rem g"><b>1</b> left<small>/15</small></div></div></div>
+      <div class="row"><div class="cip">CIP-16</div><div class="fn">Custom top-level domains / namespaces</div><div class="meter"><div class="sbar"><i class="d" style="width:43%"></i><i class="x" style="width:3%"></i><i class="r s" style="width:54%"></i></div><div class="rem s"><b>19</b> left<small>/35</small></div></div></div>
+    </div>
+  </section>
+
+  <!-- Board 4 -->
+  <section class="board">
+    <h2>4 · Payments / banking / fiat <span class="k">becomes the most critical board once the CIP-36 plan is set</span> <span class="rt"><b>19</b> left (incl. no-project)</span></h2>
+    <p class="desc">Payment gateway, fiat exchange bridge, CUSD points issuance; the features that must ship by late August most likely concentrate in this board; Agent banking (CIP-28): 21 of 27 done, 5 left.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-8</div><div class="fn">Multi-party payment sessions (pay-as-you-go)<span class="lastwk">Resolved this period: 1 (0 done, 1 canceled) — COW-1013</span><span class="plan">Next period (1): COW-1543</span></div><div class="meter"><div class="sbar"><i class="d" style="width:89%"></i><i class="l" style="width:3%"></i><i class="p" style="width:3%"></i><i class="r g" style="width:5%"></i></div><div class="rem g"><b>3</b> left<small>/39</small></div></div></div>
+      <div class="row"><div class="cip">CIP-18</div><div class="fn">On-chain payment gateway (PaymentGate), the settlement point<span class="note">1 left at this snapshot — COW-1184, which has a point the specification leaves open — we are implementing it on our own reading and will confirm it against the business requirements in the pre-launch test round</span></div><div class="meter"><div class="sbar"><i class="d" style="width:80%"></i><i class="x" style="width:15%"></i><i class="r g" style="width:5%"></i></div><div class="rem g"><b>1</b> left<small>/20</small></div></div></div>
+      <div class="row"><div class="cip">CIP-19</div><div class="fn">External MCP (AI tool-call interface) ingress into the gateway<span class="plan">Next period (7): COW-1764, COW-1774, COW-1777, COW-1778, COW-1780, COW-1781, COW-1788</span></div><div class="meter"><div class="sbar"><i class="d" style="width:50%"></i><i class="x" style="width:17%"></i><i class="p" style="width:23%"></i><i class="r s" style="width:10%"></i></div><div class="rem s"><b>10</b> left<small>/30</small></div></div></div>
+      <div class="row"><div class="cip">CIP-28</div><div class="fn">Account funds/banking actor: fiat exchange bridge, CUSD points issuance<span class="note">becomes launch-critical once the CIP-36 plan is set; 81% done. The 7 issues committed for Week 2 (Aug 3–9) were finished ahead of schedule and 9 more closed in the previous period; 1 more closed this period, and the 5 that remain have points the specification leaves open — we are implementing them on our own reading and will confirm them against the business requirements in the pre-launch test round</span><span class="lastwk">Resolved this period: 1 (1 done) — COW-1916</span></div><div class="meter"><div class="sbar"><i class="d" style="width:73%"></i><i class="l" style="width:4%"></i><i class="x" style="width:4%"></i><i class="r w" style="width:19%"></i></div><div class="rem w"><b>5</b> left<small>/27</small></div></div></div>
+      <div class="row np"><div class="cip">CIP-33</div><div class="fn">Actor hire &amp; dispatch (General Store)</div><div class="meter"><span class="npnote">Outside this initiative · project exists but is not attached to this initiative; 1 issue in flight (COW-2669)</span></div></div>
+    </div>
+  </section>
+
+  <!-- Board 5 -->
+  <section class="board">
+    <h2>5 · Decentralized storage (CBFS) <span class="k">the blocker here is proving a storage provider still holds the data</span> <span class="rt"><b>17</b> left</span></h2>
+    <p class="desc">Runners provide file storage and earn rent; the hard part is proving the storage provider still holds the data, by spot-checking it at random and taking its deposit if it cannot answer.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-9</div><div class="fn">Runners provide file storage &amp; earn rent<span class="note">the mechanism that proves a storage provider still holds the data is not built yet (blocker); the 14 left include challenge/slashing</span><span class="lastwk">Resolved this period: 1 (1 done) — COW-2827</span><span class="plan">Next period (10): COW-927, COW-937, COW-2099, COW-2113, COW-2829, COW-2830, COW-2831, COW-2832, COW-2833, COW-2834</span></div><div class="meter"><div class="sbar"><i class="d" style="width:75%"></i><i class="l" style="width:1%"></i><i class="x" style="width:4%"></i><i class="p" style="width:14%"></i><i class="r w" style="width:6%"></i></div><div class="rem w"><b>14</b> left<small>/71</small></div></div></div>
+      <div class="row"><div class="cip">CIP-31</div><div class="fn">Storage rent + challenge/slashing<span class="note">rent schedule done; challenge/slashing issues sit under CIP-9. COW-2896 (registry-proto bills from a compile-time constant instead of the governance parameter), opened in the previous period, is still open; two more were opened this period — COW-2914 (rename the fee field burn_bps to treasury_bps) and COW-2915 (the multisig owner key for platform fee account 0x18 must be generated before genesis) — so this row now shows 3 left</span><span class="lastwk">Resolved this period: 1 (1 done) — COW-2911</span></div><div class="meter"><div class="sbar"><i class="d" style="width:67%"></i><i class="l" style="width:8%"></i><i class="r g" style="width:25%"></i></div><div class="rem g"><b>3</b> left<small>/12</small></div></div></div>
+    </div>
+  </section>
+
+  <!-- Board 6 -->
+  <section class="board">
+    <h2>6 · Cross-chain / DeFi / state tree <span class="k">includes the state-tree blocker &amp; token-launch batch</span> <span class="rt"><b>67</b> left (incl. no-project)</span></h2>
+    <p class="desc">Token standard; a cross-chain bridge and settlement where a party first declares what it wants to swap and matching happens off-chain; the state-tree engine; exchange / auctions (CIP-21/22) are a batch of features scheduled for after the token launch, hence large remainders.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-20</div><div class="fn">Fungible token standard (ERC-20-like); CUSD is an instance<span class="plan">Next period (3): COW-1073, COW-1082, COW-2826</span></div><div class="meter"><div class="sbar"><i class="d" style="width:86%"></i><i class="x" style="width:6%"></i><i class="p" style="width:6%"></i><i class="r g" style="width:2%"></i></div><div class="rem g"><b>4</b> left<small>/50</small></div></div></div>
+      <div class="row np"><div class="cip">CIP-34</div><div class="fn">Declare "swap A for B", off-chain bidding, settled on-chain in one step — either the whole swap goes through or none of it does (incl. NEAR cross-chain)</div><div class="meter"><span class="npnote">Outside this initiative · project exists but holds no issues; known issues (COW-2449 etc.) sit under "no project"</span></div></div>
+      <div class="row"><div class="cip">CIP-25</div><div class="fn">Cross-chain bridge architecture<span class="note">a demonstration-level implementation only; Delivery Commitment Week 1 (Jul 27 – Aug 2) has now closed with 5 of its 7 issues completed, and the two that did not land (COW-1899, COW-1901) roll into the next period</span><span class="plan">Next period (4): COW-1896, COW-1897, COW-1899, COW-1901</span></div><div class="meter"><div class="sbar"><i class="d" style="width:58%"></i><i class="p" style="width:24%"></i><i class="r w" style="width:18%"></i></div><div class="rem w"><b>7</b> left<small>/17</small></div></div></div>
+      <div class="row np"><div class="cip">CIP-27</div><div class="fn">Fast copy/fork of actor state<span class="note">blocked on CIP-30</span></div><div class="meter"><span class="npnote">Outside this initiative · issues under the CIP-30 project or "no project"</span></div></div>
+      <div class="row"><div class="cip">CIP-30</div><div class="fn">Per-actor state-tree root (state-tree engine)<span class="note">the state-tree engine is a blocker; CIP-27 depends on it</span><span class="plan">Next period (2): COW-1277, COW-1283</span></div><div class="meter"><div class="sbar"><i class="d" style="width:63%"></i><i class="p" style="width:12%"></i><i class="r w" style="width:25%"></i></div><div class="rem w"><b>6</b> left<small>/16</small></div></div></div>
+      <div class="row"><div class="cip">CIP-21</div><div class="fn">DEX / automated market maker (AMM)<span class="note">token-launch batch: the exchange goes live only after the $COWBOY token launch, and the Cowboy team has confirmed the development is to follow the launch as well — the Delivery Commitment has moved these 10 unblocked issues into Phase 3, the November batch, with no date in the current phase</span></div><div class="meter"><div class="sbar"><i class="d" style="width:20%"></i><i class="x" style="width:5%"></i><i class="r c" style="width:75%"></i></div><div class="rem c"><b>15</b> left<small>/20</small></div></div></div>
+      <div class="row"><div class="cip">CIP-22</div><div class="fn">Continuous clearing auctions<span class="note">blocked on CIP-21, token-launch batch, 5% done; moved with CIP-21 into Phase 3 of the Delivery Commitment, the November batch — 8 of them run alongside CIP-21 then, with no date in the current phase</span></div><div class="meter"><div class="sbar"><i class="d" style="width:5%"></i><i class="x" style="width:5%"></i><i class="r c" style="width:90%"></i></div><div class="rem c"><b>35</b> left<small>/39</small></div></div></div>
+    </div>
+  </section>
+
+  <!-- Board 7 -->
+  <section class="board">
+    <h2>7 · Events + new commercialization proposals <span class="k">includes two drafts the client recently proposed</span> <span class="rt"><b>4</b> left (incl. no-project)</span></h2>
+    <p class="desc">On-chain event subscriptions; plus the CIP-35 / CIP-36 drafts the client proposed on 7/7–7/10.</p>
+    <div class="rows">
+      <div class="row"><div class="cip">CIP-29</div><div class="fn">On-chain event subscription / callbacks (data feeds)<span class="lastwk">Resolved this period: 1 (0 done, 1 canceled) — COW-2852</span><span class="plan">Next period (1): COW-1917</span></div><div class="meter"><div class="sbar"><i class="d" style="width:68%"></i><i class="l" style="width:4%"></i><i class="x" style="width:12%"></i><i class="p" style="width:4%"></i><i class="r g" style="width:12%"></i></div><div class="rem g"><b>4</b> left<small>/25</small></div></div></div>
+      <div class="row np"><div class="cip">CIP-35</div><div class="fn">Creator codes &amp; toolchain (Patrick's 7/7 draft, at a very early stage)</div><div class="meter"><span class="npnote">Outside this initiative · client draft; project exists but holds no issues</span></div></div>
+      <div class="row np"><div class="cip">CIP-36</div><div class="fn">Phased launch + CUSD-metered commercialization master plan (defines how the launch proceeds)</div><div class="meter"><span class="npnote">Outside this initiative · spec-level plan, issues scattered under other projects</span></div></div>
+    </div>
+  </section>
+
+  <!-- Client-owned -->
+  <section class="board">
+    <h2>Client-owned <span class="k">these 3 CIPs are the client's responsibility, listed separately for identification</span> <span class="rt"><b>11</b> left</span></h2>
+    <p class="desc">These three CIPs are the client's responsibility; this still counts only their ours/unassigned issues, which are included in the 1,123 total above.</p>
+    <div class="rows">
+      <div class="row np"><div class="cip">CIP-7</div><div class="fn">Simple Stream Protocol (Watchtower)<span class="lastwk">Resolved this period: 3 (0 done, 3 canceled) — COW-997, COW-1003, COW-1005</span></div><div class="meter"><div class="sbar"><i class="d" style="width:92%"></i><i class="l" style="width:8%"></i></div><div class="rem done">Cleared ✓</div></div></div>
+      <div class="row np"><div class="cip">CIP-10</div><div class="fn">Runner container runtime (v2 live)<span class="lastwk">Resolved this period: 1 (0 done, 1 canceled) — COW-2509</span><span class="plan">Next period (1): COW-1575</span></div><div class="meter"><div class="sbar"><i class="d" style="width:83%"></i><i class="l" style="width:2%"></i><i class="x" style="width:2%"></i><i class="p" style="width:2%"></i><i class="r w" style="width:11%"></i></div><div class="rem w"><b>7</b> left<small>/53</small></div></div></div>
+      <div class="row np"><div class="cip">CIP-24</div><div class="fn">Secret service (CBSS / Secrets Manager)<span class="plan">Next period (1): COW-2842</span></div><div class="meter"><div class="sbar"><i class="d" style="width:95%"></i><i class="p" style="width:1%"></i><i class="r g" style="width:4%"></i></div><div class="rem g"><b>4</b> left<small>/74</small></div></div></div>
+    </div>
+  </section>
+
+  
+  <!--X:xsec-->
+  <section class="xsec">
+    <h2>How the remaining issues split three ways</h2>
+    <p class="xs">The 167 issues left are split into three groups below, on exactly the same basis as the companion list of open issues under the CIP projects: <b>actionable this period</b> is what the current schedule really drives; <b>external prerequisites missing</b> is not decided by scheduling; <b>deferred to November</b> waits for the $COWBOY token launch. The last two groups, 58 issues in all, are listed individually below.</p>
+    <div class="xtw"><table class="xt xsum"><thead><tr><th>Group</th>
+    <th style="text-align:right">Issues</th><th style="text-align:right">Share of remaining</th></tr></thead><tbody><tr><td class="g">Actionable this period</td><td class="n">109</td><td class="n">65%</td></tr><tr><td class="g">External prerequisites missing</td><td class="n">8</td><td class="n">5%</td></tr><tr><td class="g">Deferred to after the November token launch</td><td class="n">50</td><td class="n">30%</td></tr><tr><td class="g">Total remaining</td><td class="n">167</td><td class="n">100%</td></tr></tbody></table></div>
+    <p class="xper">Reporting period: Sunday 2026-08-02 19:00 to Wednesday 2026-08-05 18:00, Beijing time.</p>
+  </section>
+
+  <section class="xsec">
+    <h2>External prerequisites missing · 8 issues</h2>
+    <p class="xs">This group is not something our own scheduling can resolve: even with every specification question settled, nothing can be built while the external prerequisite is absent. For the 4 marked "client team to implement", the obstacle is that we have no operating access to the <code>aws-infrastructure</code> repository or the Canyon environment. All 8 are currently unassigned: COW-2617 and COW-1365 used to be assigned to us and have been moved to unassigned.</p>
+    <div class="xtw"><table class="xt"><thead><tr><th>Issue</th><th>CIP</th><th>Owner</th><th>Title</th><th>Why it cannot be done now</th><th>What would unblock it</th></tr></thead><tbody><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1051/cbss-tee-vendor-quote-chain-of-trust-dod-07-tee-v11" target="_blank" rel="noopener">COW-1051</a></td><td class="c">CIP-24</td><td class="c">Unassigned</td><td>[CBSS] TEE vendor-quote chain-of-trust (DOD-07-TEE v1.1)</td><td>Requires the <b>real vendor certificate chains</b> — Intel DCAP (PCK certificates, TCB info, QE identity, revocation lists) and AMD VLEK. Today both the on-chain handler and the runner verify only the envelope signature, not the vendor endorsement material. That material is issued by the chip vendors' certificate services and can only be obtained with real TEE hardware.</td><td>Obtain access to the Intel and AMD certificate services, and real TEE machines</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1111/noderunner-nvidia-ncc-gpu-attestation-nras-token-verification" target="_blank" rel="noopener">COW-1111</a></td><td class="c">CIP-23</td><td class="c">Unassigned</td><td>[Node/Runner] NVIDIA NCC GPU attestation (NRAS token + verification)</td><td>NVIDIA GPU attestation depends on the <b>NVIDIA NRAS remote attestation service</b> and its certificate chain: the runner has to fetch an NRAS token from the local NVIDIA driver and the chain has to verify that token. The code currently holds only type definitions and the attestation payload is CPU-only.</td><td>Obtain access to NVIDIA NRAS, and GPU machines with NCC capability</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1582/146-gpu-side-channel-mitigations-nvidia-mig-isolation" target="_blank" rel="noopener">COW-1582</a></td><td class="c">CIP-10</td><td class="c">Unassigned</td><td>§14.6 GPU side-channel mitigations (NVIDIA MIG isolation</td><td>GPU side-channel mitigation requires <b>NVIDIA MIG hardware-level isolation</b>, video-memory zeroing and single-tenant-by-default, all of which need a real GPU environment. On top of that, CIP-10's GPU pricing and scheduling specification is not settled yet.</td><td>GPU machines that support MIG, and a settled CIP-10 GPU pricing and scheduling specification</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1365/39-future-gc-reachability-guard-gc-must-check-union-of-live" target="_blank" rel="noopener">COW-1365</a></td><td class="c">CIP-26</td><td class="c">Unassigned</td><td>§3.9 future-GC reachability guard (GC must check union of live</td><td>The guard requires garbage collection to check the union of all live references before reclaiming code, but <b>the garbage collector itself does not exist</b> — the code table has never reclaimed anything. The CIP spec itself notes this is "currently impossible, acceptable".</td><td>Charter and implement garbage collection for the code table first</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-2283/canyon-reset-ansible-one-command-wipe-rebuild-at-pinned-versions" target="_blank" rel="noopener">COW-2283</a><span class="cbadge">Client team to implement</span></td><td class="c">CIP-24</td><td class="c">Unassigned</td><td>canyon-reset Ansible: one-command wipe + rebuild at pinned versions</td><td>The code lives in the <code>aws-infrastructure</code> repository, to which <b>we have no access</b> (verified as no-access). Note also that the description says it has been run from scratch twice, all green — the work is probably already done and the issue simply was not closed.</td><td><b>Implemented or closed by the client team</b>; they hold access to that repository</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-2617/infra-cowboy-runner-execstartpre-truncates-runnerenv-dropping-operator" target="_blank" rel="noopener">COW-2617</a><span class="cbadge">Client team to implement</span></td><td class="c">CIP-10</td><td class="c">Unassigned</td><td>infra: cowboy-runner ExecStartPre truncates runner.env, dropping operator RUNNER_CONTAINER_* vars</td><td>On Canyon, <code>runner.env</code> is rewritten by a script on every start, so operator-added settings such as the container image root are lost after a restart. The change belongs in the Canyon host start-up script, and <b>we have no Canyon access, so we cannot make it</b>.</td><td><b>Implemented by the client team</b> (Canyon access is on their side)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-2618/infra-enforced-cgroup-containers-on-canyon-need-dbus-user-session-for" target="_blank" rel="noopener">COW-2618</a><span class="cbadge">Client team to implement</span></td><td class="c">CIP-10</td><td class="c">Unassigned</td><td>infra: enforced-cgroup containers on canyon need dbus-user-session for the cowboy service user</td><td>Enabling cgroup resource limits on Canyon requires a dbus user session for the cowboy service account; without it containers can only run unlimited. This is system-level configuration on the Canyon host, and <b>we have no Canyon access, so we cannot make it</b>.</td><td><b>Implemented by the client team</b> (Canyon access is on their side)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-2661/canyon-enable-model-aware-runner-selection-and-split-provider" target="_blank" rel="noopener">COW-2661</a><span class="cbadge">Client team to implement</span></td><td class="c">CIP-11</td><td class="c">Unassigned</td><td>[Canyon] Enable model-aware runner selection and split provider credentials</td><td>Canyon has to be upgraded to a version that supports model-aware runner selection, and the Terraform-managed Codex and Claude runner credentials have to be split. The Terraform configuration sits in the aws-infrastructure repository, and <b>we have access to neither that repository nor Canyon</b>.</td><td><b>Implemented by the client team</b> (both the repository and Canyon access are on their side)</td></tr></tbody></table></div>
+  </section>
+
+  <section class="xsec">
+    <h2>Deferred to after the November token launch · 50 issues</h2>
+    <p class="xs">CIP-21 (DEX and liquidity pools) and CIP-22 (continuous clearing auctions) do token matching and clearing. Before the token launch there is nothing tradable, so the functionality cannot be validated in a real setting, and CIP-22 itself is marked as depending on CIP-21. None of these 50 sit with the client team, so deferring them does not affect the client schedule.</p>
+    <div class="xtw"><table class="xt"><thead><tr><th>Issue</th><th>CIP</th><th>Owner</th><th>State</th><th>Title</th></tr></thead><tbody><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1805/reference-platform-impl-cowboy-coresrcruntimeammrs-spec-reference" target="_blank" rel="noopener">COW-1805</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>Reference platform impl cowboy-core/src/runtime/amm.rs (spec §Reference</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1803/sync-event-events-section-example-emits-liquidityswap-events-but-no" target="_blank" rel="noopener">COW-1803</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>Sync event (events section) - example emits liquidity/swap events but no</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1802/mev-protection-hook-63-and-kyccompliance-hook-64-absent-no-hook" target="_blank" rel="noopener">COW-1802</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>MEV-protection hook (6.3) and KYC/compliance hook (6.4) - absent (no hook</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1801/on-chain-limit-orders-via-state-triggered-timers-62-limitorderbook" target="_blank" rel="noopener">COW-1801</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>On-chain limit orders via state-triggered timers (6.2 LimitOrderBook)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1800/canonical-token-sorting-in-init-token-atoken-b-swap-spec-ref-impl" target="_blank" rel="noopener">COW-1800</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>Canonical token sorting in init (token_a&gt;token_b swap) - spec ref impl</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1799/iv2pool-extras" target="_blank" rel="noopener">COW-1799</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>IV2Pool extras</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1096/tests-multi-hop-routing-factory-hooks-twap-integration-tests" target="_blank" rel="noopener">COW-1096</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>[Tests] Multi-hop routing + factory + hooks + TWAP integration tests</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1093/nodeexamples-fee-handling-protocol-fee-vault-dao-treasury-distribution" target="_blank" rel="noopener">COW-1093</a></td><td class="c">CIP-21</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] Fee handling: protocol fee vault + DAO treasury distribution</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1092/nodeexamples-cip-22-auction-cip-21-pool-graduation" target="_blank" rel="noopener">COW-1092</a></td><td class="c">CIP-21</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] CIP-22 auction → CIP-21 pool graduation</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1091/nodeexamples-v3-position-manager-positions-as-transferable-nfts" target="_blank" rel="noopener">COW-1091</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>[Node/Examples] V3 position manager: positions as transferable NFTs</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1090/nodeexamples-native-twap-oracle-via-timer-driven-price-cumulative" target="_blank" rel="noopener">COW-1090</a></td><td class="c">CIP-21</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] Native TWAP oracle via timer-driven price-cumulative tracking</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1089/nodeexamples-validation-hooks-can-swap-on-swap-can-add-liquidity-can" target="_blank" rel="noopener">COW-1089</a></td><td class="c">CIP-21</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] Validation hooks: can_swap, on_swap, can_add_liquidity, can_remove_liquidity</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1088/nodeexamples-swap-routers-actor-router-flexible-platform-router-amm" target="_blank" rel="noopener">COW-1088</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>[Node/Examples] Swap routers: actor-router (flexible) + platform-router (amm_swap_exact_in/_out)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1087/nodeexamples-pool-factory-registry-create-v2-pool-create-v3-pool-get" target="_blank" rel="noopener">COW-1087</a></td><td class="c">CIP-21</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] Pool factory + registry (create_v2_pool, create_v3_pool, get_pool by (tokenA, tokenB, fee))</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1086/nodeexamples-v3-concentrated-liquidity-pool-ticks-positions-fee" target="_blank" rel="noopener">COW-1086</a></td><td class="c">CIP-21</td><td class="c">Ours</td><td class="c">Backlog</td><td>[Node/Examples] V3 concentrated-liquidity pool: ticks, positions, fee accumulators</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1833/event-tokensclaimedtokens" target="_blank" rel="noopener">COW-1833</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event TokensClaimed(tokens</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1832/event-bidpriceupdated" target="_blank" rel="noopener">COW-1832</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event BidPriceUpdated</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1831/event-bidincreased" target="_blank" rel="noopener">COW-1831</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event BidIncreased</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1830/event-bidwithdrawn" target="_blank" rel="noopener">COW-1830</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event BidWithdrawn</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1829/event-bidplaced" target="_blank" rel="noopener">COW-1829</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event BidPlaced</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1828/event-auctionfailedcurrency-raised" target="_blank" rel="noopener">COW-1828</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event AuctionFailed(currency_raised</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1827/event-auctiongraduatedfinal-price" target="_blank" rel="noopener">COW-1827</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event AuctionGraduated(final_price</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1826/event-auctionended" target="_blank" rel="noopener">COW-1826</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event AuctionEnded</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1825/event-auctionstarted" target="_blank" rel="noopener">COW-1825</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event AuctionStarted</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1824/event-auctioncreated" target="_blank" rel="noopener">COW-1824</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Event AuctionCreated</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1822/iccafactorycreate-auction-with-tokenname" target="_blank" rel="noopener">COW-1822</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>ICCAFactory.create_auction_with_token(name</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1821/iccafactorycreate-auction-address-with-endstart" target="_blank" rel="noopener">COW-1821</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>ICCAFactory.create_auction(...)-&gt;address with end&gt;start</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1819/timer-integration" target="_blank" rel="noopener">COW-1819</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Timer integration</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1817/checkpoint-append-per-block-for-pro-rata-claim-accounting" target="_blank" rel="noopener">COW-1817</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Checkpoint append per block for pro-rata claim accounting</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1816/remaining-demandbid" target="_blank" rel="noopener">COW-1816</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>_remaining_demand(bid</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1815/query-methods" target="_blank" rel="noopener">COW-1815</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Query methods</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1814/iccaclaim-batchbid-ids" target="_blank" rel="noopener">COW-1814</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>ICCA.claim_batch(bid_ids)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1813/iccaclaimbid-id-tokens" target="_blank" rel="noopener">COW-1813</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>ICCA.claim(bid_id)-&gt;(tokens</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1812/auctionstatus-enum-pendingactiveendedgraduatedfailed" target="_blank" rel="noopener">COW-1812</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>AuctionStatus enum (PENDING/ACTIVE/ENDED/GRADUATED/FAILED)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1811/checkpoint-data-structure-block" target="_blank" rel="noopener">COW-1811</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Checkpoint data structure (block</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1810/auctionstate-data-structure-current-block" target="_blank" rel="noopener">COW-1810</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>AuctionState data structure (current_block</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1809/bid-data-structure-bid-id" target="_blank" rel="noopener">COW-1809</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>Bid data structure (bid_id</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1808/pooltype-enum-v2-full-range-v3-concentrated" target="_blank" rel="noopener">COW-1808</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>PoolType enum (V2_FULL_RANGE / V3_CONCENTRATED)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1807/releasestep-data-structure-rate-mps-u24" target="_blank" rel="noopener">COW-1807</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>ReleaseStep data structure (rate_mps u24</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1806/auctionconfig-data-structure-token-id" target="_blank" rel="noopener">COW-1806</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>AuctionConfig data structure (token_id</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1201/tests-clearing-math-edge-cases-pro-rata-rounding-tie-break-partial" target="_blank" rel="noopener">COW-1201</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Tests] Clearing math edge cases (pro-rata rounding, tie-break, partial fill, max u256)</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1200/examples-reference-auction-example-actor-at-examplesnn-cca" target="_blank" rel="noopener">COW-1200</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] Reference auction example actor at examples/&lt;NN&gt;-cca/</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1198/examples-iccahook-integration-validation-hooks-at-place-bid-withdraw" target="_blank" rel="noopener">COW-1198</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] ICCAHook integration: validation hooks at place_bid / withdraw_bid / claim</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1197/examples-failed-path-min-currency-raised-threshold-claim-refund-logic" target="_blank" rel="noopener">COW-1197</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] FAILED path: min_currency_raised threshold + claim() refund logic</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1196/examples-anti-manipulation-twap-checkpoints-flash-loan-guards-bid" target="_blank" rel="noopener">COW-1196</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] Anti-manipulation: TWAP checkpoints, flash-loan guards, bid duration locks, MEV-guard for timer</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1195/examples-cip-21-pool-graduation-factoryget-or-create-v2orv3-pool-mint" target="_blank" rel="noopener">COW-1195</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] CIP-21 pool graduation: factory.get_or_create_v2|v3_pool() + mint_position()</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1194/examples-release-schedule-parsing-releasestep-iteration-by-block" target="_blank" rel="noopener">COW-1194</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] Release schedule parsing: ReleaseStep iteration by block-height offset</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1193/examples-per-block-clearing-logic-sortedmap-by-max-price-pro-rata-fill" target="_blank" rel="noopener">COW-1193</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] Per-block clearing logic: SortedMap by max_price + pro-rata fill</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1192/examples-bid-submission-escrow-place-bid-withdraw-bid-increase-bid" target="_blank" rel="noopener">COW-1192</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Examples] Bid submission + escrow: place_bid / withdraw_bid / increase_bid / update_max_price</td></tr><tr><td class="k"><a href="https://linear.app/cowboy-labs/issue/COW-1191/nodeexamples-continuousclearingauction-actor-skeleton-clear-block" target="_blank" rel="noopener">COW-1191</a></td><td class="c">CIP-22</td><td class="c">Unassigned</td><td class="c">Backlog</td><td>[Node/Examples] ContinuousClearingAuction actor skeleton + clear_block algorithm</td></tr></tbody></table></div>
+  </section>
+  <!--/X:xsec-->
+
+  <footer>
+    <p><b>Source:</b> Linear GraphQL API, issues under CIP projects in the validator-whitepaper-cips initiative, replayed by event timestamp to 2026-08-05 18:00 (Beijing).</p>
+    <p><b>Scope:</b> this sheet counts <b>ours/unassigned issues only</b> (assignee pavilionledger or none) and <b>excludes client</b> (<code>*@cowboy.inc</code>) issues; left = in progress + todo; completion rate = completed ÷ (total − canceled).</p>
+    <p><b>Function copy &amp; board grouping</b> follow the 2026-07-11 CIP Overview Reference; progress here is recast as issue disposition (countable, reproducible), distinct from that document's implementation-audit percentages. <b>The 5 CIPs not covered by this initiative (27 / 33 / 34 / 35 / 36)</b> are excluded from the totals.</p>
+  </footer>
+
+</div>
+
+
+</body></html>
