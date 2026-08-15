@@ -5,11 +5,13 @@ sources:
   - refs/cips/cip-16-custom-domains.md
   - refs/cips/cip-14-dns-addressable-actors.md
   - refs/cips/cip-2-offchain-compute.md
-last_updated: 2026-04-21
+last_updated: 2026-08-15 (地址段代码更正 banner；前值 2026-04-21)
 status: draft
 ---
 
 # Custom Domains & First-Party TLDs (CIP-16 v2)
+
+> **[2026-08-15 地址更正]** 本页沿用旧 CIP v2.r2 spec 序列（Route Registry=`0x0D`）。**代码最终落位后移一位**：ROUTE_REGISTRY=`0x0E`、GATEWAY=`0x0F`、RECEIPT=`0x10`（`0x0D` 被 CIP-7 STREAM_KEY_MANAGER 占用、`0x11` 被 CIP-11 VALIDATOR_SET 占用）。代码权威表见 [[../entities/system-actors]]；本页 `0x0D` 等叙述请整体 +1 阅读。
 
 Extends CIP-14 v2's Route Registry (`0x0D`, v2.r2 spec-only) with two more naming classes: protocol-owned TLD names under `.cow` / `.cowboy`, and externally owned FQDNs like `api.example.com` attached via DNS-based control proof.
 
@@ -84,7 +86,7 @@ DomainBinding {
        ],
      }
      callback:  {
-       actor:    ROUTE_REGISTRY,                     // 0x0D (v2.r2)
+       actor:    ROUTE_REGISTRY,                     // 0x0E (代码落位；spec 曾写 0x0D)
        handler:  "_dns.callback",                    // → 协议 emit ExternalDomainCallback opcode 67
        ...
      }

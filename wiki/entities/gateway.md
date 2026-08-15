@@ -5,11 +5,13 @@ sources:
   - refs/cips/cip-14-dns-addressable-actors.md
   - refs/cips/cip-15-public-asset-hosting.md
   - refs/cips/cip-16-custom-domains.md
-last_updated: 2026-05-26
+last_updated: 2026-08-15 (地址 0x0E→0x0F 代码更正；前值 2026-05-26)
 status: draft
 ---
 
-# Gateway 节点角色（Gateway Registry `0x0E`，spec-only）
+# Gateway 节点角色（Gateway Registry `0x0F`）
+
+> **[2026-08-15 地址更正]** 本页原写 `0x0E`（旧 CIP v2.r2 spec 序列），**代码最终落位是 `0x0F`**（`0x0D=STREAM_KEY_MANAGER`、`0x11=VALIDATOR_SET` 占位使整段后移；ROUTE=`0x0E`/GATEWAY=`0x0F`/RECEIPT=`0x10`）。代码权威表见 [[system-actors]]。下文所有 `0x0E` 请读作 `0x0F`。
 
 CIP-14 v2 引入的**第一个** ingress 节点角色，与 Runner / Validator / Relay Node 并列的 4 个独立协议角色之一。单物理节点可并行多角色；协议层每个角色独立 staking、心跳、激励。
 

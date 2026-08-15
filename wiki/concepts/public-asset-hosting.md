@@ -7,7 +7,7 @@ sources:
   - refs/cips/cip-14-dns-addressable-actors.md
   - refs/cips/cip-9-runner-storage.md
   - refs/cips/cip-18-payments.md
-last_updated: 2026-05-11
+last_updated: 2026-08-15 (system-actors 交叉引用地址校正；前值 2026-05-11)
 status: draft
 ---
 
@@ -162,7 +162,7 @@ Gateway 按量读取 shard 但**不**向 Relay Node 付 per-read 费用；Relay 
 - [[payments]] — CIP-18 `pays = caller` 路径付款 wire 与 settle（Phase 4 依赖）
 - [[mcp-ingress]] — CIP-19 把同一路由表当 MCP tools 列出
 - [[../entities/gateway]] — Gateway 节点缓存 / fetch 协议
-- [[../entities/system-actors]] — `0x0A` STORAGE_MANAGER / `0x13` PAYMENT_GATE
+- [[../entities/system-actors]] — `0x0A` STORAGE_MANAGER / `0x12` PAYMENT_GATE（代码落位；旧 spec 序列曾写 `0x11`/`0x13`）
 - [[../parameters]] — CIP-15 常量（`MAX_GATEWAY_CACHE_BYTES`, `MANIFEST_POLL_INTERVAL` 等）
 
 ## Sources

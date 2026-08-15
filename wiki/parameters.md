@@ -27,7 +27,7 @@ sources:
   - refs/cips/cip-25-cross-chain-architecture.md
   - refs/cips/cip-28-cowboy-agent-banking.md
   - refs/cips/cip-29-on-chain-event-hooks-en.md
-last_updated: 2026-05-26
+last_updated: 2026-08-15 (系统 actor 地址段按代码 pin 测试 `runner/src/system_actors.rs` 校正：ROUTE/GATEWAY/RECEIPT/PAYMENT_GATE/CONTAINER 因 STREAM_KEY_MANAGER=0x0D、VALIDATOR_SET=0x11 占位而整体后移；前值 2026-05-26)
 status: authoritative
 ---
 
@@ -202,13 +202,15 @@ status: authoritative
 
 ---
 
-## DNS-Addressable Actors（CIP-14 v2.r2 Draft，尚未实装）
+## DNS-Addressable Actors（CIP-14/16）
 
-| 常量 | 值 | 说明 |
+> **[2026-08-15 更正]** 代码已落地这些 registry，但**最终地址比本表旧的 v2.r2 spec 序列整体后移一位**：`0x0D` 被 CIP-7 STREAM_KEY_MANAGER 占用，把 ROUTE→`0x0E`、GATEWAY→`0x0F`、RECEIPT→`0x10`；`0x11` 被 CIP-11 VALIDATOR_SET 占用，把 PAYMENT_GATE→`0x12`、CONTAINER→`0x13`。**代码权威表见 [[entities/system-actors]]**（校正自 `runner/src/system_actors.rs` 的 pin 测试）。下表值已按代码更新；「说明」保留 spec 沿革。
+
+| 常量 | 值（代码） | 说明 |
 |---|---|---|
-| `ROUTE_REGISTRY_ADDRESS` | `0x0D` | v2.r2 后移；v1 草案 `0x0011` / v2.r1 草案 `0x0C` 均已废（`0x0C = SESSION_ACTOR` 已 commit）|
-| `GATEWAY_REGISTRY_ADDRESS` | `0x0E` | v2.r2 后移；v1 草案 `0x0012` 已废 |
-| `RECEIPT_REGISTRY_ADDRESS` | `0x0F` | v2.r2 后移（v2.r1 为 `0x0E`，因前两位后移 +1）|
+| `ROUTE_REGISTRY_ADDRESS` | `0x0E` | 代码最终落位（`0x0D` 被 STREAM_KEY_MANAGER 取用）；v2.r2 spec 曾写 `0x0D`，v1 草案 `0x0011` / v2.r1 草案 `0x0C` 均已废（`0x0C = SESSION_ACTOR`）|
+| `GATEWAY_REGISTRY_ADDRESS` | `0x0F` | 代码最终落位；v2.r2 spec 曾写 `0x0E`，v1 草案 `0x0012` 已废 |
+| `RECEIPT_REGISTRY_ADDRESS` | `0x10` | 代码最终落位；v2.r2 spec 曾写 `0x0F` |
 | `MIN_NAME_LENGTH` / `MAX_NAME_LENGTH` | 3 / 64 | 名称长度约束 |
 | `NAME_GRACE_PERIOD` | 2,592,000 blocks（≈30d @ 1 block/sec）| 过期后宽限期 |
 | `NAME_AUCTION_DURATION` | 604,800 blocks（≈7d）| Dutch 拍卖释放窗口 |
@@ -380,7 +382,7 @@ handler MUST exhaustive switch；未知 → `ERR_UNKNOWN_POOL`。
 
 | 常量 | 值 | 说明 |
 |---|---|---|
-| `PAYMENT_GATE_ADDRESS` | `0x11` | CIP-18 r2 (2026-05-11) 对齐 v2 主表（从 `0x0013` 后移）|
+| `PAYMENT_GATE_ADDRESS` | `0x12` | 代码最终落位（`0x11` 被 CIP-11 VALIDATOR_SET 取用）；CIP-18 r2 spec 曾写 `0x11`（从 `0x0013` 后移）。见 [[entities/system-actors]] |
 | `PROTOCOL_PAYMENT_FEE_BPS` | 500（5%）| `actor_fee / pass / subscription` 全部抽 |
 | `MAX_PRICE_TABLE_ENTRIES` | 100 | 单 PaymentPolicy 价格规则上限 |
 | `MAX_ACCEPTED_ASSETS` | 10 | 单 PaymentPolicy 支持 asset 上限 |
@@ -410,7 +412,7 @@ AssetConfig  { asset: Address, network: string, method: string,
 
 **Wire 格式 fallback 链**（PaymentGate 评估顺序）：1) free → 2) active subscription → 3) valid pass → 4) actor budget → 5) per-request credential (MPP/x402) → 6) 402 challenge。
 
-**Opcode**：无新 SystemInstruction（所有调用为 ActorMessage to `PAYMENT_GATE_ADDRESS = 0x11`）。
+**Opcode**：无新 SystemInstruction（所有调用为 ActorMessage to `PAYMENT_GATE_ADDRESS = 0x12`，代码最终落位；spec 曾写 `0x11`）。
 
 **源**: `refs/cips/cip-18-payments.md` §6-§22 + [[concepts/payments]]。
 
@@ -503,13 +505,13 @@ L1 / L2 / L3 三层架构常量。具体后端 / TVL 阈值 / TTL 由治理细�
 
 | 常量 | 值 | 说明 |
 |---|---|---|
-| `CONTAINER_REGISTRY_ADDRESS` | `0x10` | v2.r2 §1 落锁（从 v2.r1 `0x0F` 后移 +1）；v1 草案占位 `0x0...cowboy.containers` 已废 |
+| `CONTAINER_REGISTRY_ADDRESS` | `0x13` | 代码最终落位（`0x11=VALIDATOR_SET` / `0x12=PAYMENT_GATE` 在前）；v2.r2 §1 spec 曾写 `0x10`；v1 草案占位 `0x0...cowboy.containers` 已废。见 [[entities/system-actors]] |
 | `BILLING_DISPUTE_WINDOW` | 300 blocks（≈1h @ 12s）| 非 TEE billing 争议窗口 |
 | Opcodes | 61–64 | 见主分配表 |
 
 **费分配**: `system:container_settlement_config`（target_pool: CONTAINER）；默认 `runner 89 / treasury 1 / burn 10`，与 CIP-2 runner job 同。
 
-**BillingAttestation TEE 路径**：`tee_signature: Option<CompositeAttestation>` 由 `0x0F` 调 `0x05::VerifyCae` (opcode 57) 校验。
+**BillingAttestation TEE 路径**：`tee_signature: Option<CompositeAttestation>` 由 CONTAINER_REGISTRY（`0x13`）调 `0x05::VerifyCae` (opcode 57) 校验。
 
 **源**: `refs/cips/cip-10-runner-containers.md` Part II §1-§5。
 

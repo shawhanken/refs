@@ -3,11 +3,13 @@ type: concept
 tags: [ingress, gateway, dns, routing, cip-14]
 sources:
   - refs/cips/cip-14-dns-addressable-actors.md
-last_updated: 2026-04-21
+last_updated: 2026-08-15 (地址段代码更正 banner；前值 2026-04-21)
 status: draft
 ---
 
 # DNS-Addressable Actors (CIP-14 v2)
+
+> **[2026-08-15 地址更正]** 本页用旧 CIP v2.r2 spec 序列（ROUTE=`0x0D`/GATEWAY=`0x0E`/RECEIPT=`0x0F`）。**代码最终落位整体后移一位**：ROUTE=`0x0E`、GATEWAY=`0x0F`、RECEIPT=`0x10`（`0x0D` 被 CIP-7 STREAM_KEY_MANAGER 占用、`0x11` 被 CIP-11 VALIDATOR_SET 占用）。代码权威表见 [[../entities/system-actors]]；下文所有 `0x0D/E/F` 请整体 +1 阅读。
 
 Ingress routing layer that makes Cowboy actors reachable over the public internet by HTTP. Core primitives: a new `ingress.http` entitlement, a Route Registry system actor at **`0x0D`** (CIP-14 v2.r2), a Gateway ingress role registered at **`0x0E`**, a Receipt Registry at **`0x0F`**, a canonical HTTP request/response envelope split across a **read-only path** (no consensus, via `read_handler` RPC) and a **command path** (state-mutating, system-mediated via `IngressDispatch` opcode 65).
 

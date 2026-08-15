@@ -13,7 +13,7 @@
    - `refs/economics/`、`refs/devex/`、`refs/common/` — 专题文档
    - `refs/analysis/` — 跨主题分析、修正案、会议纪要
    - `refs/plans/` — 工程实施计划 / 评估 / 路径图（随机 slug 命名；见 `wiki/entities/plans-inventory.md`）
-   - 代码（真正权威）位于 workspace `node/`、`runner/`、`steamtrain/` workspace
+   - 代码（真正权威）位于 workspace `node/`、`runner/`、`cbfs/`（CIP-9 存储层，前称 `steamtrain/`）、`cbss/` 等 workspace
 
 2. **Wiki**（`refs/wiki/`）— LLM 全权维护
    - `index.md`、`log.md` — 索引与时序

@@ -8,7 +8,7 @@ sources:
   - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-4-storage.md
   - refs/cips/cip-25-cross-chain-architecture.md
-last_updated: 2026-05-11
+last_updated: 2026-08-15 (Route Registry 地址交叉引用更正；前值 2026-05-11)
 status: draft
 ---
 
@@ -102,7 +102,7 @@ CIP-17 §7 估计 < 200 行（含测试）。复用 `cbfs`/`node` 已有 MPT tri
 - [[public-asset-hosting]] — CIP-15 v2.r2 Gateway 主消费者
 - [[mcp-ingress]] — CIP-19 `tools/list` 派生
 - [[cross-chain]] — CIP-25 native light client 后端 future 消费者
-- [[../entities/system-actors]] — Route Registry `0x0D` 是 Gateway 第一个 `GET_STATE` 目标
+- [[../entities/system-actors]] — Route Registry `0x0E`（代码落位；spec 曾写 `0x0D`）是 Gateway 第一个 `GET_STATE` 目标
 - [[../parameters]] — 暂无单独参数段；CIP-17 v1 无新常量
 
 ## Sources

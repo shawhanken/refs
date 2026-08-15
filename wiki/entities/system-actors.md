@@ -21,7 +21,7 @@ sources:
   - refs/cips/cip-28-cowboy-agent-banking.md
   - refs/cips/cip-29-on-chain-event-hooks-en.md
   - refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md
-last_updated: 2026-05-26
+last_updated: 2026-08-15 (全表按代码 pin 测试 `runner/src/system_actors.rs` 重写：0x0D-0x1E 段整体校正 + 补 0x11/0x14/0x16/0x17/0x1E；作废旧 spec-only 段；前值 2026-05-26)
 status: authoritative
 ---
 
@@ -29,46 +29,42 @@ status: authoritative
 
 Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们与用户 Actor 同构（消息驱动），但由 genesis 初始化、拥有特权操作。
 
-地址空间 **2026-05-26 现状**分三段（来源：`node/runner/src/system_actors.rs` + `node/types/src/constants.rs:156` + `node/execution/src/pvm_host.rs:1961, 4291`）：
+> **[2026-08-15 更正]** 旧版（2026-05-26）把 `0x0D–0x13` 整段标为 "spec-only" 并给了错误的名称映射：`STREAM_KEY_MANAGER` 已实装在 **`0x0D`**，把 ROUTE/GATEWAY/RECEIPT 各推后一位，且 `0x11/0x14/0x16/0x17/0x1E` 缺失。下表已按 pin 测试 **`node/runner/src/system_actors.rs`（`well_known_low_byte_assignments`）** 校正——该段现在**全部已声明为常量**，不再是 spec-only。未列出的 `0x15 / 0x18–0x1C / 0x1F+` 为未分配。
 
-| 段 | 范围 | 性质 | 数量 |
-|---|---|---|---|
-| **代码已实装（部署型）** | `0x01–0x0C` | `node/runner/src/system_actors.rs` 12 个 `Address` 常量；保留段 `0x01..=0x0F` 在 `pvm_host.rs` 中禁止 actor 部署 / 禁作 `fee_payer_override` | 12 |
-| **代码已实装（虚拟）** | `0x1D` | `pvm_host::call_actor` 拦截路由到 `event_sub_system_actor::dispatch_rpc`；不部署 actor 代码；保留段不适用（`0x1D > 0x0F`）| 1 |
-| **Spec-only** | `0x0D–0x13` | CIP v2 系列提议但代码未实装；激活时地址可能修订；需选"扩 reserved band"或"interception"模式 | 7 |
+地址空间现状（权威来源：`node/runner/src/system_actors.rs` 的 `SystemActorAddresses` 宏 + `well_known_low_byte_assignments` 测试；`node/types/src/constants.rs`）：`0x01–0x1E` 已声明常量，保留段 `< 0x100` 在 `pvm_host.rs` 中禁止用户 actor 部署 / 禁作 `fee_payer_override`。`0x1D`（EVENT_SUBSCRIPTION）是**虚拟型**——`call_actor` 拦截路由到 RPC dispatch，不部署 actor 代码。
 
 ---
 
-## 权威地址表（2026-05-26）
+## 权威地址表（2026-08-15，校正自 `system_actors.rs`）
 
 | 地址 | 名称 | 职能 | 规范来源 | 状态 |
 |---|---|---|---|---|
-| `0x01` | RUNNER_REGISTRY | Runner 注册、stake、心跳；CIP-13 v2 委托扩展（spec-only） | CIP-2 §6 / CIP-13 v2 | ✅ 代码 |
+| `0x01` | RUNNER_REGISTRY | Runner 注册、stake、心跳；CIP-13 v2 委托扩展 | CIP-2 §6 / CIP-13 v2 | ✅ 代码 |
 | `0x02` | JOB_DISPATCHER | 任务分发、VRF 选择、托管 | CIP-2 §3-4 | ✅ 代码 |
 | `0x03` | RESULT_VERIFIER | 结果验证、结算、slashing | CIP-2 §5 | ✅ 代码 |
 | `0x04` | SECRETS_MANAGER | CBSS 链上面：per-secret 记录、release-key registry、proxy registry | CIP-24 §3.2 | ✅ 代码 |
-| `0x05` | TEE_VERIFIER | TEE attestation 校验；存 trusted key（opcodes 60-63）+ attestation 记录 | CIP-2 §8 / CIP-23 v2 / CIP-24 §3.3 | ✅ 代码 |
+| `0x05` | TEE_VERIFIER | TEE attestation 校验；trusted key（opcodes 60-63）+ attestation 记录 | CIP-2 §8 / CIP-23 v2 / CIP-24 §3.3 | ✅ 代码 |
 | `0x06` | DUAL_BASEFEE | Cycles/Cells basefee 状态；CIP-5 revised `TimerConfig` 也存这里 | CIP-3 / CIP-5 §6.4 | ✅ 代码 |
 | `0x07` | ENTITLEMENT_REGISTRY | Scope/Action/Constraints/Role 授权 | CIP-2 §7 | ✅ 代码 |
 | `0x08` | TREASURY | 协议国库（slashing / burn 目的地） | — | ✅ 代码 |
-| `0x09` | GOVERNANCE | 治理参数；`SettlementConfig` + `Proposal` 表；DrainRelay / AutoDrainPolicy 提案（CIP-9 §13）落地这里 | CIP-12 / CIP-9 §13 | ✅ 代码 |
-| `0x0A` | STORAGE_MANAGER | CIP-9 链下存储元数据 / 路由清单 / CORS（spec-only 扩展） | CIP-9 §11.1 | ✅ 代码 |
-| `0x0B` | RELAY_REGISTRY | CIP-9 中继节点注册；`AutoDrainPolicyConfig` 存 `0x0B:AUTO_DRAIN_POLICY_KEY`（CIP-9 §13.4） | CIP-9 §11.2 | ✅ 代码 |
-| `0x0C` | SESSION_ACTOR | MPP Session 模型：托管 + 累积 voucher 结算 + dispute hook | CIP-8 / `system_actors.rs:35` | ✅ 代码 |
-| `0x0D` | ROUTE_REGISTRY | FQDN → actor 映射；注册 / 续费 / 外部域绑定 | CIP-14 v2.r2 §4 | 📋 spec-only |
-| `0x0E` | GATEWAY_REGISTRY | Gateway 节点注册 + 心跳 + command-path 系统中介 | CIP-14 v2.r2 §7 | 📋 spec-only |
-| `0x0F` | RECEIPT_REGISTRY | HTTP 命令路径异步结果存储 | CIP-14 v2.r2 §8 | 📋 spec-only |
-| `0x10` | CONTAINER_REGISTRY | OCI 镜像 / 资源类 allowlist；治理可写 | CIP-10 v2.r2 §1 | 📋 spec-only |
-| `0x11` | PAYMENT_GATE | 付款策略 / 预算 / Pass / Subscription / 入站 EVM bridge | CIP-18 r2 §8 | 📋 spec-only |
-| `0x12` | STREAM_KEY_MANAGER | VM-level 流加密 / 按 epoch 密钥发放 / CBY 计费 | CIP-7 r2 §4 | 📋 spec-only |
-| `0x13` | BANK_ACTOR | Agent banking 原语（cards / gas 路由 / 策略） | CIP-28 r1.1 | 📋 spec-only |
-| `0x1D` | EVENT_SUBSCRIPTION_SYSTEM_ACTOR | CIP-29 on-chain event hooks：竞价市场查询 RPC（`get_rank` / `get_topic_orderbook` / `get_min_bid_for_rank`） | CIP-29 §2.6 / `constants.rs:156` | ✅ 代码（虚拟） |
+| `0x09` | GOVERNANCE | 治理参数；`SettlementConfig` + `Proposal` 表；DrainRelay / AutoDrainPolicy（CIP-9 §13） | CIP-12 / CIP-9 §13 | ✅ 代码 |
+| `0x0A` | STORAGE_MANAGER | CIP-9 链下存储元数据 / 路由清单 / CORS | CIP-9 §11.1 | ✅ 代码 |
+| `0x0B` | RELAY_REGISTRY | CIP-9 中继节点注册；`AutoDrainPolicyConfig`（CIP-9 §13.4） | CIP-9 §11.2 | ✅ 代码 |
+| `0x0C` | SESSION_ACTOR | MPP Session：托管 + 累积 voucher 结算 + dispute hook | CIP-8 | ✅ 代码 |
+| `0x0D` | **STREAM_KEY_MANAGER** | VM-level 流加密 / 按 epoch 密钥发放 / CBY 计费（CIP-7；占用 0x0D，ROUTE 顺延到 0x0E） | CIP-7 r2 §4 | ✅ 代码 |
+| `0x0E` | ROUTE_REGISTRY | FQDN → actor 映射；注册 / 续费 / 外部域绑定（spec 原写 0x0D，因 0x0D 已被 STREAM_KEY_MANAGER 占用而顺延至 0x0E） | CIP-16 | ✅ 代码 |
+| `0x0F` | GATEWAY_REGISTRY | Gateway 边缘广告 + 心跳 + command-path 系统中介 | CIP-16 | ✅ 代码 |
+| `0x10` | RECEIPT_REGISTRY | domain-action 收据存储 | CIP-16 | ✅ 代码 |
+| `0x11` | VALIDATOR_SET | CIP-11 验证者集快照 | CIP-11 | ✅ 代码 |
+| `0x12` | PAYMENT_GATE | 付款策略 / 预算 / Pass / Subscription / 入站 EVM bridge | CIP-18 r2 §8 | ✅ 代码 |
+| `0x13` | CONTAINER_REGISTRY | OCI 镜像 / 资源类 allowlist；治理可写 | CIP-10 v2.r2 §1 | ✅ 代码 |
+| `0x14` | INTENT_SETTLEMENT | CIP-10 v2 意图结算账户 | CIP-10 v2 | ✅ 代码 |
+| `0x16` | BANK_ACTOR | Agent banking 原语（cards / gas 路由 / 策略） | CIP-28 | ✅ 代码 |
+| `0x17` | STREAM_REGISTRY | CBQS 流 / provider 记录 | CIP-39 | ✅ 代码 |
+| `0x1D` | EVENT_SUBSCRIPTION | CIP-29 on-chain event hooks：竞价市场查询 RPC（`get_rank` / `get_topic_orderbook` / `get_min_bid_for_rank`） | CIP-29 §2.6 | ✅ 代码（虚拟/拦截） |
+| `0x1E` | TRADING_POST | actor hiring 与分发 rails | CIP-33 | ✅ 代码 |
 
-**源**:
-- `node/runner/src/system_actors.rs:13-35` —— 12 个部署型 const（`0x01-0x0C`）
-- `node/types/src/constants.rs:156` —— `EVENT_SUBSCRIPTION_SYSTEM_ACTOR = 0x1D`
-- `node/execution/src/pvm_host.rs:1867-1881` —— `0x1D` 拦截 dispatch
-- `0x0D-0x13` 来自 CIP 文本，代码尚无对应 const
+**源**：`node/runner/src/system_actors.rs`（`SystemActorAddresses` 宏 + `well_known_low_byte_assignments` 测试，钉住 `0x01–0x1E` 全部映射）+ `node/types/src/constants.rs`（`VALIDATOR_SET=0x11`、`EVENT_SUBSCRIPTION=0x1D`、`TRADING_POST=0x1E` 等）。改地址即改此二处并跑该测试。
 
 ---
 
@@ -165,19 +161,9 @@ Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们�
 
 ---
 
-## Spec-only 段（`0x0D-0x13`，待激活）
+## ~~Spec-only 段（`0x0D-0x13`，待激活）~~ —— 已作废（2026-08-15）
 
-| 地址 | 名称 | CIP | 主要 spec 内容 |
-|---|---|---|---|
-| `0x0D` | ROUTE_REGISTRY | CIP-14 v2.r2 §4 | FQDN ↔ actor 映射；`cowboy.network` + `.cow/.cowboy` + 外部 FQDN 三类命名空间 |
-| `0x0E` | GATEWAY_REGISTRY | CIP-14 v2.r2 §7 | Gateway 节点 stake + 心跳；command-path 系统中介（`IngressDispatch` opcode 65） |
-| `0x0F` | RECEIPT_REGISTRY | CIP-14 v2.r2 §8 | HTTP 命令路径异步结果；`CompleteReceipt` opcode 66 |
-| `0x10` | CONTAINER_REGISTRY | CIP-10 v2.r2 §1 | OCI 镜像 + 资源类 allowlist；治理-only 写 |
-| `0x11` | PAYMENT_GATE | CIP-18 r2 §8 | 付款策略 / 预算 / Pass / Subscription |
-| `0x12` | STREAM_KEY_MANAGER | CIP-7 r2 §4 | 流加密密钥 / epoch 滚动 / CBY 计费（v1 草案曾占 `0x06`，与 DUAL_BASEFEE 冲突，r2 移到 `0x12`） |
-| `0x13` | BANK_ACTOR | CIP-28 r1.1 | Agent banking 卡 + gas 路由（v1 草案曾占 `0x0D`，与 ROUTE_REGISTRY 冲突，r1.1 移到 `0x13`） |
-
-激活路径与对应 master opcode 重排详见 CIP-13 §1（重写为代码权威视角）。
+> **[2026-08-15 更正]** 本节旧版把 `0x0D-0x13` 列为「spec-only 待激活」并给了**已过时的地址映射**（ROUTE=0x0D … BANK_ACTOR=0x13）。这些 actor **现已全部在代码声明**（见上方权威地址表 + `runner/src/system_actors.rs`），且最终落位与旧 spec 序列不同：`STREAM_KEY_MANAGER` 占 `0x0D`（非旧写的 `0x12`）、`VALIDATOR_SET` 占 `0x11`，把 ROUTE→`0x0E` / GATEWAY→`0x0F` / RECEIPT→`0x10` / PAYMENT_GATE→`0x12` / CONTAINER→`0x13`；`BANK_ACTOR` 落 `0x16`。旧 spec 沿革（草案地址演变）见 CIP-7/14/16/10/18/28 各文本及 [[../drift]] 历史条目。**以上方权威地址表为准。**
 
 ---
 
@@ -185,8 +171,8 @@ Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们�
 
 历次解决的 v2 v1 重排与 v1 单方面 claim 已在 [[../drift]] 看板归档（C-1 / C-2 / C-3 / C-4 + V-1 / V-3 / V-7）。当前仍开放的项：
 
-1. **V-1**：7 个 spec-only 系统 actor（`0x0D-0x13`）等代码激活；激活模型在 CIP-28 §0 留有 "extend band vs interception" 二选一。
-2. **V-3**：CIP-13 v2 / CIP-23 v2 / CIP-10 v2 / CIP-14 v2 / CIP-16 v2 的 opcode 提案与代码 52-57 / 60-63 / 85-86 撞号；激活时需重号到 ≥ 87 free range。CIP-13 §1 主表已重写并显式留 "aspirational allocations" 段。
+1. ~~**V-1**：7 个 spec-only 系统 actor（`0x0D-0x13`）等代码激活~~ —— **已闭合（2026-08-15）**：这些 actor 均已在 `runner/src/system_actors.rs` 声明，落位见上方权威表（较旧 spec 序列后移；`0x0D=STREAM_KEY_MANAGER`、`0x11=VALIDATOR_SET` 占位所致）。
+2. **V-3**：CIP-13 v2 / CIP-23 v2 / CIP-10 v2 / CIP-14 v2 / CIP-16 v2 的 opcode 提案与代码撞号；激活时需重号到 free range。CIP-13 §1 主表已重写并显式留 "aspirational allocations" 段。（opcode 层，与上方地址表分开跟踪）
 
 详见 [[../drift]]。
 
@@ -194,13 +180,13 @@ Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们�
 
 ## Sources
 
-- `node/runner/src/system_actors.rs:13-35` —— `0x01-0x0C` 部署型 const + accessor + 唯一性测试
+- `node/runner/src/system_actors.rs` —— `SystemActorAddresses` 宏声明 `0x01-0x1E` 全部映射 + `ALL` 注册表 + `well_known_low_byte_assignments` pin 测试（本页权威来源）
 - `node/types/src/constants.rs:146,149,152,156` —— 别名 const（`CBSS_SYSTEM_ACTOR=0x04` / `BASEFEE_SYSTEM_ACTOR=0x06` / `GOVERNANCE_SYSTEM_ACTOR=0x09`） + `EVENT_SUBSCRIPTION_SYSTEM_ACTOR=0x1D`
 - `node/execution/src/pvm_host.rs:1867-1881` —— `0x1D` 拦截 dispatch；`pvm_host.rs:1961, 4291` —— 保留段 `0x01..=0x0F` 检查
 - `node/execution/src/execution/event_sub_system_actor.rs` —— `0x1D` 的 RPC handler 集合
 - `node/types/src/execution.rs:591-699` + `1870-2130` —— `SYS_*` opcode 常量 + Decode dispatch
 - `refs/cips/cip-2-offchain-compute.md` —— 顶部 Warning 内 2026-05-26 三段式地址表
-- `refs/cips/cip-7-simple-stream-protocol.md` §4 —— Stream Key Manager `0x12` (r2)
+- `refs/cips/cip-7-simple-stream-protocol.md` §4 —— Stream Key Manager（spec 文本曾写 `0x12`；代码落 `0x0D`，见上方权威表）
 - `refs/cips/cip-8-mpp-session.md` §4 —— Session Actor `0x0C`（追认代码）
 - `refs/cips/cip-9-runner-storage.md` §11 / §13 —— Storage Manager `0x0A` + Relay Registry `0x0B` + DrainRelay/AutoDrainPolicy
 - `refs/cips/cip-10-runner-containers.md` §1 —— Container Registry `0x10` (v2.r2)

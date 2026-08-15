@@ -42,7 +42,7 @@
 | [vrf-runner-selection.md](concepts/vrf-runner-selection.md) | Fisher-Yates VRF + CIP-13 v2 effective_stake 修正、CIP-23 v2 measurement_binding 过滤 |
 | [governance.md](concepts/governance.md) | CIP-12 双院治理、Tier 0-4 提案、Security Council、系统 Actor 升级（Draft）|
 | [runner-delegation.md](concepts/runner-delegation.md) | CIP-13 v2 Runner Stake 委托：Tranche、分账、slash 级联、懒惰解绑、opcode 52-56（Draft）|
-| [dns-addressable-actors.md](concepts/dns-addressable-actors.md) | CIP-14 v2 HTTP ingress：`ingress.http` entitlement、Read-only/Command 双路径、IngressDispatch 65/CompleteReceipt 66、ROUTE_REGISTRY=0x0C/GATEWAY_REGISTRY=0x0D/RECEIPT_REGISTRY=0x0E（Draft）|
+| [dns-addressable-actors.md](concepts/dns-addressable-actors.md) | CIP-14 v2 HTTP ingress：`ingress.http` entitlement、Read-only/Command 双路径、IngressDispatch 65/CompleteReceipt 66、ROUTE_REGISTRY=0x0E/GATEWAY_REGISTRY=0x0F/RECEIPT_REGISTRY=0x10（代码落位，见 entities/system-actors）|
 | [public-asset-hosting.md](concepts/public-asset-hosting.md) | CIP-15 v2 Gateway 直服 CIP-9 public volume 静态资产；独立 ingress.static entitlement、route_manifest on-chain、`GET_MANIFEST` (AMEND 9-G)、CORS 优先级修正（Draft）|
 | [custom-domains.md](concepts/custom-domains.md) | CIP-16 v2 `.cow` / `.cowboy` TLD + 外部 FQDN 绑定（MajorityVote DNS 验证 + ExternalDomainCallback opcode 67 + 双层 reverify fee + verified_fqdn 注入, Draft）|
 | [tee-attestation.md](concepts/tee-attestation.md) | CIP-23 v2 CAE 复合证明 + 三层资格 chain + opcode 57-60 + 与 CIP-13 委托正交（Draft）|

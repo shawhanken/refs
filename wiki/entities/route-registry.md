@@ -4,11 +4,13 @@ tags: [ingress, route-registry, system-actor, cip-14, cip-16]
 sources:
   - refs/cips/cip-14-dns-addressable-actors.md
   - refs/cips/cip-16-custom-domains.md
-last_updated: 2026-05-26
+last_updated: 2026-08-15 (地址 0x0D→0x0E 代码更正；前值 2026-05-26)
 status: draft
 ---
 
-# Route Registry（系统 Actor `0x0D`，spec-only）
+# Route Registry（系统 Actor `0x0E`）
+
+> **[2026-08-15 地址更正]** 本页原写 `0x0D`（旧 CIP v2.r2 spec 序列），**代码最终落位是 `0x0E`**（`0x0D` 被 CIP-7 STREAM_KEY_MANAGER 占用）。代码权威表见 [[system-actors]]。下文所有 `0x0D` 请读作 `0x0E`。
 
 CIP-14 v2.r2 引入的 ingress 命名权威。维护 FQDN → actor 的规范映射；CIP-16 v2.r2 扩展到三类命名空间（`cowboy.network` / `.cow|.cowboy` / external FQDN）。
 

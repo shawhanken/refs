@@ -23,6 +23,8 @@ description: Code-aligned v2 — adds GET_MANIFEST RPC, ManifestCommitted event,
 > - **§6 (clarification)**: Gateways are unauthenticated readers under the existing CIP-9 §7.6.3 PUBLIC volume model — not a privileged storage role.
 > - **§9 errata**: corrects an over-broad earlier alignment list. The following are NOT missing from CIP-9 (they are all in §11.1 / §12.2 / §7.6 / §13): `StorageCommitment` schema, `commit_manifest` system instruction, `volume_id = keccak256(account_address || volume_name)` formula, `Visibility::Public` model, status state machine.
 
+> **Terminology note (2026-08-15).** The storage engine this CIP calls **"Steamtrain"** was renamed to **CBFS** ("Cowboy File System") and now lives in the `cbfs/` workspace repo (the standalone `steamtrain/` repo was retired; see r2 above, which already cites `cbfs/manifest/src/merkle.rs`). Read every "Steamtrain" below as **CBFS** — the Part I body is preserved verbatim from v1 and is not rewritten. "Relay Node", "manifest", "Volume", "CapToken", and the on-chain wire formats are unchanged by the rename.
+
 ---
 
 ## Part I — v1 Specification (verbatim from `cip-9-runner-storage.md`)

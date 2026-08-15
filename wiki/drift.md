@@ -21,11 +21,13 @@ sources:
   - refs/cips/cip-29-on-chain-event-hooks-en.md
   - refs/runner/2026-04-28_MPP_Session_Research.md
   - refs/plans/2026-05-06_mpp_session_implementation.md
-last_updated: 2026-05-26 (v2.r2 merged into main cip-*.md; cross-CIP consistency audit; block time unified to 1 s; CIP-29/24/8/9 §13 spec ↔ code aligned; new implementation audit 2026-05-26)
+last_updated: 2026-08-15 (系统 actor 地址段按代码 pin 测试整段校正，见顶部 banner；前值 2026-05-26 v2.r2 audit)
 status: authoritative
 ---
 
 # 文档-代码漂移看板
+
+> **2026-08-15 系统 actor 地址段代码校正** — 发现整个 wiki 的系统 actor 地址表落后于代码：wiki 忠实镜像 2026-05-11 CIP v2.r2 spec 序列，但**代码最终落位整体后移**——`0x0D` 被 CIP-7 `STREAM_KEY_MANAGER` 占用、`0x11` 被 CIP-11 `VALIDATOR_SET` 占用，导致 `ROUTE_REGISTRY 0x0D→0x0E` / `GATEWAY 0x0E→0x0F` / `RECEIPT 0x0F→0x10` / `PAYMENT_GATE 0x11→0x12` / `CONTAINER 0x10→0x13`；另 spec 未记的 `INTENT_SETTLEMENT 0x14` / `BANK_ACTOR 0x16` / `STREAM_REGISTRY 0x17` / `TRADING_POST 0x1E` 已在代码。**权威来源 = `runner/src/system_actors.rs` 的 `well_known_low_byte_assignments` pin 测试**。已校正：`wiki/entities/system-actors.md`（全表重写）、`wiki/parameters.md`、`wiki/concepts/payments.md`、`wiki/concepts/public-asset-hosting.md`。**残余 drift（未改，属 raw sources）**：CIP-7/10/11/14/16/18 spec 文本仍带旧序列；受保护白皮书仍用 "Steamtrain" 旧名（已在 CIP-9 顶部加 Steamtrain→CBFS 术语注）。
 
 > **2026-05-26 implementation audit** — 新一轮 CIP + WP 代码完成度审计已完成（见 [`refs/analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md`](../analysis/2026-05-26_CIP_IMPLEMENTATION_AUDIT.md)，作为新 baseline 取代 5/15 audit）。**最显著两项进展**：CIP-24（CBSS）从未列入 audit → 🟢 ~80%（41K 行代码 + 21 handlers）；CIP-29（事件钩子）从 ❌ <5% → 🟢 ~55%（`0x1D` 虚拟 actor + Phase 1/2 框架）。整体平均完成度 ~40% → ~45%。
 

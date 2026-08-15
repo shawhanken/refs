@@ -8,7 +8,7 @@ sources:
   - refs/cips/cip-19-gateway-mcp-ingress.md
   - refs/cips/cip-3-fee-model.md
   - refs/cips/cip-20-fungible-tokens.md
-last_updated: 2026-05-11
+last_updated: 2026-08-15 (PAYMENT_GATE 地址按代码校正 0x11→0x12；前值 2026-05-11)
 status: draft
 ---
 
@@ -25,18 +25,20 @@ Presentation:  MPP (Authorization: Payment)  +  x402 (PAYMENT-SIGNATURE)
                             ↓ normalize ↓
 Settlement:    PaymentIntent { method, intent, payer, recipient, asset, amount, binding }
                             ↓
-                    PaymentGate (0x11)
+                    PaymentGate (0x12)
 ```
 
 一份 PaymentPolicy → 两种 wire 同时生效；PaymentGate 内部只看 PaymentIntent，不关心 wire 来源。
 
 ---
 
-## PaymentGate（系统 Actor `0x11`，CIP-18 r2）
+## PaymentGate（系统 Actor `0x12`，CIP-18）
 
 新系统 actor，genesis 部署，只由协议升级动。承载：PaymentPolicy 表 / 预算 / Pass / Subscription / nonce table / fee 分配。
 
-> **地址段（CIP-18 r2，2026-05-11）**：原 CIP-18 §22 sequential-allocation 引用了 CIP-14 v1 老编号 `0x0011/0x0012` 并续到 `0x0013`；r2 修正为 v2 主表当前的单字节序列 —— `0x0C = SESSION_ACTOR`（code）/ `0x0D = ROUTE_REGISTRY`（CIP-14 v2.r2）/ `0x0E = GATEWAY_REGISTRY`/ `0x0F = RECEIPT_REGISTRY`/ `0x10 = CONTAINER_REGISTRY`（CIP-10 v2.r2）/ **`0x11 = PAYMENT_GATE`**。
+> **[2026-08-15 代码更正]** 代码最终把 PAYMENT_GATE 落在 **`0x12`**（不是下方 spec 序列的 `0x11`）：`0x0D` 被 CIP-7 STREAM_KEY_MANAGER 占用、`0x11` 被 CIP-11 VALIDATOR_SET 占用，使整段较 spec 后移。代码权威表见 [[../entities/system-actors]]。下方保留 CIP-18 r2 spec 沿革。
+>
+> **地址段（CIP-18 r2 spec，2026-05-11）**：原 CIP-18 §22 sequential-allocation 引用了 CIP-14 v1 老编号 `0x0011/0x0012` 并续到 `0x0013`；r2 修正为当时 v2 主表的单字节序列 —— `0x0C = SESSION_ACTOR`（code）/ `0x0D = ROUTE_REGISTRY`（CIP-14 v2.r2）/ `0x0E = GATEWAY_REGISTRY`/ `0x0F = RECEIPT_REGISTRY`/ `0x10 = CONTAINER_REGISTRY`（CIP-10 v2.r2）/ `0x11 = PAYMENT_GATE`。**该 spec 序列后被代码整体后移一位，见上方更正。**
 
 ### Handler API
 
@@ -176,7 +178,7 @@ Gateway 自动在 `/_cowboy/payment/openapi.json` 暴露 actor 的 OpenAPI 3.1 �
 
 | 常量 | 值 |
 |---|---|
-| `PAYMENT_GATE_ADDRESS` | `0x11`（CIP-18 r2 已对齐 v2 主表）|
+| `PAYMENT_GATE_ADDRESS` | `0x12`（代码落位；spec 曾写 `0x11`）|
 | `PROTOCOL_PAYMENT_FEE_BPS` | 500（5%）|
 | `MAX_PRICE_TABLE_ENTRIES` / `MAX_ACCEPTED_ASSETS` | 100 / 10 |
 | `MAX_EPOCH_BLOCKS` / `DEFAULT_EPOCH_BLOCKS` | 2_592_000（~30d） / 86_400（~1d）|
@@ -210,7 +212,7 @@ Gateway 自动在 `/_cowboy/payment/openapi.json` 暴露 actor 的 OpenAPI 3.1 �
 - [[public-asset-hosting]] — CIP-15 v2 路由 `pays` 字段
 - [[mcp-ingress]] — CIP-19 MCP 路径下的付款集成
 - [[mpp-session]] — MPP 协议 Session 模式（与 charge 正交）
-- [[../entities/system-actors]] — PaymentGate `0x11` / `0x10`
+- [[../entities/system-actors]] — PaymentGate `0x12`（代码落位；spec 曾写 `0x11`）
 - [[../parameters]] — Payments 常量段
 
 ## Sources
