@@ -13,6 +13,8 @@ icon: credit-card
   **Requires:** CIP-3 (Dual-Metered Gas), CIP-14 v2 (DNS-Addressable Actors), CIP-19 (Gateway MCP Ingress — §13 MCP gating wire format), CIP-20 (Fungible Token Standard)
 </Note>
 
+> **⚠️ [2026-08-16] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-18-payments.md`** (which has since diverged by ~120 lines). Notably the **PaymentGate system-actor address is wrong here**: this copy says `0x11`, but code (`node/runner/src/system_actors.rs`, pin test `well_known_low_byte_assignments`) and the authoritative doc place **`PAYMENT_GATE` at `0x12`** (`0x11`=VALIDATOR_SET took the slot ahead of it; the whole band shifted +1 from `0x0D`=STREAM_KEY_MANAGER). See `cowboy/docs/` and [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md). The `0x11` references below are retained as historical record — do not build against them.
+
 > **Revision history**
 >
 > - **r2 (2026-05-11)** — Three corrections:

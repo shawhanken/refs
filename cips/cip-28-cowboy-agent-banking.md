@@ -8,6 +8,8 @@
 
 ---
 
+> **⚠️ [2026-08-16] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy (r1.1) is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-28-cowboy-agent-banking.md`** (now **r1.2**, ~140 lines ahead). Notably the **BankActor system-actor address is wrong here**: this copy says `0x13`, but that slot turned out to be the deployed `CONTAINER_REGISTRY`, so BankActor was **reassigned to `0x16`** (r1.2, 2026-07-14; see `node/runner/src/system_actors.rs` `BANK_ACTOR = 0x16` + pin test `well_known_low_byte_assignments`). See `cowboy/docs/` and [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md). The `0x13` references below are retained as historical record — do not build against them.
+
 ## 0. Summary
 
 Decouple "gas funds + risk controls + compliance handle" from regular actor addresses, and lift them into a first-class **banking account** primitive. A new system actor `BankActor (0x13)`:

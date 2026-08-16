@@ -5,6 +5,8 @@ description: Code-aligned v2 — MajorityVote DNS verification, system-mediated 
 
 # CIP-16 v2
 
+> **⚠️ [2026-08-16] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-16-custom-domains.md`**. Notably the **Route Registry system-actor address is wrong here**: this copy says `0x0D`, but code (`node/runner/src/system_actors.rs`, pin test `well_known_low_byte_assignments`) and the authoritative doc place **`ROUTE_REGISTRY` at `0x0E`** (`0x0D`=STREAM_KEY_MANAGER took the slot; GATEWAY=`0x0F`). See `cowboy/docs/` and [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md). The `0x0D` references below are retained as historical record — do not build against them.
+
 > **Versioning.** This is v2 of CIP-16. v1 is the canonical document `cip-16-custom-domains.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II) + the cross-cutting conventions (Part III).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I.

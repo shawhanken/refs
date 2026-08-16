@@ -7,6 +7,8 @@
 
 ---
 
+> **⚠️ [2026-08-16] 过时快照 (STALE SNAPSHOT).** 本 `refs/cips/` 副本已被取代;权威且与代码对齐的规格在 **`cowboy/docs/cips/cip-28-cowboy-agent-banking.md`**(现为 **r1.2**)。本副本的 **BankActor 系统 actor 地址是最旧的错值 `0x0D`**;代码(`node/runner/src/system_actors.rs` `BANK_ACTOR = 0x16`,pin 测试 `well_known_low_byte_assignments`)与权威文档已定 **BankActor = `0x16`**(`0x0D` 早被 STREAM_KEY_MANAGER 占用,r1.1 曾移到 `0x13` 又撞上 CONTAINER_REGISTRY,r1.2 最终定 `0x16`)。见 `cowboy/docs/` 与 [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md)。下方 `0x0D` 保留作历史记录,勿据以实作。
+
 ## 0. 摘要
 
 把"持有 gas 资金 + 风控规则 + 合规手柄"从普通 actor 地址里解耦出来，做成第一公民的"银行账户"原语。新增系统 actor `BankActor (0x0D)`：

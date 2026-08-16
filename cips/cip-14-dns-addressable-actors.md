@@ -5,6 +5,8 @@ description: Code-aligned v2 — real PVM syscalls, real RPC primitives, real ad
 
 # CIP-14 v2
 
+> **⚠️ [2026-08-16] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-14-dns-addressable-actors.md`**. Notably the **system-actor addresses are wrong here**: this copy uses ROUTE=`0x0D` / GATEWAY=`0x0E` / RECEIPT=`0x0F` (and some Part I sections still show the even older two-byte `0x0011`/`0x0012`), but code (`node/runner/src/system_actors.rs`, pin test `well_known_low_byte_assignments`) and the authoritative doc place **ROUTE_REGISTRY=`0x0E` / GATEWAY_REGISTRY=`0x0F` / RECEIPT_REGISTRY=`0x10`** (the whole band shifted +1 because `0x0D`=STREAM_KEY_MANAGER and `0x11`=VALIDATOR_SET took slots). See `cowboy/docs/` and [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md). Addresses below are retained as historical record — do not build against them.
+
 > **Versioning.** This is v2 of CIP-14. v1 is the canonical document `cip-14-dns-addressable-actors.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II) + the cross-cutting conventions (Part III).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I. Part III defines shared conventions referenced by Part II.

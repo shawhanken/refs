@@ -5,6 +5,8 @@ description: Code-aligned v2 — concrete container registry actor address (0x10
 
 # CIP-10 v2
 
+> **⚠️ [2026-08-16] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-10-runner-containers.md`** (which has since diverged by hundreds of lines). Notably the **Container Registry system-actor address is wrong here**: this copy says `0x10`, but code (`node/runner/src/system_actors.rs`, pin test `well_known_low_byte_assignments`) and the authoritative doc place **`CONTAINER_REGISTRY` at `0x13`** (`0x11`=VALIDATOR_SET, `0x12`=PAYMENT_GATE now precede it; `0x0D`=STREAM_KEY_MANAGER shifted the whole band). See `cowboy/docs/` and [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md). The `0x10` references below are retained as historical record — do not build against them.
+
 > **Versioning.** This is v2 of CIP-10. v1 is the canonical document `cip-10-runner-containers.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I.
