@@ -198,11 +198,11 @@ pack 里**有一个扫描器主动嗅探已知危险模式**(目前全是 `ci.*`
 
 > ⚠️ 本清单是 **DB `invariant_registry` 的快照**,不是 pack 全量目录 —— 两者的关系见下方「四、」。DB 是需求驱动的物化视图,数字会随「哪些不变量被真实 PR 行使过」变化。
 
-- **DB 现有 74 条**(2026-08-17;编制时为 72,当日 seed 了 `cbss.threshold_any_t_recovers` + `cbqs.at_least_once_safe_prefix_holds` 两条 onboarding 基座)。按 status:`active` 69 · `candidate-red` 3(`determinism.handler_load_gas_independent_of_cache`、`state.overlay_root_finalize_parity`、`state.timer_dispatch_wall_clock_independent`)· `pending` 2(`tee.chip_root_verify_deterministic`、`contract.tx_canonical_vectors_cover_actor_and_multisig`)。
-- 按 executor:`test` 42 · `proptest` 24 · `conformance-vector` 2 · `pytest` 2 · `review` 2 · `review-hazard` 2。
-- 绝大多数 origin=`ratchet`(逃逸棘轮),少数 `hand`(手写基座:4 条 econ/state 种子 + 新加的 cbss/cbqs onboarding)。
-- 严重度:`high` 63 · `medium` 9 · `mid` 2。
-- 覆盖 repo:`node` 58 · `marshal` 7 · `cbfs` 4 · `runner` 2 · `cbss` 1 · `cbqs` 1 · `wallet` 1。
+- **DB 现有 83 条**(2026-08-17;编制时 72 → seed cbss/cbqs onboarding 基座 → `reconcile --apply` 补 6 条 catalog 滞后 → onboard cowboy-protocol/gateway/runner 三仓各 1 条基座)。按 status:`active` 78 · `candidate-red` 3 · `pending` 2。
+- 按 executor:`test` 44 · `proptest` 26 · `conformance-vector` 7 · `pytest` 2 · `review` 2 · `review-hazard` 2。
+- origin:`ratchet` 68(逃逸棘轮)· `hand` 15(手写基座:4 条 econ/state 种子 + cbss/cbqs/cowboy-protocol/gateway/runner onboarding + reconcile 补的 catalog 条目)。
+- 严重度:`high` 71 · `medium` 9 · `mid` 3。
+- 覆盖 repo:`node` 63 · `marshal` 7 · `cbfs` 5 · `runner` 3 · `cbss` 1 · `cbqs` 1 · `gateway` 1 · `cowboy-protocol` 1 · `wallet` 1。
 
 ---
 
@@ -239,6 +239,18 @@ dashboard 的「某 repo=0」多半不是「没规则」,而是**镜像滞后**�
 3. **加进 `pr_inbox._DEFAULT_REPOS`** —— 否则它的 PR 根本不进 Review Queue。
 
 > cbss 情况相同(pack 早有已验证 proptest 锚,DB 长期 0),同法于 2026-08-17 seed。其余新 repo 接入照此三步。
+
+**2026-08-17 批量 onboard 其余 cowboyinc code 仓**(每条 baseline 都锚定在 repo head **实测通过**的真实测试,`running 1 test; ok`,非幽灵):
+
+| repo | 分类前缀(→high) | baseline 不变量 | 锚定测试 | 钉住的属性 |
+|---|---|---|---|---|
+| **cowboy-protocol** | `codec/` `types/` `cbss-crypto/` | `protocol.tx_canonical_bytes_identical_to_node`(conformance-vector) | `cowboy-protocol-codec` `golden_vectors_byte_identity` ⚠️需 `--features signing` | signing-preimage/hash/提交编码与 canyon node **字节相同**,drift=硬分叉 |
+| **gateway** | `gateway-x402/` `gateway-server/src/{payment_state,chain_payments,x402,mpp}` `gateway-chain/` | `gateway.x402_no_double_serve_before_settle`(test) | `gateway-x402` `tests::reservation_blocks_concurrent_same_key` | serve-before-settle 双花守卫:同凭证并发 claim 被拒 |
+| **runner** | `result-verifier/` `runner-consensus/` `canonical_result_parity` `job-dispatcher/` `runner-container/src/{sandbox,oci,runc}` `tee-verifier/`… | `runner.majority_vote_rejects_below_threshold`(test) | `result-verifier` `verifier::tests::test_majority_vote_threshold_not_met_fails` | N-of-M 门槛未达必须拒绝认证,不放行无共识的错误 off-chain 结果 |
+
+⚠️ **cowboy-protocol 的 feature-flag 陷阱**:整个 golden 测试档是 `#![cfg(feature="signing")]`,`run_command` **必须**带 `--features signing`,否则 `cargo test` 跑 0 test 静默假绿。已固化进 run_command;若哪天 flag 失效变 0-test,执行器的「≥1 test ran」检查会把它当 `degraded` 暴露,而非误 PASS。
+
+**JS 仓的边界(store-admin / wallet)**:两者已进 `_DEFAULT_REPOS`(PR 进 Review Queue),但**机械执行器只支持 cargo/pytest**,没有 JS 跑法,所以给不出会绿的 mechanical baseline。它们的覆盖只能靠 `review`/`review-hazard`(阶段二)或等 JS 执行器落地。故 `reconcile` 的 `coverage_gaps` 仍会诚实列出 `store-admin`(和 docs-only 的 `cowboy`)—— 这是如实报告,不是遗漏。
 
 ### 4.4 一键对账:`marshal reconcile-invariants`
 
