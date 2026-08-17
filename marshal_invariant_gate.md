@@ -239,3 +239,24 @@ dashboard 的「某 repo=0」多半不是「没规则」,而是**镜像滞后**�
 3. **加进 `pr_inbox._DEFAULT_REPOS`** —— 否则它的 PR 根本不进 Review Queue。
 
 > cbss 情况相同(pack 早有已验证 proptest 锚,DB 长期 0),同法于 2026-08-17 seed。其余新 repo 接入照此三步。
+
+### 4.4 一键对账:`marshal reconcile-invariants`
+
+4.3 里「pack 有、DB 没有」的滞后**不用手动逐条 seed**,一条命令对账所有被审计 repo:
+
+```bash
+# 只检查(dry-run,不写库):列出每个 repo 缺哪些、哪些 pending 被跳过、哪些 repo 零覆盖
+marshal reconcile-invariants
+# 入库:把缺的 non-pending catalog 不变量写进 DB(等同一次性模拟所有 PR 触发登记)
+marshal reconcile-invariants --apply
+# 最严格:先在各 repo checkout 真跑锚定测试,只 seed 会绿的(彻底防幽灵不变量)
+marshal reconcile-invariants --apply --verify --workspace /home/ubuntu/workspace
+```
+
+输出 `counts:{added/present/pending/unverified}` + `coverage_gaps_no_invariant`(catalog **和** DB 都为 0 的 bound repo = 真空白,需人工 onboard;docs-only 的 cowboy 除外)。
+
+**安全性**(为何 `--apply` 不违反 4.1):它只 seed `not pending` 的 catalog 条目,与「一个 PR 恰好碰到该路径时会自动登记的那条」**完全相同**,不比正常 gate 流程更危险。铁律:① pending 一律跳过(幽灵守卫);② DB 已有的绝不覆盖(保住 ratchet 的 `origin`/`escape_id`);③ origin 从 `escape_registry.spawned_check` 忠实反查(有对应 escape=ratchet+escape_id,否则 hand);④ `--verify` 是可选加固,真跑测试(exit 0 且 ≥1 passed)才 seed。
+
+**注意**:这只补「catalog 有但没入库」的滞后,**不会凭空发明新不变量** —— 真正的新覆盖仍靠 4.1 的棘轮(逃逸→ratchet-open)或 4.3 的人工 onboarding。`coverage_gaps` 报告帮你定位后者的目标。
+
+> 2026-08-17 首次 `--apply` 补了 6 条从未被 PR 触发的 catalog 不变量(5 条 contract/跨-repo + `cbfs.erasure_any_k_reconstructs`);DB 从 74 → 80。重跑幂等(0 added)。
