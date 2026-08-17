@@ -198,11 +198,11 @@ pack 里**有一个扫描器主动嗅探已知危险模式**(目前全是 `ci.*`
 
 > ⚠️ 本清单是 **DB `invariant_registry` 的快照**,不是 pack 全量目录 —— 两者的关系见下方「四、」。DB 是需求驱动的物化视图,数字会随「哪些不变量被真实 PR 行使过」变化。
 
-- **DB 现有 83 条**(2026-08-17;编制时 72 → seed cbss/cbqs onboarding 基座 → `reconcile --apply` 补 6 条 catalog 滞后 → onboard cowboy-protocol/gateway/runner 三仓各 1 条基座)。按 status:`active` 78 · `candidate-red` 3 · `pending` 2。
-- 按 executor:`test` 44 · `proptest` 26 · `conformance-vector` 7 · `pytest` 2 · `review` 2 · `review-hazard` 2。
-- origin:`ratchet` 68(逃逸棘轮)· `hand` 15(手写基座:4 条 econ/state 种子 + cbss/cbqs/cowboy-protocol/gateway/runner onboarding + reconcile 补的 catalog 条目)。
-- 严重度:`high` 71 · `medium` 9 · `mid` 3。
-- 覆盖 repo:`node` 63 · `marshal` 7 · `cbfs` 5 · `runner` 3 · `cbss` 1 · `cbqs` 1 · `gateway` 1 · `cowboy-protocol` 1 · `wallet` 1。
+- **DB 现有 85 条**(2026-08-17;编制时 72 → seed cbss/cbqs → `reconcile --apply` 补 6 → onboard cowboy-protocol/gateway/runner 各 1 → wallet/store-admin 各 1 条 review-hazard)。按 status:`active` 80 · `candidate-red` 3 · `pending` 2。
+- 按 executor:`test` 44 · `proptest` 26 · `conformance-vector` 7 · `pytest` 2 · `review-hazard` 4 · `review` 2。
+- origin:`ratchet` 68(逃逸棘轮)· `hand` 17(手写基座:4 条 econ/state 种子 + cbss/cbqs/cowboy-protocol/gateway/runner onboarding + wallet/store-admin review-hazard + reconcile 补的 catalog 条目)。
+- 严重度:`high` 73 · `medium` 9 · `mid` 3。
+- 覆盖 repo:`node` 63 · `marshal` 7 · `cbfs` 5 · `runner` 3 · `wallet` 2 · `cbss` 1 · `cbqs` 1 · `gateway` 1 · `cowboy-protocol` 1 · `store-admin` 1。
 
 ---
 
@@ -250,7 +250,14 @@ dashboard 的「某 repo=0」多半不是「没规则」,而是**镜像滞后**�
 
 ⚠️ **cowboy-protocol 的 feature-flag 陷阱**:整个 golden 测试档是 `#![cfg(feature="signing")]`,`run_command` **必须**带 `--features signing`,否则 `cargo test` 跑 0 test 静默假绿。已固化进 run_command;若哪天 flag 失效变 0-test,执行器的「≥1 test ran」检查会把它当 `degraded` 暴露,而非误 PASS。
 
-**JS 仓的边界(store-admin / wallet)**:两者已进 `_DEFAULT_REPOS`(PR 进 Review Queue),但**机械执行器只支持 cargo/pytest**,没有 JS 跑法,所以给不出会绿的 mechanical baseline。它们的覆盖只能靠 `review`/`review-hazard`(阶段二)或等 JS 执行器落地。故 `reconcile` 的 `coverage_gaps` 仍会诚实列出 `store-admin`(和 docs-only 的 `cowboy`)—— 这是如实报告,不是遗漏。
+**JS 仓的边界(store-admin / wallet)**:两者已进 `_DEFAULT_REPOS`(PR 进 Review Queue),但**机械执行器只支持 cargo/pytest**,没有 JS 跑法,给不出会绿的 mechanical baseline。它们的覆盖只能是**阶段二 review-hazard**。2026-08-17 各加一条(见下),`coverage_gaps` 遂只剩 docs-only 的 `cowboy`:
+
+| repo | review-hazard(SECURITY_HAZARDS id / 注册 id) | when_paths 触发 | 钉住的否定性属性 |
+|---|---|---|---|
+| **wallet** | `wallet-blind-signing-intent-binding` / `wallet.no_blind_signing_intent_binding` | `src/lib/sign-binding` `src/popup/approve` `src/background/service-worker` `src/content/inject` | window.cowboy 签名必须域分离(personal-message≠交易)+ 解码展示,不盲签 opaque bytes(esc-20260616) |
+| **store-admin** | `store-admin-privileged-op-authz-and-db-boundary` / `store-admin.privileged_op_server_authz` | `src/services/{signing,read-cap-verifier,approval-orchestrator,review-workflow,republish,labs-publisher}` `src/server` | 特权 approval/publish/sign 服务端授权(无 IDOR)+ 从不写 explorer chain-truth DB(README 硬边界) |
+
+**为何是 review-hazard 而非惰性 `review` 行**:纯 `review` registry 行**没牙**—— reviewer 的阶段二视角只来自 `review_plan` + `security_hazards()` + ratchet 探针,没有代码把 registry 的 `review` 条目喂回去。`SecurityHazard`(review-hazard)才有 `when_paths` 触发 + 注入对抗 prompt + 升 high。两条**不进** `list_invariants`(否则机械门禁会去跑一条无 `run_command` 的检查报假 degraded),只经 `all_invariant_defs` 进 catalog 供 `reconcile` seed。`invariant_able=False`(否定性属性,不可往返化)。
 
 ### 4.4 一键对账:`marshal reconcile-invariants`
 
