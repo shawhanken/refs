@@ -1,7 +1,7 @@
 # CIP-39 Simplification Plan — document version 2
 
 **Date:** 2026-08-24
-**Scope:** `cowboy` branch `spec/cip-39-v2` (base `main` @ `beb1e5c`), two commits: the rewrite and the deep-review fix pass
+**Scope:** `cowboy` branch `spec/cip-39-v2` (base `main` @ `beb1e5c`) — the rewrite plus twelve rounds of Marshal deep review and their fix passes (see §9)
 **Companion to:** `docs/cips/cip-39-cowboy-queue-system.md` (rewritten), `docs/cips/cip-39-gas-vectors-v2.json` (new)
 
 ---
@@ -50,7 +50,7 @@ protocol gives up, because every one of them gives up something.
 | **v2** | One governance parameter `cbqs.stream_rate_per_block`, **snapshotted into each stream record at creation** so a later write is prospective; one prepaid balance per **owner**; a flat `CBQS_STREAM_CREATION_CHARGE` protocol constant debited from the native account; and three statuses (`Active`/`Suspended`/`Closed`), where `Suspended` stops the meter. `settle()` is about twenty lines including the suspended branch. |
 | **Why** | A capacity market implemented inside consensus is what most of the registry's state, most of its instructions, and most of its failure modes were for. Capacity is bounded instead by per-stream ceilings the broker already has to enforce, plus each provider's own `max_streams` and `accepts_new`. |
 | **Cost** | Three, all now stated in the CIP rather than left to be found: no price discrimination (a heavy and a light stream pay the same); no way to reprice an existing stream, since the rate is snapshotted; and a provider's collectible is no longer isolated from the owner's other streams, so settlement cadence replaces escrow as its protection and the broker's availability check has to be conservative (`balance >= due × active_streams`). |
-| **Also fixed** | v1's `CBQS_MIN_RATE_PER_BLOCK = 8_000 // wei per block` disagreed with §4.5's "rates are denominated in nano-CBY" by nine orders of magnitude — the implementation (`node/execution/src/cbqs/storage.rs:44`) reads nano-CBY. v2 says nano-CBY once, in one place. |
+| **Also fixed** | v1's `CBQS_MIN_RATE_PER_BLOCK = 8_000 // wei per block` disagreed with v1 §4.5's "rates are denominated in nano-CBY" by nine orders of magnitude — the implementation (`node/execution/src/cbqs/storage.rs:44`) reads nano-CBY. v2 says nano-CBY once, in one place. |
 
 ### 3. Stream configuration leaves the chain
 
@@ -85,7 +85,7 @@ protocol gives up, because every one of them gives up something.
 | --- | --- |
 | **v1** | `merkle_root_v1` (odd-node promotion, with a written argument about length ambiguity), `sparse_root_v1` (fixed-depth-256 sparse tree, bitmap proofs, canonical descent, empty-subtree constants), per-lane presence/absence proofs per batch, omission detection, verifying-subscription batch ordering, and two verification modes — about 400 lines. |
 | **v2** | One flat `records_digest` per batch. §11 states plainly that a lane-scoped subscriber cannot verify a checkpoint, and that the workaround is one stream per verification domain. |
-| **Why** | The mechanism detects a real defect (silent per-lane omission) that nothing in v1 can act on: no dispute, no staking, no slashing, and §16.1's own remedy for a failed provider is "migrate away". |
+| **Why** | The mechanism detects a real defect (silent per-lane omission) that nothing in v1 can act on: no dispute, no staking, no slashing, and v1's own remedy for a failed provider is "migrate away". |
 | **Cost** | Stated, not hidden: lane-scoped verification is unavailable. Reinstating it belongs with the dispute path that makes detection actionable. |
 
 ### 7. Platform encryption and key rotation leave the protocol
@@ -109,13 +109,53 @@ features above.
 ### 9. Endpoint validation leaves consensus
 
 v1 ran a five-rule algorithm at consensus admission — forbidden-byte scan, a
-byte-exact scheme compare with a two-paragraph erratum, a WHATWG URL parse, a raw
-authority scan for `@`, and IPv4/IPv6 special-range blocklists — pinned by 30
-normative accept/reject vectors, about 160 lines. Any parse difference between two
-node implementations is a consensus fork, and v1 concedes in the same section that
-admission cannot check DNS, so **the client must revalidate anyway**. v2 checks
-length, UTF-8, forbidden bytes, and the `wss://` prefix at admission, and puts the
-address policy on the dialer (§12.4), where the resolved address is actually known.
+byte-exact scheme compare with a two-paragraph erratum, a WHATWG URL parse, a
+raw authority scan for `@`, and IPv4/IPv6 special-range blocklists — pinned by
+37 normative accept/reject vectors, about 160 lines. Any parse difference
+between two node implementations is a consensus fork, and v1 concedes in the
+same section that admission cannot check DNS, so **the client must revalidate
+anyway**.
+
+v2 keeps three byte-level rules — a bounded endpoint count, a bounded URI
+length, and every byte in `0x21`–`0x7E` with a byte-exact `wss://` prefix — and
+puts the address policy on the dialer (§11.4), where the resolved address is
+actually known.
+
+**The host grammar went in two stages, and the second is the more interesting
+one.** The first draft of v2 replaced v1's parse-based rules with a written
+grammar for the authority: canonical dotted-quad, RFC 5952 lowercase IPv6 in
+brackets, DNS labels whose last label begins with a letter, and a port with no
+leading zero and not 443. That was a real improvement over parsing — a grammar
+has no dependency on a URL library's quirks — and it survived ten rounds of
+review.
+
+Round 11's determinism lens then proved it was itself a live fork. "The
+canonical lowercase form of RFC 5952" does not name one form: RFC 5952 §5
+leaves the mixed hex/dot-decimal notation for IPv4-mapped addresses a
+*recommendation*, so the two mainstream standard libraries disagree — Rust
+renders `::ffff:c000:201` as `::ffff:192.0.2.1`, and Python renders
+`::ffff:192.0.2.1` as `::ffff:c000:201`. Any sane implementation of "is this
+text canonical" is parse-then-reformat-then-compare, so a Rust validator admits
+a `RegisterProvider` a Python validator rejects. Both honestly implement the
+sentence. None of the vectors in the block would have caught it, because none
+was in that address class.
+
+The obvious repair was to hand-write an IPv6 grammar. Instead the whole rule was
+deleted, on the ground that it was never buying anything: consensus **stores**
+this field and never interprets it — no rule compares two endpoints, no handler
+resolves one — and the only reader that acts on it is a client deciding where
+to dial, which §11.4 governs after resolution on the address actually reached.
+Every vector the grammar existed for lands somewhere §11.4 already covers:
+`wss://0251.0376.0251.0376/ws` is a link-local address to a parser and an
+ordinary name to a byte scanner, and §11.4 rejects the first outright and
+rejects whatever the second resolves to.
+
+What is given up is stated in the CIP: consensus no longer guarantees that a
+registered endpoint is syntactically dialable. A provider that registers
+nonsense has burned its own 5 CBY registration charge and is unreachable —
+self-harm, priced, and visible. What is gained is about a hundred lines and the
+**whole fork class** rather than one instance of it, plus one fewer thing every
+validator implementation has to get bit-identical.
 
 ### 10. Lanes stop carrying protocol machinery
 
@@ -141,39 +181,64 @@ workload should be authorized. That is application design, and it is gone.
 
 ## 3. Before / after
 
-Every number is derived from the two documents, not asserted. Reproduce with:
-
-```bash
-git show origin/main:docs/cips/cip-39-cowboy-queue-system.md > /tmp/v1.md
-python3 - <<'PY'
-import re
-for f in ("/tmp/v1.md","docs/cips/cip-39-cowboy-queue-system.md"):
-    s=open(f).read()
-    print(f, s.count("\n"), "lines,", s.count("MUST"), "MUST")
-PY
-```
+Every number is derived from the two documents, not asserted, and recomputed at
+each round. Reproduce from a `cowboy` checkout on `spec/cip-39-v2` with
+[`cip39_metrics.py`](cip39_metrics.py) beside this file, run against
+`origin/main`'s copy of the document as v1.
 
 | Metric | v1 | v2 | Δ |
 | --- | ---: | ---: | ---: |
-| Specification lines | 4,827 | 1,962 | −59% |
-| RFC-2119 `MUST` occurrences | 331 | 120 | −64% |
+| Specification lines | 4,827 | 2,923 | −39% |
+| RFC-2119 `MUST` occurrences | 331 | 139 | −58% |
+| — of which `MUST NOT` | 66 | 21 | −68% |
 | Chain instructions | 9 | 8 | −1 |
-| `StreamRecord` fields | 26 | 12 | −54% |
+| `StreamRecord` fields | 26 | 9 | −65% |
 | `StreamConfig` fields on chain | 12 | 0 | −100% |
 | `RecordHeader` fields | 10 | 5 | −50% |
 | Signed object types | 14 | 3 | −79% |
-| Governance parameters | 44 | 34 | −23% |
+| Governance parameters | 56 | 34 | −39% |
 | — of which genesis-frozen, never read live | 12 | 0 | — |
-| — of which read by a **consensus handler** | 25 | 5 | −80% |
+| — named in the per-instruction state-read table | n/a | 4 | — |
 | Chain events | 12 | 8 | −33% |
-| Typed error codes | 46 | 31 | −33% |
-| State reads reserved across all instructions | 233 | 44 | −81% |
-| State writes reserved across all instructions | 50 | 25 | −50% |
-| `CreateStream` reads / writes | 34 / 11 | 9 / 5 | −74% / −55% |
-| Required CIPs | 8 | 3 | −63% |
+| Typed error codes | 46 | 45 | −2% |
+| State reads reserved across all instructions | 233 | 48 | −79% |
+| State writes reserved across all instructions | 50 | 33 | −34% |
+| `CreateStream` reads / writes | 34 / 11 | 11 / 8 | −68% / −27% |
+| Required CIPs | 8 | 3 | −62% |
 | Ed25519 verifications per appended message | 1 | 0 | — |
 | Provider signatures per appended message | 1 | 1 per batch | up to 1,024 records/batch |
 | Synchronous durable commits per appended message | 1 | 1 per batch | up to 1,024 records/batch |
+
+Four rows deserve a note, because the headline number either understates or
+overstates what actually changed.
+
+**Error codes barely moved — 46 to 45 — and that is the honest number.** Three
+v1 codes went with the base-rate machinery, and round 11 *added* two
+(`MalformedFrame`, `SessionNotOpen`) for denial classes v1 named in its
+precedence rule and never assigned, which meant the most common wire failure
+had no number and `cbqsd` had invented `3998` outside the band. A simpler
+protocol does not need fewer names for failures. It needs fewer ways to fail —
+which is what the state and instruction rows measure.
+
+**Governance parameters are 56, not the 44 an earlier draft of this document
+reported.** That 44 excluded the twelve genesis-frozen `cbqs.base_rate.*` rows
+and then listed them again as a sub-row, so it double-counted against itself.
+
+**"Read by a consensus handler" is 4 for v2 and unstated for v1.** v2's §15.1
+carries a per-instruction state-read table, so the number is mechanical:
+`max_provider_endpoints`, `max_provider_endpoint_uri_bytes`,
+`max_streams_per_account`, and `stream_rate_per_block`. v1 has no equivalent
+table — its reserved-I/O table lists counts only — so an earlier draft's "25"
+was not reproducible from the documents and has been withdrawn rather than
+restated with a footnote.
+
+**State writes fell far less than reads: −34% against −79%.** That gap is real
+and worth naming, because it is the shape of the whole redesign. Reads
+collapsed because authorization and configuration left consensus entirely. Writes
+did not, because v2 moved *money* onto the chain path that v1 kept in
+per-stream escrow: five of the eight instructions now touch custody, the
+provider's native account, and the Platform Fee Account. Settlement is the one
+thing that has to stay on chain, and it is what the remaining writes are.
 
 Dependencies dropped: CIP-9 (CBFS), CIP-24 (CBSS), CIP-36 (administered CBY
 rate), and CIP-2/CIP-10 as *requirements* (they remain related — runner
@@ -182,7 +247,7 @@ Platform Fee Account rule it cites.
 
 The figures are lower than the first draft's because the deep review put ~570
 lines back: the effective-rent-height definition, the signing registry, the
-request-body table, the address ranges §12.4 now enumerates, the group-config
+request-body table, the address ranges §11.4 now enumerates, the group-config
 validity rules, and the conformance items. Simplification that deletes a
 definition another rule depends on is not simplification — §9 records which
 deletions the review reversed and why.
@@ -204,7 +269,7 @@ Simplification is not deletion, and these survived on purpose:
 - **The custody discipline.** Every credit is debited from custody in the same
   transition; handlers fail closed rather than mint.
 - **Gas vectors as a normative artifact**, regenerated as
-  `cip-39-gas-vectors-v2.json` and pinned by SHA-256 in §16.1.
+  `cip-39-gas-vectors-v2.json` and pinned by SHA-256 in §15.1.
 
 ## 5. Activation
 
@@ -231,13 +296,31 @@ drift, so the same branch carries:
 | File | Change |
 | --- | --- |
 | `docs/cips/cip-39-cowboy-queue-system.md` | Rewritten as document version 2. |
-| `docs/cips/cip-39-gas-vectors-v2.json` | New; 10 vectors over 8 instructions, pinned by SHA-256 in §16.1. |
+| `docs/cips/cip-39-gas-vectors-v2.json` | New; 27 vectors over 8 instructions — 19 success paths and 8 rejection paths — pinned by SHA-256 in §15.1. |
 | `docs/cips/cip-39-gas-vectors-v1.json` | Deleted — it pins nine instructions that no longer exist. |
 | `docs/cips/cip-36-phased-launch-cusd.md` | Two statements about CIP-39 that v2 falsifies: "CBQS reserved capacity" and "CIP-39's schedule is genesis-frozen and carries no band". |
 | `docs/cips/cip-42-statusz.md` | Its worked example said a cbqsd that cannot read chain state is `unhealthy`; under §18 that condition is `degraded`. |
 | `docs/whitepaper/cowboy-technical-whitepaper.md` | The `0x17` row said "pricing, escrow custody"; it is now prepaid-balance custody. |
 | `docs/whitepaper/cowboy-cbqs-whitepaper.md` | Status note: this whitepaper describes v1, CIP-39 is authoritative where they disagree, with a section-level map of what v2 removed. A full rewrite is deferred (W6). |
 | `docs/whitepaper/changelog.md` | Entry for both whitepaper changes. |
+
+## 6a. One observation handed back rather than acted on
+
+CIP-12 §7's pausable-actor allowlist is `{0x04, 0x05, 0x06, 0x07, 0x08, 0x0C,
+0x0D, 0x0E, 0x0F, 0x10, 0x13, 0x14, 0x1D, 0x1E}`, while the implementation it
+cites (`node/types/src/pause.rs`, `PAUSABLE_LOW_BYTES`) admits **every address
+in `0x01`–`0x1E` except `0x09` and `0x11`**, and its comment calls those two
+"the only two, final" — which the CIP's own exclusion rationale contradicts for
+`0x01`–`0x03`, `0x0A`, `0x0B`, and `0x12`.
+
+An earlier revision of this branch amended that list. The amendment has been
+**reverted**, for two reasons. CIP-39 v2 no longer depends on `0x17` being
+pausable — the rent clock that needed it is gone — so the change had lost its
+justification and would have left a governance surface citing a rule that does
+not exist. And which document is right about the other six addresses is CIP-12's
+question, not something a queue CIP should settle as a side effect.
+
+It is recorded here so it is not lost.
 
 ## 7. Implementation work breakdown
 
@@ -286,13 +369,15 @@ These are decisions we should not make unilaterally:
 
 ## 9. What the deep review changed
 
-The first draft of this rewrite went through a five-lens Marshal deep review
-before this document was finalised. It surfaced 30+ confirmed defects, and the
-pattern is worth recording because it is the risk of any simplification pass:
-**most were deletions of machinery that something else still depended on**, not
-bad new design.
+This rewrite has been through **twelve rounds** of Marshal deep review — six
+adversarial lenses per round (correctness, spec coherence, cross-repo,
+security, economics, determinism), each round followed by a fix pass and a
+fresh review of the fixes. Every round found something. That is the honest
+headline, and the pattern underneath it is the part worth recording, because it
+is the risk profile of any simplification pass.
 
-Six deletions were reversed:
+**Most early findings were deletions of machinery that something else still
+depended on** — not bad new design. Six were reversed in the first fix pass:
 
 | Deleted in the first draft | Why it had to come back |
 | --- | --- |
@@ -301,22 +386,63 @@ Six deletions were reversed:
 | Per-stream rate snapshotting | Reading the rate live meant a governance write retroactively rebilled every unsettled interval on the network at the new rate. |
 | Request bodies and the `session_id` on request frames | Removing per-request signatures removed the only field binding a request to its authenticated session. |
 | `max_lane_creates_per_min` and a staleness bound | Their absence let one holder burn a stream's permanent lane namespace, and let a broker that simply never refreshes ignore every revocation forever. |
-| Per-group visibility ceiling and a retention-pin equivalent | Without them one never-acknowledging group pins the retention floor forever and every producer on the stream gets `Backpressure` permanently. |
+| Per-group visibility ceiling and a per-record deadline | Without them one never-acknowledging group could hold delivery state open indefinitely. (The retention half of this was later solved differently: §12's floor now advances on time or bytes without consulting group state at all, so no group can pin it.) |
 
-Three new rules were added that version 1 did not have, because pooling the
+**Later rounds found a different and more instructive failure: the fixes
+themselves.** Five distinct shapes recurred often enough to be named, and all
+five are shapes a human reviewer of a large specification should expect.
+
+1. **A stale restatement survives the fix.** Rounds 6 through 11 each left at
+   least one. The worst case took six rounds to die: §9.2's "Live records MUST
+   NOT be evicted under capacity pressure; the broker returns `Backpressure`
+   instead" was the authority §12 cited, and when §12 was rewritten to evict on
+   a byte bound, the sentence stayed. A round-10 sweep declared it absent
+   because it grepped `"under pressure"` and the text reads `"under capacity
+   pressure"`. Three lenses found it independently in round 11.
+2. **A recommendation lands as the shortest possible edit** and loses the
+   property it was meant to add.
+3. **The fix breaks a neighbour.** Round 11 introduced a blank line that
+   silently split seven of the eight rows out of the chain-instruction table,
+   and inserted a sentence into a run of two that a following sentence counts
+   as "these two rules".
+4. **A count goes stale when the thing counted changes.** Round 10 rewrote a
+   rule from "four checks" to "three rejections" and left §19 asserting four.
+5. **A rationale outlives the design it justifies.** Several paragraphs
+   correctly stated a rule while explaining it by a hazard a later round had
+   already removed — true conclusion, dead argument.
+
+The countermeasure that worked was not more care. It was a mechanical
+pre-commit sweep that greps **the concept keywords of every rule changed** and
+checks every hit, plus structural checks for tables, list indentation, and
+counted self-claims. The sweep is in the process, not in anyone's intentions.
+
+**Round 11 also produced the largest single simplification of the whole pass,
+and it came from a defect.** The determinism lens proved that §4.1's endpoint
+host grammar was a live consensus fork: "the canonical lowercase form of RFC
+5952" is not one form, because RFC 5952 §5 leaves the mixed notation for
+IPv4-mapped addresses a recommendation, so Rust and Python canonicalise
+`::ffff:192.0.2.1` in opposite directions. Two honest validators admit
+different `RegisterProvider` bytes. The obvious repair was to hand-write an
+IPv6 grammar. Instead the whole rule was deleted: consensus stores the endpoint
+and never interprets it, and §11.4 already governs dialing after resolution, on
+the address actually reached. That removed about a hundred lines and the entire
+fork class rather than one instance of it — the clearest example in this pass
+of a defect report pointing at a deletion rather than an addition.
+
+**Three new rules were added that version 1 did not have**, because pooling the
 balance created exposures per-stream escrow did not have:
 
 - the broker's availability check multiplies by `active_streams`, so one
   stream's funding cannot buy service on an owner's whole fleet;
-- a `Suspended` stream stops accruing rent, so an abandoned stream does not
+- a suspended account stops accruing rent, so an abandoned stream does not
   compound a bill for months of non-service; and
-- the assigned provider may close a `Suspended` stream, so `assigned_streams`
-  and `Deregistered` stay reachable without the cooperation of an owner who has
-  stopped participating.
+- the assigned provider may close a stream whose account cannot fund the next
+  block (§5.1), so a provider is not held to an owner who has stopped
+  participating.
 
-Two economic properties are now stated as costs rather than left to be
-discovered: a provider's collectible is no longer isolated from the owner's
-other streams (settlement cadence replaces escrow as its protection), and
+**Two economic properties are stated as costs rather than left to be
+discovered**: a provider's collectible is no longer isolated from the owner's
+other streams, so settlement cadence replaces escrow as its protection; and
 snapshotting the rate means v2 has no way to reprice an existing stream.
 
 ## 10. Self-review against the review gate
@@ -331,7 +457,7 @@ spec PR:
 - **No number restated from another document.** v2 quotes no USD figure and no
   CIP-31/CIP-36 constant; `0x18` is cited to CIP-31 §4, which was read to confirm
   it (`docs/cips/cip-31-cbfs-rent-schedule.md:71,86`).
-- **No unobservable `MUST`.** §20 lists the conformance surface, and every
+- **No unobservable `MUST`.** §19 lists the conformance surface, and every
   normative rule resolves to chain state, canonical bytes, or a broker response.
 - **No derived-instead-of-enumerated gate.** §14 names each setting's ceiling in a
   table rather than saying "validated against its §16 ceiling".
@@ -341,6 +467,6 @@ spec PR:
   (fixed at zero in v1) are gone; the pinned-but-unwritable `pending` schedule went
   with the schedule.
 - **Pinned artifact digest verified after generation**, not asserted:
-  `sha256sum docs/cips/cip-39-gas-vectors-v2.json` matches §16.1.
+  `sha256sum docs/cips/cip-39-gas-vectors-v2.json` matches §15.1.
 - **Sibling documents reconciled** (§6 above), including the whitepaper that would
   otherwise have kept describing v1 with no marker.
