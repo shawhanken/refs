@@ -102,9 +102,20 @@ protocol gives up, because every one of them gives up something.
 v1 defined a signing registry of 14: price quote, grant, session proof, request
 proof, key-rotation batch, key-batch receipt, broker-epoch transition, checkpoint,
 append receipt, delivery-state receipt, snapshot manifest, and three retention
-anchors. v2 signs three: `StreamGrantV2`, `SessionProofV2`, `CheckpointReceiptV2`.
-Retention floors become a `u64` in an error payload; the rest went with the
-features above.
+anchors. v2 signs four: `StreamGrantV2`, `SessionProofV2`, `CheckpointReceiptV2`,
+and `BrokerProofV2`. Retention floors become a `u64` in an error payload; the
+rest went with the features above.
+
+The fourth was added late and against the direction of this whole document, so
+it is worth saying why it is not a regression. v2's handshake authenticated only
+the client: nothing let a client tell the registered provider from anyone who
+could reach its address, and `UpdateProvider` lets a provider repoint its
+endpoints — so an attacker holding a provider's *chain account key alone* could
+redirect every client of every stream assigned to it and receive their grants
+and payloads, with TLS no defence because the attacker is dialled at an address
+the registry itself names. `BrokerProofV2` reuses the key, the rotation window,
+and the resolution table that `CheckpointReceiptV2` already needed; it adds one
+field to a frame that was already being sent, and costs no round trip.
 
 ### 9. Endpoint validation leaves consensus
 
@@ -157,6 +168,18 @@ self-harm, priced, and visible. What is gained is about a hundred lines and the
 **whole fork class** rather than one instance of it, plus one fewer thing every
 validator implementation has to get bit-identical.
 
+### 12a. The dead-letter queue, the second delivery mode, and `Nack` delays are deleted
+
+Added after round 19, and the only reductions in this document that came from
+reviewing v2 against itself rather than v2 against v1.
+
+| | |
+| --- | --- |
+| **Earlier v2 drafts** | Three terminal delivery states, a `Redrive` method and `Redriven` response, a `REDRIVE` verb, `dead_letter_ttl_ms`, `cbqs.max_redrive_page`, a per-group `queue_position` counter, a `StrictFifo`/`Concurrent` mode field, `Nack.delay_ms`, and `cbqs.max_nack_delay_ms`. |
+| **Now** | Two terminal states, `ACKED` and `EXPIRED`. One delivery mode. `Nack` releases immediately. |
+| **Why** | Each carried a defect that patching would have grown the document. The dead-letter queue's own text conceded it could not be inspected, only drained blindly — a second index over bytes the log already holds and already orders by sequence, with its own TTL, parameter, page bound, and reclamation deadline competing with the retention floor. `StrictFifo` exposed only the lowest non-terminal cycle, which made `max_in_flight_per_holder` worthless at its minimum of one: a holder with `CONSUME` alone, unable to terminate anything, could take that single lease, stay silent, and let ten expiries walk each record in turn into a terminal state. `Nack`'s delay let the action §6.2 *exempts* from the solvency test buy 120× the lifetime of the action §6.2 *gates*, falsifying that section's own discriminator. |
+| **Cost** | A consumer that wants only the failed records replays the log by sequence instead of draining a queue. A group that wants ordered processing uses one lane per ordering domain rather than a mode flag. A consumer that wants backoff sets a longer `visibility_timeout_ms`, which is validated against a ceiling and applies to every holder alike rather than being chosen per request by whoever holds `ACKNOWLEDGE`. |
+
 ### 10. Lanes stop carrying protocol machinery
 
 Lanes stay — one stream per wiki page is the wrong shape and always was. What
@@ -188,15 +211,15 @@ each round. Reproduce from a `cowboy` checkout on `spec/cip-39-v2` with
 
 | Metric | v1 | v2 | Δ |
 | --- | ---: | ---: | ---: |
-| Specification lines | 4,827 | 2,923 | −39% |
-| RFC-2119 `MUST` occurrences | 331 | 139 | −58% |
-| — of which `MUST NOT` | 66 | 21 | −68% |
+| Specification lines | 4,827 | 3,486 | −28% |
+| RFC-2119 `MUST` occurrences | 331 | 157 | −53% |
+| — of which `MUST NOT` | 66 | 27 | −59% |
 | Chain instructions | 9 | 8 | −1 |
 | `StreamRecord` fields | 26 | 9 | −65% |
 | `StreamConfig` fields on chain | 12 | 0 | −100% |
-| `RecordHeader` fields | 10 | 5 | −50% |
-| Signed object types | 14 | 3 | −79% |
-| Governance parameters | 56 | 34 | −39% |
+| `RecordHeader` fields | 10 | 3 | −70% |
+| Signed object types | 14 | 4 | −71% |
+| Governance parameters | 56 | 31 | −45% |
 | — of which genesis-frozen, never read live | 12 | 0 | — |
 | — named in the per-instruction state-read table | n/a | 4 | — |
 | Chain events | 12 | 8 | −33% |
@@ -245,6 +268,19 @@ rate), and CIP-2/CIP-10 as *requirements* (they remain related — runner
 workloads are CBQS clients). v2 requires CIP-3, CIP-12, and CIP-31 §4 for the
 Platform Fee Account rule it cites.
 
+**The line count is the one metric that moved the wrong way, and it is worth
+being exact about.** The first draft of v2 was 1,390 lines; this table's earlier
+revision reported 2,923; the document is now 3,486. Nothing was re-added: every
+round of review deleted mechanism and added *prose* — the reason a rule exists,
+the divergence it closes, the draft that got it wrong. That prose is why later
+rounds could tell a load-bearing rule from a decorative one, and it is why the
+mechanism counts in every other row of this table kept falling while the line
+count rose. Against v1's 4,827 lines the document is still 28% shorter while
+specifying 8 chain instructions instead of 9, 31 parameters instead of 56, and
+48 reserved state reads instead of 233. A reader who wants the mechanism
+without the reasoning should read §§4–14 and skip the paragraphs that begin
+"An earlier draft".
+
 The figures are lower than the first draft's because the deep review put ~570
 lines back: the effective-rent-height definition, the signing registry, the
 request-body table, the address ranges §11.4 now enumerates, the group-config
@@ -261,9 +297,21 @@ Simplification is not deletion, and these survived on purpose:
   not a Cowboy service.
 - **Provider registry with consent.** `accepts_new` and `max_streams`, so a
   permissionless registry cannot commit a provider past its capacity.
-- **At-least-once semantics in full.** Leases, visibility timeouts, attempts,
-  dead-letter, redrive, strict-FIFO, idempotent append. A work queue without these
-  is not a work queue.
+- **At-least-once semantics, reduced to what a work queue needs.** Leases,
+  visibility timeouts, attempt counting, per-holder in-flight bounds, and the
+  four lease actions. Four things that started in this list did not survive
+  later rounds, and the reasons belong here rather than in a footnote:
+  **idempotent append** was deleted because bounding the broker-side
+  deduplication store produced a new defect on each of four attempts, the last
+  of which admitted a duplicate under compliant inputs by comparing a client
+  clock against a broker clock; **dead-letter and redrive** were deleted
+  together because the document's own text conceded the queue could not be
+  inspected, only drained, which made it a second index over bytes the log
+  already holds; and **strict-FIFO** was deleted because it exposed only the
+  lowest non-terminal cycle, which made `max_in_flight_per_holder` — the bound
+  a shared group relies on — worthless at its own minimum value of one, so a
+  holder with the weakest consumer verb could destroy a whole group by holding
+  one lease and saying nothing.
 - **Credit-based flow control**, because backpressure has to be explicit.
 - **Durable-before-ack**, because the alternative is silent loss.
 - **The custody discipline.** Every credit is debited from custody in the same
