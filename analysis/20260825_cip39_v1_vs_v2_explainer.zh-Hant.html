@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CIP-39 v1 → v2 · 全面對比與變更原由(小白友善)</title>
+<title>CIP-39 v1 → v2 · 全面對比與變更原由</title>
 <style>
   :root{
     --bg:#0f1216; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
@@ -122,12 +122,12 @@
 <nav>
   <h2>目錄</h2>
   <a href="#tldr">一分鐘導讀</a>
-  <a href="#zero">① 先搞清楚這是什麼</a>
+  <a href="#zero">① 系統概觀與角色</a>
   <a href="#zero-mq" class="sub">什麼是訊息佇列</a>
   <a href="#zero-who" class="sub">四個角色</a>
   <a href="#zero-chain" class="sub">鏈上與鏈下</a>
-  <a href="#gloss">② 術語表(看到不懂就回來)</a>
-  <a href="#core">③ 核心觀念:鏈不該在資料路徑上</a>
+  <a href="#gloss">② 術語定義</a>
+  <a href="#core">③ 核心觀念:鏈不在資料路徑上</a>
   <a href="#nums">④ 數字對照</a>
   <a href="#ch1">⑤ 變更一:鏈退出資料路徑</a>
   <a href="#ch2">⑥ 變更二:計價方式</a>
@@ -144,8 +144,8 @@
 <header class="hero">
   <div class="kick">CIP-39 · document version 2</div>
   <h1>CBQS 規格 v1 → v2:全面對比與變更原由</h1>
-  <p>這份文件寫給<strong>沒有讀過 CIP-39、也不熟悉區塊鏈或訊息佇列</strong>的讀者。
-  每個術語第一次出現時都會解釋,每個變更都會說明「原本怎樣、現在怎樣、為什麼改、代價是什麼」。</p>
+  <p>本文自成體系:每個術語在首次出現處給出定義,不預設讀者讀過 CIP-39。
+  每個變更均記錄「原本怎樣、現在怎樣、為什麼改、代價是什麼」。</p>
   <div class="meta">
     <span class="pill">v1 4,827 行</span>
     <span class="pill">v2 3,591 行</span>
@@ -176,7 +176,7 @@
 </section>
 
 <section id="zero">
-  <h2 class="sec"><span class="n">①</span>先搞清楚這是什麼</h2>
+  <h2 class="sec"><span class="n">①</span>系統概觀:CBQS 是什麼、由誰使用</h2>
 
   <h3 id="zero-mq">什麼是「訊息佇列」</h3>
   <p>想像一個餐廳的出單機。服務生把點單貼上去,廚師一張一張撕下來做。點單機讓兩邊<strong>不必同時在場</strong>:
@@ -189,7 +189,7 @@
     需要互相傳工作訊息,而這些訊息不適合塞進區塊鏈——太大、太頻繁、太不值錢。</p>
   </div>
 
-  <h3 id="zero-who">四個角色,分清楚就不會亂</h3>
+  <h3 id="zero-who">四個角色及其邊界</h3>
   <div class="flow">
     <div class="step"><b>Owner 擁有者</b><span>在鏈上持有這條佇列的人。他付錢,他決定誰能用。</span></div>
     <div class="step"><b>Provider 服務商</b><span>實際跑伺服器、存資料、送訊息的人。他收錢。</span></div>
@@ -197,13 +197,13 @@
     <div class="step"><b>Holder 憑證持有者</b><span>拿到 owner 簽發的授權、實際來讀寫訊息的程式。</span></div>
   </div>
   <div class="box info">
-    <div class="h">為什麼要分這麼細</div>
+    <div class="h">這個區分為什麼重要</div>
     <p>因為<strong>付錢的人、做事的人、用的人可以是三批人</strong>。owner 可能是一家公司,provider 是它租的
     服務商,holder 是它自己的十個微服務——每個微服務拿到的權限還可以不一樣(有的只能寫、有的只能讀)。
     規格必須說清楚每一條規則約束的是誰。</p>
   </div>
 
-  <h3 id="zero-chain">「鏈上」和「鏈下」差在哪</h3>
+  <h3 id="zero-chain">「鏈上」與「鏈下」的區別</h3>
   <p><strong>鏈上(on-chain)</strong>= 寫進區塊鏈的資料。全世界每個驗證節點都要存一份、都要算出一模一樣的結果。
   好處是不可竄改、有公信力;壞處是<strong>又貴又慢</strong>。</p>
   <p><strong>鏈下(off-chain)</strong>= 普通伺服器上的資料。快、便宜,但要信任跑它的人。</p>
@@ -217,7 +217,7 @@
 </section>
 
 <section id="gloss">
-  <h2 class="sec"><span class="n">②</span>術語表(下面看到不懂的詞就回來查)</h2>
+  <h2 class="sec"><span class="n">②</span>術語定義</h2>
   <div class="gloss">
     <div class="term"><span class="n">stream</span><span class="zh">串流 / 佇列</span>
       <p>一條訊息佇列本身。CBQS 的基本單位,一個 owner 可以有很多條。</p></div>
@@ -271,8 +271,8 @@
 </section>
 
 <section id="core">
-  <h2 class="sec"><span class="n">③</span>核心觀念:鏈為什麼不該在資料路徑上</h2>
-  <p>這一節值得單獨講,因為後面八成的變更都是它的推論。</p>
+  <h2 class="sec"><span class="n">③</span>核心觀念:鏈為什麼不在資料路徑上</h2>
+  <p>這一節單獨成節,因為後面約八成的變更都是它的推論。</p>
 
   <div class="fig">
     <svg viewBox="0 0 760 250" role="img" aria-label="v1 與 v2 的請求路徑對照圖">
@@ -331,10 +331,10 @@
 </section>
 
 <section id="nums">
-  <h2 class="sec"><span class="n">④</span>數字對照(每個數字都解釋在量什麼)</h2>
+  <h2 class="sec"><span class="n">④</span>數字對照</h2>
   <div class="tw">
   <table>
-    <thead><tr><th>指標</th><th>這在量什麼(白話)</th><th class="num">v1</th><th class="num">v2</th><th class="num">變化</th></tr></thead>
+    <thead><tr><th>指標</th><th>該指標的含義</th><th class="num">v1</th><th class="num">v2</th><th class="num">變化</th></tr></thead>
     <tbody>
       <tr><td>結構定義數</td><td>協議裡需要精確定義位元組格式的資料型別</td><td class="num was">80</td><td class="num now">16</td><td class="dl">−80%</td></tr>
       <tr><td>簽名物件種類</td><td>需要密碼學簽名、且要定義簽名前像的東西</td><td class="num was">13</td><td class="num now">3</td><td class="dl">−77%</td></tr>

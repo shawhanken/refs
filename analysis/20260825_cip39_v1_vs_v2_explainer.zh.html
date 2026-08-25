@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CIP-39 v1 → v2 · 全面对比与变更原由(小白友好)</title>
+<title>CIP-39 v1 → v2 · 全面对比与变更原由</title>
 <style>
   :root{
     --bg:#0f1216; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
@@ -122,21 +122,21 @@
 <nav>
   <h2>目录</h2>
   <a href="#tldr">一分钟导读</a>
-  <a href="#zero">① 先搞清楚这是什么</a>
+  <a href="#zero">① 系统概观与角色</a>
   <a href="#zero-mq" class="sub">什么是消息队列</a>
   <a href="#zero-who" class="sub">四个角色</a>
   <a href="#zero-chain" class="sub">链上与链下</a>
-  <a href="#gloss">② 术语表(看到不懂就回来)</a>
-  <a href="#core">③ 内核观念:链不该在数据路径上</a>
+  <a href="#gloss">② 术语定义</a>
+  <a href="#core">③ 核心观念:链不在数据路径上</a>
   <a href="#nums">④ 数字对照</a>
   <a href="#ch1">⑤ 变更一:链退出数据路径</a>
   <a href="#ch2">⑥ 变更二:计价方式</a>
   <a href="#ch3">⑦ 变更三:四个子系统下架</a>
   <a href="#ch4">⑧ 变更四:五个补偿机制</a>
   <a href="#ch5">⑨ 变更五:v2 自我审查砍掉的</a>
-  <a href="#add">⑩ v2 添加的东西</a>
+  <a href="#add">⑩ v2 新增的东西</a>
   <a href="#keep">⑪ 刻意保留 + 明说的限制</a>
-  <a href="#act">⑫ 怎么激活</a>
+  <a href="#act">⑫ 怎样启用</a>
   <span class="tag">2026-08-25 · refs/analysis</span>
 </nav>
 
@@ -144,12 +144,11 @@
 <header class="hero">
   <div class="kick">CIP-39 · document version 2</div>
   <h1>CBQS 规格 v1 → v2:全面对比与变更原由</h1>
-  <p>这份文档写给<strong>没有读过 CIP-39、也不熟悉区块链或消息队列</strong>的读者。
-  每个术语第一次出现时都会解释,每个变更都会说明「原本怎样、现在怎样、为什么改、代价是什么」。</p>
+  <p>本文自成体系:每个术语在首次出现处给出定义,不预设读者读过 CIP-39。每个变更均记录「原本怎样、现在怎样、为什么改、代价是什么」。</p>
   <div class="meta">
     <span class="pill">v1 4,827 行</span>
     <span class="pill">v2 3,591 行</span>
-    <span class="pill">重置激活 · 无迁移</span>
+    <span class="pill">重置启用 · 无迁移</span>
     <span class="pill">系统 actor 0x17</span>
   </div>
 </header>
@@ -164,7 +163,7 @@
   <div class="box ok">
     <div class="h">三个最大的数字</div>
     <p><strong>结构定义 80 → 16 个</strong>(协议里需要精确定义的数据格式数量)<br>
-    <strong>每指令链上状态读取 233 → 48 次</strong>(运行一个链上操作要读多少笔数据)<br>
+    <strong>每指令链上状态读取 233 → 48 次</strong>(执行一个链上操作要读多少笔数据)<br>
     <strong>签名对象 13 → 3 种</strong>(需要密码学签名的东西)</p>
   </div>
   <div class="box warn">
@@ -176,20 +175,20 @@
 </section>
 
 <section id="zero">
-  <h2 class="sec"><span class="n">①</span>先搞清楚这是什么</h2>
+  <h2 class="sec"><span class="n">①</span>系统概观:CBQS 是什么、由谁使用</h2>
 
   <h3 id="zero-mq">什么是「消息队列」</h3>
-  <p>想像一个餐厅的出单机。服务生把点单粘贴去,厨师一张一张撕下来做。点单机让两边<strong>不必同时在场</strong>:
+  <p>想象一个餐厅的出单机。服务生把点单贴上去,厨师一张一张撕下来做。点单机让两边<strong>不必同时在场</strong>:
   服务生不用等厨师有空,厨师忙完再来拿下一张。</p>
   <div class="box analogy">
-    <div class="h">模拟:出单机</div>
+    <div class="h">类比:出单机</div>
     <p>消息队列就是软件版的出单机。<strong>生产者(producer)</strong>把消息放进去,<strong>消费者(consumer)</strong>
     取出来处理。这样两边可以独立扩容、独立故障、独立重启,而不会互相拖累。</p>
     <p>CBQS 要解决的具体场景:Cowboy 上的 <strong>runner</strong>(运行 AI 任务、HTTP 请求的链下程序)之间
     需要互相传工作消息,而这些消息不适合塞进区块链——太大、太频繁、太不值钱。</p>
   </div>
 
-  <h3 id="zero-who">四个角色,分清楚就不会乱</h3>
+  <h3 id="zero-who">四个角色及其边界</h3>
   <div class="flow">
     <div class="step"><b>Owner 拥有者</b><span>在链上持有这条队列的人。他付钱,他决定谁能用。</span></div>
     <div class="step"><b>Provider 服务商</b><span>实际跑服务器、存数据、送消息的人。他收钱。</span></div>
@@ -197,18 +196,18 @@
     <div class="step"><b>Holder 凭证持有者</b><span>拿到 owner 签发的授权、实际来读写消息的程序。</span></div>
   </div>
   <div class="box info">
-    <div class="h">为什么要分这么细</div>
+    <div class="h">这个区分为什么重要</div>
     <p>因为<strong>付钱的人、做事的人、用的人可以是三批人</strong>。owner 可能是一家公司,provider 是它租的
     服务商,holder 是它自己的十个微服务——每个微服务拿到的权限还可以不一样(有的只能写、有的只能读)。
     规格必须说清楚每一条规则约束的是谁。</p>
   </div>
 
-  <h3 id="zero-chain">「链上」和「链下」差在哪</h3>
+  <h3 id="zero-chain">「链上」与「链下」的区别</h3>
   <p><strong>链上(on-chain)</strong>= 写进区块链的数据。全世界每个验证节点都要存一份、都要算出一模一样的结果。
-  好处是不可窜改、有公信力;坏处是<strong>又贵又慢</strong>。</p>
+  好处是不可篡改、有公信力;坏处是<strong>又贵又慢</strong>。</p>
   <p><strong>链下(off-chain)</strong>= 普通服务器上的数据。快、便宜,但要信任跑它的人。</p>
   <div class="box analogy">
-    <div class="h">模拟:法院与仓库</div>
+    <div class="h">类比:法院与仓库</div>
     <p>链就像法院:适合登记「这间仓库是谁的」「租金付到几号」。你不会把每一箱货物进出都去法院公证一次——
     那既没必要,也瘫痪法院。</p>
     <p><strong>v1 的问题正是如此:它每搬一箱货都去法院盖章。</strong>v2 把法院的职责收回到
@@ -217,12 +216,12 @@
 </section>
 
 <section id="gloss">
-  <h2 class="sec"><span class="n">②</span>术语表(下面看到不懂的词就回来查)</h2>
+  <h2 class="sec"><span class="n">②</span>术语定义</h2>
   <div class="gloss">
-    <div class="term"><span class="n">stream</span><span class="zh">串流 / 队列</span>
+    <div class="term"><span class="n">stream</span><span class="zh">流 / 队列</span>
       <p>一条消息队列本身。CBQS 的基本单位,一个 owner 可以有很多条。</p></div>
     <div class="term"><span class="n">lane</span><span class="zh">信道</span>
-      <p>串流<b>内部</b>的分类标签,像同一个出单机上分「凉菜/热炒/甜点」。不是独立队列——所有 lane 共享
+      <p>流<b>内部</b>的分类标签,像同一个出单机上分「凉菜/热炒/甜点」。不是独立队列——所有 lane 共享
       同一个总顺序。</p></div>
     <div class="term"><span class="n">record / sequence</span><span class="zh">记录 / 序号</span>
       <p>一条消息叫 record。每条有一个严格递增的整数 <code>sequence</code>,从 0 开始,不跳号、不重用。</p></div>
@@ -230,7 +229,7 @@
       <p>一组互相<b>抢</b>消息的消费者。同一条消息在一个 group 内只会交给其中一个成员处理,但不同 group
       各自都会拿到一份。</p></div>
     <div class="term"><span class="n">lease</span><span class="zh">租约</span>
-      <p>消息交给某个消费者时发的「暂时归你处理」凭证,有时限。超时没回报就收回重派——这样消费者当机
+      <p>消息交给某个消费者时发的「暂时归你处理」凭证,有时限。超时没回报就收回重派——这样消费者宕机
       消息也不会卡死。</p></div>
     <div class="term"><span class="n">at-least-once</span><span class="zh">至少一次</span>
       <p>保证消息<b>至少</b>被送达一次,但<b>可能重复</b>。因为「刚好一次」在分布式系统里代价极高,
@@ -244,7 +243,7 @@
       <p>链上所有节点必须完全一致的那份数据。每读一次、写一次都要计价,而且两个实现算出不同结果 =
       <b>分叉</b>,是最严重的 bug。</p></div>
     <div class="term"><span class="n">governance parameter</span><span class="zh">治理参数</span>
-      <p>可以通过链上治理投票调整的设置值(例如「一条串流最多几个 lane」)。v1 有 56 个,v2 剩 31 个。</p></div>
+      <p>可以通过链上治理投票调整的设置值(例如「一条流最多几个 lane」)。v1 有 56 个,v2 剩 31 个。</p></div>
     <div class="term"><span class="n">grant</span><span class="zh">授权凭证</span>
       <p>owner 用链上密钥签发的一张「许可证」,写明持有者能做什么(读/写/管理)、能碰哪些 lane、有效到何时。</p></div>
     <div class="term"><span class="n">snapshot</span><span class="zh">链状态快照</span>
@@ -254,25 +253,25 @@
       per-lane 证明,v2 拿掉了。</p></div>
     <div class="term"><span class="n">HPKE / 端到端加密</span><span class="zh"></span>
       <p>一套标准加密方法。v1 让平台帮用户管密钥和加解密;v2 不碰——应用自己加密好再丢进来。</p></div>
-    <div class="term"><span class="n">CRDT</span><span class="zh">无冲突拷贝数据类型</span>
+    <div class="term"><span class="n">CRDT</span><span class="zh">无冲突复制数据类型</span>
       <p>一种能让多人同时编辑、事后自动合并不冲突的数据结构(例如协作文档)。v1 的 <code>fast</code>
       类别是为它设计的。</p></div>
     <div class="term"><span class="n">escrow</span><span class="zh">托管余额</span>
-      <p>预先锁在链上、用来付租金的钱。v1 每条串流一份,v2 改成每个 (owner, provider) 关系一份。</p></div>
+      <p>预先锁在链上、用来付租金的钱。v1 每条流一份,v2 改成每个 (owner, provider) 关系一份。</p></div>
     <div class="term"><span class="n">backpressure</span><span class="zh">背压</span>
       <p>接收方告诉发送方「我来不及了,慢一点」的机制。没有它,慢的消费者会被塞爆。</p></div>
     <div class="term"><span class="n">dead-letter queue</span><span class="zh">死信队列</span>
       <p>处理失败太多次的消息被丢进去的地方。v2 把整套拿掉了(原因见第 ⑨ 节)。</p></div>
     <div class="term"><span class="n">conformance</span><span class="zh">一致性(符合度)</span>
-      <p>一份「怎样才算正确实现了这个规格」的可测清单。v1 完全没有,v2 添加了一整章。</p></div>
+      <p>一份「怎样才算正确实现了这个规格」的可测清单。v1 完全没有,v2 新增了一整章。</p></div>
     <div class="term"><span class="n">gas / metering</span><span class="zh">计量</span>
       <p>链上每个操作要收多少运算费。必须<b>逐字节精确</b>,因为两个节点算出不同的 gas 就是分叉。</p></div>
   </div>
 </section>
 
 <section id="core">
-  <h2 class="sec"><span class="n">③</span>内核观念:链为什么不该在数据路径上</h2>
-  <p>这一节值得单独讲,因为后面八成的变更都是它的推论。</p>
+  <h2 class="sec"><span class="n">③</span>核心观念:链为什么不在数据路径上</h2>
+  <p>这一节单独成节,因为后面约八成的变更都是它的推论。</p>
 
   <div class="fig">
     <svg viewBox="0 0 760 250" role="img" aria-label="v1 與 v2 的請求路徑對照圖">
@@ -334,14 +333,14 @@
   <h2 class="sec"><span class="n">④</span>数字对照(每个数字都解释在量什么)</h2>
   <div class="tw">
   <table>
-    <thead><tr><th>指针</th><th>这在量什么(白话)</th><th class="num">v1</th><th class="num">v2</th><th class="num">变化</th></tr></thead>
+    <thead><tr><th>指标</th><th>该指标的含义</th><th class="num">v1</th><th class="num">v2</th><th class="num">变化</th></tr></thead>
     <tbody>
       <tr><td>结构定义数</td><td>协议里需要精确定义字节格式的数据类型</td><td class="num was">80</td><td class="num now">16</td><td class="dl">−80%</td></tr>
       <tr><td>签名对象种类</td><td>需要密码学签名、且要定义签名前像的东西</td><td class="num was">13</td><td class="num now">3</td><td class="dl">−77%</td></tr>
       <tr><td>保留状态读取</td><td>所有链上指令加总,要读多少笔共识数据</td><td class="num was">233</td><td class="num now">48</td><td class="dl">−79%</td></tr>
       <tr><td>治理参数</td><td>可以投票调整的设置值个数</td><td class="num was">56</td><td class="num now">31</td><td class="dl">−45%</td></tr>
       <tr><td><code>MUST</code> 条数</td><td>规格里的强制要求数量</td><td class="num was">331</td><td class="num now">154</td><td class="dl">−53%</td></tr>
-      <tr><td><code>StreamRecord</code> 字段</td><td>每条串流在链上存几个字段</td><td class="num was">26</td><td class="num now">9</td><td class="dl">−65%</td></tr>
+      <tr><td><code>StreamRecord</code> 字段</td><td>每条流在链上存几个字段</td><td class="num was">26</td><td class="num now">9</td><td class="dl">−65%</td></tr>
       <tr><td><code>StreamConfig</code> 字段</td><td>设置值有几个在链上</td><td class="num was">12</td><td class="num now">0</td><td class="dl">−100%</td></tr>
       <tr><td><code>RecordHeader</code> 字段</td><td>每条消息的标头有几个字段</td><td class="num was">10</td><td class="num now">3</td><td class="dl">−70%</td></tr>
       <tr><td>链上指令</td><td>可以送上链的操作种类</td><td class="num was">9</td><td class="num now">8</td><td class="dl">−1</td></tr>
@@ -376,7 +375,7 @@
     </table>
     </div>
     <p><code>UpdateStream</code> 从读 35 笔变成读 2 笔,是因为它以前要把整份链上设置和计价表都读进来检查。
-    设置搬到链下之后,它只需要确认「这条串流存在、你是管理员」。</p>
+    设置搬到链下之后,它只需要确认「这条流存在、你是管理员」。</p>
   </details>
 </section>
 
@@ -400,36 +399,36 @@
     <div class="a"><div class="lbl">v1</div><p>每次写入返回一张 broker 签名的收据,串进<b>全域</b>和
     <b>每个 lane</b> 两条哈希链。连 Ack/Nack/Extend/Reject/Redrive 和群组变更都各自有收据和自己的链——
     共 12 种带收据的动作。</p></div>
-    <div class="b"><div class="lbl">v2</div><p>每个持久化批量一张 <code>CheckpointReceiptV2</code>,
-    用一个扁平摘要涵盖整批,再用连续性规则把批量串起来。消息路径上零非对称密码学。</p></div>
+    <div class="b"><div class="lbl">v2</div><p>每个持久化批次一张 <code>CheckpointReceiptV2</code>,
+    用一个扁平摘要涵盖整批,再用连续性规则把批次串起来。消息路径上零非对称密码学。</p></div>
   </div>
   <div class="rc"><div class="t">为什么</div><p>批量提交(group commit)是所有主流消息中介达到高吞吐的办法。
   而且更细的证据<b>没有东西去消费它</b>——v1 自己的信任模型就写明没有争议仲裁、没有质押、没有罚没。
-  证据再细也没有人能拿它去运行什么。</p></div>
-  <div class="rc cost"><div class="t">代价</div><p>证据粒度从「单条消息」降到「一个批量」。而且<b>只持有批量
+  证据再细也没有人能拿它去执行什么。</p></div>
+  <div class="rc cost"><div class="t">代价</div><p>证据粒度从「单条消息」降到「一个批次」。而且<b>只持有批次
   一部分的人根本无法验证</b>——v2 把这句话明写出来,而不是让人误以为有逐则证明。</p></div>
 </section>
 
 <section id="ch2">
   <h2 class="sec"><span class="n">⑥</span>变更二:计价从「按量」变「按条」</h2>
   <div class="box analogy">
-    <div class="h">模拟:水表 vs 月租</div>
+    <div class="h">类比:水表 vs 月租</div>
     <p>v1 像装水表:按流量、按存量、按带宽三种单位分别计价,还分两种资费方案(标准/快速),
     每种三个单位、每个单位两个参数——光资费表就 <strong>12 个</strong> 链上冻结参数。</p>
-    <p>v2 像收月租:<strong>一条串流每个区块固定多少钱</strong>,不管你传多少。</p>
+    <p>v2 像收月租:<strong>一条流每个区块固定多少钱</strong>,不管你传多少。</p>
   </div>
   <div class="pair">
     <div class="a"><div class="lbl">v1</div><p>一条签名报价路径 <code>PriceQuoteV1</code> <b>加上</b>一套
-    管理式资费表(12 个冻结参数)。托管余额<b>每条串流一份</b>,有停权宽限期,租金还要扣掉链暂停的时间。</p></div>
+    管理式资费表(12 个冻结参数)。托管余额<b>每条流一份</b>,有停权宽限期,租金还要扣掉链暂停的时间。</p></div>
     <div class="b"><div class="lbl">v2</div><p>一个 <code>cbqs.stream_rate_per_block</code>,从一个
-    <b>按 (owner, provider) 记帐</b>的预付帐户扣。没有报价、没有资费表、没有每串流托管、没有宽限期、
+    <b>按 (owner, provider) 记帐</b>的预付帐户扣。没有报价、没有资费表、没有每流托管、没有宽限期、
     没有暂停时钟。</p></div>
   </div>
   <div class="rc"><div class="t">为什么</div><p>那些计量单位在计价「broker 本来就会用上限挡住」的容量——
   同一份风险被两套机制各挡一次。而两条资费路径意味着两套准入规则、两种失败模式、两组错误码,只为回答
-  同一个问题:<b>这条串流这个区块可不可以存在?</b></p></div>
-  <div class="rc cost"><div class="t">代价</div><p>provider 无法对重负载的串流收更多钱。它的风险改由
-  §15 的每串流上限和它自己的 <code>max_streams</code> 界定,而不是靠价格。</p></div>
+  同一个问题:<b>这条流这个区块可不可以存在?</b></p></div>
+  <div class="rc cost"><div class="t">代价</div><p>provider 无法对重负载的流收更多钱。它的风险改由
+  §15 的每流上限和它自己的 <code>max_streams</code> 界定,而不是靠价格。</p></div>
   <div class="kv">
     <span>− ActivateKeyGeneration</span><span>− SetProviderStatus</span><span>− SettleStreamRent</span>
     <span>− TopUpStream</span><span class="add">+ SettleAccount</span><span class="add">+ TopUpAccount</span>
@@ -456,34 +455,34 @@
   <h3>3.1 <code>fast</code> 快速交付类别</h3>
   <div class="pair">
     <div class="a"><div class="lbl">v1 · 提到 109 次</div><p>第二种交付类别,有暂定确认、broker 世代、
-    <code>FastLineageV1</code> 血统追踪、Clean/Void 两种世代转换语意、暂定与持久两条水位线,
+    <code>FastLineageV1</code> 血统追踪、Clean/Void 两种世代转换语义、暂定与持久两条水位线,
     外加一整套规范性的 CRDT 重新同步进程。</p></div>
     <div class="b"><div class="lbl">v2 · 提到 1 次</div><p>只有一种交付类别。那 1 次出现在「被移除了什么」的清单里。</p></div>
   </div>
   <div class="rc"><div class="t">为什么</div><p>在还没有任何用户之前,一份文档里就放了<b>两套持久性模型、
-  两条当机复原路径、两种识别码形状</b>。</p></div>
+  两条宕机复原路径、两种识别码形状</b>。</p></div>
   <div class="rc cost"><div class="t">代价</div><p>这是<b>真的退步</b>,而且文档明说:协作光标、在线状态这类
-  workload 要多付一个批量窗口(约 20 毫秒)的延迟。这是最可能第一个被要求加回来的东西。</p></div>
+  workload 要多付一个批次窗口(约 20 毫秒)的延迟。这是最可能第一个被要求加回来的东西。</p></div>
 
   <h3>3.2 Lane 分区的 Merkle 证明</h3>
   <div class="pair">
     <div class="a"><div class="lbl">v1 · 约 400 行</div><p>两种树算法(含奇数节点提升规则和一段关于长度歧义
-    的论证)、固定深度 256 的稀疏树、bitmap 证明、规范化下降路径、每批量的每 lane 存在与不存在证明、
+    的论证)、固定深度 256 的稀疏树、bitmap 证明、规范化下降路径、每批次的每 lane 存在与不存在证明、
     遗漏检测、两种验证模式。</p></div>
-    <div class="b"><div class="lbl">v2 · 1 句话</div><p>每批量一个扁平摘要,外加一句「lane 范围的订阅者
+    <div class="b"><div class="lbl">v2 · 1 句话</div><p>每批次一个扁平摘要,外加一句「lane 范围的订阅者
     无法验证 checkpoint」。</p></div>
   </div>
   <div class="rc"><div class="t">为什么</div><p>这套机制检测的是<b>真实存在的缺陷</b>(provider 偷偷漏送某个
   lane 的消息)。但 v1 里没有任何东西能处置这个检测结果:没有争议机制、没有质押、没有罚没。
   v1 自己对「provider 出问题」开的药方是「换一家」。<b>检测得到但无法追究,等于没有。</b></p></div>
   <div class="rc cost"><div class="t">代价</div><p>明说不藏:lane 范围的验证不可用,变通办法是「一个验证域
-  开一条串流」。要加回来,应该和让检测有意义的争议机制一起加。</p></div>
+  开一条流」。要加回来,应该和让检测有意义的争议机制一起加。</p></div>
 
-  <h3>3.3 平台加密、密钥串流、CBSS 托管</h3>
+  <h3>3.3 平台加密、密钥流、CBSS 托管</h3>
   <div class="pair">
-    <div class="a"><div class="lbl">v1 · 加密 36 次 / CBSS 18 次</div><p>HPKE 信封、每条数据串流配一条密钥
-    串流、分块上传的密钥轮替批量(自带收据)、成员变更语意、一个专属链上指令
-    <code>ActivateKeyGeneration</code>、CBSS 门槛式根密钥托管,以及 5 个密钥批量参数。</p></div>
+    <div class="a"><div class="lbl">v1 · 加密 36 次 / CBSS 18 次</div><p>HPKE 信封、每条数据流配一条密钥
+    流、分块上传的密钥轮替批次(自带收据)、成员变更语义、一个专属链上指令
+    <code>ActivateKeyGeneration</code>、CBSS 门槛式根密钥托管,以及 5 个密钥批次参数。</p></div>
     <div class="b"><div class="lbl">v2</div><p>payload 就是不透明的字节。应用自己管密钥。
     broker <b>MUST NOT</b> 解读 payload 内容。</p></div>
   </div>
@@ -561,16 +560,16 @@
 </section>
 
 <section id="add">
-  <h2 class="sec"><span class="n">⑩</span>v2 添加的东西(简化不只是减法)</h2>
+  <h2 class="sec"><span class="n">⑩</span>v2 新增的东西(简化不只是减法)</h2>
   <p>下面前三项,<strong>v1 完全没有对应章节</strong>。</p>
   <ul>
     <li><b>一致性章节(Conformance)。</b>v1 没有。§19 说明「怎样才算正确实现」,并且<b>另外列出哪些要求
     是从外部观测不到的</b>——这样读者能分辨「可稽核的保证」和「只能靠信任的义务」。</li>
     <li><b>激活章节(Activation)。</b>v1 没有。§18 说明激活是<b>重置</b>、用封闭世界规则让 genesis 拒绝
     所有 v1 参数(不必逐一枚举),并钉死保存格式标记键,让 v2 的 broker 打不开 v1 的数据库。</li>
-    <li><b>钉住的 gas 矢量文件。</b>27 条矢量涵盖每个链上指令的每个分支,用 SHA-256 钉在 §15.1 里,
+    <li><b>钉住的 gas 向量文件。</b>27 条向量涵盖每个链上指令的每个分支,用 SHA-256 钉在 §15.1 里,
     逐条写明计费的读、写、cycles、cells。<b>两个验证节点算出不同 gas 就是分叉</b>,v1 把这件事留给散文。</li>
-    <li><b>预付帐户对象与提领路径。</b>钱从串流记录搬走之后,总得有地方放、有办法拿回来。</li>
+    <li><b>预付帐户对象与提领路径。</b>钱从流记录搬走之后,总得有地方放、有办法拿回来。</li>
     <li><b>运维面(§17)。</b>定义 <code>/readyz</code>、<code>/statusz</code>、<code>/metrics</code>,
     其中包含一条关键规则:<b>链快照刷新失败 MUST NOT 让 broker 变成未就绪</b>——这条规则才让
     「数据面独立于链」在实务上成立(否则负载平衡器会把还能服务的 broker 全部摘掉)。</li>
@@ -587,7 +586,7 @@
     「自己维护客户名单的中间件」,而不是 Cowboy 的服务。</li>
     <li><b>带同意权的 provider 注册表。</b><code>accepts_new</code> 和 <code>max_streams</code>,
     让一个无需许可的注册表<b>不能</b>把 provider 塞爆。</li>
-    <li><b>至少一次语意,精简到工作队列真正需要的部分。</b>租约、可见性超时、尝试次数、每持有者的
+    <li><b>至少一次语义,精简到工作队列真正需要的部分。</b>租约、可见性超时、尝试次数、每持有者的
     在途上限、四个租约动作。</li>
     <li><b>信用额度式背压</b>(背压必须是明示的),以及<b>先持久化再确认</b>(否则就是静默丢失)。</li>
   </ul>
@@ -611,7 +610,7 @@
 </section>
 
 <section id="act">
-  <h2 class="sec"><span class="n">⑫</span>怎么激活:重置,不是迁移</h2>
+  <h2 class="sec"><span class="n">⑫</span>怎样启用:重置,不是迁移</h2>
   <div class="box info">
     <div class="h">为什么可以直接重置</div>
     <p>CBQS <strong>从来没有在一个「状态必须被保留」的网络上激活过</strong>,而且 v1 自己就把自己规定为
