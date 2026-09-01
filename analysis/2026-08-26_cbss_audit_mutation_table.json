@@ -1,0 +1,51 @@
+{
+  "M2_freshness": {
+    "status": "SURVIVED",
+    "killers": [],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M3_metadata_equality": {
+    "status": "SURVIVED",
+    "killers": [],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M4_scope": {
+    "status": "SURVIVED",
+    "killers": [],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M5_runner_sig": {
+    "status": "KILLED",
+    "killers": [
+      "[   0.021s] (149/401) cbssd chain_authorizer::tests::http_chain_authorizer_rejects_forged_runner_signature"
+    ],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M6_job_assignment": {
+    "status": "KILLED",
+    "killers": [
+      "[   0.025s] (151/401) cbssd chain_authorizer::tests::http_chain_authorizer_rejects_submitter_mismatch",
+      "[   0.027s] (158/401) cbssd chain_authorizer::tests::http_chain_authorizer_rejects_trading_post_submitter_mismatch"
+    ],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M7_manifest": {
+    "status": "SURVIVED",
+    "killers": [],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  },
+  "M8_chain_id": {
+    "status": "KILLED",
+    "killers": [
+      "[   0.019s] (147/401) cbssd chain_authorizer::tests::http_chain_authorizer_rejects_foreign_chain_before_network_access"
+    ],
+    "adversarial_pass": 21,
+    "adversarial_total": 21
+  }
+}

@@ -1,0 +1,279 @@
+diff --git a/crates/cbssd/src/chain_authorizer.rs b/crates/cbssd/src/chain_authorizer.rs
+index 173f2a8..fde2e38 100644
+--- a/crates/cbssd/src/chain_authorizer.rs
++++ b/crates/cbssd/src/chain_authorizer.rs
+@@ -1558,4 +1558,104 @@ mod tests {
+ 
+         assert_eq!(auth.scope, ReleaseKeyScope::Account(secret_id.account));
+     }
++
++    // ---------------- AUDIT PROBE (not part of the product) ----------------
++    async fn probe_mount_two_member_committee(
++        server: &MockServer,
++        request: &SignedReleaseRequest,
++        proxy_a: ProxyId,
++        proxy_b: ProxyId,
++    ) {
++        let account_hex = hex_addr(request.body.secret_id.account);
++        let key_hash_hex = format!("0x{}", hex::encode(request.body.secret_id.key_hash));
++        Mock::given(method("GET"))
++            .and(path(format!("/cbss/secret/{account_hex}/{key_hash_hex}")))
++            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
++                "chain_id": request.body.chain_id,
++                "secret_id": { "account": account_hex, "key_hash": key_hash_hex },
++                "version": request.body.version,
++                "recipient": { "kind": "account", "account": account_hex },
++                "policy": { "actors": [hex_addr(request.body.actor)], "tee_required": false },
++                "wrap_epoch": 4,
++                "request_block": 110,
++                "release_key": {
++                    "scope": { "kind": "account", "account": account_hex },
++                    "threshold": 2,
++                    "committee_epoch": request.body.serve_epoch,
++                    "vss_commitments_g2": [],
++                    "committee": [
++                        { "proxy_id": format!("0x{}", hex::encode(proxy_a.as_bytes())),
++                          "proxy_index": 1,
++                          "network_addr": "quic://127.0.0.1:9601",
++                          "tls_spki": "0x01" },
++                        { "proxy_id": format!("0x{}", hex::encode(proxy_b.as_bytes())),
++                          "proxy_index": 2,
++                          "network_addr": "quic://127.0.0.1:9602",
++                          "tls_spki": "0x02" }
++                    ]
++                }
++            })))
++            .mount(server)
++            .await;
++        Mock::given(method("GET"))
++            .and(path(format!("/job/0x{}", hex::encode(request.body.job_id.as_bytes()))))
++            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
++                "submitter": hex_addr(request.body.actor),
++                "callback": { "actor": hex_addr(request.body.actor), "handler": "on_result", "payload": null },
++            })))
++            .mount(server)
++            .await;
++        Mock::given(method("GET"))
++            .and(path(format!("/job/0x{}/runners", hex::encode(request.body.job_id.as_bytes()))))
++            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
++                "runners": [hex_addr(request.body.runner_id)],
++            })))
++            .mount(server)
++            .await;
++        Mock::given(method("GET"))
++            .and(path(format!("/actor/{}/manifest", hex_addr(request.body.actor))))
++            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
++                "entitlements": [{ "id": "secrets.read", "params": { "keys": [format!("{account_hex}:API_KEY")] } }]
++            })))
++            .mount(server)
++            .await;
++    }
++
++    /// AUDIT PROBE: a byte-identical `SignedReleaseRequest` — the value every
++    /// `SubmitReleaseReceipt` republishes verbatim on chain — authorizes at a
++    /// committee proxy the runner NEVER queried. `authorize()` consumes only
++    /// (a) the request and (b) the proxy's OWN id; the caller contributes
++    /// nothing, so there is no caller-side property any gate could test.
++    #[tokio::test]
++    async fn probe_replayed_request_authorizes_at_a_proxy_that_never_served() {
++        let runner_key = k256::ecdsa::SigningKey::random(&mut OsRng);
++        let runner_id = verifying_key_to_address(runner_key.verifying_key());
++        let secret_id = secret_id(address(7), "API_KEY");
++        let request = signed_request_for(&runner_key, secret_id, address(8), runner_id, 9);
++        let proxy_a = H256::from_low_u64_be(1);
++        let proxy_b = H256::from_low_u64_be(2);
++        let server = MockServer::start().await;
++        probe_mount_two_member_committee(&server, &request, proxy_a, proxy_b).await;
++
++        // 1. The proxy the runner actually queried.
++        let auth_a = HttpChainReleaseAuthorizer::new(server.uri(), 1, proxy_a)
++            .authorize(&request)
++            .await
++            .expect("served proxy authorizes");
++        assert_eq!(auth_a.proxy_index, 1);
++
++        // 2. A chain OBSERVER harvests `receipt.runner_request` and re-presents
++        //    the identical bytes to proxy B. Round-trip through the same
++        //    serde codec the receipt/chain path uses to prove verbatim reuse.
++        let wire = serde_json::to_vec(&request).unwrap();
++        let replayed: SignedReleaseRequest = serde_json::from_slice(&wire).unwrap();
++        assert_eq!(replayed, request, "observer replays the request verbatim");
++
++        let auth_b = HttpChainReleaseAuthorizer::new(server.uri(), 1, proxy_b)
++            .authorize(&replayed)
++            .await
++            .expect("PROBE: proxy that never served MUST have rejected the replay");
++        assert_eq!(auth_b.proxy_index, 2);
++        assert_eq!(auth_b.committee_epoch, auth_a.committee_epoch);
++    }
+ }
+diff --git a/crates/cbssd/src/partial_sign.rs b/crates/cbssd/src/partial_sign.rs
+index ed6f980..247e558 100644
+--- a/crates/cbssd/src/partial_sign.rs
++++ b/crates/cbssd/src/partial_sign.rs
+@@ -1351,4 +1351,165 @@ mod tests {
+         }
+         assert!(ServedRequests::from_persisted(records).is_err());
+     }
++
++    // ---------------- AUDIT PROBE (not part of the product) ----------------
++    fn probe_dkg_outputs_for_two_proxies() -> (cbss_crypto::DkgOutput, cbss_crypto::DkgOutput) {
++        let mut rng = thread_rng();
++        let indexes = vec![1, 2, 3];
++        let mut coordinators = indexes
++            .iter()
++            .map(|index| DkgCoordinator::for_committee(*index, indexes.clone(), 2, &mut rng))
++            .collect::<Result<Vec<_>, _>>()
++            .unwrap();
++        let round1 = coordinators
++            .iter_mut()
++            .map(DkgCoordinator::start)
++            .collect::<Result<Vec<_>, _>>()
++            .unwrap();
++        let round2_one = coordinators
++            .iter()
++            .map(|coordinator| coordinator.round2_for(1))
++            .collect::<Result<Vec<_>, _>>()
++            .unwrap();
++        let round2_two = coordinators
++            .iter()
++            .map(|coordinator| coordinator.round2_for(2))
++            .collect::<Result<Vec<_>, _>>()
++            .unwrap();
++        (
++            DkgCoordinator::finalize(1, &round1, &round2_one).unwrap(),
++            DkgCoordinator::finalize(2, &round1, &round2_two).unwrap(),
++        )
++    }
++
++    fn probe_store_share(
++        store: &CbssdStore,
++        scope: ReleaseKeyScope,
++        epoch: u64,
++        operator_storage_key: &[u8],
++        output: &cbss_crypto::DkgOutput,
++        proxy_id: ProxyId,
++    ) {
++        let share_bytes: [u8; 32] = output
++            .share_scalar
++            .as_slice()
++            .try_into()
++            .expect("share scalar length");
++        let share = Option::<Scalar>::from(Scalar::from_bytes_le(&share_bytes)).unwrap();
++        let sealed = seal_share(
++            operator_storage_key,
++            &share,
++            &share_storage_aad(&scope, epoch),
++            &mut thread_rng(),
++        )
++        .unwrap();
++        store
++            .put_share(&crate::ShareRecord {
++                scope,
++                epoch,
++                proxy_id,
++                threshold: 2,
++                committee: vec![proxy(1), proxy(2)],
++                lifecycle: crate::ShareLifecycle::Active,
++                activation_block: Some(90),
++                mpk_g2: output.mpk_g2.clone(),
++                sealed_share: bincode::serialize(&sealed).unwrap(),
++                vss_commitments_g2: output.vss_commitments_g2.clone(),
++                created_at_block: 90,
++            })
++            .unwrap();
++    }
++
++    /// AUDIT PROBE: one signed release request, two DISTINCT proxies, two
++    /// distinct valid partials. The `ServedRequests` replay guard lives inside a
++    /// single `PartialSignService` + its own `CbssdStore`, so proxy 2 has no
++    /// record that proxy 1 already served this exact `request_hash`.
++    #[tokio::test]
++    async fn probe_same_signed_request_yields_partials_from_two_distinct_proxies() {
++        let dir_one = tempfile::tempdir().unwrap();
++        let dir_two = tempfile::tempdir().unwrap();
++        let store_one = CbssdStore::new(
++            dir_one.path().join("shares"),
++            dir_one.path().join("audit.jsonl"),
++        );
++        let store_two = CbssdStore::new(
++            dir_two.path().join("shares"),
++            dir_two.path().join("audit.jsonl"),
++        );
++        let account = Address::from_low_u64_be(9);
++        let scope = ReleaseKeyScope::Account(account);
++        let operator_storage_key = b"operator-storage-key";
++        let (output_one, output_two) = probe_dkg_outputs_for_two_proxies();
++        probe_store_share(
++            &store_one,
++            scope.clone(),
++            7,
++            operator_storage_key,
++            &output_one,
++            proxy(1),
++        );
++        probe_store_share(
++            &store_two,
++            scope.clone(),
++            7,
++            operator_storage_key,
++            &output_two,
++            proxy(2),
++        );
++
++        let auth = |proxy_index: u32| ReleaseAuthorization {
++            scope: scope.clone(),
++            committee_epoch: 7,
++            wrap_epoch: 4,
++            proxy_index,
++            served_at_block: 101,
++        };
++        let service_one = PartialSignService::new(
++            proxy(1),
++            store_one.clone(),
++            StaticAuthorizer { auth: auth(1) },
++            |_bytes: &[u8]| Ok(Signature::zero()),
++        )
++        .unwrap();
++        let service_two = PartialSignService::new(
++            proxy(2),
++            store_two.clone(),
++            StaticAuthorizer { auth: auth(2) },
++            |_bytes: &[u8]| Ok(Signature::zero()),
++        )
++        .unwrap();
++
++        let psr = PartialSignRequest {
++            version_byte: PROTOCOL_VERSION,
++            request: signed_request(account, 3, 4, 7),
++        };
++
++        // Proxy 1 serves the legitimate runner.
++        let sigma_one = service_one
++            .handle(psr.clone(), operator_storage_key)
++            .await
++            .expect("proxy 1 serves");
++
++        // Proxy 1 will not serve the same bytes twice.
++        assert!(matches!(
++            service_one
++                .handle(psr.clone(), operator_storage_key)
++                .await
++                .unwrap_err(),
++            PartialSignError::ReplayedRequest
++        ));
++
++        // Proxy 2 — never queried by the runner — serves the SAME bytes.
++        let sigma_two = service_two
++            .handle(psr.clone(), operator_storage_key)
++            .await
++            .expect("PROBE: proxy 2 MUST have refused the harvested request");
++
++        assert_ne!(
++            sigma_one.sigma_i, sigma_two.sigma_i,
++            "two independent partials on the same identity"
++        );
++        assert_eq!(store_one.load_served_requests().unwrap().len(), 1);
++        assert_eq!(store_two.load_served_requests().unwrap().len(), 1);
++    }
+ }
