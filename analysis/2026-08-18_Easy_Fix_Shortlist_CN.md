@@ -4,7 +4,7 @@
 **来源报告**：`refs/analysis/Cowboy CIP · Issue Disposition Snapshot (how many issues each CIP still has left).html`（数据时点 2026-08-17 24:00 北京时间，口径 = ours/unassigned，排除客户方）
 **Linear 实况**：2026-08-18 直接查 GraphQL 复核，见 §1
 **代码基线**：`node@devnet 99042956`、`cbfs@devnet 7b55d09`、`runner@devnet ebf2054`、`cowboy@devnet 62cd3ae`
-**配套文档**：`20260806_Issue_Difficulty_Assessment_CN.md`（109 条难度评估，08-11 代码对比更新）、`20260810_CIP9_Open_Issues_Deep_Review_CN.md`（CIP-9 深度审核）
+**配套文档**：`2026-08-06_Issue_Difficulty_Assessment_CN.md`（109 条难度评估，08-11 代码对比更新）、`2026-08-10_CIP9_Open_Issues_Deep_Review_CN.md`（CIP-9 深度审核）
 
 > 本文回答的是「**现在就能开工、且开工后不会被共识面/跨仓/决策门拖住**的是哪几条」。
 > 每条 A/B 级都在上面的代码基线上**实地看过改点**（文件:行号列在表里），不是按 Issue 标题推定。
@@ -94,7 +94,7 @@
 
 ## 5. 本文没有逐条评估的部分
 
-107 条里，A/B 级之外的绝大多数在 `20260806_Issue_Difficulty_Assessment_CN.md` 里已有 M/L/XL 评级（并在 08-07 / 08-11 两轮里多条从 S 降为 M），本文不重复。**没有单独评级**的是 08-18 新开那批里的重活：COW-3260（pre-auth QUIC 内存边界）、3263（root placement 进提交原子性）、3264（FUSE writer fencing / rebase）、3266（增量 scrub）、3267（分块流式写）、3268（prune gap 对账）、3269（原子容量预留 + 累计配额）、3270（`path_prefix` 授权边界）、3274（写截止 + 耐久 quorum）、3275/3276（release-key 与中继身份认证）、3277（placement tombstone）——这些是设计题，不是快赢。
+107 条里，A/B 级之外的绝大多数在 `2026-08-06_Issue_Difficulty_Assessment_CN.md` 里已有 M/L/XL 评级（并在 08-07 / 08-11 两轮里多条从 S 降为 M），本文不重复。**没有单独评级**的是 08-18 新开那批里的重活：COW-3260（pre-auth QUIC 内存边界）、3263（root placement 进提交原子性）、3264（FUSE writer fencing / rebase）、3266（增量 scrub）、3267（分块流式写）、3268（prune gap 对账）、3269（原子容量预留 + 累计配额）、3270（`path_prefix` 授权边界）、3274（写截止 + 耐久 quorum）、3275/3276（release-key 与中继身份认证）、3277（placement tombstone）——这些是设计题，不是快赢。
 
 ---
 

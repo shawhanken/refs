@@ -15,7 +15,7 @@ ACTORS = f"{ROOT}/node/runner/src/system_actors.rs"
 CIP_DIR = f"{ROOT}/cowboy/docs/cips"
 
 # Known-benign exceptions (host syscalls, correct "does-not-exist" prose, and the
-# CIP-10-owner holdout tracked in 2026-07-13-system-actor-address-reconciliation.md).
+# CIP-10-owner holdout tracked in 2026-07-13_system-actor-address-reconciliation.md).
 IGNORE_OPNAMES = {"SYS_FETCH_SECRET_METADATA", "SYS_VALIDATOR_", "SYS_SESSION_"}
 IGNORE_DOCS_FOR_CONTAINER_0X11 = {"cip-10-runner-containers.md"}  # owner to fix
 

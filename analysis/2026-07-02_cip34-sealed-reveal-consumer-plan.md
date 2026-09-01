@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust; `blstrs` (pairing, already in execution); new execution deps `hkdf`,`sha2`,`aes-gcm`; `cowboy-protocol-codec` (new rev); node `cowboy-execution`.
 
-**Spec:** `refs/analysis/2026-07-02-cip34-sealed-reveal-consumer-design.md`.
+**Spec:** `refs/analysis/2026-07-02_cip34-sealed-reveal-consumer-design.md`.
 
 ---
 

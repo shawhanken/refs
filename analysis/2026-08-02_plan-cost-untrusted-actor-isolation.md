@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Plan** | `/home/ubuntu/workspace/refs/analysis/2026-07-31-untrusted-actor-isolation-gaps.pdf`(35 页) |
+| **Plan** | `/home/ubuntu/workspace/refs/analysis/2026-07-31_untrusted-actor-isolation-gaps.pdf`(35 页) |
 | **Plan 版本** | 2026-07-31,pin 在 `cowboyinc/node origin/devnet 2b2e73ab` |
 | **Domain pack** | `cowboy`(34 个概念) |
 | **生成日期** | 2026-08-02 |
@@ -176,7 +176,7 @@ speculative-execution / timer-mechanism)—— **反映的是波及面,不是工
 > 本 plan 的 **B4(机检 store-write choke point)**提议**修掉**"引擎在 handler 返 `Err` 时不回滚
 > 部分写"这个缺陷。
 >
-> 而 **CIP-36**(`2026-08-02-plan-cost-cip-36.md`)§6.2 / §6.3 选择**绕过**同一个缺陷 ——
+> 而 **CIP-36**(`2026-08-02_plan-cost-cip-36.md`)§6.2 / §6.3 选择**绕过**同一个缺陷 ——
 > 把 check-then-apply 定为 PaymentGate 与 `settle_provider` handler 的规范。
 >
 > **两份 plan 在同一个引擎缺陷上做了相反的决定。** 这不是 Marshal 替你选,但你应该知道:

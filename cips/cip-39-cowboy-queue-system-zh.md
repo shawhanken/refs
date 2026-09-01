@@ -7,7 +7,7 @@
 > - **译自**：`cowboyinc/cowboy` 分支 `spec/cip-39-v2`，commit **`3b26751`**（2026-08-24）
 > - **文档版本**：document version 2（v1 已被整体取代，见 §19）
 > - **配套产物**：`cowboy/docs/cips/cip-39-gas-vectors-v2.json`（规范性 gas 向量，SHA-256 钉在 §16.1）
-> - **精简方案与前后对比**：[`refs/analysis/20260824_cip39_v2_simplification_plan.md`](../analysis/20260824_cip39_v2_simplification_plan.md)
+> - **精简方案与前后对比**：[`refs/analysis/2026-08-24_cip39_v2_simplification_plan.md`](../analysis/2026-08-24_cip39_v2_simplification_plan.md)
 >
 > 英文原文若有更新而本文未同步，请以上面那个 commit 为基准做 diff。
 

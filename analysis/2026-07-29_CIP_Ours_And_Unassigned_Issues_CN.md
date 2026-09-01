@@ -44,7 +44,7 @@
 ### 深审结论（无 active bug，记录以免重扫）
 
 - **governance enact 校验一致性审计**：全 24 个 `ProposalPayloadKind` 的 payload 不变量都在 submission 或 enactment 被校验，无可绕过旁路；generic `SubmitProposal` 是 basefee-specific 非任意 payload；TreasuryDisbursement 在 enactment 由 treasury 余额上界守好。**路径健全**。
-- **UpgradeSystemActor（CIP-12 §7）**：`new_code_hash` 提交/enactment 都不校验可解析——但 runtime **零消费**该 version record（系统 actor 跑 native Rust，dispatcher code-swap「not yet on-chain」，cip-12:315），故 dangling hash **今日无 brick、无 bug**。**前瞻前提**：将来接线 code-swap 时须同批加 on-chain hash-resolvability 闸。另 spec 不一致：§7.2.1 pausable allowlist 含 `0x1D` 但 §7 line 129 说 virtual actor 不 bytecode-swap（待 spec owner）。详见 `refs/analysis/2026-07-30-cip12-s7-system-actor-upgrade-notes.md`。
+- **UpgradeSystemActor（CIP-12 §7）**：`new_code_hash` 提交/enactment 都不校验可解析——但 runtime **零消费**该 version record（系统 actor 跑 native Rust，dispatcher code-swap「not yet on-chain」，cip-12:315），故 dangling hash **今日无 brick、无 bug**。**前瞻前提**：将来接线 code-swap 时须同批加 on-chain hash-resolvability 闸。另 spec 不一致：§7.2.1 pausable allowlist 含 `0x1D` 但 §7 line 129 说 virtual actor 不 bytecode-swap（待 spec owner）。详见 `refs/analysis/2026-07-30_cip12-s7-system-actor-upgrade-notes.md`。
 
 **本轮教训**：成熟 backlog 的剩余「Backlog」多为 stale-done / 大 build / spec-blocked；单票 probing 低产。真 bug（如 COW-2114 live spec-violation）来自定向 spec-vs-code 不变量审计，非逐票扫。
 
@@ -64,7 +64,7 @@
 
 ### Triage 结论（本地 + Linear 直读核实）
 
-- **CIP-8 session 簇**：**COW-1012（pin session chain_id）= 真 replay gap 但 launch-gated + 设计冲突**——voucher EIP-712 chain_id 硬编码=1、与真 chain_id 解耦 + caller-supplied session_id → 跨链 voucher 重放;但同常量被 CIP-9 volume-DEK 故意用作**跨链 portable** 身份（cbss.rs:832-838），不能简单改值，须**拆分两用途**。单链 devnet 不可利用；第二条链前必修。cross-repo + dormant。design note: `2026-07-31-cow1012-session-chainid-binding.md`。其余：COW-1013(dispute 路径 spec=future work)、COW-1542(feature)、COW-1543(runner infra)。
+- **CIP-8 session 簇**：**COW-1012（pin session chain_id）= 真 replay gap 但 launch-gated + 设计冲突**——voucher EIP-712 chain_id 硬编码=1、与真 chain_id 解耦 + caller-supplied session_id → 跨链 voucher 重放;但同常量被 CIP-9 volume-DEK 故意用作**跨链 portable** 身份（cbss.rs:832-838），不能简单改值，须**拆分两用途**。单链 devnet 不可利用；第二条链前必修。cross-repo + dormant。design note: `2026-07-31_cow1012-session-chainid-binding.md`。其余：COW-1013(dispute 路径 spec=future work)、COW-1542(feature)、COW-1543(runner infra)。
 - **CIP-29 事件订阅簇**（Linear 直读）：**COW-1922/1923 = Done**（close 候选，关前 spot-check）；**COW-1150 已交付 #1193**；COW-1917(EmitResult 未 surface=改 SDK-in-binary 契约=共识面,大)、COW-1147(receipt causality=改 receipt_root)、COW-1152(schema 校验 opt-in)皆共识面 feature work。
 
 ### Linear routing（用 team API key,仅贴 comment 未改状态）

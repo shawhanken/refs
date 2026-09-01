@@ -184,4 +184,4 @@ This belongs to governance (CIP-12 / repository administration) rather than the 
 
 ---
 
-_Verified by: Marshal cognitive loop. Primary sources: `cowboyinc/cowboy` origin/main (after `git fetch`), GitHub metadata for PR#227/#228/#242, `git log -S` pickaxe, `cbss/crates/cbssd/src/cip7_content_key_seal.rs`, `node/execution/src/stream_key_manager.rs`, and `refs/analysis/2026-07-06-cip24-operator-principal-release-amendment-draft.md`. Advisory only, non-blocking._
+_Verified by: Marshal cognitive loop. Primary sources: `cowboyinc/cowboy` origin/main (after `git fetch`), GitHub metadata for PR#227/#228/#242, `git log -S` pickaxe, `cbss/crates/cbssd/src/cip7_content_key_seal.rs`, `node/execution/src/stream_key_manager.rs`, and `refs/analysis/2026-07-06_cip24-operator-principal-release-amendment-draft.md`. Advisory only, non-blocking._

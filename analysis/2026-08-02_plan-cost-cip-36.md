@@ -177,7 +177,7 @@ scoping 选了"不含",但你可能不同意。**
 ### 3.4 与上一份 plan-cost 的交叉点(值得知道)
 
 > CIP-36 §6.2 / §6.3 选择**绕过**"引擎不回滚部分写"这个缺陷(用 check-then-apply 规范)。
-> 而 `2026-07-31-untrusted-actor-isolation-gaps.pdf` 的 **B4 ticket(机检 store-write choke point)**
+> 而 `2026-07-31_untrusted-actor-isolation-gaps.pdf` 的 **B4 ticket(机检 store-write choke point)**
 > 提议**修掉**同一个缺陷。
 >
 > **两份 plan 在同一个引擎缺陷上做了相反的决定。** 这不是 Marshal 替你选,但你应该知道它们撞在一起了:

@@ -1079,7 +1079,7 @@ Expected: node PR base = `devnet`, codec PR base = `main`, both green in CI.
 
 ## Execution Handoff
 
-Plan saved to `refs/analysis/2026-07-19-cip36-w1-burn-from-implementation-plan.md`. Two execution options:
+Plan saved to `refs/analysis/2026-07-19_cip36-w1-burn-from-implementation-plan.md`. Two execution options:
 
 1. **Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks. Note the cross-repo ordering: Tasks 3–4 land in `cowboy-protocol`; Tasks 2,5–8 in `node` (compiling via the Task 1 local `[patch]`); Task 9 finalizes the rev pin.
 2. **Inline Execution** — execute in this session with checkpoints.

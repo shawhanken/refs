@@ -1,6 +1,6 @@
 # System-Actor Address Reconciliation — `0x11` / `0x13` collision (deep-audit §6)
 
-_2026-07-13. Resolves the one **real** cross-spec collision surfaced by the deep-audit §6 collision scan, run the cheap way (deterministic diff against the source-of-truth registry, **no verification agents** — per the §6 recommendation). Companion to `2026-07-09-cips-wp-deep-audit.md`._
+_2026-07-13. Resolves the one **real** cross-spec collision surfaced by the deep-audit §6 collision scan, run the cheap way (deterministic diff against the source-of-truth registry, **no verification agents** — per the §6 recommendation). Companion to `2026-07-09_cips-wp-deep-audit.md`._
 
 ## 1. Method (reproducible / CI-able)
 

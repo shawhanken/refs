@@ -1,7 +1,7 @@
 # Hyperliquid：组件拆解与 Cowboy 平台映射
 
 > **本文是翻译件。** 权威文本为同目录英文原文
-> **`20260825_hyperliquid_cowboy_component_mapping.md`**，两者不一致时以英文原文为准。
+> **`2026-08-25_hyperliquid_cowboy_component_mapping.md`**，两者不一致时以英文原文为准。
 > 所有标识符、常量名、CIP 编号与文件路径均保留英文原样，章节编号与英文原文一致。
 
 **日期**：2026-08-25

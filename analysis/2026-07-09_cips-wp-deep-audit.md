@@ -594,9 +594,9 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 | # | 判定 / 建議 | 追蹤 |
 |---|-----------|------|
-| H-8 | CIP-30 O(1) fork vs CIP-27 sealed 排除不可調和。建議方案 b(**runtime**(非 on_fork)刪 manifest-declared sealed keys),須兩份 CIP 協同 | [#236](https://github.com/cowboyinc/cowboy/issues/236) · 方案文檔 `refs/analysis/2026-07-12-cip30-cip27-fork-sealed-exclusion-decision.md` |
-| H-10 | ~~CIP-31 儲存費 per-MiB vs 代碼 per-byte~~ **已解決**:devnet 代碼(`cowboy-protocol-types@0aa46e1`)`STORAGE_FEE_PER_MIB_PER_EPOCH = 450` = 規格;per-byte 常量全刪 | **[#237](https://github.com/cowboyinc/cowboy/issues/237) 已 closed(completed)** · 文檔 `...2026-07-12-cip31-storage-fee-denomination-RESOLVED.md` |
-| H-14 | CBSS `MIN_PROXY_STAKE` 規格 10k vs 代碼 1k(10× Sybil)。建議方案 a(代碼調高至 10k,單位基準須釘)+ 綁 COW-2497 | [#238](https://github.com/cowboyinc/cowboy/issues/238) · 方案文檔 `refs/analysis/2026-07-12-cbss-min-proxy-stake-decision.md` |
+| H-8 | CIP-30 O(1) fork vs CIP-27 sealed 排除不可調和。建議方案 b(**runtime**(非 on_fork)刪 manifest-declared sealed keys),須兩份 CIP 協同 | [#236](https://github.com/cowboyinc/cowboy/issues/236) · 方案文檔 `refs/analysis/2026-07-12_cip30-cip27-fork-sealed-exclusion-decision.md` |
+| H-10 | ~~CIP-31 儲存費 per-MiB vs 代碼 per-byte~~ **已解決**:devnet 代碼(`cowboy-protocol-types@0aa46e1`)`STORAGE_FEE_PER_MIB_PER_EPOCH = 450` = 規格;per-byte 常量全刪 | **[#237](https://github.com/cowboyinc/cowboy/issues/237) 已 closed(completed)** · 文檔 `...2026-07-12_cip31-storage-fee-denomination-RESOLVED.md` |
+| H-14 | CBSS `MIN_PROXY_STAKE` 規格 10k vs 代碼 1k(10× Sybil)。建議方案 a(代碼調高至 10k,單位基準須釘)+ 綁 COW-2497 | [#238](https://github.com/cowboyinc/cowboy/issues/238) · 方案文檔 `refs/analysis/2026-07-12_cbss-min-proxy-stake-decision.md` |
 
 
 ---
@@ -671,7 +671,7 @@ _一個驗證者確認、另一個反駁。其中 23 條(backfill)是第一個(�
 
 **權威源自身零碰撞**:143 個 SYS_ opcode(range 0–159,`#[deny(unreachable_patterns)]` 編譯期保證)+ 21 個 system actor 地址,皆無重號。故 §6 的 130 候選確為良性 per-CIP 枚舉重用(人讀已判)。
 
-**撈出 1 條真跨-spec 碰撞**(§6 未驗批的真發現):**WP §9.1「canonical」地址表 vs 部署代碼在 `0x11`/`0x13` 系統性衝突** —— 表寫 `0x11`=Container Registry / `0x13`=BankActor,代碼實為 `0x11`=**VALIDATOR_SET**(genesis 部署)/ `0x13`=**CONTAINER_REGISTRY**(Council-pausable),且 VALIDATOR_SET 整個不在表內;cip-10/14/16/18/34 全跟著誤放 Container=0x11。方向由 WP §9.1 自身 note 1/2 鎖定(部署 registry=source of truth、deployed claim wins)→**spec 須跟上**。**已修**:WP §9.1 錨表 + cip-14/16/18/34(Container 0x11→0x13、補 VALIDATOR_SET 列)。**CIP-10 Container=0x11×8→已修 0x13**(✅ RESOLVED 2026-07-14 owner-authorized 破例 = cowboy#260;最後一個 holdout 閉合)。**BankActor(CIP-28)撞 0x13→已重分配 0x16**(✅ RESOLVED 2026-07-14 owner-approved;留 0x15 給 penciled EventListener,next free=0x17;WP §9.1 + CIP-28 已修 = cowboy#259)。詳:`refs/analysis/2026-07-13-system-actor-address-reconciliation.md`。
+**撈出 1 條真跨-spec 碰撞**(§6 未驗批的真發現):**WP §9.1「canonical」地址表 vs 部署代碼在 `0x11`/`0x13` 系統性衝突** —— 表寫 `0x11`=Container Registry / `0x13`=BankActor,代碼實為 `0x11`=**VALIDATOR_SET**(genesis 部署)/ `0x13`=**CONTAINER_REGISTRY**(Council-pausable),且 VALIDATOR_SET 整個不在表內;cip-10/14/16/18/34 全跟著誤放 Container=0x11。方向由 WP §9.1 自身 note 1/2 鎖定(部署 registry=source of truth、deployed claim wins)→**spec 須跟上**。**已修**:WP §9.1 錨表 + cip-14/16/18/34(Container 0x11→0x13、補 VALIDATOR_SET 列)。**CIP-10 Container=0x11×8→已修 0x13**(✅ RESOLVED 2026-07-14 owner-authorized 破例 = cowboy#260;最後一個 holdout 閉合)。**BankActor(CIP-28)撞 0x13→已重分配 0x16**(✅ RESOLVED 2026-07-14 owner-approved;留 0x15 給 penciled EventListener,next free=0x17;WP §9.1 + CIP-28 已修 = cowboy#259)。詳:`refs/analysis/2026-07-13_system-actor-address-reconciliation.md`。
 
 **其餘掃描項=良性/已知**:`SYS_VALIDATOR_*`(cip-11)/`SYS_SESSION_*`(cip-8)是正確 prose(前明說不存在/後須納入測試);`SYS_FETCH_SECRET_METADATA`(cip-24)是 host syscall 非 wire opcode;dual cip-15 + CIP-10 opcode 61-64 vs 160-164 已在 §2/§3 記錄。
 

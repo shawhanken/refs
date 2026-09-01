@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Recompute the CIP-39 v1-vs-v2 metrics table in
-20260824_cip39_v2_simplification_plan.md.
+2026-08-24_cip39_v2_simplification_plan.md.
 
 Every number in that table comes from here, so the table can be re-derived
 rather than trusted. Run from a `cowboy` checkout on `spec/cip-39-v2`:

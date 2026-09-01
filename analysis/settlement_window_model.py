@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Settlement-window sizing for a Cowboy-hosted CLOB exchange.
 
-Companion to 20260825_hyperliquid_cowboy_component_mapping.md, section 9.
+Companion to 2026-08-25_hyperliquid_cowboy_component_mapping.md, section 9.
 Every constant is quoted from node/ source with its file and line, so the result
 can be re-derived against the tree at any commit.
 """

@@ -22,7 +22,7 @@
 
 ## Deep-audit revisions applied (2026-07-19 — BINDING; supersede any conflicting task text below)
 
-Full detail: `refs/analysis/2026-07-19-cip36-w3-bankactor-m1-plan-audit.md`. Where a task step below still reflects the pre-audit design, these win:
+Full detail: `refs/analysis/2026-07-19_cip36-w3-bankactor-m1-plan-audit.md`. Where a task step below still reflects the pre-audit design, these win:
 
 - **R1 (A1, BLOCKER) — bounded sweep.** `CloseCard`/`Withdraw` must NOT "sweep all token balances" (there is no per-holder token enumeration; the only enumeration is the global, unbounded `mints_index` — a griefing DoS under M1's no-gas). Sweep only **native CBY + the genesis stablecoin whitelist**; recover any other reserve token via CIP-28 §5.3 post-Close **residual `Withdraw`** (Closed cards stay `Withdraw`-able). O(1), spec-consistent.
 - **R2 (A4/A7) — fresh re-genesis, no gate; sequencing.** Delete the `bank_activation_height` gate (Decision 5). Branch the codec off node's current pin **`b373b9a9`** (bank-only — avoids silently pulling in `TokenBurnFrom` opcode 24) **or** land W3 after the W1 node branch merges to devnet and budget node's opcode-24 arms.

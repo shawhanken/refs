@@ -184,4 +184,4 @@ CBSS 有 `committee_epoch`、`wrap_epoch`、`quorum_epoch` 三个 epoch 概念�
 
 ---
 
-_核对人：Marshal 认知回路。一手源：`cowboyinc/cowboy` origin/main（已 `git fetch`）+ PR#227/#228/#242 的 GitHub 元数据 + `git log -S` pickaxe + `cbss/crates/cbssd/src/cip7_content_key_seal.rs` + `node/execution/src/stream_key_manager.rs` + `refs/analysis/2026-07-06-cip24-operator-principal-release-amendment-draft.md`。建议态，非阻断。_
+_核对人：Marshal 认知回路。一手源：`cowboyinc/cowboy` origin/main（已 `git fetch`）+ PR#227/#228/#242 的 GitHub 元数据 + `git log -S` pickaxe + `cbss/crates/cbssd/src/cip7_content_key_seal.rs` + `node/execution/src/stream_key_manager.rs` + `refs/analysis/2026-07-06_cip24-operator-principal-release-amendment-draft.md`。建议态，非阻断。_

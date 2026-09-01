@@ -1,7 +1,7 @@
 # Deep Audit — CIP-28 BankActor M1 Implementation Plan
 
 - **Date**: 2026-07-19
-- **Target**: `refs/analysis/2026-07-19-cip36-w3-bankactor-m1-implementation-plan.md`
+- **Target**: `refs/analysis/2026-07-19_cip36-w3-bankactor-m1-implementation-plan.md`
 - **Method**: 5 parallel adversarial lenses (codec/opcode/wire · system-actor integration · data-model/serde-determinism · genesis/activation/fork · spec-compliance/gaps), each verified against live `node/` + `cowboy-protocol/` source and CIP-28/CIP-36 spec.
 - **Verdict**: The plan's **address, opcode, derivation, and storage-key mechanics are correct** (verified byte-for-byte). But it has **1 unimplementable-as-written operation, 1 compile break, and a cluster of consensus/commitment defects** — most of which the plan's own "let the compiler flag it" verification cannot catch. Do **not** execute as written; apply the revisions below first.
 
