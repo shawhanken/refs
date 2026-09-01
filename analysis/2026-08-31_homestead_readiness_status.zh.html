@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homestead 现状与交付难点 · 2026-08-31</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2a333d; --accent:#4aa3ff; --accent2:#7ee0c0; --gold:#f2c14e;
+    --ok:#3fb950; --warn:#d29922; --danger:#f85149; --purple:#bc8cff;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;font-size:16.5px}
+  .wrap{display:grid;grid-template-columns:250px 1fr;max-width:1280px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:26px 16px;border-right:1px solid var(--line);background:var(--panel)}
+  nav h2{font-size:12px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin:0 0 12px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:7px;font-size:13.5px}
+  nav a:hover{color:var(--ink);background:var(--panel2)}
+  nav .tag{display:block;margin-top:18px;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:3px 10px;text-align:center}
+  main{padding:40px 48px 110px;min-width:0}
+
+  header.hero{border:1px solid var(--line);border-radius:16px;padding:30px 32px;margin-bottom:34px;
+    background:radial-gradient(1100px 300px at 0% 0%,rgba(126,224,192,.09),transparent 60%),var(--panel)}
+  header.hero .kick{color:var(--accent2);font-family:var(--mono);font-size:12.5px;letter-spacing:.05em}
+  header.hero h1{margin:8px 0 6px;font-size:29px;line-height:1.25}
+  header.hero p{margin:10px 0 0;color:var(--muted)}
+  header.hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+
+  section{margin:0 0 46px;scroll-margin-top:18px}
+  h2.sec{font-size:22px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2.sec .n{color:var(--accent2);font-family:var(--mono);font-size:16px;margin-right:10px}
+  h3{font-size:17px;margin:26px 0 8px;color:#fff}
+  p{margin:12px 0}
+  code{font-family:var(--mono);background:#0b0e12;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.85em;color:var(--accent2);overflow-wrap:anywhere}
+  strong{color:#fff}
+  .lead{font-size:17px;color:#cfd8e0}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+
+  .box{border-radius:12px;padding:15px 18px;margin:18px 0;border:1px solid var(--line);background:var(--panel)}
+  .box .h{font-weight:700;margin-bottom:4px}
+  .box p{margin:8px 0}
+  .box p:last-child{margin-bottom:0}
+  .box.info{border-color:#1f4b73;background:linear-gradient(180deg,rgba(74,163,255,.07),transparent)}
+  .box.info .h{color:#8fd0ff}
+  .box.warn{border-color:#6b551a;background:linear-gradient(180deg,rgba(210,153,34,.07),transparent)}
+  .box.warn .h{color:var(--gold)}
+  .box.danger{border-color:#6e2b28;background:linear-gradient(180deg,rgba(248,81,73,.08),transparent)}
+  .box.danger .h{color:#ff9d8a}
+
+  /* ---- tables: fixed layout + explicit colgroup widths + wrapping ---- */
+  .tw{overflow-x:auto;margin:16px 0;border-radius:10px;border:1px solid var(--line)}
+  table{width:100%;min-width:660px;border-collapse:collapse;table-layout:fixed;font-size:14px}
+  th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+        padding:10px 13px;text-align:left;vertical-align:top;overflow-wrap:break-word;word-break:normal;line-height:1.6}
+  th:last-child,td:last-child{border-right:none}
+  tbody tr:last-child td{border-bottom:none}
+  thead th{background:var(--panel2);color:#fff;font-weight:600;font-size:13.5px;letter-spacing:.02em;white-space:nowrap}
+  tbody tr:nth-of-type(odd) td{background:rgba(255,255,255,.018)}
+  td.mono{font-family:var(--mono);font-size:12.5px}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:center;font-size:13px}
+  .st{font-family:var(--mono);font-size:12px;font-weight:700;display:inline-block}
+  .st.ok{color:var(--ok)} .st.mid{color:var(--gold)} .st.bad{color:#ff8a7a} .st.na{color:var(--muted)}
+
+  .layers{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:18px 0;font-family:var(--mono);font-size:12.5px}
+  .layers div{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .layers div:last-child{border-bottom:none}
+  .layers b{color:var(--accent2)}
+  .layers span{color:var(--muted)}
+
+  .chain{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:16px 0;font-family:var(--mono);font-size:12.5px}
+  .chain .n{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:7px 10px}
+  .chain .n.blk{border-color:#6e2b28;color:#ff9d8a}
+  .chain .n.ext{border-color:#6b551a;color:var(--gold)}
+  .chain .ar{color:var(--muted)}
+
+  .zero{border-left:3px solid #6e2b28;padding:2px 0 2px 14px;margin:14px 0}
+  .zero b{color:#fff}
+  .zero span{color:var(--muted)}
+
+  figure{margin:22px 0}
+  figure svg{display:block;width:100%;height:auto;background:#12161c;border:1px solid var(--line);border-radius:12px;padding:8px}
+  figcaption{margin-top:10px;color:var(--muted);font-size:13.5px;line-height:1.65}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr}
+    nav{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+    main{padding:26px 18px 70px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <h2>目录</h2>
+  <a href="#s1">1 · 系统构成</a>
+  <a href="#s2">2 · 端与协议</a>
+  <a href="#s3">3 · 三档范围</a>
+  <a href="#s4">4 · 当前状态</a>
+  <a href="#s5">5 · 五个未部署的服务</a>
+  <a href="#s6">6 · 失败形态</a>
+  <a href="#s7">7 · 依赖链</a>
+  <a href="#s8">8 · 外部依赖</a>
+  <a href="#s9">9 · 尚无证据的部分</a>
+  <a href="#s10">10 · 不可逆环节</a>
+  <a href="#s11">11 · 证据与漂移</a>
+  <span class="tag">2026-08-31 · 对内</span>
+</nav>
+<main>
+
+<header class="hero">
+  <div class="kick">COWBOY · 内部现状盘点</div>
+  <h1>Homestead 现状与交付难点</h1>
+  <p class="lead">系统走到哪了、还有什么没有解决、哪些部分不在我们手上。</p>
+  <p>本页只陈述可核验的事实:文件路径、commit、交接文档自述日期。产品的<strong>代码层面</strong>已经相当完整;尚未闭合的部分集中在<strong>凭证、部署与实跑验证</strong>三类,与写代码是不同性质的工作。</p>
+  <div class="meta">
+    <span class="pill">homestead@main 6b836c4</span>
+    <span class="pill">chain 1862 / sitch-cb</span>
+    <span class="pill">出处见 §10</span>
+  </div>
+</header>
+
+<section id="s1">
+<h2 class="sec"><span class="n">01</span>系统构成</h2>
+<p>Homestead 是 macOS 原生 Markdown 协作工作区:免费本地模式不需账号,付费云端模式把协作、存储、计费跑在 Cowboy 自己的链上基础设施上。它同时是<strong>用真实产品压测整条 Cowboy 技术栈</strong>的载体 —— 这意味着它的交付路径穿过 node、gateway、cbqs、cbfs、cowboy-protocol 五个仓。</p>
+
+<div class="layers">
+  <div><b>apps/Homestead/</b> <span>SwiftUI 外壳 · 135 文件 / 48.5k 行</span></div>
+  <div><b>webeditor/</b> <span>CodeMirror 6 + Yjs,单文件内联进 WKWebView · 20.7k 行 TS</span></div>
+  <div><b>crates/homestead-{core,ffi}/</b> <span>SQLite 缓存 + UniFFI 桥(29 方法) · 12.3k 行 Rust</span></div>
+  <div><b>actor/homestead.py</b> <span>链上 actor:成员、页树、ACL、计费授权 · 14.7k 行</span></div>
+  <div><b>services/collab-relay/</b> <span>独立部署的 Yjs 中继 + 嵌入式 CBFS · 37.1k 行 Rust</span></div>
+  <div><b>services/{billing,storage-provisioner,dev-readiness}/ · store/</b> <span>计费、存储供应、dev 就绪签名、CIP-33 上架包</span></div>
+</div>
+
+<div class="box info">
+  <div class="h">仓内有两条并行的产品线</div>
+  <p><code>main</code> 是云端/基础设施线(actor、中继、CBQS、计费、证明闸);<code>origin/devnet</code> 是产品/编辑器线(Notion 本地化导入、只读 HTML 查看器、侧边栏键盘导航、Gallop 设计 token),领先 5 个 commit,定期把 main 同步进来。两条线目前对 v1 形态的假设并不一致,详见 §10 漂移第 4 条。</p>
+</div>
+</section>
+
+<section id="s2">
+<h2 class="sec"><span class="n">02</span>端与协议</h2>
+<p>下图是一次<strong>云端页面打开</strong>实际经过的端与协议。值得注意的是中间那条绿线:编辑器并不是把所有流量都交给 relay —— 它先向 relay 领取凭证,然后<strong>直连 CBQS broker</strong>。</p>
+
+<figure>
+<svg viewBox="0 0 960 560" role="img" aria-label="Homestead 各端与协议关系图:本地 Markdown 文件与本机 AI 端点停留在信任边界左侧;macOS 壳经 gateway 与链上 actor 通信;编辑器向 collab relay 领取票据与 StreamGrant 后直连 CBQS broker;relay 负责 ACL 复核、快照发布与公开分享页渲染;billing 与 provisioner 尚未部署">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,4 0,8" fill="currentColor" fill-opacity=".55"/>
+    </marker>
+    <marker id="ahg" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,4 0,8" fill="#7ee0c0"/>
+    </marker>
+    <marker id="ahr" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,4 0,8" fill="#ff8a7a" fill-opacity=".8"/>
+    </marker>
+  </defs>
+
+  <text x="95"  y="18" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">本地 · 不出设备</text>
+  <text x="330" y="18" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">客户端</text>
+  <text x="580" y="18" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">服务</text>
+  <text x="840" y="18" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">链上 · 存储</text>
+
+  <line x1="440" y1="32" x2="440" y2="500" stroke="currentColor" stroke-opacity=".22" stroke-width="1.2" stroke-dasharray="5 5"/>
+
+  <rect x="20" y="44" width="150" height="48" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="95" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">本地 .md 文件</text>
+  <text x="95" y="83" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">磁盘</text>
+
+  <rect x="20" y="186" width="150" height="48" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="95" y="208" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">文档 AI 端点</text>
+  <text x="95" y="225" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">127.0.0.1:8081</text>
+
+  <rect x="20" y="286" width="150" height="48" rx="9" fill="#1c232d" stroke="#ff8a7a" stroke-opacity=".55" stroke-dasharray="4 3"/>
+  <text x="95" y="308" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Codex · ACP</text>
+  <text x="95" y="325" text-anchor="middle" font-size="10.5" fill="#ff8a7a" fill-opacity=".8">ACP 未合 main</text>
+
+  <rect x="250" y="36" width="160" height="58" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="330" y="60" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">macOS 壳</text>
+  <text x="330" y="78" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">SwiftUI · 唯一平台端</text>
+
+  <rect x="250" y="178" width="160" height="62" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="330" y="202" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">编辑器</text>
+  <text x="330" y="220" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">CodeMirror + Yjs</text>
+
+  <rect x="250" y="320" width="160" height="54" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="330" y="342" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">公开浏览器</text>
+  <text x="330" y="359" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">无 JS · 只读</text>
+
+  <rect x="490" y="40" width="180" height="44" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="580" y="58" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">gateway</text>
+  <text x="580" y="75" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">钱包签名上链</text>
+
+  <rect x="490" y="150" width="180" height="250" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="580" y="174" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">collab relay</text>
+  <text x="506" y="200" font-size="10" fill="currentColor" fill-opacity=".5">POST /ticket</text>
+  <text x="506" y="218" font-size="10" fill="currentColor" fill-opacity=".5">POST /cbqs/session</text>
+  <text x="506" y="236" font-size="10" fill="currentColor" fill-opacity=".5">GET  /cbqs/chain-proof</text>
+  <text x="506" y="254" font-size="10" fill="currentColor" fill-opacity=".5">GET  /collab/:room (WS)</text>
+  <text x="506" y="272" font-size="10" fill="currentColor" fill-opacity=".5">GET  /rooms/:room/meta</text>
+  <text x="506" y="290" font-size="10" fill="currentColor" fill-opacity=".5">GET  /search</text>
+  <text x="506" y="308" font-size="10" fill="currentColor" fill-opacity=".5">POST /share · GET /s/:guid</text>
+  <text x="506" y="326" font-size="10" fill="currentColor" fill-opacity=".5">GET  /assets/:ws/:room/:id</text>
+  <text x="580" y="356" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">嵌入式 CBFS · 快照器</text>
+  <text x="580" y="378" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".45">独立部署,不受 Runner 托管</text>
+
+  <rect x="490" y="436" width="180" height="52" rx="9" fill="#1c232d" stroke="#ff8a7a" stroke-opacity=".55" stroke-dasharray="4 3"/>
+  <text x="580" y="458" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">billing · provisioner</text>
+  <text x="580" y="475" text-anchor="middle" font-size="10.5" fill="#ff8a7a" fill-opacity=".8">未部署 · role-driver 未合 main</text>
+
+  <rect x="750" y="30" width="180" height="76" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="840" y="56" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">actor(链上 PVM)</text>
+  <text x="840" y="74" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">成员 · 页树 · ACL</text>
+  <text x="840" y="91" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">部署后不可升级</text>
+
+  <rect x="750" y="170" width="180" height="56" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="840" y="192" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CBQS broker</text>
+  <text x="840" y="209" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">fast lane · checkpoint</text>
+
+  <rect x="750" y="290" width="180" height="56" rx="9" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="840" y="312" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CBFS 卷</text>
+  <text x="840" y="329" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">快照 · 附件</text>
+
+  <line x1="170" y1="66" x2="250" y2="66" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="210" y="58" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">读写磁盘</text>
+
+  <line x1="170" y1="208" x2="250" y2="208" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="210" y="200" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">本机推理</text>
+
+  <path d="M170,308 H330 V240" fill="none" stroke="#ff8a7a" stroke-opacity=".6" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ahr)"/>
+  <text x="248" y="300" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">stdio</text>
+
+  <line x1="290" y1="94" x2="290" y2="178" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="298" y="140" font-size="10.5" fill="currentColor" fill-opacity=".7">JSON 桥</text>
+
+  <line x1="410" y1="62" x2="490" y2="62" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="450" y="54" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">JWT</text>
+
+  <line x1="670" y1="62" x2="750" y2="62" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="710" y="54" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">签名上链</text>
+
+  <line x1="410" y1="194" x2="490" y2="194" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="450" y="186" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">领票据</text>
+
+  <line x1="490" y1="222" x2="410" y2="222" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="450" y="238" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">发 grant</text>
+
+  <path d="M370,178 V126 H700 V190 H750" fill="none" stroke="#7ee0c0" stroke-opacity=".95" stroke-width="1.8" marker-end="url(#ahg)"/>
+  <text x="520" y="118" text-anchor="middle" font-size="10.5" fill="#7ee0c0">wss 直连 · 持 StreamGrant</text>
+
+  <path d="M540,150 V100 H750" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="702" y="93" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">ACL 复核</text>
+
+  <line x1="670" y1="212" x2="750" y2="212" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="710" y="228" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">只读会话</text>
+
+  <line x1="670" y1="318" x2="750" y2="318" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="710" y="310" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">发快照</text>
+
+  <line x1="410" y1="347" x2="490" y2="347" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="450" y="339" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">只读渲染</text>
+
+  <line x1="580" y1="436" x2="580" y2="400" stroke="#ff8a7a" stroke-opacity=".6" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ahr)"/>
+  <text x="590" y="422" font-size="10.5" fill="currentColor" fill-opacity=".7">重启 + 收据</text>
+
+  <line x1="20" y1="521" x2="44" y2="521" stroke="#7ee0c0" stroke-width="1.8"/>
+  <text x="52" y="525" font-size="10.5" fill="currentColor" fill-opacity=".6">编辑器直连 broker,relay 只发凭证</text>
+  <rect x="330" y="514" width="22" height="12" rx="3" fill="none" stroke="#ff8a7a" stroke-opacity=".6" stroke-dasharray="4 3"/>
+  <text x="360" y="525" font-size="10.5" fill="currentColor" fill-opacity=".6">未部署 / 未合 main</text>
+  <line x1="530" y1="514" x2="530" y2="528" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 4"/>
+  <text x="540" y="525" font-size="10.5" fill="currentColor" fill-opacity=".6">此线左侧的内容不进入 relay</text>
+</svg>
+<figcaption>一次云端页面打开经过的端与协议。返回方向(页树、ACL、房间内容)沿同一条链路回流。本地页面与本机 AI 的内容停在虚线左侧:规格要求 local-only 内容永不进入协作中继。</figcaption>
+</figure>
+
+<h3>授权面:谁向谁证明什么</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:26%"><col style="width:42%"><col style="width:32%"></colgroup>
+<thead><tr><th>关系</th><th>凭证</th><th>由谁验证</th></tr></thead>
+<tbody>
+<tr><td>App → actor</td><td>Google ID token(JWT)</td><td>actor,有界 JWKS 校验</td></tr>
+<tr><td>gateway → 链</td><td>网关钱包签名</td><td>节点;每笔声明 4,250 CBY 最坏成本</td></tr>
+<tr><td>relay → actor</td><td>预置的 relay 签名密钥 + HTTPS</td><td>actor 验签名;HTTPS 验 actor 应答</td></tr>
+<tr><td>relay → 编辑器</td><td>持有者绑定、lane 限定的 StreamGrant</td><td>broker(由 admin 密钥签发)</td></tr>
+<tr><td>billing → actor</td><td><code>homestead.billing-auth.v1</code> 签名</td><td>actor</td></tr>
+<tr><td>role-driver → actor</td><td><code>homestead.role-driver.v1</code> 签名 + <code>expected_actor_evidence</code></td><td>actor</td></tr>
+<tr><td>公开链接</td><td>guid bearer,view 或 comment</td><td>relay,可独立撤销</td></tr>
+<tr><td>附件</td><td>随机能力 URL</td><td>relay,不嵌 Google token</td></tr>
+<tr><td>App 自更新</td><td>manifest 摘要 + Developer ID 类别 + Team ID</td><td>App 自身,安装前校验</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box info">
+  <div class="h">图上三处值得单独记住</div>
+  <p><strong>1 · 编辑器与 broker 是直连的。</strong> relay 只负责铸出 lane 限定的 StreamGrant,之后的 CRDT 记录走客户端到 broker 的 wss。这意味着 broker 端点必须对客户端可达 —— 原生客户端与浏览器都拒绝非 loopback 的 <code>ws://</code>。</p>
+  <p><strong>2 · 公开分享页不是 web 客户端。</strong> <code>GET /s/:guid</code> 是服务端渲染的只读 HTML,CSP 为 <code>default-src 'none'</code>、<code>no-store</code>。因此权限格里的 comment 级公开链接,目前没有对应的浏览器交互面。</p>
+  <p><strong>3 · 虚线的两个箱子决定其余部分能否启用。</strong> billing 与 provisioner 未部署、role-driver 未合入主线,workspace 因此停在 <code>pending</code> / <code>created</code>,写入返回 409。</p>
+</div>
+</section>
+
+<section id="s3">
+<h2 class="sec"><span class="n">03</span>「跑通」的三档范围</h2>
+<p>三档的验收标准不同,剩余工作量也不同。下表按<strong>可数的条目</strong>列出,不含工期判断。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:11%"><col style="width:25%"><col style="width:28%"><col style="width:24%"><col style="width:12%"></colgroup>
+<thead><tr><th>档位</th><th>验收含义</th><th>已具备</th><th>尚缺条目</th><th>外部依赖方</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>L1</strong><br><span class="st na">演示级</span></td>
+  <td>对方能在自己环境部署起来,多人打开同一页协作</td>
+  <td>完整 runbook;0802 与 0822/23 两次端到端演练(含 genesis reset)</td>
+  <td>对方环境的网络 / TLS / 防火墙适配、dev-readiness 签名仪式、钱包注资 —— <strong>3 项</strong></td>
+  <td class="num">0</td>
+</tr>
+<tr>
+  <td><strong>L1+</strong><br><span class="st mid">内部日用</span></td>
+  <td>协作稳定、激活不再手工、内容耐久性有证据</td>
+  <td>中继、actor、证明闸、快照器代码均已在 main</td>
+  <td>role-driver 合入主线、provisioner 部署、快照器在集群持续发布、smoke B/C 首次执行、463 页语料验收、性能实测 —— <strong>6 项</strong>(其中 1 项代码未合主线)</td>
+  <td class="num">1</td>
+</tr>
+<tr>
+  <td><strong>L2</strong><br><span class="st bad">可收钱</span></td>
+  <td>刷卡 → 托管 hire → 两个私有卷 → 可写 workspace,含备份、退出、公证、上架</td>
+  <td>五个服务的代码与测试均已完成</td>
+  <td>五个服务的<strong>部署与凭证</strong>、六项外部安全闸、CIP-33 上链申报 —— <strong>12 项</strong></td>
+  <td class="num">7</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="s4">
+<h2 class="sec"><span class="n">04</span>当前状态</h2>
+
+<h3>本地模式 —— 基本可用</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:34%"><col style="width:14%"><col style="width:52%"></colgroup>
+<thead><tr><th>项目</th><th>状态</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>编辑器与 App 本体</td><td><span class="st ok">✅ 可用</span></td><td>CI 六个 job 全绿:web / billing+store / core / ffi-profile / relay / app</td></tr>
+<tr><td>本地文件编辑、导入、导出、附件</td><td><span class="st ok">✅ 可用</span></td><td>确定性合成 archive 通过</td></tr>
+<tr><td>463 页 Notion 语料验收</td><td><span class="st bad">未执行</span></td><td>语料刻意不进仓,需人工提供;规格列为 release 必跑项</td></tr>
+<tr><td>性能预算(暖开 &lt;300ms / 冷开 &lt;1.5s)</td><td><span class="st bad">未测量</span></td><td>规格自述「单元测试和 local build 不能证明延迟」</td></tr>
+<tr><td>公证与分发</td><td><span class="st mid">部分</span></td><td>CI 会做 Developer ID 签名;notarize、staple、OAuth 凭证轮换、干净安装与升级 smoke 均未做</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>集群现状 —— 活着,但激活靠手工</h3>
+<p>GCP <code>sitch-cb</code> / <code>us-central1-a</code>,链 <code>network=homestead, chain_id=1862</code>,<strong>单验证者</strong>。0822–0823 做过完整 genesis reset 与 CBQS 切换。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:26%"><col style="width:26%"><col style="width:48%"></colgroup>
+<thead><tr><th>机器</th><th>运行</th><th>要点</th></tr></thead>
+<tbody>
+<tr><td class="mono">homestead-rpc-01</td><td>validator + indexer</td><td>RPC :4000。日志在 <code>/var/log/cowboy/validator.log</code>,不在 journald</td></tr>
+<tr><td class="mono">homestead-gateway-01</td><td>gateway + caddy</td><td>钱包 <code>0xD95B906c…CAFAA</code> 签所有变更类 actor 调用</td></tr>
+<tr><td class="mono">homestead-collab-01</td><td>collab 中继</td><td>存储是 <code>/var/lib/collab</code> 的<strong>嵌入式 CBFS</strong>,不是链上 CBFS</td></tr>
+<tr><td class="mono">homestead-cbfs-0{1..3}</td><td>链上 CBFS 存储层</td><td><strong>目前不在 App 的数据路径上</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>新建的 workspace 起始状态是 <code>billing_state=pending</code> + <code>provisioning_state=created</code>,任何写入返回 <strong>409 "workspace is not active"</strong>。因为 <code>role-driver</code> 与 <code>storage-provisioner</code> 都没有部署,目前用测试身份密钥手工完成两段签名流程来顶替。</p>
+
+<div class="box info">
+  <div class="h">目前唯一的可写路径是 dev-only 构建</div>
+  <p><code>CloudTrustBuild.swift</code> 在编译期只产出一个信任 profile:<code>production-chain-storage-v1</code>(要求 <code>provisioning_state=active</code>),或 <code>proof-bound-development-embedded-v1</code>(接受 <code>dev_ready</code>)。后者仍要求<strong>真实的链上 hire</strong> 与<strong>真实的 CBQS finalized stream proof</strong>,只是把信任根换成一个 dev-only 密钥 —— 生产构建会把它编译掉并拒绝。演示与生产之间因此存在一条明确的分界线。</p>
+</div>
+</section>
+
+<section id="s5">
+<h2 class="sec"><span class="n">05</span>五个服务:有代码、有测试、没部署</h2>
+<p>这是 L2 的主体。共同点是<strong>缺的都不是代码</strong>,而是真实托管凭证与链上效果。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:22%"><col style="width:14%"><col style="width:64%"></colgroup>
+<thead><tr><th>服务</th><th>状态</th><th>缺什么</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>role-driver</strong><br>特权角色驱动</td>
+  <td><span class="st bad">不在 main</span></td>
+  <td>只存在于 <code>jw/homestead-policy-fence-driver</code>、<code>jw/homestead-provision</code> 等未合分支。根 README 让人执行的 <code>services/role-driver/tests</code> 在 main 上不存在。它是整条激活链的第一环</td>
+</tr>
+<tr>
+  <td><strong>storage-provisioner</strong><br>存储供应</td>
+  <td><span class="st mid">未部署</span></td>
+  <td>13 个密封测试通过。仓库<strong>刻意不伪造特权驱动</strong>:需要真建 content / search 两个 CBFS 卷、KMS 托管 owner 与 delegate 密钥、release-bound CBSS 附着、standing-write 委派、中继重启包装器</td>
+</tr>
+<tr>
+  <td><strong>billing</strong><br>Stripe → 托管 hire</td>
+  <td><span class="st mid">未部署</span></td>
+  <td>209 测试与 typecheck 通过;服务自述「还不是真的法币→链桥」。缺 KMS 托管、国库 CBY 资金、committed hire/deposit/renew 收据、live Stripe 配置与 webhook、CBQS 租金补缴、五个计量采样器、到期与删除传输、对账与退款</td>
+</tr>
+<tr>
+  <td><strong>backup</strong><br>备份与退出</td>
+  <td><span class="st mid">未部署</span></td>
+  <td>14 个密封测试通过。缺 private-CBFS 传输、能证明「恰好 90 天到期」的目的地策略,以及一次真实还原</td>
+</tr>
+<tr>
+  <td><strong>链上 CBFS 数据层</strong></td>
+  <td><span class="st bad">不在路径上</span></td>
+  <td>需要 descriptor-pinned 读、RAS 委派与撤销校验、standing-write token 续期、commit-horizon 监督、两阶段 ready receipt</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="s6">
+<h2 class="sec"><span class="n">06</span>这个栈的失败形态:静默成功</h2>
+<p class="lead">已经遇到的缺陷有一个共同形状:<strong>命令返回 0、CLI 打印 tx hash、测试全绿、日志无报错 —— 而实际什么都没有发生</strong>。这类问题不会被静态检查或单元测试发现,只在实际运行中暴露。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:24%"><col style="width:26%"><col style="width:50%"></colgroup>
+<thead><tr><th>事件</th><th>表面现象</th><th>实际原因</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>0828 演示中断</strong></td>
+  <td>交易提交没有反应</td>
+  <td>gateway 钱包低于每笔交易声明的 <strong>4,250 CBY</strong> 最坏成本,节点拒绝入池 —— 在 node#1461 之前是<strong>静默</strong>拒绝</td>
+</tr>
+<tr>
+  <td><strong>所有页面打不开</strong></td>
+  <td>会话握手全部正常,随后无内容</td>
+  <td>部署的 cbqsd 与浏览器 wasm 对「无记录 fast lane」的 origin trailer 判读不同,客户端 fail-closed。两边各自都自洽</td>
+</tr>
+<tr>
+  <td><strong>快照器不工作</strong></td>
+  <td>订阅成功、无任何错误、零投递</td>
+  <td>订阅以零信用额度打开,broker 不投递本身就是协议正常行为,因此没有错误可报</td>
+</tr>
+<tr>
+  <td><strong>CBQS 建流被拒</strong></td>
+  <td>CLI 打印 tx hash,看起来成功</td>
+  <td>三种原因同一形态:retention 默认 7d 超过 fast 24h 上限、provider base-rate 预留在第十条流后耗尽、未导出 <code>COWBOY_PRIVATE_KEY</code>。只有 <code>stream-close</code> 会返回上限</td>
+</tr>
+<tr>
+  <td><strong>磁盘写满</strong></td>
+  <td><code>extern location for X does not exist</code>、后台命令空输出</td>
+  <td>磁盘 100%,从不报告为磁盘错误。约 1 TB 是 35 个 worktree 的 <code>target/</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <div class="h">团队自己总结的两条(直接来自交接文档)</div>
+  <p><strong>「绿或红都不是证明。」</strong> 一次全套 209/0 通过,几分钟后同一套件命中 15% 概率的竞态;该修复的验收标准定为 6-in-40 → 0-in-60,而不是「下一次跑绿」。反向也成立:一次重跑通过不是 flake 的证据 —— 那个判断做早了,结果把 devnet 弄红。</p>
+  <p><strong>「规格里记下的决定,在到达实现之前不算决定。」</strong> CIP-39 的 v2 回退在规格里躺了十二小时,codec 与 broker 同期发布的是相反的东西;PR 审得很干净,因为 diff 自洽,只有 CIP 不同意。结果是一整层多余的 V2 协议被 19 个文件消费,事后删除 −684 / −386 行。</p>
+</div>
+</section>
+
+<section id="s7">
+<h2 class="sec"><span class="n">07</span>依赖链</h2>
+<h3>部署链 —— 每一步消费上一步的产物</h3>
+<div class="chain">
+  <span class="n">node/homestead</span><span class="ar">→</span>
+  <span class="n">gateway/homestead</span><span class="ar">→</span>
+  <span class="n">collab relay</span><span class="ar">→</span>
+  <span class="n">actor set_routes</span><span class="ar">→</span>
+  <span class="n">钱包注资</span>
+</div>
+<p>顺序不可颠倒:gateway 消费 node 的新 wire surface(<code>/proof/account</code> 排除证明、<code>submit_wait</code> 类型化错误),对着旧 node 会<strong>永久</strong>报 <code>readiness-unknown</code> —— 这是 fail-closed 的设计行为,不是故障。</p>
+
+<h3>激活链 —— 每一环都需要上一环的真实凭证</h3>
+<div class="chain">
+  <span class="n blk">role-driver 合入主线</span><span class="ar">→</span>
+  <span class="n ext">KMS 托管密钥</span><span class="ar">→</span>
+  <span class="n">两个私有 CBFS 卷</span><span class="ar">→</span>
+  <span class="n">manifest v2 + 重启包装</span><span class="ar">→</span>
+  <span class="n">中继 ready receipt</span><span class="ar">→</span>
+  <span class="n">actor 转 active</span><span class="ar">→</span>
+  <span class="n ext">Stripe 生产账号</span><span class="ar">→</span>
+  <span class="n">可写 workspace</span>
+</div>
+<p><span style="color:#ff9d8a">红</span> = 代码尚未合入主线,<span style="color:var(--gold)">黄</span> = 依赖外部方。</p>
+
+<div class="box info">
+  <div class="h">整个栈是 fail-closed 的</div>
+  <p>陈旧收据、绑定失败、监督器 panic、摘要不符、token 剩余时间不足、子进程效果不确定、超时 —— 全部判为 <code>reconcile</code> 而非 ready。协调器拒绝在缺少真实凭证时放行。这是它值得信任的原因,也意味着链条上的每一环都必须按顺序真实完成。</p>
+</div>
+</section>
+
+<section id="s8">
+<h2 class="sec"><span class="n">08</span>外部依赖</h2>
+<p>以下环节位于关键路径上,完成时点取决于第三方或其他团队。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:22%"><col style="width:56%"><col style="width:22%"></colgroup>
+<thead><tr><th>依赖方</th><th>我们需要什么</th><th>影响档位</th></tr></thead>
+<tbody>
+<tr><td>Tony 团队 / 平台</td><td>CIP-39 queuing rewrite 落到 <code>cbqs/homestead</code> 与 <code>node/homestead</code></td><td><span class="st mid">L1+ / L2</span></td></tr>
+<tr><td>Stripe</td><td>生产账号、live webhook、结算与对账通道</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>KMS / 托管方</td><td>owner 与 delegate 密钥托管;release-bound CBSS 附着</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>Apple</td><td>Developer ID 公证与 staple</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>Google</td><td>轮换历史 OAuth 凭证,签发公开 desktop client</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>国库 / 财务</td><td>CBY 资金注入托管账户,供 hire 与存储租金使用</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>链上治理</td><td>CIP-33 Free 声明真正提交上链(至今未提交)</td><td><span class="st bad">L2</span></td></tr>
+<tr><td>Chad</td><td>轮换已销毁的 tailscale authkey;若干 PR 的开启授权</td><td><span class="st mid">运维</span></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="s9">
+<h2 class="sec"><span class="n">09</span>尚无证据的部分</h2>
+<p>以下每一项目前的证据量都是<strong>零</strong> —— 不是「做过但有问题」,而是<strong>尚未执行过</strong>。</p>
+
+<div class="zero"><b>备份还原</b> <span>—— 协调器有 14 个密封测试,真实的 private-CBFS 快照、上传与还原一次都没有做过。</span></div>
+<div class="zero"><b>Smoke Phase B / C</b> <span>—— Phase A 曾被 origin 缺陷阻断(已解决),B 与 C 从未运行。</span></div>
+<div class="zero"><b>多 workspace 爆炸半径与还原演练</b> <span>—— 需要真实 KMS/CBFS 凭证,并证明日志、收据、计费状态中不泄密。</span></div>
+<div class="zero"><b>463 页 Notion 语料验收</b> <span>—— 语料需人工提供;合成 archive 通过不等同于真实导出通过。</span></div>
+<div class="zero"><b>性能预算</b> <span>—— 暖开 &lt;300ms / 冷开 &lt;1.5s,尚未对签名版本与真实语料测量过一次。</span></div>
+<div class="zero"><b>浏览器端真实快照 join</b> <span>—— 单元路径已覆盖,对着活的快照的真实 join 没有跑过。</span></div>
+<div class="zero"><b>CBQS wasm 字节等价闸</b> <span>—— 浏览器验证器与原生验证器没有比对语料;目前是 verified-by-construction,不是 verified-by-gate。cbss-wasm 有此闸,CBQS 没有。</span></div>
+<div class="zero"><b>cbqs 的 Marshal 覆盖</b> <span>—— 从未审过任何内容(0 条,对比 node 的 454);<code>cowboy-protocol</code> 的不变量闸返回空数组。</span></div>
+
+<div class="box danger">
+  <div class="h">耐久性</div>
+  <p>0827 的记录中,被钉住的那个页面处于<strong>「按设计已死」</strong>状态:lane 在 1 小时保留期下被裁剪,而<strong>快照器在集群上已发布的 generation 数为零</strong>。也就是说,若快照发布没有真正持续运行,内容在保留期之后不可恢复。</p>
+  <p>该状态需要对当前集群复核。它指向的是一个结构性事实:<strong>目前还没有一份「数据在集群上确实持久」的证据</strong>。</p>
+</div>
+</section>
+
+<section id="s10">
+<h2 class="sec"><span class="n">10</span>不可逆与单点环节</h2>
+<ul>
+  <li><strong>actor 部署后不可升级。</strong> 创世后部署的 actor 收不到 <code>sys.upgrade</code>。每次改动 = 部署新 actor + 一次性 owner 迁移 + 安装路由 + 重指客户端,旧 actor 需保留到新的验证完毕。这里出错的代价是迁移状态,不是回滚一个 commit。</li>
+  <li><strong>genesis reset 是破坏性的。</strong> 链上状态不保留;之后需重注册 runner、重注资钱包,且 <code>chain_instance_id</code> 在 genesis 文件相同时会存活,必须使用新 nonce。</li>
+  <li><strong>squash 合并后必须重新 pin。</strong> 已经踩过一次:被 pin 的分支 sha 从来不是一个已合入的修订。</li>
+  <li><strong>单验证者链。</strong> 当前 <code>chain_id=1862</code> 是单验证者,不具备生产的可用性形态。</li>
+  <li><strong>tailscale authkey 的密钥版本已被销毁</strong>,重启的机器会掉出 tailnet(非致命,IAP ssh 仍可用),需要轮换。</li>
+  <li><strong>dev-only 信任根与生产信任根是两个编译产物。</strong> 二者在外观上没有区别,但生产构建会拒绝前者。</li>
+</ul>
+</section>
+
+<section id="s11">
+<h2 class="sec"><span class="n">11</span>证据出处与已知漂移</h2>
+
+<h3>本页依据</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:34%"><col style="width:16%"><col style="width:50%"></colgroup>
+<thead><tr><th>来源</th><th>自述日期</th><th>支撑内容</th></tr></thead>
+<tbody>
+<tr><td class="mono">docs/homestead-v1-spec.md</td><td class="mono">2026-08-06</td><td>产品合约、实现清单、验证快照、完成序列、外部安全闸</td></tr>
+<tr><td class="mono">docs/handoff/cbqs-handoff.md</td><td class="mono">2026-08-23</td><td>集群现状、两道激活闸、运维陷阱、失败形态总结</td></tr>
+<tr><td class="mono">docs/handoff/finality-jump-handoff.md</td><td class="mono">2026-08-27</td><td>origin 语义裁决、smoke 覆盖、耐久性状态</td></tr>
+<tr><td class="mono">HANDOFF.md · deploy.md</td><td class="mono">08-30 · 08-02</td><td>四仓分支、部署顺序、钱包门槛、集群拓扑</td></tr>
+<tr><td class="mono">代码树 @ main 6b836c4</td><td class="mono">2026-08-31</td><td>role-driver 缺失、证明闸调用点、CI job、构建 profile</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>八天内解决的三个阻塞</h3>
+<p>下面三条在 0823 还是头号阻塞,现在已不成立。它们都属于<strong>代码层面的分歧</strong>,与 §4、§8 中剩余的部分性质不同。</p>
+<ul>
+  <li>证明闸接线:<code>admitTrustedCacheEpoch</code> 的生产调用点从零变为真实存在(<code>RelayEndpoint.swift:1605/1770</code>),FFI 接上 <code>verify_trusted_stream_binding_v1</code></li>
+  <li>webeditor 打包冲突:wasm 以 data URI 内联进单文件构建(<code>vite.config.ts</code>),依赖升至 <code>@cowboyinc/cbqs-wasm@0.2.0</code></li>
+  <li>empty-lane origin 分歧:已裁决并落地(<code>81b9449</code>)</li>
+</ul>
+
+<div class="box warn">
+  <div class="h">已知文档漂移(引用前请先核对)</div>
+  <p><strong>1 · actor 地址</strong> —— <code>actor/README.md</code> 记录的当前 actor 与 0823 交接文档记录的不是同一个(旧的那批已随旧链消失)。以集群实测为准。</p>
+  <p><strong>2 · 根 README 的测试命令会失败</strong> —— <code>services/role-driver/tests</code> 不在 main 上。</p>
+  <p><strong>3 · 测试数量随文档日期不同</strong> —— 编辑器 176 / 184;中继 136 → 141。引用时请带日期。</p>
+  <p><strong>4 · 两份产品规格结论相反</strong> —— <code>product-spec.md</code> 主张公开版移除全部 Cowboy 基础设施并开源;<code>docs/homestead-v1-spec.md</code> 主张 closed source 加付费云端层。v1 的形态尚未定案。</p>
+</div>
+
+<footer>
+  Homestead 现状与交付难点 · 2026-08-31 · 依据 <code>homestead@main 6b836c4</code> · 内部文档<br>
+  本页描述现状与已知难点,不含工期判断。版本号、地址与集群状态请对照实际集群复核。
+</footer>
+</section>
+
+</main>
+</div>
+</body>
+</html>
