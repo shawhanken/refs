@@ -143,3 +143,48 @@ crontab 的 `rotate-trusted-checkpoint.sh` 每小時 :17 會**重建 relay 並�
 用的是 `/home/ubuntu/workspace/homestead` 當下 checkout 的分支。多 audience
 的修改在 `macos-cip39-v2-port`(PR #80)上,所以切到別的分支會讓 macOS 的
 audience 靜默失效——換分支時記得這件事。
+
+---
+
+# 追加 2(2026-09-06 下午):proof 改成常數大小,錨點不再過期
+
+上面那節講的「簽名委派」讓輪換不必重編。之後又做了一步更根本的:**proof 本身
+改成常數大小**,於是錨點根本不需要輪換。
+
+## 現在的數字(devnet,1 block/秒)
+
+| 錨點年齡 | v1 proof | v2 proof |
+|---|---|---|
+| 2 小時 | 1,752,447 bytes | **1,085 bytes** |
+| 1 天 | **409 拒絕** | **1,085 bytes** |
+| 創世(~4 天) | **409 拒絕** | **1,117 bytes** |
+
+`crontab` 的每小時輪換**已停用**(條目保留為註解)。
+`scripts/rotate-trusted-checkpoint.sh` 留著,但只用於「換一個**不同**的錨點」
+(re-genesis、換 chain instance),不再用於保鮮。
+
+## 回退法
+
+這一段的回退**不需要動鏈上任何東西**,只是把三個 repo 的 pin 退回去:
+
+| repo | 回退到 | 目前 |
+|---|---|---|
+| cowboy-protocol | `4428f42` | `3c18a8d` |
+| cbfs | `1fe54d2` | `3d2bc3f` |
+| cbqs | `2caf93e` | `9cfa6ec` |
+| node | `afc0e8fbd` | `0a2c58157` |
+| homestead | `a05c2e1`(PR #80 合併點) | 見分支 head |
+
+實務上更簡單的回退是:把 `node` 與 `homestead` 各自 `git revert` 掉這幾個
+commit,錨點檔本身沒變、actor 沒變、relay key 沒變。舊 node 二進位仍能服務 v1
+請求(`bundle_version` 缺省就是 1)。
+
+## 兩個要記住的坑
+
+1. **這台機器的檔案 mtime 比牆鐘慢約 4 小時**,cargo 因此會**靜默跳過重編** ——
+   改了原始碼卻部署到舊二進位,而且看起來一切正常。構建前
+   `touch -d "<未來時間>"`,或 `cargo clean -p <pkg>`。
+2. **relay 的 production profile 仍在 v1**,因為 cargo 不允許同一 package 用兩個
+   名字,而 `cowboy-protocol-proof-codec` 這個別名必須匹配所釘 cbfs 解析出的
+   codec rev。要抬它得先遷 cbfs(`relay_handshake_signing_bytes` 從 3 參數變 4
+   參數)。devnet 與 macOS app 走的 development profile 已在 v2。
