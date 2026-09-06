@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homestead Web 版产品方案 · 2026-09-01</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2a333d; --accent:#4aa3ff; --accent2:#7ee0c0; --gold:#f2c14e;
+    --ok:#3fb950; --warn:#d29922; --danger:#f85149; --purple:#bc8cff;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;font-size:16.5px}
+  .wrap{display:grid;grid-template-columns:250px 1fr;max-width:1280px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:26px 16px;border-right:1px solid var(--line);background:var(--panel)}
+  nav h2{font-size:12px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin:0 0 12px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:7px;font-size:13.5px}
+  nav a:hover{color:var(--ink);background:var(--panel2)}
+  nav .tag{display:block;margin-top:18px;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:3px 10px;text-align:center}
+  main{padding:40px 48px 110px;min-width:0}
+  header.hero{border:1px solid var(--line);border-radius:16px;padding:30px 32px;margin-bottom:34px;
+    background:radial-gradient(1100px 300px at 0% 0%,rgba(126,224,192,.10),transparent 60%),var(--panel)}
+  header.hero .kick{color:var(--accent2);font-family:var(--mono);font-size:12.5px;letter-spacing:.05em}
+  header.hero h1{margin:8px 0 6px;font-size:29px;line-height:1.25}
+  header.hero p{margin:10px 0 0;color:var(--muted)}
+  header.hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+  section{margin:0 0 46px;scroll-margin-top:18px}
+  h2.sec{font-size:22px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2.sec .n{color:var(--accent2);font-family:var(--mono);font-size:16px;margin-right:10px}
+  h3{font-size:17px;margin:26px 0 8px;color:#fff}
+  p{margin:12px 0}
+  code{font-family:var(--mono);background:#0b0e12;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.85em;color:var(--accent2);overflow-wrap:anywhere}
+  strong{color:#fff}
+  .lead{font-size:17px;color:#cfd8e0}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+  .box{border-radius:12px;padding:15px 18px;margin:18px 0;border:1px solid var(--line);background:var(--panel)}
+  .box .h{font-weight:700;margin-bottom:4px}
+  .box p{margin:8px 0}
+  .box p:last-child{margin-bottom:0}
+  .box.info{border-color:#1f4b73;background:linear-gradient(180deg,rgba(74,163,255,.07),transparent)}
+  .box.info .h{color:#8fd0ff}
+  .box.ok{border-color:#1f5b32;background:linear-gradient(180deg,rgba(63,185,80,.07),transparent)}
+  .box.ok .h{color:var(--ok)}
+  .box.warn{border-color:#6b551a;background:linear-gradient(180deg,rgba(210,153,34,.07),transparent)}
+  .box.warn .h{color:var(--gold)}
+  .box.danger{border-color:#6e2b28;background:linear-gradient(180deg,rgba(248,81,73,.08),transparent)}
+  .box.danger .h{color:#ff9d8a}
+  .tw{overflow-x:auto;margin:16px 0;border-radius:10px;border:1px solid var(--line)}
+  table{width:100%;min-width:660px;border-collapse:collapse;table-layout:fixed;font-size:14px}
+  th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+        padding:10px 13px;text-align:left;vertical-align:top;overflow-wrap:break-word;line-height:1.6}
+  th:last-child,td:last-child{border-right:none}
+  tbody tr:last-child td{border-bottom:none}
+  thead th{background:var(--panel2);color:#fff;font-weight:600;font-size:13.5px;white-space:nowrap}
+  tbody tr:nth-of-type(odd) td{background:rgba(255,255,255,.018)}
+  td.mono{font-family:var(--mono);font-size:12.5px}
+  .st{font-family:var(--mono);font-size:12px;font-weight:700;display:inline-block}
+  .st.ok{color:var(--ok)} .st.mid{color:var(--gold)} .st.bad{color:#ff8a7a} .st.na{color:var(--muted)}
+  .phase{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;background:var(--panel)}
+  .phase .tag{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent2);letter-spacing:.06em}
+  .phase h4{margin:6px 0 8px;font-size:17px;color:#fff}
+  .phase .goal{color:var(--muted);font-size:14.5px;margin:0 0 10px}
+  .phase .dod{border-left:3px solid var(--accent2);padding-left:12px;margin-top:12px;font-size:14.5px}
+  .phase .dod b{color:var(--accent2)}
+  figure{margin:22px 0}
+  figure svg{display:block;width:100%;height:auto;background:#12161c;border:1px solid var(--line);border-radius:12px;padding:8px}
+  figcaption{margin-top:10px;color:var(--muted);font-size:13.5px;line-height:1.65}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr}
+    nav{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+    main{padding:26px 18px 70px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <h2>目录</h2>
+  <a href="#s1">1 · 方案一句话</a>
+  <a href="#s2">2 · 为什么是现在</a>
+  <a href="#s3">3 · 技术起点</a>
+  <a href="#s4">4 · 定位与边界</a>
+  <a href="#s5">5 · 功能矩阵</a>
+  <a href="#s6">6 · 架构</a>
+  <a href="#s7">7 · 三阶段路线</a>
+  <a href="#s8">8 · 必须先解的工作项</a>
+  <a href="#s9">9 · 风险与待决</a>
+  <a href="#s10">10 · 成功判据</a>
+  <span class="tag">2026-09-01 · 方案稿</span>
+</nav>
+<main>
+
+<header class="hero">
+  <div class="kick">COWBOY · HOMESTEAD · 产品方案</div>
+  <h1>Homestead Web 版</h1>
+  <p class="lead">把「要装 DMG 才能看」的产品,变成「发条链接就能用」。</p>
+  <p>核心判断:<strong>Homestead 的编辑器今天已经是一个能在浏览器里跑起来的 Web 应用</strong>。缺的不是编辑器,是外壳、认证和托管。这份方案围绕已确认的核心卖点,给出边界、架构、三阶段路线和每阶段的验收判据。</p>
+  <div class="meta">
+    <span class="pill">依据 homestead@main 6b836c4</span>
+    <span class="pill">会议 2026-09-01</span>
+    <span class="pill">Slack #homestead 08-04→08-31</span>
+  </div>
+</header>
+
+<section id="s1">
+<h2 class="sec"><span class="n">01</span>方案一句话</h2>
+<div class="box ok">
+  <div class="h">方案</div>
+  <p>复用现有的 <code>webeditor/</code>(25 个模块、395 个测试、自带完整 CBQS 浏览器客户端),为它补一层 <strong>Web 外壳</strong>、一套<strong>浏览器认证</strong>和一个<strong>托管入口</strong>,分三阶段交付:<strong>可分享的只读页 → 可协作编辑的单页 → 完整 Web 工作区</strong>。</p>
+  <p>macOS 原生版继续存在,承担本地文件夹与本机 Agent 这两件浏览器做不到的事。<strong>Web 版不是它的替代,是它的入口。</strong></p>
+</div>
+</section>
+
+<section id="s2">
+<h2 class="sec"><span class="n">02</span>为什么是现在</h2>
+
+<h3>会议给的理由</h3>
+<p>0901 会议把优先级说得很直白:客户要的是<strong>可展示的产品实体</strong>,不是 CIP 进度。原话两句 ——「你不能说我是过来吃龙虾的,我龙虾没有,我给你上盘牛蛙」、「都是视觉动物嘛,就是这个市场都是个视觉动物嘛」。</p>
+<p>而今天要让人看到 Homestead,路径是:签名 → 公证 → 下载 DMG → 拖进 /Applications → 过 Gatekeeper → 登录 → 等工作区激活。这条链上任何一环出问题(8 月里 502、更新器报错、沙箱迁移都出过),演示就没了。</p>
+
+<div class="box info">
+  <div class="h">Web 版把这条链压成一步:发一个链接</div>
+  <p>对「视觉动物」型受众,这是投入产出比最高的一次形态改动 —— <strong>不需要新功能,只需要换一个交付形态</strong>。</p>
+</div>
+
+<h3>战略理由</h3>
+<p>会议定的定位是「Homestead 对 Cowboy 就像 CodeX 对 OpenAI」、「链上那一堆东西最后都得通过 Homestead 串起来」。一个只能装在 Mac 上的入口,承载不了「统一入口」这个角色 —— 覆盖面最大的入口形态是浏览器。</p>
+
+<div class="box warn">
+  <div class="h">这是一次明确的范围翻案,要写进纪要</div>
+  <p><code>docs/homestead-v1-spec.md</code> 白纸黑字把 <strong>web client 列为 v1 out of scope</strong>(与 Windows/iOS、按人头计价并列)。本方案主张把它移进范围,理由是上面两条。<strong>不要假装这是既定计划</strong> —— 它推翻了一条已写下的决定,需要拍板。</p>
+</div>
+</section>
+
+<section id="s3">
+<h2 class="sec"><span class="n">03</span>技术起点:比想象中近得多</h2>
+<p class="lead">这一节是本方案的支点。<strong>编辑器不需要重写,它今天就能在浏览器里跑。</strong></p>
+
+<h3>已经是纯 Web 的部分</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:30%"><col style="width:16%"><col style="width:54%"></colgroup>
+<thead><tr><th>资产</th><th>规模</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>webeditor/</code> 编辑器</td><td>25 模块 / 395 测试</td><td>CodeMirror 6 + Yjs,TypeScript。所见即所得、斜杠菜单、拖拽手柄、评论、Mermaid、表格、附件、查找替换、AI 聊天栏全在这里</td></tr>
+<tr><td><code>webeditor/src/cbqs/</code></td><td>10 模块 + wasm</td><td><strong>完整的浏览器 CBQS 客户端</strong>:bootstrap、session、channel、lanes、snapshot 验证、yjs-frames。已能直连 broker、验证快照头、hydrate 后加入</td></tr>
+<tr><td>collab relay</td><td>14 条路由</td><td>Yjs WS、票据、CBQS session 铸造、链证明信使、房间元数据、搜索、分享、附件 —— 全是 HTTP/WS,与客户端形态无关</td></tr>
+<tr><td>链上 actor</td><td>41 条路由</td><td>成员、页树、ACL、计费授权。认证用 Google ID token,浏览器天然支持</td></tr>
+<tr><td>公开分享页</td><td><code>GET /s/:guid</code></td><td><strong>已经是一个 Web 页面</strong>:服务端渲染的只读 HTML,CSP <code>default-src 'none'</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>对原生外壳的耦合:只有 4 处</h3>
+<p>我对 <code>webeditor/src/</code> 全量搜索 <code>webkit</code> / <code>messageHandlers</code>,生产代码命中只有三个文件:</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:30%"><col style="width:26%"><col style="width:44%"></colgroup>
+<thead><tr><th>位置</th><th>做什么</th><th>Web 版怎么办</th></tr></thead>
+<tbody>
+<tr><td class="mono">main.ts:104 <code>toSwift()</code></td><td>所有出站原生消息的<strong>唯一出口</strong></td><td>用了可选链,<strong>浏览器里自动空转</strong>,零改动</td></tr>
+<tr><td class="mono">main.ts:108 <code>openURL()</code></td><td>打开外链</td><td><strong>已有浏览器分支</strong>(<code>window.open</code>)</td></tr>
+<tr><td class="mono">workspaceassets.ts:233</td><td><code>homesteadAttach</code> 把附件写到磁盘 <code>assets/</code></td><td>改走 relay 的 <code>/assets</code> 能力 URL —— <strong>该接口已存在</strong></td></tr>
+<tr><td class="mono">harnesschat.ts:187</td><td>告诉外壳 AI 栏开/关</td><td>纯 UI 状态,Web 外壳自己管</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box ok">
+  <div class="h">实证:它已经在浏览器里跑了</div>
+  <p><code>main.ts:928</code> 和 <code>main.ts:995</code> 各有一段 <code>if (!window.webkit)</code> 分支 —— 前者在浏览器里挂上 <code>window.__homestead</code> 调试句柄,后者<strong>在浏览器里打开时自动 seed 一篇欢迎文档</strong>。这两段是给浏览器验证用的,说明编辑器的浏览器路径一直是活的、被维护的,不是理论可能性。</p>
+</div>
+</section>
+
+<section id="s4">
+<h2 class="sec"><span class="n">04</span>定位与边界</h2>
+
+<h3>Web 版是什么</h3>
+<ul>
+  <li><strong>入口与演示面</strong> —— 发一个链接,对方在浏览器里看到、并能编辑真实文档</li>
+  <li><strong>协作面</strong> —— 多人同时编辑、评论、分享,不要求对方装任何东西、不要求对方用 Mac</li>
+  <li><strong>Cowboy 能力的展示窗</strong> —— 链上工作区、CBQS 协作、CBFS 存储,在一个普通浏览器标签页里发生</li>
+</ul>
+
+<h3>Web 版不是什么(这些留给桌面版)</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+<thead><tr><th>不做</th><th>原因</th></tr></thead>
+<tbody>
+<tr><td><strong>本地 Markdown 文件夹作为真相源</strong></td><td>File System Access API 只有 Chromium 系支持,且授权模型与「文件即真相」的承诺不匹配。桌面版的核心差异化就在这里,不要稀释</td></tr>
+<tr><td><strong>本机 Agent(ACP / Codex 子进程)</strong></td><td>浏览器起不了子进程。要在 Web 上提供 Agent,只能是服务端托管的形态 —— 那是另一个产品决定,不在本方案范围</td></tr>
+<tr><td><strong>Keychain、应用内更新、app-scoped 书签</strong></td><td>平台能力,Web 上不存在也不需要</td></tr>
+<tr><td><strong>离线优先</strong></td><td>Yjs + IndexedDB 天然给了短时离线容错,但「离线可用」不作为 Web 版承诺</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="s5">
+<h2 class="sec"><span class="n">05</span>功能矩阵:macOS 版 × Web 版</h2>
+<p>按已确认的核心卖点逐条对照。<span class="st ok">平移</span>=复用现有代码;<span class="st mid">重做</span>=功能保留但要新实现;<span class="st bad">不做</span>=留在桌面版。</p>
+<div class="tw">
+<table>
+<colgroup><col style="width:26%"><col style="width:12%"><col style="width:62%"></colgroup>
+<thead><tr><th>卖点 / 功能</th><th>Web</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>所见即所得 Markdown(不露语法)</td><td><span class="st ok">平移</span></td><td>编辑器本体,零改动</td></tr>
+<tr><td>斜杠命令菜单 · 格式栏 · 拖拽重排</td><td><span class="st ok">平移</span></td><td><code>slashmenu.ts</code> <code>formatmenu.ts</code> <code>blockhandle.ts</code></td></tr>
+<tr><td>代码高亮 · 表格 · Mermaid · 页面图标</td><td><span class="st ok">平移</span></td><td>编辑器本体</td></tr>
+<tr><td>实时协作 + 光标</td><td><span class="st ok">平移</span></td><td><code>collab.ts</code> + <code>cbqs/</code>,浏览器直连 broker</td></tr>
+<tr><td>行内评论</td><td><span class="st ok">平移</span></td><td><code>comments.ts</code></td></tr>
+<tr><td>文档内 AI 聊天</td><td><span class="st ok">平移</span></td><td><code>cowchat.ts</code> <code>harnesschat.ts</code>;推理走服务端代理,凭证不进浏览器</td></tr>
+<tr><td>查找替换</td><td><span class="st ok">平移</span></td><td><code>findreplace.ts</code></td></tr>
+<tr><td>分享链接(只读 / 评论)</td><td><span class="st ok">平移</span></td><td>relay 已有 <code>/share</code> + <code>/s/:guid</code>;评论级链接的交互面是 Web 版<strong>顺手补上的缺口</strong>(桌面版今天也没有)</td></tr>
+<tr><td>附件上传与显示</td><td><span class="st mid">重做</span></td><td>从 <code>homesteadAttach</code> 原生桥改走 relay <code>/assets</code> 能力 URL</td></tr>
+<tr><td>侧边栏 / 页树 / 标签页 / 收藏 / 回收站</td><td><span class="st mid">重做</span></td><td>对应 Swift 的 <code>Document</code> <code>WorkspaceAdmin</code> 域,需要 Web 实现</td></tr>
+<tr><td>搜索</td><td><span class="st mid">重做</span></td><td>relay <code>/search</code> 已有;Web 只需查询面</td></tr>
+<tr><td>Google 登录</td><td><span class="st mid">重做</span></td><td>原生 OAuth + Keychain → 浏览器 PKCE + 会话 cookie</td></tr>
+<tr><td>本地缓存(快速重开)</td><td><span class="st mid">重做</span></td><td>Rust/SQLite → IndexedDB;Yjs 房间缓存<strong>本来就在用 IndexedDB</strong></td></tr>
+<tr><td>成员 / 权限 / 计费面板</td><td><span class="st mid">重做</span></td><td>actor 接口已有,只缺 Web 界面</td></tr>
+<tr><td>Notion ZIP 导入</td><td><span class="st mid">重做</span></td><td>解析逻辑在 Swift 里(<code>NotionImport.swift</code>),Web 版要么前端解析、要么做成服务端任务</td></tr>
+<tr><td>本地 Markdown 文件夹</td><td><span class="st bad">不做</span></td><td>桌面版专属</td></tr>
+<tr><td>ACP / 本机 Codex</td><td><span class="st bad">不做</span></td><td>桌面版专属</td></tr>
+<tr><td>应用内更新器</td><td><span class="st na">不适用</span></td><td>Web 天然常新</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>统计:19 项里 8 项直接平移、8 项重做、3 项不做。重做的 8 项集中在「外壳」,没有一项需要碰协作或存储内核。</strong></p>
+</section>
+
+<section id="s6">
+<h2 class="sec"><span class="n">06</span>架构:复用什么、新建什么</h2>
+
+<figure>
+<svg viewBox="0 0 900 470" role="img" aria-label="Homestead Web 版架构:新建 Web 外壳与浏览器认证、IndexedDB 缓存和托管入口;编辑器内核与 CBQS 客户端整体复用;collab relay、链上 actor、CBQS broker、CBFS 全部不动;本地文件夹与本机 Agent 留在桌面版">
+  <defs>
+    <marker id="a" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,4 0,8" fill="currentColor" fill-opacity=".55"/>
+    </marker>
+  </defs>
+
+  <text x="18" y="20" font-size="11" fill="#f2c14e" font-weight="700">新建</text>
+  <rect x="18" y="30" width="620" height="76" rx="10" fill="none" stroke="#f2c14e" stroke-opacity=".45" stroke-dasharray="5 4"/>
+  <rect x="34" y="44" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="104" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Web 外壳</text>
+  <text x="104" y="81" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">侧栏·标签·设置</text>
+  <rect x="190" y="44" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="260" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">浏览器 PKCE</text>
+  <text x="260" y="81" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">替代 Keychain</text>
+  <rect x="346" y="44" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="416" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">IndexedDB 缓存</text>
+  <text x="416" y="81" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">替代 SQLite/FFI</text>
+  <rect x="502" y="44" width="120" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="562" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">托管入口</text>
+  <text x="562" y="81" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">origin + CSP</text>
+
+  <text x="18" y="140" font-size="11" fill="#7ee0c0" font-weight="700">整体复用(零改动或极小改动)</text>
+  <rect x="18" y="150" width="620" height="76" rx="10" fill="none" stroke="#7ee0c0" stroke-opacity=".45"/>
+  <rect x="34" y="164" width="286" height="48" rx="8" fill="#1c232d" stroke="#7ee0c0" stroke-opacity=".5"/>
+  <text x="177" y="184" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">编辑器内核 webeditor/</text>
+  <text x="177" y="201" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">25 模块 · 395 测试 · CodeMirror 6 + Yjs</text>
+  <rect x="336" y="164" width="286" height="48" rx="8" fill="#1c232d" stroke="#7ee0c0" stroke-opacity=".5"/>
+  <text x="479" y="184" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CBQS 浏览器客户端</text>
+  <text x="479" y="201" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">10 模块 + wasm 验证器</text>
+
+  <text x="18" y="262" font-size="11" fill="#7ee0c0" font-weight="700">服务端与链:完全不动</text>
+  <rect x="18" y="272" width="620" height="76" rx="10" fill="none" stroke="#7ee0c0" stroke-opacity=".45"/>
+  <rect x="34" y="286" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="104" y="306" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">collab relay</text>
+  <text x="104" y="323" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">14 条路由</text>
+  <rect x="190" y="286" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="260" y="306" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">链上 actor</text>
+  <text x="260" y="323" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">41 条路由</text>
+  <rect x="346" y="286" width="140" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="416" y="306" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CBQS broker</text>
+  <text x="416" y="323" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">浏览器直连</text>
+  <rect x="502" y="286" width="120" height="48" rx="8" fill="#1c232d" stroke="currentColor" stroke-opacity=".3"/>
+  <text x="562" y="306" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CBFS 卷</text>
+  <text x="562" y="323" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">快照·附件</text>
+
+  <line x1="328" y1="106" x2="328" y2="150" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#a)"/>
+  <line x1="328" y1="226" x2="328" y2="272" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-start="url(#a)" marker-end="url(#a)"/>
+
+  <text x="672" y="20" font-size="11" fill="#ff8a7a" font-weight="700">留在桌面版</text>
+  <rect x="672" y="30" width="212" height="196" rx="10" fill="none" stroke="#ff8a7a" stroke-opacity=".4" stroke-dasharray="5 4"/>
+  <rect x="688" y="46" width="180" height="42" rx="8" fill="#1c232d" stroke="#ff8a7a" stroke-opacity=".35"/>
+  <text x="778" y="72" text-anchor="middle" font-size="12" fill="currentColor">本地 .md 文件夹</text>
+  <rect x="688" y="100" width="180" height="42" rx="8" fill="#1c232d" stroke="#ff8a7a" stroke-opacity=".35"/>
+  <text x="778" y="126" text-anchor="middle" font-size="12" fill="currentColor">ACP · 本机 Codex</text>
+  <rect x="688" y="154" width="180" height="42" rx="8" fill="#1c232d" stroke="#ff8a7a" stroke-opacity=".35"/>
+  <text x="778" y="180" text-anchor="middle" font-size="12" fill="currentColor">Keychain · 更新器</text>
+
+  <rect x="672" y="272" width="212" height="76" rx="10" fill="#161b22" stroke="#6e2b28" stroke-opacity=".6"/>
+  <text x="778" y="296" text-anchor="middle" font-size="12.5" font-weight="600" fill="#ff9d8a">硬阻塞</text>
+  <text x="778" y="314" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">relay CORS 只允许</text>
+  <text x="778" y="330" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">localhost / file://</text>
+
+  <text x="18" y="392" font-size="11.5" fill="currentColor" fill-opacity=".6">改动集中在最上面一层。中间与下面两层是今天已经在跑的东西,Web 版不需要碰它们。</text>
+  <text x="18" y="414" font-size="11.5" fill="currentColor" fill-opacity=".6">右下角那条是唯一挡在路上的服务端改动,见 §08。</text>
+</svg>
+<figcaption>Web 版的改动面。三层里只有最上面一层是新建的;编辑器内核、CBQS 客户端、relay、actor、broker、CBFS 全部原样复用。红框是明确不迁移的桌面能力。</figcaption>
+</figure>
+</section>
+
+<section id="s7">
+<h2 class="sec"><span class="n">07</span>三阶段路线</h2>
+<p>每阶段都要能单独拿出去演示,不做「憋大招」。</p>
+
+<div class="phase">
+  <div class="tag">W1</div>
+  <h4>可分享的只读 Web 页</h4>
+  <p class="goal">把现有的 <code>GET /s/:guid</code> 从「无 JS 的服务端渲染」升级成真正的阅读体验。</p>
+  <ul>
+    <li>用编辑器的只读模式渲染,而不是服务端 Markdown 转 HTML —— 图片、表格、Mermaid、代码高亮与桌面版一致</li>
+    <li>补上<strong>评论级公开链接的交互面</strong>:权限格里有 <code>comment</code> 级,但今天那个页面没有 JS,拿到评论权限的人无处可评。这是现成的缺口</li>
+    <li>不需要登录、不需要放开 CORS(同源)、不触碰写路径</li>
+  </ul>
+  <div class="dod"><b>验收:</b>把一篇带图片、表格和 Mermaid 的文档分享出去,对方在手机和桌面浏览器上都能正常阅读并留下评论;撤销链接后立即失效。</div>
+</div>
+
+<div class="phase">
+  <div class="tag">W2</div>
+  <h4>可协作编辑的单页 Web</h4>
+  <p class="goal">登录后打开一个已授权的页面,在浏览器里协作编辑。这一阶段交付的是<strong>核心卖点本身</strong>。</p>
+  <ul>
+    <li>浏览器 PKCE 登录,拿 Google ID token 调 actor</li>
+    <li>复用 <code>cbqs/bootstrap.ts</code> 走完整流程:领票据 → 铸 StreamGrant → 直连 broker → 验证快照头 → hydrate</li>
+    <li><strong>放开 relay CORS</strong>(见 §08),这是本阶段的前置硬条件</li>
+    <li>附件改走 relay <code>/assets</code></li>
+    <li>暂不做侧边栏和页树:通过 URL 直达单页</li>
+  </ul>
+  <div class="dod"><b>验收:</b>两个不同浏览器、两个不同 Google 账号打开同一个 URL,同时编辑,互相看到光标与内容;各自刷新后内容仍在;其中一人被移出工作区后,下一次重连即被拒绝。</div>
+</div>
+
+<div class="phase">
+  <div class="tag">W3</div>
+  <h4>完整 Web 工作区</h4>
+  <p class="goal">补齐外壳,达到桌面版的功能面(本地文件夹与本机 Agent 除外)。</p>
+  <ul>
+    <li>侧边栏页树、多工作区切换、标签页、收藏、回收站、搜索</li>
+    <li>成员与权限管理、分享管理、计费面板</li>
+    <li>Notion ZIP 导入(前端解析或服务端任务,二选一)</li>
+    <li>文档内 AI:推理走服务端代理,凭证不进浏览器</li>
+  </ul>
+  <div class="dod"><b>验收:</b>一个新用户从零开始 —— 登录、建工作区、导入一份 Notion 导出、邀请同事、共同编辑、分享出去 —— 全程只用浏览器。</div>
+</div>
+</section>
+
+<section id="s8">
+<h2 class="sec"><span class="n">08</span>必须先解决的具体工作项</h2>
+
+<div class="box danger">
+  <div class="h">硬阻塞:relay 的 CORS 白名单</div>
+  <p><code>services/collab-relay/src/lib.rs:2505</code> 的 <code>ticket_cors_origin_allowed()</code> 目前只放行三种来源:<code>null</code>(即 <code>file://</code>,桌面版 WebView 加载本地单文件页面时就是这个)、<code>localhost</code>、<code>127.0.0.1</code>。</p>
+  <p><strong>任何部署在真实域名上的 Web 版,调 <code>/ticket</code>、<code>/cbqs/session</code>、<code>/cbqs/chain-proof</code> 都会被浏览器挡下。</strong>这三条恰好是拿到编辑权限的必经之路。改动本身很小(一个函数 + 一个配置项),但必须<strong>配置化而不是写死</strong>,且默认拒绝未知来源。</p>
+</div>
+
+<div class="tw">
+<table>
+<colgroup><col style="width:26%"><col style="width:16%"><col style="width:58%"></colgroup>
+<thead><tr><th>工作项</th><th>阶段</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>relay CORS 可配置</td><td>W2 前置</td><td>把允许来源做成部署配置;默认拒绝;与现有 <code>file://</code> 桌面路径共存</td></tr>
+<tr><td>Web 外壳骨架</td><td>W2→W3</td><td>路由、布局、状态层。对应 Swift 的 10 个 Feature 域,但只需其中的云端部分</td></tr>
+<tr><td>浏览器认证</td><td>W2</td><td>PKCE + state/callback 校验;token 存内存 + 短期会话,<strong>不落 localStorage</strong></td></tr>
+<tr><td>附件路径切换</td><td>W2</td><td><code>workspaceassets.ts</code> 增加浏览器分支,走 relay <code>/assets</code> 能力 URL</td></tr>
+<tr><td>构建产物拆分</td><td>W1</td><td>桌面版是 <code>vite-plugin-singlefile</code> 打成单文件内联(含 wasm 的 data URI);Web 版应改为常规多产物构建,否则首屏要拖一个巨大的 HTML</td></tr>
+<tr><td>IndexedDB 缓存层</td><td>W3</td><td>替代 SQLite 页树缓存;注意桌面版已有「按授权作用域隔离缓存、撤权即隔离」的规则,Web 版必须照抄</td></tr>
+<tr><td>Notion 导入迁移</td><td>W3</td><td><code>NotionImport.swift</code> 的解析与规划逻辑要么移植到 TS,要么做成服务端任务</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <div class="h">别忘了刚合入的那条安全改动</div>
+  <p>relay 的 WebSocket 中继在 2026-09-01 刚加了 <strong>Origin 校验与连接数上限</strong>(node#1460)。Web 版部署时,这个校验和上面的 CORS 白名单是<strong>两处独立的来源判断</strong>,必须一起配置,否则会出现「HTTP 通了但 WebSocket 被拒」的半通状态。</p>
+</div>
+</section>
+
+<section id="s9">
+<h2 class="sec"><span class="n">09</span>风险与待决</h2>
+
+<h3>风险</h3>
+<div class="tw">
+<table>
+<colgroup><col style="width:26%"><col style="width:74%"></colgroup>
+<thead><tr><th>风险</th><th>说明与对策</th></tr></thead>
+<tbody>
+<tr><td><strong>稀释桌面版的差异化</strong></td><td>桌面版的卖点是「文件即真相 + 本机 Agent」。Web 版若也宣称本地能力,两边都说不清。对策:<strong>边界写死在 §04</strong>,对外话术统一为「Web 是入口,桌面是工作台」</td></tr>
+<tr><td><strong>信任边界扩大</strong></td><td>浏览器里跑 = 更大的攻击面(XSS、token 泄漏、第三方脚本)。对策:严格 CSP、token 不落持久存储、公开页保持 <code>default-src 'none'</code></td></tr>
+<tr><td><strong>协作耐久性尚无证据</strong></td><td>目前还没有「数据在集群上确实持久」的证据(快照器已发布 generation 数曾为零)。Web 版会放大这个风险 —— 用户不会觉得「网页丢了内容」是可接受的。<strong>W2 上线前必须先有耐久性证据</strong></td></tr>
+<tr><td><strong>与 CIP-39 v2 改造撞车</strong></td><td>当前所有研发在 <code>homestead-based-on-cip-39-v2</code> 分支,协作传输层正在改。Web 版复用的正是 <code>cbqs/</code> 客户端。对策:W1 不碰传输层可以并行;<strong>W2 应排在 v2 传输稳定之后</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>待决</h3>
+<ol>
+  <li><strong>是否翻案 v1 spec 的「web client out of scope」?</strong> 这是本方案的前提,需要拍板。</li>
+  <li><strong>Web 版是免费入口还是付费产品的一部分?</strong> 影响计费面板要不要进 W3。</li>
+  <li><strong>Web 上要不要提供 Agent?</strong> 若要,是服务端托管形态,是一个独立产品决定。</li>
+  <li><strong>域名与部署形态</strong> —— 独立 origin 还是挂在现有 relay 主机下?影响 CORS 配置的复杂度。</li>
+</ol>
+</section>
+
+<section id="s10">
+<h2 class="sec"><span class="n">10</span>成功判据</h2>
+<div class="box ok">
+  <div class="h">一句话判据</div>
+  <p><strong>把一个链接发给一个没有 Mac、没装过任何东西的人,他能在浏览器里打开文档、和你同时编辑、刷新后内容还在。</strong></p>
+</div>
+<p>分解到三阶段:</p>
+<ul>
+  <li><strong>W1</strong> —— 分享出去的页面在手机浏览器上读起来和桌面版一样好</li>
+  <li><strong>W2</strong> —— 两个浏览器同时编辑同一页,光标互见,撤权后立即失效</li>
+  <li><strong>W3</strong> —— 一个新用户全程只用浏览器完成:登录 → 建工作区 → 导入 Notion → 邀请同事 → 协作 → 分享</li>
+</ul>
+<p>另外两条不写进阶段但要一直盯:<strong>首屏时间</strong>(桌面版的预算是暖开 300ms / 冷开 1.5s,Web 版要给出自己的数字并实测)、<strong>没有一次内容丢失</strong>。</p>
+
+<footer>
+  Homestead Web 版产品方案 · 2026-09-01 · 方案稿,依据 <code>homestead@main 6b836c4</code><br>
+  技术起点一节的耦合点与 CORS 判断来自对代码树的实际检索;路线与边界是提案,需拍板后才是计划。
+</footer>
+</section>
+
+</main>
+</div>
+</body>
+</html>
