@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homestead macOS 版完工差距評估 · 2026-09-05</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  /* Palette is the product's own: Gallop tokens (webeditor/src/gallop-tokens.css),
+     the same hay / bison / nugget / canyon ramps the macOS app ships with.
+     Committed dark, like the rest of refs/analysis. */
+  :root{
+    --ground:#14110F;          /* bison-950, warmed toward nugget */
+    --panel:#1D1916;           /* bison-900 */
+    --panel-2:#26211D;         /* bison-800 */
+    --sunken:#0E0C0B;
+    --line:#3D3530;            /* bison-600 */
+    --line-soft:#2E2824;       /* bison-700 */
+    --ink:#F4F0EB;             /* hay-200 */
+    --ink-dim:#D9CFC4;         /* hay-700 */
+    --muted:#AEA399;           /* bison-50 */
+    --accent:#FFAD33;          /* nugget-400 */
+    --accent-dim:#A85700;      /* nugget-700 */
+    --pass:#94B36B;
+    --pass-dim:#3A4429;
+    --warn:#FFC15C;            /* nugget-300 */
+    --stop:#E35531;            /* canyon-400 */
+    --stop-dim:#4A1D10;
+    --mono:"JetBrains Mono","SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC",
+           "Hiragino Sans TC","Microsoft JhengHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:var(--sans);font-size:16.5px;line-height:1.8;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{display:grid;grid-template-columns:236px minmax(0,1fr);max-width:1220px;margin:0 auto}
+  @media (max-width:880px){.wrap{grid-template-columns:1fr}}
+
+  /* ---- nav ---- */
+  nav{
+    position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;
+    padding:30px 14px;border-right:1px solid var(--line-soft);background:var(--panel);
+  }
+  @media (max-width:880px){nav{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line-soft)}}
+  nav .brand{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent-dim);margin:0 10px 16px}
+  nav a{display:flex;gap:9px;align-items:baseline;color:var(--muted);text-decoration:none;
+    padding:6px 10px;border-radius:8px;font-size:13.5px;line-height:1.5}
+  nav a .n{font-family:var(--mono);font-size:11px;color:#72675F;min-width:1.1em}
+  nav a:hover{color:var(--ink);background:var(--panel-2)}
+  nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  nav .foot{margin:20px 10px 0;padding-top:14px;border-top:1px solid var(--line-soft);
+    font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.9}
+
+  main{padding:40px 46px 120px;min-width:0}
+  @media (max-width:880px){main{padding:28px 20px 70px}}
+
+  /* ---- hero: the verdict is conditional, so it is drawn as a gate, not a big number ---- */
+  header.hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);
+    padding:28px 30px;margin-bottom:38px}
+  header.hero .kick{font-family:var(--mono);font-size:12px;letter-spacing:.09em;color:var(--accent)}
+  header.hero h1{margin:10px 0 0;font-size:30px;line-height:1.3;font-weight:700;text-wrap:balance}
+  header.hero .lead{margin:14px 0 0;color:var(--ink-dim);font-size:17px;max-width:62ch}
+  .gate{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 18px;margin-top:24px;
+    border-top:1px solid var(--line-soft);padding-top:22px}
+  .gate .barrier{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--stop);writing-mode:vertical-rl;text-orientation:mixed;
+    border-left:2px solid var(--stop);padding-left:8px}
+  @media (max-width:600px){.gate{grid-template-columns:1fr}
+    .gate .barrier{writing-mode:horizontal-tb;border-left:0;border-top:2px solid var(--stop);
+      padding:8px 0 0;margin-bottom:10px}}
+  .estimates{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+  .est{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:15px 17px}
+  .est .t{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .est .v{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent);
+    font-variant-numeric:tabular-nums;line-height:1.2}
+  .est .n{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.65}
+
+  /* ---- sections ---- */
+  section{margin:0 0 52px;scroll-margin-top:16px}
+  h2.sec{font-size:21px;margin:0 0 6px;font-weight:700;display:flex;gap:12px;align-items:baseline;
+    padding-bottom:11px;border-bottom:1px solid var(--line-soft)}
+  h2.sec .n{font-family:var(--mono);font-size:13px;color:var(--accent-dim);font-weight:500}
+  h3{font-size:16.5px;margin:30px 0 6px;font-weight:700;color:#fff}
+  p{margin:13px 0;max-width:70ch}
+  ul,ol{margin:13px 0;padding-left:22px;max-width:70ch}
+  li{margin:8px 0}
+  strong{color:#fff;font-weight:700}
+  code{font-family:var(--mono);font-size:.84em;background:var(--sunken);border:1px solid var(--line-soft);
+    border-radius:5px;padding:1px 5px;color:var(--warn);overflow-wrap:anywhere}
+  a.ref{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dim)}
+
+  /* ---- chips ---- */
+  .chip{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.03em;
+    border-radius:20px;padding:2px 9px;border:1px solid var(--line);color:var(--muted);
+    background:var(--panel-2);white-space:nowrap}
+  .chip.pass{color:var(--pass);border-color:var(--pass-dim)}
+  .chip.stop{color:var(--stop);border-color:var(--stop-dim)}
+  .chip.warn{color:var(--warn);border-color:var(--accent-dim)}
+  .chip.app{color:var(--accent);border-color:var(--accent-dim)}
+
+  /* ---- tables ---- */
+  .scroll{overflow-x:auto;margin:18px 0;border:1px solid var(--line-soft);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+  th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  thead th{background:var(--panel);font-size:11.5px;font-family:var(--mono);letter-spacing:.08em;
+    text-transform:uppercase;color:var(--muted);font-weight:500;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--panel)}
+  td.cmd{font-family:var(--mono);font-size:12.5px;color:var(--ink-dim);white-space:nowrap}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* ---- callouts: only three exist, each earns its weight ---- */
+  .note{border-left:3px solid var(--line);background:var(--panel);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin:22px 0}
+  .note .h{font-weight:700;color:#fff;margin-bottom:2px}
+  .note p{margin:7px 0}
+  .note p:last-child{margin-bottom:0}
+  .note.stop{border-left-color:var(--stop)}
+  .note.stop .h{color:var(--stop)}
+  .note.warn{border-left-color:var(--warn)}
+  .note.warn .h{color:var(--warn)}
+  .note.pass{border-left-color:var(--pass)}
+  .note.pass .h{color:var(--pass)}
+
+  /* ---- the ordered plan: a real dependency chain, so it is numbered ---- */
+  ol.plan{list-style:none;padding:0;margin:20px 0;max-width:none;
+    display:grid;gap:10px;counter-reset:step}
+  ol.plan li{counter-increment:step;margin:0;display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;gap:0 16px;align-items:start;
+    background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;padding:14px 17px}
+  ol.plan li::before{content:counter(step);font-family:var(--mono);font-size:12px;font-weight:700;
+    color:var(--accent);border:1px solid var(--accent-dim);border-radius:50%;
+    width:24px;height:24px;display:grid;place-items:center;margin-top:2px}
+  ol.plan li .body{min-width:0}
+  ol.plan li .body b{color:#fff}
+  ol.plan li .body span{display:block;color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.6}
+  ol.plan li .cost{font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    white-space:nowrap;margin-top:3px}
+  @media (max-width:600px){ol.plan li{grid-template-columns:auto minmax(0,1fr)}
+    ol.plan li .cost{grid-column:2;margin-top:8px}}
+
+  /* ---- spec sequence: done / not done ---- */
+  .steps{display:grid;gap:8px;margin:18px 0}
+  .step{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:baseline;
+    padding:11px 16px;border:1px solid var(--line-soft);border-radius:9px;background:var(--panel)}
+  .step .k{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .step.done{border-left:3px solid var(--pass)}
+  .step.todo{border-left:3px solid var(--line);opacity:.92}
+  footer{border-top:1px solid var(--line-soft);margin-top:60px;padding-top:20px;
+    font-size:13px;color:var(--muted);font-family:var(--mono);line-height:2}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <p class="brand">Homestead · 差距評估</p>
+  <a href="#verdict"><span class="n">—</span><span>結論</span></a>
+  <a href="#v2"><span class="n">1</span><span>底層已在 v2 上</span></a>
+  <a href="#unknown"><span class="n">2</span><span>唯一的大未知</span></a>
+  <a href="#parity"><span class="n">3</span><span>功能對照</span></a>
+  <a href="#gaps"><span class="n">4</span><span>兩個真缺口</span></a>
+  <a href="#launch"><span class="n">5</span><span>上線缺口</span></a>
+  <a href="#plan"><span class="n">6</span><span>建議順序</span></a>
+  <a href="#risk"><span class="n">!</span><span>信任錨風險</span></a>
+  <p class="foot">
+    2026-09-05<br>
+    branch<br>
+    homestead-based-<br>on-cip-39-v2<br>
+    HEAD 7f32f9c
+  </p>
+</nav>
+
+<main>
+<header class="hero">
+  <p class="kick">apps/Homestead · 135 檔 Swift / 48,512 行 + 41 檔測試 / 561 個 test case</p>
+  <h1>macOS app 不是半成品——它在功能面比 web demo 完整</h1>
+  <p class="lead">
+    底層 Rust 已經全部在 CIP-39 v2 上而且是綠的,原生功能覆蓋率比 web shell 高。
+    真正擋在「完工」前面的只有一件事:<strong>v2 移植之後的 Swift,從來沒有在 macOS 上編譯過一次。</strong>
+  </p>
+  <div class="gate">
+    <div class="barrier">gated by step 1</div>
+    <div class="estimates">
+      <div class="est">
+        <p class="t">到「內部 dogfood 可用的 v2 桌面版」</p>
+        <p class="v">1–2 週</p>
+        <p class="n">不確定性幾乎全部集中在第一次 <code>swift build</code> 之後的修正量。</p>
+      </div>
+      <div class="est">
+        <p class="t">再到 spec 定義的「v1 對外付費 beta」</p>
+        <p class="v">4–8 週</p>
+        <p class="n">瓶頸是憑證、金流與營運接線,不是程式碼。</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="verdict">
+  <h2 class="sec"><span class="n">00</span>結論</h2>
+  <p>差距可以拆成三層,而且三層的性質完全不同:</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>層</th><th>內容</th><th>誰能解</th><th>狀態</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>驗證</strong></td>
+        <td>v2 移植後的 Swift 沒編譯過、沒跑過測試、沒跑過 live devnet e2e</td>
+        <td>一台 Mac,或對這分支開 PR 讓 CI 跑</td>
+        <td><span class="chip stop">唯一的大未知</span></td>
+      </tr>
+      <tr>
+        <td><strong>功能</strong></td>
+        <td>兩個 web 專屬功能沒有原生版本(服務端都已就緒)</td>
+        <td>照 web demo 的實作接線即可</td>
+        <td><span class="chip warn">約 1.5 天</span></td>
+      </tr>
+      <tr>
+        <td><strong>上線</strong></td>
+        <td>production KMS / Stripe / backup transport / notarize / 付費 beta</td>
+        <td>外部憑證與帳號,非工程可獨立完成</td>
+        <td><span class="chip">產品/營運工程</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="v2">
+  <h2 class="sec"><span class="n">01</span>底層已經在 v2 上,而且是綠的</h2>
+  <p>在這台 Linux 上跑了 CI 用的那三條指令,全部通過:</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>指令(與 <code>.github/workflows/ci.yml</code> 的 <code>ffi-profile-tests</code> 一致)</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td class="cmd">cargo check --locked -p homestead-ffi --features cowchat</td>
+          <td class="num"><span class="chip pass">✓ 48.04s</span></td></tr>
+      <tr><td class="cmd">cargo test -p homestead-ffi --features production-chain-storage,cowchat</td>
+          <td class="num"><span class="chip pass">✓ 27 passed</span></td></tr>
+      <tr><td class="cmd">cargo test -p homestead-ffi --features proof-bound-development-embedded,cowchat</td>
+          <td class="num"><span class="chip pass">✓ 29 passed</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    <code>crates/homestead-cbqs/</code> 的 3,648 行全部是 v2 面:<code>trusted_binding_v2</code>、
+    <code>snapshot_head_v2</code>、<code>snapshot_manifest_v2</code>、<code>chain_snapshot_v2</code>、
+    <code>authenticated_chain_view_v2</code>、<code>payload_crypto</code>、<code>proof_fixture_v2</code>
+    ——最後這個建的是<strong>真的</strong> bundle:BLS 門檻 finalization、真的 QMDB inclusion proof、
+    node 的正規操作編碼,所以驗證測試打的是真的 light client 而不是 stub。
+  </p>
+  <p>
+    <code>crates/homestead-ffi/src/native_cbqs_writer.rs</code> 1,099 行是<strong>原生的 v2 寫入路徑</strong>
+    ——app 並不是靠 JS 去寫 lane。Swift 端也已經呼叫 v2 入口:
+    <code>RelayEndpoint.swift:1765</code> 的 <code>verifyHomesteadTrustedStreamBindingV2(...)</code>。
+    程式碼裡到處出現的 <code>TrustedStreamBinding</code> 是概念名,不是 v1 殘留。
+  </p>
+
+  <h3><code>docs/cip39v2/PORT-PLAN.md §10.6「Not done」</code> 的三項,現在剩一項</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>移植當時列的未完項</th><th>今天</th></tr></thead>
+    <tbody>
+      <tr><td>browser editor 未移植,被 private package 擋住</td>
+          <td><span class="chip pass">已完成</span> 0903 起在公網跑</td></tr>
+      <tr><td><code>homestead-dev-readiness-record</code> 還有 v1 key-stream 邏輯</td>
+          <td><span class="chip pass">已清乾淨</span> 全 repo 只剩 relay 一行<em>註解</em>在解釋 v2 刪了什麼</td></tr>
+      <tr><td>Swift app 已改但未驗證</td>
+          <td><span class="chip stop">仍然成立</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="unknown">
+  <h2 class="sec"><span class="n">02</span>唯一的大未知:Swift 從沒編過</h2>
+  <div class="note stop">
+    <p class="h">CI 從未在這個分支上跑過</p>
+    <p>
+      workflow 觸發條件是 <code>push: branches [main, devnet]</code> 加 <code>pull_request</code>。
+      <code>homestead-based-on-cip-39-v2</code> 上有 <strong>0 次 workflow run、0 個 PR</strong>,
+      所以在 <code>macos-26</code> runner 上的 <code>app</code> job(<code>swift test --package-path apps/Homestead</code>,
+      41 檔 / 17,130 行 / <strong>561 個 test case</strong>)<strong>在 v2 上從未執行過</strong>。
+    </p>
+  </div>
+  <p>
+    PORT-PLAN 自己就寫著 “The Swift app is edited but unverified — there is no Swift toolchain
+    on this machine”,而這台機器現在仍然沒有。已經改動、但一次都沒編譯過的檔案是:
+  </p>
+  <ul>
+    <li><code>RelayEndpoint.swift</code> — 新 FFI 簽名、v2 綁定驗證</li>
+    <li><code>EditorWebView.swift</code> — 整數 lane id、<code>nativeGrantVerificationRequired</code></li>
+    <li><code>TrustedProtocolFloorStore.swift</code> — <code>configGeneration</code> → <code>authorizationGeneration</code> 更名</li>
+    <li><code>CloudTrustBuild.swift</code> — build-pinned provider root</li>
+  </ul>
+  <p>
+    <strong>偏樂觀的理由:</strong>FFI 已經綠了,代表 UniFFI 產生出來的 Swift binding 是自洽的,
+    剩下的多半是呼叫端的型別與命名層機械修正。<strong>偏保守的理由:</strong>沒編過就是沒編過。
+    這個數字要在第一次 <code>swift build</code> 之後才算得準——這也是為什麼上面的工期是「被第 1 步閘住」的。
+  </p>
+  <p>
+    好消息是這個分支<strong>有在維護</strong>:<code>apps/Homestead</code> 最後一次被改是 2026-09-02,
+    自 08-20 以來有 27 個 commit 落在 app 上。它不是被放著長灰塵的目錄。
+  </p>
+</section>
+
+<section id="parity">
+  <h2 class="sec"><span class="n">03</span>功能對照:大部分方向是反的</h2>
+  <p>
+    先講架構,因為它決定了哪些東西 app 自動就有。app 載入的是
+    <code>index.html?doc=…&amp;mode=…</code> 的<strong>文件模式</strong>;
+    sidebar、分頁、頁面清單全部由 native 擁有——
+    <code>webeditor/src/shell/mount.ts</code> 開頭那段註解寫的正是這件事:
+    「The macOS app injects <code>homesteadCbqsAuthority</code> … because IT is the shell」。
+  </p>
+  <div class="note pass">
+    <p class="h">app 自動繼承(重建 bundle 即可拿到)</p>
+    <p>
+      這一週在 demo 上修的<strong>文件層</strong>問題,native 重新 build 就直接吃到:
+      <code>cbqs/channel.ts</code> 的 durable/live 差集重送(快速打字會靜默丟掉三分之二文字的那個
+      ——<strong>這一項對 app 價值最高</strong>,同樣的丟法在 native 一樣會發生)、
+      comments panel 的 <code>decodePos</code> 守衛(空 anchor 會炸掉整個評論面板)、
+      以及 <code>#doc</code> 的版面。
+    </p>
+  </div>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>能力</th><th>web shell(本週做的)</th><th>macOS app</th><th>判定</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>workspace 切換</td>
+        <td>本週新增</td>
+        <td class="cmd">WorkspaceAdminModel<br>.fetchWorkspaces / createWorkspace /<br>selectWorkspace / rename / setWorkspaceIcon</td>
+        <td><span class="chip app">app 領先</span></td>
+      </tr>
+      <tr>
+        <td>名冊 / 角色 / 邀請</td>
+        <td>本週新增</td>
+        <td class="cmd">fetchMembers / addMember /<br>setMemberRole / removeMember<br>+ copyInviteLink + onboarding 邀請</td>
+        <td><span class="chip app">app 領先</span></td>
+      </tr>
+      <tr>
+        <td><strong>admin 不能刪自己</strong></td>
+        <td>本週才補上</td>
+        <td class="cmd">WorkspaceViews.swift:77<br>canManage: isAdmin &amp;&amp;<br>member.email != model.accountEmail</td>
+        <td><span class="chip app">app 早就有</span></td>
+      </tr>
+      <tr>
+        <td>分享連結</td>
+        <td>本週修好 404</td>
+        <td class="cmd">ShareModel.mintShareLink /<br>fetchShareLinks / revokeShareLink<br>+ PageAccess 四個 ACL 方法</td>
+        <td><span class="chip app">app 領先</span></td>
+      </tr>
+      <tr>
+        <td>AI 會話</td>
+        <td>本週新增,shell out 到本機 <code>claude -p</code></td>
+        <td class="cmd">aiRequest bridge → DocAIService<br>走 Cowboy inference,含計費錯誤碼<br>(inference_usage_missing …)<br>Cowchat sidebar 每個 profile 都編進去</td>
+        <td><span class="chip app">app 產品化得多</span></td>
+      </tr>
+      <tr>
+        <td>頁面歸屬 / 權限可讀性</td>
+        <td>本週新增 <code>describeAccess</code></td>
+        <td>Sharing 面板為主,無等價的一句話解釋</td>
+        <td><span class="chip warn">web 領先(可移植)</span></td>
+      </tr>
+      <tr>
+        <td>加入申請佇列</td>
+        <td>本週新增,含 admin 審核</td>
+        <td class="cmd">grep -rl join-requests apps/Homestead → 0</td>
+        <td><span class="chip stop">web 獨有</span></td>
+      </tr>
+      <tr>
+        <td>公開留言 / 留言審核</td>
+        <td>本週新增,經 CBQS lane 進成員編輯器</td>
+        <td class="cmd">ShareModel.swift:29<br>"Can comment (legacy;<br>native opens read-only)"</td>
+        <td><span class="chip stop">web 獨有</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    另外還有一整批 <strong>app 獨有、web 完全沒有</strong>的東西:Notion 匯入(1,976 行)、
+    Billing、本機資料夾(796 行)、搜尋、export、Keychain、
+    <code>UpdateChecker</code>/<code>UpdateClient</code> 自動更新、首次啟動 onboarding。
+  </p>
+</section>
+
+<section id="gaps">
+  <h2 class="sec"><span class="n">04</span>兩個真缺口(服務端都已就緒)</h2>
+  <p>
+    這是「web demo 的實作可以直接當參考」最具體的兩處——兩邊共用同一個 relay,
+    服務端已經寫完並在公網跑著,native 缺的只有 UI 與呼叫。
+  </p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>缺口</th><th>服務端現況</th><th>native 需要做的</th><th>估算</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>加入申請</strong><br>request to join → admin 審核 → 自動 add member</td>
+        <td class="cmd">/workspaces/:ws/join-requests<br>三條路由 +<br>caller_is_workspace_admin<br>皆已就緒</td>
+        <td>WorkspaceAdmin 加一個待審清單、三個 HTTP 呼叫,以及無權限時的「申請加入」入口</td>
+        <td class="num"><span class="chip warn">~半天</span></td>
+      </tr>
+      <tr>
+        <td><strong>公開留言</strong><br>頁主看得到訪客留言並能刪</td>
+        <td class="cmd">share_comments.rs<br>POST /s/:guid<br>DELETE /rooms/:room/<br>public-comments/:id</td>
+        <td>把 legacy 唯讀標籤換成真的留言檢視 + 刪除動作</td>
+        <td class="num"><span class="chip warn">~1 天</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="launch">
+  <h2 class="sec"><span class="n">05</span>上線缺口:這才是真正的距離,而且不是寫碼</h2>
+  <p>
+    <code>docs/homestead-v1-spec.md</code> 的 completion sequence 有六步。第 1 步大致完成,
+    2–6 步基本沒動:
+  </p>
+  <div class="steps">
+    <div class="step done"><span class="k">step 1 · 大致完成</span>
+      <span>整合 Homestead 與 CBFS 變更,重跑各 repo 的完整可行 gate</span></div>
+    <div class="step todo"><span class="k">step 2 · 未開始</span>
+      <span>production KMS/CBFS role driver、committed chain transport、treasury funding、Stripe 設定、backup transport、監控重啟 wrapper —— <strong>全部是外部憑證與帳號</strong></span></div>
+    <div class="step todo"><span class="k">step 3 · 未開始</span>
+      <span>dev 環境走完整條:card → committed hire → 兩個 volume → fresh relay receipt → writable actor,再走 lapse/recovery/revocation/export/backup/restore</span></div>
+    <div class="step todo"><span class="k">step 4 · 未開始</span>
+      <span>對全量 workspace corpus 量 warm/cold open 與搜尋延遲,對照既定預算收斂回歸</span></div>
+    <div class="step todo"><span class="k">step 5 · 未開始</span>
+      <span>OAuth 輪換、Developer ID 簽章、notarize、clean-install / 升級 / 更新 smoke</span></div>
+    <div class="step todo"><span class="k">step 6 · 未開始</span>
+      <span>有營運告警、對帳、刪除保留、支援與匯出程序的限量付費外部 beta</span></div>
+  </div>
+  <div class="note pass">
+    <p class="h">發行管線本身已經寫好了</p>
+    <p>
+      <code>app</code> → <code>app-release</code>(<code>macos-26</code> 上簽章 + notarize)→
+      <code>publish</code>(推到 updates bucket)三段都在 <code>ci.yml</code> 裡,
+      只是<strong>只在 <code>main</code> 上跑</strong>。版本號還停在 <code>0.0.1</code>。
+    </p>
+  </div>
+  <p>
+    順帶一提,spec 的 verification snapshot 停在 2026-08-03——那時 web editor 是 176 個測試,
+    現在是 675 個。那張表需要重寫。
+  </p>
+</section>
+
+<section id="plan">
+  <h2 class="sec"><span class="n">06</span>建議順序</h2>
+  <p>這是一條真的依賴鏈:第 1 步之前,後面每一項的工期都是猜的。</p>
+  <ol class="plan">
+    <li>
+      <div class="body"><b>先拿到 macOS 判決</b>
+        <span>對這個分支開一個 draft PR 讓 CI 跑 <code>macos-26</code>,或直接在一台 Mac 上 <code>make build</code>。</span></div>
+      <div class="cost">≈ 1 小時人力</div>
+    </li>
+    <li>
+      <div class="body"><b>修第 1 步吐出來的東西</b>
+        <span>編譯錯誤,加上 561 個 Swift 測試裡的紅字。</span></div>
+      <div class="cost">1–3 天 / 悲觀 1–2 週</div>
+    </li>
+    <li>
+      <div class="body"><b>重建 bundle,讓 app 吃到 durability repair</b>
+        <span>幾分鐘的事,但這是會靜默吃掉使用者文字的 bug,價值最高。</span></div>
+      <div class="cost">幾分鐘</div>
+    </li>
+    <li>
+      <div class="body"><b>補兩個功能洞</b>
+        <span>加入申請佇列、公開留言審核——服務端都已就緒。</span></div>
+      <div class="cost">~1.5 天</div>
+    </li>
+    <li>
+      <div class="body"><b>app ↔ 現有 v2 devnet 端到端跑一次</b>
+        <span>broker 與 relay 都已經在跑。PORT-PLAN 說「沒有任何 live devnet e2e」——web 現在有了,app 還沒。</span></div>
+      <div class="cost">1 天</div>
+    </li>
+    <li>
+      <div class="body"><b>才輪到 spec 的第 2–6 步</b>
+        <span>產品與營運工程,瓶頸在憑證、金流與外部帳號。</span></div>
+      <div class="cost">4–8 週</div>
+    </li>
+  </ol>
+</section>
+
+<section id="risk">
+  <h2 class="sec"><span class="n">!!</span>要驗證的風險:信任錨與 devnet 重啟</h2>
+  <div class="note warn">
+    <p class="h">devnet 一旦重新 genesis,所有已安裝的 .app 全部失效</p>
+    <p>
+      app 的信任錨是 build 時燒進 <code>Contents/Resources/trusted-checkpoint-v1.bin</code> 的
+      <strong>217 bytes</strong>,<code>TrustedCheckpointResource</code> 明白寫著
+      “no actor or network fallback… fail closed”。
+    </p>
+    <p>
+      好消息:比對只看 <code>chain_id</code> 與 <code>chain_instance_id</code>,<strong>不看高度</strong>
+      ——所以錨點不會因為時間經過而過期,它是真正的 light-client 錨,往前的狀態靠
+      <code>/cbqs/chain-proof</code> 證明。
+    </p>
+    <p>
+      壞消息:<code>chain_instance_id</code> 綁的是這一條鏈的實例。
+      <code>scripts/rotate-trusted-checkpoint.sh</code> 只輪 relay 和 webeditor,<strong>沒有 app</strong>。
+      dogfood 期間要嘛固定 devnet instance,要嘛每次重建發版。
+    </p>
+  </div>
+</section>
+
+<footer>
+  依據:本機 branch <code>homestead-based-on-cip-39-v2</code> @ 7f32f9c(2026-09-05)。<br>
+  Rust 證據為本機實跑;Swift 端為原始碼閱讀 —— 這台機器沒有 Swift toolchain,無法編譯驗證。
+</footer>
+</main>
+</div>
+</body>
+</html>
