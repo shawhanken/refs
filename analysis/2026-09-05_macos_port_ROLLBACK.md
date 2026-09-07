@@ -188,3 +188,33 @@ commit,錨點檔本身沒變、actor 沒變、relay key 沒變。舊 node 二進
    名字,而 `cowboy-protocol-proof-codec` 這個別名必須匹配所釘 cbfs 解析出的
    codec rev。要抬它得先遷 cbfs(`relay_handshake_signing_bytes` 從 3 參數變 4
    參數)。devnet 與 macOS app 走的 development profile 已在 v2。
+
+---
+
+# 追加 3(2026-09-07):courier 預設 v2、snapshot receipt 修法
+
+## 現在跑的是什麼
+
+- relay `GET /cbqs/chain-proof` **預設回 v2**;`bundle_version=1` 顯式取 v1;`=2` 與不帶參數共用快取/ETag;非法值 400。
+- web bundle 的 snapshot 路徑改走 `verifySnapshotReceipt`(cbqs `b4a7e68`),不再把 snapshot 的 receipt 當 head 的錨點(原本每次開頁都 `BadLink`)。
+- PR homestead#82(分支 `snapshot-receipt-is-not-the-head-anchor`,已 rebase 到含 `fa8787f` 的 base)。
+
+## 為何與 Mac 端交接文件的 v1 預設不同
+
+該文件看到的伺服器是合併 #80/#81 前的 `af5245a`;部署當天 web/macOS 共用的驗證器已是 v2、web bundle 已重建。預設 v1 會讓 web(不帶參數)與已建好的 macOS app 都拿 v1、驗 v2、失敗。實測預設 2,597 bytes/`0x02`,`=1` 13,625,542 bytes/`0x01`。
+
+## 回退
+
+```bash
+B=~/.homestead-devnet/backups/relay-20260907T010840Z   # 換掉前跑著的二進位 + start-relay.sh + RECORD.txt
+kill $(pgrep -x homestead-colla); until ! ss -ltn | grep -q ':9300 '; do sleep 1; done
+cp $B/homestead-collab-relay /home/ubuntu/workspace/homestead/services/collab-relay/target/release/
+(cd ~/.homestead-devnet/run && setsid nohup ./start-relay.sh >> relay.log 2>&1 < /dev/null &)
+```
+回退後 courier 回 v1、無 `bundle_version` 參數;web 與 macOS 會再度開不了(它們的驗證器是 v2)。要連驗證器一起退,得把 web bundle 退回 `04:32` 那份並讓 macOS 從 `ee4c265` 之前的 commit 重建 —— 不建議。
+
+## 坑
+
+- `cargo` 說 Finished 但跑的是舊二進位/舊測試:`touch -d` 不夠,`cargo clean -p <pkg>` 才可靠。
+- relay 測試偶發 `registry parent component … group/world writable`:`umask 022` + `chmod 755 target target/release`。
+- 我的端到端探針原本只到 mint;現在要看 courier 首位元組、驗 head、連 broker。
