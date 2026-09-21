@@ -4,6 +4,8 @@ description: Height-triggered one-shot timers with end-of-block delivery
 icon: clock
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-5-timers.md`**. This copy was last updated **2026-05-14**, the authoritative doc **2026-07-29**, and the two have diverged by **79 diff lines** (468L here vs 521L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

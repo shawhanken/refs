@@ -81,7 +81,7 @@ The cost of this conservatism is twofold. (1) The 100% burn destination preserve
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 22.26.34.png](./assets/d56e6c7d_Screenshot_2026-05-05_at_22.26.34.png)
+![Screenshot 2026-05-05 at 22.26.34.png](../assets/d56e6c7d_Screenshot_2026-05-05_at_22.26.34.png)
 
 
 #### Key mechanisms
@@ -148,7 +148,7 @@ Finally, the stake floor is USD-pegged via a 7-day TWAP from the CBY/USD oracle 
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 22.30.12.png](./assets/ac0e6c7d_Screenshot_2026-05-05_at_22.30.12.png)
+![Screenshot 2026-05-05 at 22.30.12.png](../assets/ac0e6c7d_Screenshot_2026-05-05_at_22.30.12.png)
 
 
 #### Key mechanisms
@@ -213,7 +213,7 @@ This bifurcation is structurally similar to the Bittensor "subnet" pattern (mult
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 22.44.51.png](./assets/caae6c7d_Screenshot_2026-05-05_at_22.44.51.png)
+![Screenshot 2026-05-05 at 22.44.51.png](../assets/caae6c7d_Screenshot_2026-05-05_at_22.44.51.png)
 
 
 #### Key mechanisms

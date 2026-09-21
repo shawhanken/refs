@@ -5,6 +5,8 @@ description: Code-aligned v2 — three-layer TEE chain (entitlement / job spec /
 
 # CIP-23 v2
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-23-tee-execution.md`**. This copy was last updated **2026-05-26**, the authoritative doc **2026-08-13**, and the two have diverged by **754 diff lines** (541L here vs 585L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 > **Versioning.** This is v2 of CIP-23. v1 is the canonical document `cip-23-tee-execution.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I. CIP-23 v1 is mature (Created 2026-04-20); v2 is a tightly-scoped clarification layer.

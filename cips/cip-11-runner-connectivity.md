@@ -4,6 +4,8 @@ description: Persistent runner↔validator connections, vote-piggybacked presenc
 icon: plug
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-11-runner-connectivity.md`**. This copy was last updated **2026-05-26**, the authoritative doc **2026-08-18**, and the two have diverged by **1251 diff lines** (759L here vs 1234L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft<br/>
   **Type:** Standards Track<br/>

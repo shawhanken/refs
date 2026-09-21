@@ -1,5 +1,7 @@
 # 链上事件钩子（On-chain Event Hooks）提案
 
+> **⚠️ [2026-09-21] STALE TRANSLATION — 过时译本.** This Chinese rendering is kept only in `refs/cips/` and is **not** a spec of record. The authoritative, code-aligned English spec is **`cowboy/docs/cips/cip-29-on-chain-event-hooks.md`** (updated 2026-08-13; this translation 2026-09-13 — 733L here vs 755L there). Translations are not re-synced when the English spec moves; read the authoritative copy before implementing and treat anything here that contradicts it as superseded.
+
 ## 一、动机
 
 ### 1.1 当前缺口

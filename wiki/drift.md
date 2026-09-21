@@ -21,11 +21,24 @@ sources:
   - refs/cips/cip-29-on-chain-event-hooks-en.md
   - refs/runner/2026-04-28_MPP_Session_Research.md
   - refs/plans/2026-05-06_mpp_session_implementation.md
-last_updated: 2026-08-15 (系统 actor 地址段按代码 pin 测试整段校正，见顶部 banner；前值 2026-05-26 v2.r2 audit)
+last_updated: 2026-09-21 (refs 全仓有效性审计：refs/cips 34 份全部标注为过时快照；导航层 README/wiki-index/AGENTS 与被索引者对账；73 条失效链接修复。前值 2026-08-15 系统 actor 地址段代码校正)
 status: authoritative
 ---
 
 # 文档-代码漂移看板
+
+> **2026-09-21 refs 全仓有效性审计** — 续 2026-08-16 的结论，把「refs/cips 是过时快照」这件事从 7 份扩到全部：
+>
+> - **`refs/cips/` 34 份全部加横幅。** 逐档比对 `cowboy/docs/cips/` 实测差异：CIP-9 差 2035 行、CIP-15-public-asset-hosting 1642、CIP-11 1251、CIP-2 957、CIP-7 862、CIP-29 783、CIP-23 754、CIP-24 555、CIP-1 596…… 最小的 CIP-13 也差 15 行。**没有一份是相同的。** 另完全缺 CIP-27 / 30 / 33 / 34 / 36 / 40 / 41 / 42。横幅内含本地日期、权威档日期、差异行数三个可复核的数字。正文一律未改写（沿用 0816 决策：改写会制造「已维护」的假象）。
+> - **导航层在说谎，是这轮最高危的发现。** `README.md`（停在 2026-05-11）与 `wiki/index.md`（2026-05-26）都把 `refs/cips/` 描述为 living spec、链接到已被 git 删除的 `cip-*-v2.md`、引用不存在的 `cip-3-fee-model.mdx` 与 `plans/2026-06-01_marshal-quality-platform-architecture.md`（后者 2026-06-12 `dabf937` 已删）。`wiki/index.md` 内部自相矛盾：concepts 摘要写 `ROUTE=0x0E`（对），entities 摘要写 `0x0D`（错）、gateway 写 `0x0E`（错）、payments 写 PaymentGate `0x13`（错，代码 `0x12`）、system-actors 摘要仍写「spec-only 0x0D-0x13 / BankActor 0x13」—— 而它指向的 `entities/system-actors.md` 早在 0815 就已全部改对。**索引比内容页旧，读者会被导向错的结论。** 已全部对齐，并在 index 顶部加「各页新鲜度不一，以页内 `last_updated` 为准」的提示。
+> - **`wiki/AGENTS.md` 把 `refs/cips/` 定义为「正式规范（living specs）」** —— 这条会让后续 agent 照着过时快照写 wiki。已改为：权威 raw source 是 `cowboy/docs/cips/`，`refs/cips/` 标注为「不得作为 ingest 的规范来源」，权威层级链与冲突裁决条款同步更新。
+> - **盘点与被盘点者对不上。** `plans-inventory.md` 称 23 份、README 称 27 份，实为 **31** 份，漏列 `2026-05-19_bench-cip29-and-perf-coverage` / `2026-05-21_test-coverage-evaluation-plan` / `2026-06-16_tx-canonical-encoding-node-plan` / `2026-06-16_tx-canonical-followons-plan`。已补齐并加注「最后一份 2026-06-16 入库，多数已执行完或放弃」。README 的 wiki 页数 15 → 实为 20。
+> - **`entities/system-actors.md` 断言「`0x18–0x1C` 未分配」已失效** —— `types/src/constants.rs` 有 `PLATFORM_FEE = 0x18`、`ROOM_AUTHORITY = 0x19`。已补两行并把未分配段收窄为 `0x15 / 0x1A–0x1C / 0x1F+`。注意 `PLATFORM_FEE` 只在 `constants.rs`，**不在** `system_actors.rs` 的枚举与 pin 测试里。
+> - **`whitepaper/_archive_/README.md` 宣称自己是「所有技术决策的最终依据、优先级 🔴 最高」** —— 它在 `_archive_/` 里面，描述的是归档前的状态。已重写为明确的「本目录不是权威」+ 当前版本对照表。
+> - **73 条失效链接修复**（76 → 3）。剩 3 条：Notion 内部 permalink（外部系统）、以及两条指向 2026-01 旧目录结构的路径已改为可解析路径。另发现 `RUNNER_SYSTEM_DESIGN.md` 被 2026-03-30 `09ca894` 删除但 5 处引用留在原地，已逐处标注删除 commit 与替代档。
+> - **`cips/cip-24-secrets-manager.md` 的 YAML frontmatter 此前无法解析**（`description` 未引号包裹且含 `:`），已修复（内容逐字保留）。全仓 frontmatter 现已全部可解析。
+>
+> **刻意未动**：`analysis/`（129 份）、`meeting/`、`devex/`、`notion/` 等带日期前缀的历史快照 —— 按定义就是当日记录，「过时」不等于「错误」，删改会毁掉追溯链。改为在 README 的 `analysis/` 段加统一提示：结论只对当天成立。
 
 > **2026-08-15 系统 actor 地址段代码校正** — 发现整个 wiki 的系统 actor 地址表落后于代码：wiki 忠实镜像 2026-05-11 CIP v2.r2 spec 序列，但**代码最终落位整体后移**——`0x0D` 被 CIP-7 `STREAM_KEY_MANAGER` 占用、`0x11` 被 CIP-11 `VALIDATOR_SET` 占用，导致 `ROUTE_REGISTRY 0x0D→0x0E` / `GATEWAY 0x0E→0x0F` / `RECEIPT 0x0F→0x10` / `PAYMENT_GATE 0x11→0x12` / `CONTAINER 0x10→0x13`；另 spec 未记的 `INTENT_SETTLEMENT 0x14` / `BANK_ACTOR 0x16` / `STREAM_REGISTRY 0x17` / `TRADING_POST 0x1E` 已在代码。**权威来源 = `runner/src/system_actors.rs` 的 `well_known_low_byte_assignments` pin 测试**。已校正：`wiki/entities/system-actors.md`（全表重写）、`wiki/parameters.md`、`wiki/concepts/payments.md`、`wiki/concepts/public-asset-hosting.md`、`wiki/concepts/{dns-addressable-actors,custom-domains,verifiable-state-read}.md`、`wiki/entities/{gateway,route-registry}.md`、`wiki/index.md`。
 >

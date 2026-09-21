@@ -4,6 +4,8 @@ description: A single-KV-with-Merkle-proof read RPC against a Cowboy full node o
 icon: shield-check
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-17-verifiable-state-read.md`**. This copy was last updated **2026-05-11**, the authoritative doc **2026-07-14**, and the two have diverged by **121 diff lines** (236L here vs 269L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

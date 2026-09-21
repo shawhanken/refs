@@ -4,6 +4,8 @@ description: QMDB flat key-value architecture for state management and Merkle pr
 icon: database
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-4-storage.md`**. This copy was last updated **2026-05-14**, the authoritative doc **2026-09-14**, and the two have diverged by **162 diff lines** (340L here vs 352L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft (Revised 2026-03-27 — rewritten for QMDB architecture)
   **Type:** Standards Track

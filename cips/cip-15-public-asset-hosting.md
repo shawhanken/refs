@@ -5,6 +5,8 @@ description: Code-aligned v2 — separates ingress.static, conforms terminology 
 
 # CIP-15 v2
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-15-public-asset-hosting.md`**. This copy was last updated **2026-05-11**, the authoritative doc **2026-09-16**, and the two have diverged by **1642 diff lines** (1430L here vs 1304L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 > **Versioning.** This is v2 of CIP-15. v1 is the canonical document `cip-15-public-asset-hosting.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II) + the cross-cutting conventions (Part III).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I. CIP-15 v2 also depends on `cip-9-runner-storage-v2.md` Part II for the small set of Relay-Node / event additions.

@@ -4,6 +4,8 @@ description: Fair token launches with per-block clearing and automatic LP seedin
 icon: gavel
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-22-continuous-clearing-auctions.md`**. This copy was last updated **2026-03-28**, the authoritative doc **2026-07-14**, and the two have diverged by **127 diff lines** (879L here vs 918L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

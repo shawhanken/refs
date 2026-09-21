@@ -4,6 +4,8 @@ description: Hybrid AMM standard with V2/V3 pools and platform primitives
 icon: arrow-right-arrow-left
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-21-liquidity-pools.md`**. This copy was last updated **2026-03-28**, the authoritative doc **2026-07-14**, and the two have diverged by **158 diff lines** (993L here vs 1135L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

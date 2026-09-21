@@ -5,6 +5,8 @@ description: v3 — replaces the first-price + exponential-bias auction (Part I 
 
 # CIP-1 v3
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-1-actor-scheduler.md`**. This copy was last updated **2026-05-14**, the authoritative doc **2026-08-27**, and the two have diverged by **596 diff lines** (495L here vs 325L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 > **Versioning.** This is v3 of CIP-1. v1 is preserved verbatim as Part I; v2 (the CIP-5-alignment revision) as Part II; v3 (this revision, the EIP-1559 hybrid target design) is Part III.
 >
 > **Conflict rule:** Part III is canonical wherever it contradicts Part I or Part II §§2–3. Part II §§1, 4–9 (block ordering, lane naming, opcode mapping, CIP-5 fee-model alignment, migration impact, backwards compat) remain canonical — v3 does not change them. CIP-5 §§1–8 remain canonical for the currently-implemented FIFO behaviour until v3 activates.

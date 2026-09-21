@@ -4,6 +4,8 @@ description: Expose every CIP-14 actor as a Model Context Protocol (MCP) server 
 icon: plug
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-19-gateway-mcp-ingress.md`**. This copy was last updated **2026-05-11**, the authoritative doc **2026-07-16**, and the two have diverged by **24 diff lines** (531L here vs 531L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

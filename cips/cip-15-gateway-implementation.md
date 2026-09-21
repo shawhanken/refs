@@ -4,8 +4,10 @@ description: A build order and concrete implementation plan for shipping CIP-15 
 icon: hammer
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-15-gateway-implementation.md`**. This copy was last updated **2026-05-11**, the authoritative doc **2026-07-15**, and the two have diverged by **31 diff lines** (360L here vs 371L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
-  **Companion to:** [CIP-15 v2: Public Asset Hosting](./cip-15-public-asset-hosting-v2). This is not a normative CIP; it is an implementation handbook.
+  **Companion to:** [CIP-15 v2: Public Asset Hosting](./cip-15-public-asset-hosting.md). This is not a normative CIP; it is an implementation handbook.
   **Audience:** Gateway implementers
   **Status:** Living document
   **Updated:** 2026-05-11 (r2)
@@ -16,7 +18,7 @@ icon: hammer
 > - **r2 (2026-05-11)** — §2.2 reference to a non-existent CIP-15 §8.12 replaced with concrete pointer to CIP-14 v2.r2 Part II §5 (`read_handler` RPC) and §9 open-question item promoted: the `GET_STATE`-style verifiable KV-read RPC required by §2.3 is **not yet specified by any CIP and not yet present in `node/rpc/src/rpc.rs`**. Implementers must coordinate with the runtime team or start a sibling CIP. §9 open-questions list updated. Title in §13 corrected to "CIP-18: Payments" (was "CIP-18: Payment Gating", which was the file's earlier title).
 > - **r1 (initial)** — 6-phase build order published.
 
-This document is a build order. The CIP describes *what* the system does; this describes *what to write*, in what order, and what to test. Read alongside [CIP-14 v2: DNS-Addressable Actors](./cip-14-dns-addressable-actors-v2) and [CIP-18: Payments](./cip-18-payments).
+This document is a build order. The CIP describes *what* the system does; this describes *what to write*, in what order, and what to test. Read alongside [CIP-14 v2: DNS-Addressable Actors](./cip-14-dns-addressable-actors.md) and [CIP-18: Payments](./cip-18-payments.md).
 
 ---
 

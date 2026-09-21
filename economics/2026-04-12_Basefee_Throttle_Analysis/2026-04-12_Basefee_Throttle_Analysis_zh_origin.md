@@ -5,7 +5,7 @@
 
 **文档日期：** 2026-04-12
 **适用范围：** Cowboy `devnet` 版链上经济参数
-**配套文档：** [`20260412_Devnet_Basefee_Economics_zh.md`](20260412_Devnet_Basefee_Economics_zh.md)（演进时间线）
+**配套文档：** [`20260412_Devnet_Basefee_Economics_zh.md`](../2026-04-12_Devnet_Basefee_Economics/2026-04-12_Devnet_Basefee_Economics_zh.md)（演进时间线）
 **仿真脚本：** `/tmp/basefee_sim_split.py`、`/tmp/basefee_throttle.py`（整数算术复刻自 `node/execution/src/basefee.rs::update_one`）
 
 ---

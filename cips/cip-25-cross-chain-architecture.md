@@ -4,6 +4,8 @@ description: A three-layer model for cross-chain state anchoring, messaging, and
 icon: link
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-25-cross-chain-architecture.md`**. This copy was last updated **2026-05-14**, the authoritative doc **2026-07-14**, and the two have diverged by **33 diff lines** (996L here vs 1005L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

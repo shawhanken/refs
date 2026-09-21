@@ -4,6 +4,8 @@ description: Authoritative specification for Cycles, Cells, and fee markets
 icon: gauge-high
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-3-fee-model.md`**. This copy was last updated **2026-05-14**, the authoritative doc **2026-08-27**, and the two have diverged by **72 diff lines** (243L here vs 295L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft for Internal Review  
   **Type:** Standards Track  

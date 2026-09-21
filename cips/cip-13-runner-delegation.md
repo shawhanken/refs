@@ -5,6 +5,8 @@ description: Code-aligned v2 — opcode renumbering (44–48 to avoid collision)
 
 # CIP-13 v2
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-13-runner-delegation.md`**. This copy was last updated **2026-05-26**, the authoritative doc **2026-07-16**, and the two have diverged by **15 diff lines** (870L here vs 877L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 > **Versioning.** This is v2 of CIP-13. v1 is the canonical document `cip-13-runner-delegation.md` (preserved verbatim as Part I). v2 = v1 + the alignment revision (Part II).
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I.

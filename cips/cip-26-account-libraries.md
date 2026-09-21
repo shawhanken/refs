@@ -4,6 +4,8 @@ description: Per-account Python module publishing and import resolution. Actors 
 icon: package
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-26-account-libraries.md`**. This copy was last updated **2026-05-13**, the authoritative doc **2026-08-13**, and the two have diverged by **69 diff lines** (294L here vs 333L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft
   **Type:** Standards Track

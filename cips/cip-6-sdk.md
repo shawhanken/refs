@@ -4,6 +4,8 @@ description: Normative specification of the cowboy_sdk Python package — actor 
 icon: code
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-6-sdk.md`**. This copy was last updated **2026-05-26**, the authoritative doc **2026-07-29**, and the two have diverged by **110 diff lines** (1069L here vs 1161L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft<br/>
   **Type:** Standards Track<br/>
