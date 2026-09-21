@@ -21,7 +21,7 @@
 
 ### 2.1 Runner Node Structure (Off-Chain)
 
-See `runner/crates/runner-node/src/node.rs` and `refs/runner/RUNNER_SYSTEM_DESIGN.md`:
+See `runner/crates/runner-node/src/node.rs` and `RUNNER_SYSTEM_DESIGN.md`（⚠️ 已于 2026-03-30 commit `09ca894` 删除；对应内容见 [`refs/runner/README.md`](./README.md) 与 [`refs/runner/2026-02-05_DOCUMENTATION.md`](./2026-02-05_DOCUMENTATION.md)）:
 
 - `RunnerNode::start()` currently spawns three long-running async tasks:
   - **Job Listener**: Polls chain REST `GET /runner/{address}/jobs` and pushes new jobs into the local `job_queue`.

@@ -306,7 +306,7 @@ runner/
 
 ## 📚 参考文档
 
-- `refs/runner/RUNNER_SYSTEM_DESIGN.md` - 详细设计文档
+- `RUNNER_SYSTEM_DESIGN.md`（⚠️ 已于 2026-03-30 commit `09ca894` 删除；对应内容见 [`refs/runner/2026-02-05_DOCUMENTATION.md`](./2026-02-05_DOCUMENTATION.md)） — 详细设计文档
 - `refs/whitepaper/` - Cowboy 白皮书
 
 ## 🔗 Chain 与 Runner 集成

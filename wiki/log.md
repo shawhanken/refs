@@ -638,3 +638,37 @@ append-only 时序记录。格式：`## [YYYY-MM-DD] <type> | <摘要>`，`type 
 下次建议 4-6 周后做下轮 baseline，重点核 CIP-13 / CIP-23 v2 / CIP-14 v2 三大未激活提案。
 
 ---
+
+## [2026-09-21] lint | refs 全仓文档有效性审计与清理
+
+**触发**：人工要求「检查 refs 中文档的有效性，清理明显过时和错误的文档」。
+**方法**：机械化核对（不是抽样）——375 份 md 的 git 最后提交日、全仓相对链接可达性、
+YAML frontmatter 可解析性、`refs/cips/` 逐档 `diff` 对比 `cowboy/docs/cips/`、
+索引声称的档数 vs 实际档数、文档中的系统 actor 地址 vs `node/runner/src/system_actors.rs` 的 pin 测试。
+
+**结论**：`refs/` 的**内容**大体健康（历史档就该是历史档），**导航层**是坏的 ——
+README 停在 2026-05-11、`wiki/index.md` 停在 2026-05-26，两者都把已被取代的 `refs/cips/`
+描述为 living spec，并链接到已删除的档。索引比它指向的内容页还旧，读者会被导向错的结论。
+
+**受影响页**：
+- `wiki/index.md` — 9 处矛盾摘要修正（payments `0x13`→`0x12`、route-registry `0x0D`→`0x0E`、
+  gateway `0x0E`→`0x0F`、system-actors 摘要按 0815 重写版对齐、plans 23→31、
+  raw sources 首位改指 `cowboy/docs/cips/`、audit baseline 改为完整系列、补 `meeting/` + `notion/`）
+  + 顶部加「各页新鲜度不一，以页内 `last_updated` 为准」提示
+- `wiki/AGENTS.md` — 三层架构的 raw source 定义、权威顺序、冲突裁决三处：
+  `refs/cips/` 从「正式规范」降为「过时快照，不得作为 ingest 来源」，权威改指 `cowboy/docs/cips/`
+- `wiki/entities/system-actors.md` — 补 `0x18` PLATFORM_FEE / `0x19` ROOM_AUTHORITY，
+  未分配段收窄为 `0x15 / 0x1A–0x1C / 0x1F+`
+- `wiki/entities/plans-inventory.md` — 27/23 → 31，补 4 份漏列，加注「多数已执行完或放弃」
+- `wiki/drift.md` — 新增 2026-09-21 条目（完整发现清单与可复核数字）
+
+**受影响 raw**：`README.md` 重写导航与维护原则（新增第 8/9 条：不要把 CIP 同步回 refs、索引要与被索引者对账）；
+`cips/` 26 份补 STALE SNAPSHOT 横幅（+8 份已有，共 34 份全覆盖）；
+`cips/ext_cip-9-runner-steamtrain-architecture.md` 补 Steamtrain→CBFS 术语注；
+`cips/cip-24-secrets-manager.md` 修复无法解析的 frontmatter；
+`whitepaper/_archive_/README.md` 重写（原文宣称自己是最高权威）；73 条失效链接修复。
+
+**刻意未动**：`analysis/` / `meeting/` / `devex/` / `notion/` 的日期前缀历史快照，
+以及 `refs/cips/` 各档正文（只加横幅不改写 —— 改写会制造「已维护」的假象，沿用 2026-08-16 决策）。
+
+---

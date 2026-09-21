@@ -5,7 +5,7 @@ Cowboy runs a deterministic Python VM (PVM). Every node replays the same code an
 identical state. Breaking determinism causes consensus failure (chain fork).
 
 > Always read `refs/dev_support/cowboy_sdk_developer_manual.md` before writing Actor code.
-> Reference implementation: `node/examples/llm_chat2/llm_actor2.py`
+> Reference implementation: `node/examples/llm_chat/llm_actor.py`
 > SDK source: `node/pvm/Lib/cowboy_sdk/`
 
 ---

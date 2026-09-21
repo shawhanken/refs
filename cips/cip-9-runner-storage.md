@@ -5,6 +5,8 @@ description: Code-aligned v2 — adds GET_MANIFEST RPC, ManifestCommitted event,
 
 # CIP-9 v2
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-9-runner-storage.md`**. This copy was last updated **2026-08-15**, the authoritative doc **2026-09-16**, and the two have diverged by **2035 diff lines** (2121L here vs 2892L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 > **Versioning.** This is v2 of CIP-9. v1 is the canonical document `cip-9-runner-storage.md` (preserved verbatim as Part I). v2 = v1 + the alignment addendum (Part II), which is mostly *additive* over v1 — the bulk of CIP-9 stands unchanged.
 >
 > **Conflict rule:** Part II is canonical wherever it contradicts Part I.

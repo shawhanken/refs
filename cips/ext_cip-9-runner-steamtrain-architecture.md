@@ -1,5 +1,10 @@
 # Runner 与 Steamtrain 物理架构关系
 
+> **⚠️ [2026-09-21] 术语与状态提醒.** 本文写于 2026-03-21，讲的 **Steamtrain** 就是现在的 **CBFS**
+> （`cbfs/` repo，CIP-9 RAS 存储层）。这是 refs 独有的扩展分析，没有 `cowboy/docs/` 对应档，
+> 因此没有「权威版」可指 —— 但其中的架构结论、组件名与系统 actor 地址**均以当时的 CIP-9 / CIP-10 为准**，
+> 早已被后续修订取代。当历史记录读，不要据此实作；当前规范见 `cowboy/docs/cips/cip-9-runner-storage.md`。
+
 **参考文档：** CIP-9（Runner 可挂载存储）、CIP-10（容器运行时）
 
 ---

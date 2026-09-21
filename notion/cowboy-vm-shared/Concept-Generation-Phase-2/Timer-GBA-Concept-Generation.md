@@ -79,7 +79,7 @@ The strength of Concept A is that no architectural CIP needs to be authored; Cow
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 12.25.33.png](./assets/4aae6c7d_Screenshot_2026-05-05_at_12.25.33.png)
+![Screenshot 2026-05-05 at 12.25.33.png](../assets/4aae6c7d_Screenshot_2026-05-05_at_12.25.33.png)
 
 
 #### Key mechanisms
@@ -141,7 +141,7 @@ The second structural change is a **value-aware default GBA**. The actor exposes
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 12.24.48.png](./assets/72ce6c7d_Screenshot_2026-05-05_at_12.24.48.png)
+![Screenshot 2026-05-05 at 12.24.48.png](../assets/72ce6c7d_Screenshot_2026-05-05_at_12.24.48.png)
 
 
 #### Key mechanisms
@@ -201,7 +201,7 @@ The cost is honest engagement with the trade-off: the design review's §9.4 expl
 
 #### Architecture diagram
 
-![Screenshot 2026-05-05 at 13.29.28.png](./assets/189e6c7d_Screenshot_2026-05-05_at_13.29.28.png)
+![Screenshot 2026-05-05 at 13.29.28.png](../assets/189e6c7d_Screenshot_2026-05-05_at_13.29.28.png)
 
 
 #### Key mechanisms

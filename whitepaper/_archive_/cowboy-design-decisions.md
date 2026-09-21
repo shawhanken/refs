@@ -10,7 +10,7 @@
 | **Updated**   | 2026‑01‑18                |
 | **License**   | CC0‑1.0                   |
 
-> **Note:** This document explains the "why" behind Cowboy's architecture. For complete technical specifications, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+> **Note:** This document explains the "why" behind Cowboy's architecture. For complete technical specifications, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Abstract
 
@@ -32,7 +32,7 @@ Critically, these architectures fail to build trust. When an agent makes a decis
 
 Cowboy imports the actor model into a blockchain to provide a native, unified platform for autonomous agents. Every application is a set of actors; each actor is a Python program with deterministic execution, a persistent key/value store, and a mailbox. The chain delivers messages and timers, enforces resource limits, and commits state transitions in blocks. For work that cannot or should not run on-chain, Cowboy exposes a native market where **Runners** execute jobs off-chain and post verifiable results.
 
-This document explains the architectural decisions and trade-offs that shape Cowboy's design. For complete technical specifications, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+This document explains the architectural decisions and trade-offs that shape Cowboy's design. For complete technical specifications, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Key Innovations in Cowboy
 
@@ -225,7 +225,7 @@ The timer system is a potential vector for denial-of-service attacks. An adversa
 - **Timer Queue Basefee:** Similar to EIP-1559, a timer basefee adjusts based on global timer queue pressure, naturally throttling demand when the queue is congested.
 - **Per-Block Execution Budget:** Each block reserves a dedicated portion of its compute budget for timer execution, ensuring timer storms cannot completely crowd out regular transactions.
 
-For complete technical details on these mechanisms, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For complete technical details on these mechanisms, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Verifiable Off-Chain Compute
 
@@ -275,7 +275,7 @@ Cowboy addresses this through multiple verification modes:
 - **Semantic Similarity:** For subjective tasks, embedding-based similarity checks ensure semantic equivalence.
 - **Economic Bonds:** For truly subjective outputs, runners post bonds and the market judges quality over time.
 
-For complete technical details on verification modes and mechanisms, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For complete technical details on verification modes and mechanisms, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Dual-Metered Gas
 
@@ -318,7 +318,7 @@ Cowboy takes a multi-layered approach to MEV mitigation:
 - **Dedicated Lanes:** Block space is partitioned into reserved lanes for system operations, timers, and runner results. Attackers cannot spam the mempool to delay victim transactions.
 - **No Encrypted Mempool:** Given the ~2s finality and VRF ordering, the observation window for front-running is already minimal. The marginal benefit of encryption doesn't justify the latency cost.
 
-For complete consensus specifications, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For complete consensus specifications, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Economic Model
 
@@ -346,7 +346,7 @@ Off-chain compute is priced via a **free market**:
 
 Persistent storage incurs **ongoing rent**, preventing state bloat and encouraging efficient data lifecycle management. Actors who don't pay rent enter a grace period, then have storage evicted (but can restore it if data is preserved).
 
-For detailed parameters and mechanisms, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For detailed parameters and mechanisms, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Entitlements: Least-Privilege by Default
 
@@ -361,7 +361,7 @@ Entitlements enforce least-privilege by default:
 
 This creates an auditable, on-chain permission manifest for every actor. Users can inspect exactly what an actor can do before interacting with it.
 
-For the complete entitlements specification, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For the complete entitlements specification, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Why a Sovereign L1
 
@@ -435,7 +435,7 @@ Interoperability is a foundational design goal. The same `secp256k1` key can con
 
 This interoperability design recognizes that Cowboy and Ethereum serve complementary roles: Ethereum provides liquidity and security for high-value assets, while Cowboy provides the execution environment for autonomous agents. The bridge enables agents to leverage both ecosystems.
 
-For complete technical specifications on the bridge and interoperability mechanisms, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For complete technical specifications on the bridge and interoperability mechanisms, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Security Philosophy
 
@@ -446,7 +446,7 @@ Cowboy's security model prioritizes simplicity and auditability:
 - **Economic Security:** Staking, slashing, and fee mechanisms align incentives and penalize malicious behavior.
 - **Least Privilege:** The Entitlements system enforces least-privilege access by default.
 
-For complete security specifications and considerations, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md).
+For complete security specifications and considerations, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md).
 
 ## Applications
 
@@ -461,4 +461,4 @@ These applications were previously impractical or impossible on existing platfor
 
 ---
 
-_For complete technical specifications, parameters, and implementation details, see the [Technical Whitepaper](./cowboy-technical-whitepaper.md)._
+_For complete technical specifications, parameters, and implementation details, see the [Technical Whitepaper](../cowboy-technical-whitepaper.md)._

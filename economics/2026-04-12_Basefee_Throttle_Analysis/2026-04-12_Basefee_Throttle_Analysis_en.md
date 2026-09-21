@@ -2,7 +2,7 @@
 
 **Document date:** 2026-04-12
 **Scope:** Cowboy `devnet` on-chain economic parameters
-**Companion document:** [`20260412_Devnet_Basefee_Economics_en.md`](20260412_Devnet_Basefee_Economics_en.md) (evolution timeline)
+**Companion document:** [`20260412_Devnet_Basefee_Economics_en.md`](../2026-04-12_Devnet_Basefee_Economics/2026-04-12_Devnet_Basefee_Economics_en.md) (evolution timeline)
 **Simulation scripts:** `basefee_sim_split.py`, `basefee_throttle.py` (integer arithmetic ported line-by-line from `node/execution/src/basefee.rs::update_one`)
 
 ---

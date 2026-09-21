@@ -20,7 +20,7 @@ This document specifies Cowboy's storage layer: the **Cowboy Blockchain File Sys
 
 Together, CBFS and RAS provide actors and runners with a durable, integrity‑protected, privacy‑preserving storage primitive that (1) keeps the data path entirely off‑chain — a read or write never costs a transaction — while (2) providing on‑chain anchors sufficient for commitment, billing, repair, challenge, and eviction. A **delegation keypair** model separates cold wallet authority from hot storage authority, allowing owner‑direct data operations to be authorized locally and verified offline by Relay Nodes against cached chain state.
 
-This specification covers the volume lifecycle, CapToken and delegation cryptography, Reed‑Solomon erasure coding, Relay Node registration and repair, Proof‑of‑Retrievability challenges, per‑epoch storage rent, and all implementation parameters. It is a complement to the **[Cowboy Technical Whitepaper](./cowboy-technical-whitepaper.md)**, which is the normative reference for consensus, execution, economics, and actor semantics. Where this document and the Technical Whitepaper conflict, the Technical Whitepaper prevails.
+This specification covers the volume lifecycle, CapToken and delegation cryptography, Reed‑Solomon erasure coding, Relay Node registration and repair, Proof‑of‑Retrievability challenges, per‑epoch storage rent, and all implementation parameters. It is a complement to the **[Cowboy Technical Whitepaper](../cowboy-technical-whitepaper.md)**, which is the normative reference for consensus, execution, economics, and actor semantics. Where this document and the Technical Whitepaper conflict, the Technical Whitepaper prevails.
 
 # Introduction
 

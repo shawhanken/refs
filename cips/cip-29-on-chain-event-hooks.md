@@ -1,5 +1,7 @@
 # 链上事件钩子（On-chain Event Hooks）提案
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-29-on-chain-event-hooks.md`**. This copy was last updated **2026-05-26**, the authoritative doc **2026-08-13**, and the two have diverged by **783 diff lines** (736L here vs 755L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 ## 一、动机
 
 ### 1.1 当前缺口

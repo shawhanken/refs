@@ -3,7 +3,8 @@ type: entity
 tags: [plans, inventory, engineering, roadmap]
 sources:
   - refs/plans/
-last_updated: 2026-05-07
+last_updated: 2026-09-21 (盘点对账：27 → 31 份；补入 2026-05-19 / 05-21 / 06-16 ×2 四份；
+  加注多数计划已执行完或被放弃；前值 2026-05-07)
 status: authoritative
 ---
 
@@ -12,8 +13,10 @@ status: authoritative
 `refs/plans/` 是工程实施计划的 raw 数据源。每个文件以 **语义化 kebab-case** 命名，内容是一份面向具体改动的行动方案 / 评估 / 路径图。
 
 **定位**：
-- 计划文件 **不是权威规范**；权威顺序仍是 **代码 > 修正案 > CIP > 白皮书**
+- 计划文件 **不是权威规范**；权威顺序仍是 **代码 > 修正案 > `cowboy/docs/cips/` 的 CIP > 白皮书**
 - 计划记录"打算做什么 / 为什么 / 代价"，状态各异（已完成 / 进行中 / 提议 / 评估）
+- ⚠️ **这些计划最后一份是 2026-06-16 入库；到 2026-09 多数已执行完毕或被放弃。**
+  本清单只保证「这个档存在、讲什么」，**不保证其中的计划仍然有效**。要知道某项是否落地，查代码或 git 历史
 
 本清单按主题分组。
 
@@ -48,12 +51,13 @@ status: authoritative
 |---|---|---|
 | [validator-10100-stall-fix](../../plans/validator-10100-stall-fix.md) | Validator 10100 停滞彻底修复方案 | 复盘 `871783e` 引入的 receipt prune 死锁，设计运行时无锁方案 |
 
-## Bench / 可观测性（2）
+## Bench / 可观测性（3）
 
 | 文件 | 标题 | 摘要 |
 |---|---|---|
 | [bench-basefee-tracking](../../plans/bench-basefee-tracking.md) | 为 `bench:all` 增加 basefee 变动追踪 | 洪水期 per-second 采样 + per-block 采样 + 报告汇总 |
 | [bench-flood-errors-diagnostics](../../plans/bench-flood-errors-diagnostics.md) | 修复洪水测试错误 + Bench 报告诊断增强 | 191 笔错误根因归于 RPC 100 req/s 限速；errorBreakdown + block_samples |
+| [2026-05-19_bench-cip29-and-perf-coverage](../../plans/2026-05-19_bench-cip29-and-perf-coverage.md) | node/bench 针对 CIP-29 与更广性能覆盖的增强方案 | 事件钩子路径纳入 bench + 扩大性能覆盖面（中英双语） |
 
 ## PVM（1）
 
@@ -74,7 +78,7 @@ status: authoritative
 |---|---|---|
 | [governance-7phase-roadmap](../../plans/governance-7phase-roadmap.md) | 社区治理可行性与七阶段路径图（中英） | CIP-12 + OZ Governor / OP / Polkadot / Cosmos / Beanstalk 经验落地 |
 
-## 文档 / 测试 / 待办（4）
+## 文档 / 测试 / 待办（5）
 
 | 文件 | 标题 | 摘要 |
 |---|---|---|
@@ -82,14 +86,17 @@ status: authoritative
 | [node-readme-update-plan](../../plans/node-readme-update-plan.md) | 更新 node/ READMEs（devnet 分支） | 对照代码修正 7 处过时常量与新特性文档 |
 | [github-issues-batch-plan](../../plans/github-issues-batch-plan.md) | GitHub Issues 分类与批量实施计划 | 95 个未关 Issue 按模块聚合分批的优先级方案 |
 | [2026-04-30_rust-fmt-cleanup-node-cbfs](../../plans/2026-04-30_rust-fmt-cleanup-node-cbfs.md) 🆕 | Rust 格式化清理（node + cbfs） | 跨 workspace 全量 `cargo fmt` 落地策略 + devnet CI 触发 |
+| [2026-05-21_test-coverage-evaluation-plan](../../plans/2026-05-21_test-coverage-evaluation-plan.md) | Cowboy 代码测试覆盖度评估实施方案 | 覆盖 `node/` + `runner/` + 存储层（文中写 `steamtrain/`，现名 `cbfs/`） |
 
-## CIP / 跨子系统集成（3）
+## CIP / 跨子系统集成（5）
 
 | 文件 | 标题 | 摘要 |
 |---|---|---|
 | [cowboy-tee-execution-design](../../plans/cowboy-tee-execution-design.md) | Cowboy TEE Execution 设计文档（CIP-23） | CIP-23 Draft 配套实施设计 §12 代码改造清单 + §13 4-phase 路线图 |
 | [2026-04-22_cip-wp-gap-assessment-and-priorities](../../plans/2026-04-22_cip-wp-gap-assessment-and-priorities.md) 🆕 | CIP / Whitepaper Gap 评估与优先级 | 跨 CIP 与 WP v2 的差距盘点 + 优先级排序 |
 | [2026-05-06_mpp_session_implementation](../../plans/2026-05-06_mpp_session_implementation.md) 🆕 | MPP Session 集成实施方案 | 把 `refs/runner/2026-04-28_MPP_Session_Research.md` 第 §5–§6 设计转化为可执行任务表（PoC 2-3 周）；详见 [[../concepts/mpp-session]] |
+| [2026-06-16_tx-canonical-encoding-node-plan](../../plans/2026-06-16_tx-canonical-encoding-node-plan.md) | Canonical Transaction Encoding — node 核心实施计划 | `Transaction` 改用 commonware-codec 确定性编码 + `chain_id` 重放保护 + 删 `PayloadSign` + 钉一致性向量（共识变更） |
+| [2026-06-16_tx-canonical-followons-plan](../../plans/2026-06-16_tx-canonical-followons-plan.md) | tx-canonical 后续计划 | node PR #742 的三条独立后续工作流；Plan A 无 flag-day 依赖，B/C 有 |
 
 ---
 
@@ -115,4 +122,6 @@ status: authoritative
 
 ## Sources
 
-- `refs/plans/` 目录下 27 份 markdown 文件（2026-05-07 盘点；新增日期前缀的 CIP/Gap 类计划：`cowboy-tee-execution-design.md` / `2026-04-22_cip-wp-gap-assessment-and-priorities.md` / `2026-04-30_rust-fmt-cleanup-node-cbfs.md` / `2026-05-06_mpp_session_implementation.md`）
+- `refs/plans/` 目录下 **31 份** markdown 文件（2026-09-21 重新盘点；2026-05-07 的旧盘点漏了
+  `2026-05-19_bench-cip29-and-perf-coverage` / `2026-05-21_test-coverage-evaluation-plan` /
+  `2026-06-16_tx-canonical-encoding-node-plan` / `2026-06-16_tx-canonical-followons-plan` 四份，已补入）

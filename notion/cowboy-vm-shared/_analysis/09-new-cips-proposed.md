@@ -16,7 +16,7 @@
 
 ### CIP-30 — Validator BFT Slashing Curve & Evidence Model
 
-- **Source topic**: [01-slashing.md](../01-slashing.md) §A, §C, §E
+- **Source topic**: [01-slashing.md](./01-slashing.md) §A, §C, §E
 - **Scope**:
   - **Evidence Model.** Enumerates the four cryptographically-attributable Simplex BFT offences (notarization equivocation, finality-dummy equivocation, conflicting finalize, proposer equivocation) as normative struct layouts (`SlashingEvidence { offence_type, validator, sig_pair, height, evidence_submitter }`). System-lane classification (5% per WP §11.5). Idempotency rule (same offence settles once).
   - **Slashing Curve.** Polkadot-style quadratic `p_self(x, n) = clip(p_floor, (c · x / n)², 1)`. Per-offence severity table (proposer equivocation × 0.5; notarization / finality-dummy / conflicting finalize × 1.0). Max-of settlement rule. Correlation window = 1 epoch (3,600 blocks).
@@ -28,14 +28,14 @@
 
 ### CIP-31 — CBFS Rent Schedule
 
-- **Source topic**: [07-state-rent-cbfs.md](../07-state-rent-cbfs.md) §B, §C, §D
+- **Source topic**: [07-state-rent-cbfs.md](./07-state-rent-cbfs.md) §B, §C, §D
 - **Scope**: Concrete CBY values for all `TBD` entries in CIP-9 §14 (`STORAGE_FEE_PER_BYTE_PER_EPOCH`, `TRANSFER_FEE_PER_BYTE`, `MIN_STORAGE_BALANCE`, `MIN_RELAY_STAKE`, `POR_MISS_PENALTY`, `POR_FRAUD_PENALTY`, `RELAY_EVICTION_PENALTY`); new `RELAY_CHALLENGE_BOND` field (challenger-bond economics + 75-block dispute window aligned with CIP-2 `DISPUTE_WINDOW_BLOCKS`); explicit pro-rata weighting formula for Relay distribution (`(shard_count × shard_age_in_epochs)` after 10% burn + 2% challenge-pool reservation); resolution of the CIP-9 §14 stale-block-time bug (constants annotated against 12 s blocks while chain runs 1 s — either rescale constants 12× or correct comments).
 - **Key parameters** (straw values, economic modeling owns final): `STORAGE_FEE_PER_BYTE_PER_EPOCH = 10 nano-CBY` (1-day epochs); `TRANSFER_FEE_PER_BYTE = 1 nano-CBY`; `MIN_STORAGE_BALANCE = 1 epoch × max(declared_volume_size, 10 MiB)`; `MIN_RELAY_STAKE = 5,000 CBY`; `POR_MISS_PENALTY = 10 CBY/missed challenge`; `POR_FRAUD_PENALTY = 100 CBY` (10× miss); `RELAY_EVICTION_PENALTY = MIN_RELAY_STAKE / 2`; `RELAY_CHALLENGE_BOND = 10 CBY`. Split: 10% burn / 2% challenge-pool / 88% Relay-pro-rata.
 - **Dependencies**: none structural (greenfield). CIP-9 §14 retains parameter names; CIP-31 owns values. CIP-9 §5.6 / §10.4 amendments needed in same revision window.
 
 ### CIP-32 — Slashing Reversal Flow (`ReviewSlash` + `evidence_invalidity_proof`)
 
-- **Source topic**: [01-slashing.md](../01-slashing.md) §A "Bug-correlation safety cap & cryptographic reversal"
+- **Source topic**: [01-slashing.md](./01-slashing.md) §A "Bug-correlation safety cap & cryptographic reversal"
 - **Scope**:
   - **Auto-review.** `Payload::ReviewSlash { evidence_id, x_observed, slashed_set, proposed_action: Affirm | Reverse | Partial(bps) }` automatically opened by `0x09` when correlation window closes with `x ≥ X_safety`. Pre-application gate; 21-day review window. Outcomes: Affirm (apply full curve), Reverse (restore principal + accrued rewards), Partial.
   - **Cryptographic appeal.** `Payload::EvidenceInvalidityAppeal { evidence_id, evidence_invalidity_proof: bytes }` for post-application reversal. Cryptographic-only — proof must demonstrate signature-pair invalidity (e.g., wrong domain separator, malformed BLS aggregate). No discretionary bailout permitted; auto-review is the only pre-application bug path.
@@ -45,7 +45,7 @@
 
 ### CIP-33 — Lane V Verifiable Runner Lane (DEFERRED — do not draft this cycle)
 
-- **Source topic**: [03-runner-marketplace.md](../03-runner-marketplace.md) §H
+- **Source topic**: [03-runner-marketplace.md](./03-runner-marketplace.md) §H
 - **Scope (future)**: parallel verification lane with `M = 1` (single runner), cryptographic verification via TEE (`0x05`) or future ZK proof, no output-incorrectness slash (attestation-forgery + availability-breach only). Per-lane reputation (`r_V` separate from `r_R`). Lower stake floor `max(5k CBY USD-equiv, 1.0 × max_job_value_USD)`. Cross-lane bootstrap one-way `r_R → r_V_init = 0.2 · r_R`.
 - **Recommendation**: **DEFERRED**. Reasons: (a) Lane V depends on mature TEE attestation (CIP-23) shipping and on a Cowboy ZK story (not in CIP pipeline); (b) demand uncertainty — reviewer's own selection hedges Lane V as opt-in, not Phase-4 default; (c) Concept B (adaptive committee + EMA reputation + fractional non-reveal + delegator voice) already addresses the headline risks. Optionally **reserve a `LaneId` field in `JobSpec`** for forward compat (small one-byte amendment to CIP-2 v2), but do not author the spec at TGE.
 
@@ -55,13 +55,13 @@
 
 ### CIP-1 — substantial rewrite
 
-- **Source topic**: [02-timer-gba.md](../02-timer-gba.md) §B, §C, §E
+- **Source topic**: [02-timer-gba.md](./02-timer-gba.md) §B, §C, §E
 - **Scope**: Replace Part I's first-price + exponential-bias auction with **EIP-1559 timer basefee + priority tip + per-actor fairness weight**. Default GBA inline (closes Gap G7): `max_fee_per_cycle = 2 × current_basefee`; `max_priority_fee_per_cycle = previous_block_p50_priority_tip` (default 0 if prior block had no timer activity). SDK convenience: `priority_tier_hint ∈ {economy, standard, fast, urgent}` mapping to `{0.8×, 1.0×, 1.5×, 2.5×}` multipliers on the priority tip. Per-actor fairness weight `W(actor) ∈ [1, 2]` over a 1000-block rolling window applied multiplicatively at inclusion-ordering. Per-timer cycle cap 250k (auction-phase only). Timer-lane multiplier pinned at 1.0×. Migration: drop the `bid: int` parameter; existing CIP-1 v2 (Part II alignment doc) folded into a coherent single document.
 - **Touchpoints in current CIP-1**: §4.1 default GBA stub; §4.2 first-price-per-cycle / VCG path; §"Bidding & Auction"; §"Anti-starvation" exponential-bias. CIP-5 §9 (future-auction subsection) is removed in the same revision.
 
 ### CIP-2 — multiple amendments
 
-- **Source topics**: [03-runner-marketplace.md](../03-runner-marketplace.md) + [01-slashing.md](../01-slashing.md)
+- **Source topics**: [03-runner-marketplace.md](./03-runner-marketplace.md) + [01-slashing.md](./01-slashing.md)
 - **§5 amend (committee sizing)**: replace static `M = 5 / N = 3` with adaptive `M_epoch = clip(ceil(2 · log₂(N_active) / HHI_epoch), 3, 9)`, `N_epoch = ceil(2 · M_epoch / 3)`. HHI is EMA-smoothed with 14-day half-life. Epoch-level recompute (3,600 blocks). `JobSpec.M` override permitted up to ceiling.
 - **§5 amend (VRF weight)**: change weight from `floor(log2(s / MIN_STAKE + 1)) + 1` (stake only) to `w = stake_to_weight(effective_stake) · max(1, floor(sqrt(r)))` (stake × √reputation), with reputation `r ∈ [0, 100]`.
 - **§6 amend (non-reveal classification)**: cross-listed with **CIP-2 §8.5** (see slashing analysis). A runner who has committed but failed to reveal within `reveal_deadline_blocks` incurs a **25% fractional slash** of self-bond, EXCEPT during a single per-epoch `non_reveal_exempt_blocks` window.
@@ -75,24 +75,24 @@
 
 ### CIP-3 — minor amendments
 
-- **Source topic**: [04-fee-model-and-lanes.md](../04-fee-model-and-lanes.md) §A, §D
+- **Source topic**: [04-fee-model-and-lanes.md](./04-fee-model-and-lanes.md) §A, §D
 - **§2.2.3 amend (lane table)**: add `Fee Multiplier` column. Pin all four lanes (System / Timer / Runner / User) at **1.0×** at genesis. Mark Tier-0 tunable per CIP-12. Mirror the WP §6.3 / §17.9 / §13 table.
 - **§6.5 amend (MEV scope)**: add explicit `Out of scope` subsection enumerating three non-mitigated classes: (a) single-block proposer inclusion/censorship, (b) private orderflow MEV, (c) JIT MEV against predictable actor logic. Point at SDK-layer mitigations (commit-reveal, slippage caps).
 
 ### CIP-4 — minor amendments (or CIP-4 v2 "State Rent Normative Anchor")
 
-- **Source topic**: [07-state-rent-cbfs.md](../07-state-rent-cbfs.md) §A
+- **Source topic**: [07-state-rent-cbfs.md](./07-state-rent-cbfs.md) §A
 - **New §"Rent" subsection**: migrate normative rent content out of WP §17.5 prose into CIP-4 v2. Pin catch-up fee semantics: `catch_up_fee_i = 0.10 × missed_rent_i` where `missed_rent_i` uses the **rent rate at epoch i** (miss-time), not catch-up-time rate. Add rent-rate snapshot mechanism (or moving-average fallback if per-epoch snapshots too expensive).
 - **Optional**: introduce `rent_rate_floor` and `rent_rate_ceiling` to bound WP §4.4 auto-adjust geometric drift.
 
 ### CIP-5 — minor amendment (sunset §9)
 
-- **Source topic**: [02-timer-gba.md](../02-timer-gba.md) §B "future-auction subsection: REMOVE"
+- **Source topic**: [02-timer-gba.md](./02-timer-gba.md) §B "future-auction subsection: REMOVE"
 - **Scope**: REMOVE CIP-5 §9 (future-auction subsection). Target design moves entirely to CIP-1 rewrite. CIP-5 §§1–8 (current FIFO, per-fire `fee_payer` model, three-path lifecycle, lane budgets) stay unchanged. Relabel CIP-5 header tip to "current implementation, sunset on CIP-1 (rewrite) ship". CIP-5 §9.9 open questions either resolve in CIP-1 (G7, λ calibration, VCG revenue) or evaporate (reserve price, interaction with CIP-1 GBA).
 
 ### CIP-9 — block-time bug + new field + §10.4 expansion
 
-- **Source topic**: [07-state-rent-cbfs.md](../07-state-rent-cbfs.md) §B
+- **Source topic**: [07-state-rent-cbfs.md](./07-state-rent-cbfs.md) §B
 - **§14 block-time bug**: parameter comments say "12 s blocks" but the chain runs 1 s (WP §6.1). Recompute / re-comment `POR_CHALLENGE_INTERVAL = 600`, `POR_RESPONSE_WINDOW = 50`, `STORAGE_GRACE_EPOCHS = 7,200`, `RELAY_UNSTAKE_DELAY = 7,200`, `ORPHAN_SHARD_TTL = 7,200`. Decision in CIP-31: either rescale constants 12× (preserve intended human-time durations) or correct comments only (accept the 1-second-derived durations).
 - **§14 add `RELAY_CHALLENGE_BOND`**: new parameter (currently missing). Value owned by CIP-31; field added to CIP-9 §14 alongside other Relay parameters.
 - **§5.6 challenge-bond clause**: add normative requirement that challengers escrow `RELAY_CHALLENGE_BOND` CBY; bond refunded on valid response or fraud-found, forfeit on withdrawal or frivolous-challenge.
@@ -100,7 +100,7 @@
 
 ### CIP-12 — minor amendments
 
-- **Source topic**: [06-governance.md](../06-governance.md) §A, §D, §E
+- **Source topic**: [06-governance.md](./06-governance.md) §A, §D, §E
 - **§3.2 amend (conditional sunset)**: gated on decision-register #3 (policy decision). If adopted, add: Council *scope* (named powers) auto-reduces by one named power per `sunset_epoch_length` (default 1 year) once `validator_count ≥ N` AND `total_staked_value_usd ≥ V` for two consecutive epochs. Order: (1) Cancellation, (2) Fast-track endorsement, (3) Circuit-breaker pause. Tier-4 override permitted. Suggested defaults: `N = 50`, `V = $50M`.
 - **§5.2 commentary (Tier-2 quorum)**: add "Note on Tier 2 quorum" paragraph documenting the whale-capture analysis; explain why the bicameral AND-rule (>50% validator chamber) is the appropriate defense rather than raising stake quorum. No parameter change.
 - **§10 rationale (turnout)**: add "On expected turnout" paragraph + Foundation commitment to quarterly governance-health reports for the first 24 months post-TGE.
@@ -109,7 +109,7 @@
 
 ### CIP-13 — multiple amendments
 
-- **Source topic**: [03-runner-marketplace.md](../03-runner-marketplace.md) + [06-governance.md](../06-governance.md)
+- **Source topic**: [03-runner-marketplace.md](./03-runner-marketplace.md) + [06-governance.md](./06-governance.md)
 - **§4.4 tighten `MAX_COMMISSION_BPS`** (Tier-2 governance call, not spec change): adjust from `10000 (100%)` to `3000 (30%)` once empirical race-to-bottom data exists. Floor `MIN_COMMISSION_BPS = 500 (5%)` unchanged. **Status: stale claim** — bounds already exist; this is parameter tuning.
 - **§6.1 grant delegator vote weight**: runner-delegated CBY carries **25% pro-rata weight** on Tier-2 proposals tagged `runner-marketplace-parameter` (defined in CIP-12 §6.X). Zero weight on all other tiers/tags. Voted directly by delegator (not inherited by runner). Snapshot at `voting_start_height`. Aggregates across all `Active` tranches for a delegator; `Unbonding` tranches count at pre-unbond weight (mirrors CIP-12 §6.2). Tier-0 tunable with soft cap (e.g., max 50%) enforced by CIP-12 validation.
 

@@ -1587,8 +1587,8 @@ flowchart LR
 
 ## 相关文档
 
-- [Runner 系统详细设计](./RUNNER_SYSTEM_DESIGN.md)
-- [Runner 实施方案](./Runner_Implementation_Plan_CN.md)
+- Runner 系统详细设计 — `RUNNER_SYSTEM_DESIGN.md`（⚠️ 已于 2026-03-30 commit `09ca894` 删除；对应内容见 [`refs/runner/README.md`](./README.md) 与 [`refs/runner/2026-02-05_DOCUMENTATION.md`](./2026-02-05_DOCUMENTATION.md)）
+- [Runner 实施方案](./2026-01-24_Runner_Implementation_Plan_CN.md)
 - [README](./README.md)
 
 ---

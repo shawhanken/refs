@@ -21,7 +21,7 @@
 
 ### 2.1 Runner 节点结构（链下）
 
-参考 `runner/crates/runner-node/src/node.rs` 与 `refs/runner/RUNNER_SYSTEM_DESIGN.md`：
+参考 `runner/crates/runner-node/src/node.rs` 与 `RUNNER_SYSTEM_DESIGN.md`（⚠️ 已于 2026-03-30 commit `09ca894` 删除；对应内容见 [`refs/runner/README.md`](./README.md) 与 [`refs/runner/2026-02-05_DOCUMENTATION.md`](./2026-02-05_DOCUMENTATION.md)）：
 
 - `RunnerNode::start()` 当前会启动 3 个长期运行的异步任务：
   - **Job Listener**: 轮询链侧 REST `GET /runner/{address}/jobs`，把新任务推入本地 `job_queue`。

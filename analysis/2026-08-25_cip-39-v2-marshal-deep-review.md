@@ -42,7 +42,7 @@ producer dedupe、checkpoint、retention、typed errors 和 canonical wire codec
 
 ### 1. Dedupe floor 可在合规执行下静默制造重复 append
 
-位置：[§9.1](../../docs/cips/cip-39-cowboy-queue-system.md#91-idempotent-append)
+位置：[§9.1](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#91-idempotent-append)
 
 `dedupe floor` 使用 broker 的 `received_at_ms`，而是否拒绝旧请求比较的是允许领先 broker
 最多 `max_clock_skew_ms` 的 `client_created_at_ms`。容量淘汰又被明确允许在两个 deadline
@@ -62,9 +62,9 @@ entry 后 floor 本身也失去定义，但上述反例不依赖空 store。
 
 ### 2. Checkpoint 没有兑现 Goal 5 的可举证承诺
 
-位置：[Goal](../../docs/cips/cip-39-cowboy-queue-system.md#goal)、
-[§10](../../docs/cips/cip-39-cowboy-queue-system.md#10-durability-and-checkpoints)、
-[§11.1](../../docs/cips/cip-39-cowboy-queue-system.md#111-frames)
+位置：[Goal](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#goal)、
+[§10](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#10-durability-and-checkpoints)、
+[§11.1](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#111-frames)
 
 `Appended` 只返回 `sequence`，checkpoint receipt 必须随后通过另一个 `GetCheckpoint` 请求
 获取。如果 provider 在 append 已确认、客户端首次拉取 checkpoint 之前删除或拒绝提供
@@ -77,7 +77,7 @@ entry 后 floor 本身也失去定义，但上述反例不依赖空 store。
 
 ### 3. Create/Delete Group churn 绕过 active-group 上限
 
-位置：[§9.2](../../docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
+位置：[§9.2](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
 
 持有 `GROUP_ADMIN` 的付费 stream 可以不断使用新 `group_id` 执行 Create → Delete。任意时刻
 active group 只有 0 或 1，所以不会触发 `max_groups_per_stream`；每次删除却产生一个保存至
@@ -89,8 +89,8 @@ active group 只有 0 或 1，所以不会触发 `max_groups_per_stream`；每�
 
 ### 4. ACKED/EXPIRED delivery cycle 没有回收边界
 
-位置：[§9.2](../../docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)、
-[§12](../../docs/cips/cip-39-cowboy-queue-system.md#12-retention)
+位置：[§9.2](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)、
+[§12](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#12-retention)
 
 每条 record 对每个 applicable group 创建一个 cycle，Redrive 还会继续创建新 cycle。
 `DEAD_LETTERED` 明确有 TTL 后的删除规则，但 `ACKED` 和 `EXPIRED` 没有任何回收时点。
@@ -103,7 +103,7 @@ ceilings 完整约束”的声明。
 
 ### 5. Consumer Group 的 `Head` 起点未定义
 
-位置：[GroupConfigV2](../../docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
+位置：[GroupConfigV2](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
 
 Group 配置声明 `start = Head | At(sequence)`，但只定义了 `At` 的合法性。唯一明确的
 `Head` 语义属于 Cursor subscription，且绑定 subscription-open；持久 Group 可以先创建，
@@ -114,7 +114,7 @@ Group 配置声明 `start = Head | At(sequence)`，但只定义了 `At` 的合�
 
 ### 6. `Extend` 的 `max_visibility_ms` 缺少时间锚点
 
-位置：[§9.2 Extend](../../docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
+位置：[§9.2 Extend](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)
 
 初始 lease expiry 明确是 `issued_at + visibility_timeout_ms`，但 Extend 只说不得超过
 `max_visibility_ms`，没有说明这个 duration 相对 `issued_at`、当前时间、当前 expiry 还是最近
@@ -125,8 +125,8 @@ Group 配置声明 `start = Head | At(sequence)`，但只定义了 `At` 的合�
 
 ### 7. Group 管理没有协议内读取闭环
 
-位置：[§9.2](../../docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)、
-[§11.1 methods](../../docs/cips/cip-39-cowboy-queue-system.md#111-frames)
+位置：[§9.2](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#92-consumer-groups)、
+[§11.1 methods](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#111-frames)
 
 `UpdateGroup` 的请求体是完整 `GroupConfigV2`，并要求五个不可变字段与现存记录精确一致；
 协议却没有 `GetGroup` 或 `ListGroups`，response union 也不返回 group config。
@@ -137,7 +137,7 @@ Group 配置声明 `start = Head | At(sequence)`，但只定义了 `At` 的合�
 
 ### 8. 错误版本同时匹配两个稳定 wire error
 
-位置：[§14](../../docs/cips/cip-39-cowboy-queue-system.md#14-typed-errors)
+位置：[§14](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#14-typed-errors)
 
 非 `2` 的 frame 或嵌套对象 version 同时满足：
 
@@ -149,8 +149,8 @@ Group 配置声明 `start = Head | At(sequence)`，但只定义了 `At` 的合�
 
 ### 9. §19 没有覆盖 §18 的关键 activation MUST
 
-位置：[§18](../../docs/cips/cip-39-cowboy-queue-system.md#18-activation-and-removed-surface)、
-[§19](../../docs/cips/cip-39-cowboy-queue-system.md#19-conformance)
+位置：[§18](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#18-activation-and-removed-surface)、
+[§19](../../cowboy/docs/cips/cip-39-cowboy-queue-system.md#19-conformance)
 
 §18 要求 closed-world genesis、`0x17` 无旧记录和余额、拒绝 V1 instruction/records、拒绝
 缺少 `cbqs/store-format = 2` 的 broker store，并禁止携带 V1 chain/broker/archive state。

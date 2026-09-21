@@ -21,7 +21,7 @@ sources:
   - refs/cips/cip-28-cowboy-agent-banking.md
   - refs/cips/cip-29-on-chain-event-hooks-en.md
   - refs/whitepaper/2026-03-21_cowboy-technical-whitepaper-revised-v2.md
-last_updated: 2026-08-15 (全表按代码 pin 测试 `runner/src/system_actors.rs` 重写：0x0D-0x1E 段整体校正 + 补 0x11/0x14/0x16/0x17/0x1E；作废旧 spec-only 段；前值 2026-05-26)
+last_updated: 2026-09-21 (补 `0x18` PLATFORM_FEE / `0x19` ROOM_AUTHORITY，两者已在 `types/src/constants.rs`；相应收窄「未分配」段为 `0x15 / 0x1A–0x1C / 0x1F+`。前值 2026-08-15：全表按代码 pin 测试 `runner/src/system_actors.rs` 重写，0x0D-0x1E 段整体校正 + 补 0x11/0x14/0x16/0x17/0x1E、作废旧 spec-only 段；更前值 2026-05-26)
 status: authoritative
 ---
 
@@ -29,7 +29,7 @@ status: authoritative
 
 Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们与用户 Actor 同构（消息驱动），但由 genesis 初始化、拥有特权操作。
 
-> **[2026-08-15 更正]** 旧版（2026-05-26）把 `0x0D–0x13` 整段标为 "spec-only" 并给了错误的名称映射：`STREAM_KEY_MANAGER` 已实装在 **`0x0D`**，把 ROUTE/GATEWAY/RECEIPT 各推后一位，且 `0x11/0x14/0x16/0x17/0x1E` 缺失。下表已按 pin 测试 **`node/runner/src/system_actors.rs`（`well_known_low_byte_assignments`）** 校正——该段现在**全部已声明为常量**，不再是 spec-only。未列出的 `0x15 / 0x18–0x1C / 0x1F+` 为未分配。
+> **[2026-08-15 更正]** 旧版（2026-05-26）把 `0x0D–0x13` 整段标为 "spec-only" 并给了错误的名称映射：`STREAM_KEY_MANAGER` 已实装在 **`0x0D`**，把 ROUTE/GATEWAY/RECEIPT 各推后一位，且 `0x11/0x14/0x16/0x17/0x1E` 缺失。下表已按 pin 测试 **`node/runner/src/system_actors.rs`（`well_known_low_byte_assignments`）** 校正——该段现在**全部已声明为常量**，不再是 spec-only。未列出的 `0x15 / 0x1A–0x1C / 0x1F+` 为未分配。
 
 地址空间现状（权威来源：`node/runner/src/system_actors.rs` 的 `SystemActorAddresses` 宏 + `well_known_low_byte_assignments` 测试；`node/types/src/constants.rs`）：`0x01–0x1E` 已声明常量，保留段 `< 0x100` 在 `pvm_host.rs` 中禁止用户 actor 部署 / 禁作 `fee_payer_override`。`0x1D`（EVENT_SUBSCRIPTION）是**虚拟型**——`call_actor` 拦截路由到 RPC dispatch，不部署 actor 代码。
 
@@ -61,6 +61,8 @@ Cowboy 在保留低位地址注册系统 Actor，承载协议级功能。它们�
 | `0x14` | INTENT_SETTLEMENT | CIP-10 v2 意图结算账户 | CIP-10 v2 | ✅ 代码 |
 | `0x16` | BANK_ACTOR | Agent banking 原语（cards / gas 路由 / 策略） | CIP-28 | ✅ 代码 |
 | `0x17` | STREAM_REGISTRY | CBQS 流 / provider 记录 | CIP-39 | ✅ 代码 |
+| `0x18` | PLATFORM_FEE | 平台费收款账户 | — | ✅ 代码（`types/src/constants.rs`，未列入 `system_actors.rs` 枚举）|
+| `0x19` | ROOM_AUTHORITY | 房间/会话授权 | — | ✅ 代码 |
 | `0x1D` | EVENT_SUBSCRIPTION | CIP-29 on-chain event hooks：竞价市场查询 RPC（`get_rank` / `get_topic_orderbook` / `get_min_bid_for_rank`） | CIP-29 §2.6 | ✅ 代码（虚拟/拦截） |
 | `0x1E` | TRADING_POST | actor hiring 与分发 rails | CIP-33 | ✅ 代码 |
 

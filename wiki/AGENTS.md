@@ -7,8 +7,12 @@
 ## 三层架构
 
 1. **Raw sources**（不可变）— LLM 只读
-   - `refs/whitepaper/` — 白皮书（最高设计依据，受保护）
-   - `refs/cips/` — 正式规范（living specs）
+   - **`cowboy/docs/cips/` — 正式规范（living specs，唯一权威）**。CIP 的权威副本在 `cowboy` repo，
+     不在 refs。Ingest CIP 内容时**必须**读这里
+   - `refs/whitepaper/` — 白皮书（最高设计依据，受保护）；历史版本在 `_archive_/`，不是权威
+   - `refs/cips/` — ⚠️ **过时快照，不是 living spec**。34 份全部落后于 `cowboy/docs/cips/`
+     （2026-09-21 审计；每份档头有 STALE SNAPSHOT 横幅标注差距）。只用于追溯「当时的 spec 怎么写」，
+     **不得作为 ingest 的规范来源**
    - `refs/node/`、`refs/pvm/`、`refs/runner/`、`refs/chain/` — 各子系统历史与综合文档
    - `refs/economics/`、`refs/devex/`、`refs/common/` — 专题文档
    - `refs/analysis/` — 跨主题分析、修正案、会议纪要
@@ -60,7 +64,7 @@ status: authoritative | draft | stale
 - 日期使用 `YYYY-MM-DD`
 - 代码引用使用 `path/to/file.rs:LINE` 格式
 - wiki 内交叉引用写相对路径（`../concepts/xxx.md`）或 `[[wiki-link]]` 风格（视工具）
-- 权威顺序：**代码 > 修正案 (analysis/*amendments*) > CIP > 白皮书 > 其它 raw**
+- 权威顺序：**代码 > 修正案 (analysis/*amendments*) > `cowboy/docs/cips/` 的 CIP > 白皮书 > 其它 raw（含 `refs/cips/` 快照）**
 - `refs/plans/` 属"其它 raw"，非规范性；wiki 中引用计划必须说明其状态（提议 / 进行中 / 已落地）
 
 ---
@@ -125,7 +129,8 @@ Agent 定期执行（或人类触发）：
 
 1. **查代码** — 若代码存在实际实现，以代码为准
 2. 查 `refs/analysis/2026-04-15_documentation_amendments.md` — 若已有修正案条目，以修正案为准
-3. 查 CIP — 若代码/修正案都未明确，以 CIP 为准
+3. 查 CIP — 若代码/修正案都未明确，以 **`cowboy/docs/cips/`** 的 CIP 为准
+   （**不是** `refs/cips/` 的快照；两者冲突时快照一律作废）
 4. 查白皮书
 5. 其它 raw sources
 
@@ -140,7 +145,7 @@ wiki 页在引用时标注权威级别；不一致处在 `## 源文档冲突` �
 type: concept
 tags: [consensus, economics, cip-3]
 sources:
-  - refs/cips/cip-3-fee-model.mdx
+  - cowboy/docs/cips/cip-3-fee-model.md
   - refs/economics/2026-04-13_fee-audit-report.md
   - refs/analysis/2026-04-15_documentation_amendments.md
 last_updated: 2026-04-15

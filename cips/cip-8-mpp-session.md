@@ -4,6 +4,8 @@ description: Formal specification of the on-chain MPP Session actor (`0x0C`) tha
 icon: arrow-rotate-left
 ---
 
+> **⚠️ [2026-09-21] STALE SNAPSHOT — 过时快照.** This `refs/cips/` copy is superseded; the authoritative, code-aligned spec lives at **`cowboy/docs/cips/cip-8-mpp-session.md`**. This copy was last updated **2026-05-11**, the authoritative doc **2026-07-14**, and the two have diverged by **37 diff lines** (504L here vs 517L there). The text below is retained as a historical record — **do not build against it**. For current system-actor addresses see [`refs/wiki/entities/system-actors.md`](../wiki/entities/system-actors.md).
+
 <Note>
   **Status:** Draft (Retroactive — code-first)
   **Type:** Standards Track
@@ -21,7 +23,7 @@ icon: arrow-rotate-left
 
 ## 1. Abstract
 
-This CIP retroactively specifies the **MPP Session** protocol that has been committed to code as `SESSION_ACTOR = 0x0C` along with full Rust-side handler scaffolding and runner-side voucher library. The session protocol implements the **Session mode** of the IETF Machine Payment Protocol (MPP) — the wire complement to MPP's `intent="charge"` mode covered by [CIP-18 r2](./cip-18-payments).
+This CIP retroactively specifies the **MPP Session** protocol that has been committed to code as `SESSION_ACTOR = 0x0C` along with full Rust-side handler scaffolding and runner-side voucher library. The session protocol implements the **Session mode** of the IETF Machine Payment Protocol (MPP) — the wire complement to MPP's `intent="charge"` mode covered by [CIP-18 r2](./cip-18-payments.md).
 
 Where CIP-18 covers single-call payments (HTTP request → 402 → credential → settle, **one chain tx per call**), CIP-8 covers high-frequency micro-billing — typical for LLM token streaming, paid HTTP/MCP loops, or long-lived AI sessions — where the payer opens an on-chain escrow once, exchanges payer-signed accumulating `SessionVoucher`s off-chain with the Runner over an arbitrary number of micro-calls, and settles on-chain in **three transactions** (Open + Settle + Finalize) instead of N.
 
