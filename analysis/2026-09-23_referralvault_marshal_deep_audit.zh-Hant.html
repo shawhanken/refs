@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReferralVault 深審報告</title>
+<style>
+  :root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+</head>
+<body>
+<style>
+  :root{
+    --ground:#f4f6fa;
+    --surface:#ffffff;
+    --surface-sunk:#eceff6;
+    --line:#dde2ed;
+    --line-strong:#c3cad9;
+    --ink:#101622;
+    --ink-soft:#333c4e;
+    --muted:#5c6579;
+    --accent:#2b3f8f;
+    --accent-soft:#e7ebf8;
+    --high:#ad2116;
+    --high-soft:#fbe9e7;
+    --mid:#8a5a00;
+    --mid-soft:#fbf0dc;
+    --low:#37606c;
+    --low-soft:#e4eef1;
+    --ok:#2f6b4a;
+    --shadow:0 1px 2px rgba(16,22,34,.05),0 8px 24px -16px rgba(16,22,34,.28);
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    --serif:"IBM Plex Serif",Georgia,"Songti TC","Noto Serif TC",serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0d1017;
+      --surface:#151a24;
+      --surface-sunk:#1b212d;
+      --line:#262e3d;
+      --line-strong:#3a4457;
+      --ink:#e7eaf2;
+      --ink-soft:#c3c9d8;
+      --muted:#8d95a9;
+      --accent:#93a6ff;
+      --accent-soft:#1d2440;
+      --high:#ff8478;
+      --high-soft:#33191a;
+      --mid:#e0a94a;
+      --mid-soft:#2c2416;
+      --low:#82b3c0;
+      --low-soft:#16262b;
+      --ok:#6cc294;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0d1017;
+    --surface:#151a24;
+    --surface-sunk:#1b212d;
+    --line:#262e3d;
+    --line-strong:#3a4457;
+    --ink:#e7eaf2;
+    --ink-soft:#c3c9d8;
+    --muted:#8d95a9;
+    --accent:#93a6ff;
+    --accent-soft:#1d2440;
+    --high:#ff8478;
+    --high-soft:#33191a;
+    --mid:#e0a94a;
+    --mid-soft:#2c2416;
+    --low:#82b3c0;
+    --low-soft:#16262b;
+    --ok:#6cc294;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:var(--sans);font-size:15px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding-inline:20px;padding-block:0 72px}
+  code,.mono{font-family:var(--mono);font-variant-ligatures:none}
+
+  /* ---------- masthead ---------- */
+  .masthead{padding-block:44px 28px;border-bottom:2px solid var(--ink);}
+  .eyebrow{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;
+  }
+  h1{
+    font-family:var(--serif);font-weight:700;font-size:clamp(30px,5.4vw,46px);
+    line-height:1.12;letter-spacing:-.015em;margin:0 0 6px;text-wrap:balance;
+  }
+  .subtitle{margin:0;color:var(--ink-soft);font-size:16.5px;max-width:62ch}
+  .verdict-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:22px}
+  .verdict{
+    display:inline-flex;align-items:baseline;gap:10px;
+    background:var(--high-soft);color:var(--high);
+    border:1px solid currentColor;border-radius:2px;
+    padding:7px 14px;font-family:var(--mono);font-weight:600;
+    font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+  }
+  .verdict b{font-size:13px}
+  .verdict-note{color:var(--muted);font-size:13.5px}
+
+  /* ---------- provenance strip ---------- */
+  .prov{
+    margin-top:24px;border:1px solid var(--line);border-radius:3px;
+    background:var(--surface);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));
+  }
+  .prov div{padding:12px 14px;border-right:1px solid var(--line);min-width:0}
+  .prov div:last-child{border-right:0}
+  .prov dt{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 4px;
+  }
+  .prov dd{margin:0;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);
+    overflow-wrap:anywhere;line-height:1.45}
+
+  /* ---------- section ---------- */
+  section{margin-top:56px}
+  h2{
+    font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.01em;
+    margin:0 0 6px;text-wrap:balance;
+  }
+  .sec-note{margin:0 0 22px;color:var(--muted);font-size:14px;max-width:70ch}
+  h3{font-size:15px;font-weight:600;margin:28px 0 10px;letter-spacing:.005em}
+
+  /* ---------- tally ---------- */
+  .tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .tally div{background:var(--surface);padding:14px 16px}
+  .tally .n{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;
+    font-variant-numeric:tabular-nums;display:block}
+  .tally .k{font-size:12.5px;color:var(--muted);margin-top:6px;display:block}
+  .tally .high .n{color:var(--high)}
+  .tally .mid .n{color:var(--mid)}
+  .tally .low .n{color:var(--low)}
+
+  /* ---------- callout ---------- */
+  .callout{
+    margin-top:22px;background:var(--surface);border:1px solid var(--line);
+    border-left:3px solid var(--mid);border-radius:3px;padding:16px 18px;
+  }
+  .callout h3{margin:0 0 8px;font-size:14px}
+  .callout ul{margin:0;padding-left:18px;color:var(--ink-soft);font-size:14px}
+  .callout li{margin-bottom:6px}
+  .callout li:last-child{margin-bottom:0}
+
+  /* ---------- filter ---------- */
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;align-items:center}
+  .filters .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);margin-right:4px}
+  .chip{
+    font-family:var(--mono);font-size:12px;font-weight:500;
+    padding:5px 11px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);
+    transition:background .12s,color .12s,border-color .12s;
+  }
+  .chip:hover{border-color:var(--ink);color:var(--ink)}
+  .chip[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---------- finding entries ---------- */
+  .entries{display:flex;flex-direction:column;gap:14px}
+  .entry{
+    background:var(--surface);border:1px solid var(--line);border-radius:3px;
+    box-shadow:var(--shadow);display:grid;grid-template-columns:4px 1fr;overflow:hidden;
+  }
+  .entry[hidden]{display:none!important}
+  .stripe{background:var(--line-strong)}
+  .entry[data-sev="high"] .stripe{background:var(--high)}
+  .entry[data-sev="mid"] .stripe{background:var(--mid)}
+  .entry[data-sev="low"] .stripe{background:var(--low)}
+  .entry-body{padding:16px 18px;min-width:0}
+  .entry-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:9px}
+  .key{
+    font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;
+    padding:2px 7px;border-radius:2px;background:var(--surface-sunk);color:var(--ink-soft);
+  }
+  .sev{
+    font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.11em;
+    text-transform:uppercase;padding:3px 8px;border-radius:2px;
+  }
+  .sev.high{background:var(--high-soft);color:var(--high)}
+  .sev.mid{background:var(--mid-soft);color:var(--mid)}
+  .sev.low{background:var(--low-soft);color:var(--low)}
+  .sev.adv{background:var(--surface-sunk);color:var(--muted)}
+  .entry[data-sev="adv"] .stripe{background:var(--line-strong)}
+  .support{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:auto}
+  .entry h4{
+    font-family:var(--serif);font-size:17.5px;font-weight:600;line-height:1.35;
+    margin:0 0 6px;text-wrap:balance;letter-spacing:-.005em;
+  }
+  .gloss{margin:0 0 11px;color:var(--ink-soft);font-size:14.5px}
+  .claim{margin:0;color:var(--muted);font-size:13.5px;line-height:1.62}
+  .claim code{font-size:12.5px;color:var(--ink-soft);background:var(--surface-sunk);
+    padding:1px 4px;border-radius:2px}
+  .entry-foot{
+    margin-top:13px;padding-top:11px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;
+  }
+  .loc{font-family:var(--mono);font-size:12px;color:var(--accent);overflow-wrap:anywhere}
+  .lenses{display:flex;flex-wrap:wrap;gap:5px;margin-left:auto}
+  .lens{
+    font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    border:1px solid var(--line);border-radius:2px;padding:2px 6px;white-space:nowrap;
+  }
+
+  /* ---------- method table ---------- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--muted);font-weight:500;background:var(--surface-sunk)}
+  tr:last-child td{border-bottom:0}
+  td.mono{font-family:var(--mono);font-size:12.5px;overflow-wrap:anywhere}
+  .st{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase}
+  .st.pass{color:var(--ok)} .st.deg{color:var(--mid)} .st.done{color:var(--accent)}
+
+  /* ---------- refuted ---------- */
+  .refuted{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:12px}
+  .ref{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ok);
+    border-radius:3px;padding:14px 16px}
+  .ref.caveat{border-left-color:var(--mid)}
+  .ref h4{margin:0 0 6px;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:baseline;
+    font-family:var(--sans);line-height:1.4}
+  .ref .mark{font-family:var(--mono);font-weight:700;color:var(--ok);flex:none}
+  .ref.caveat .mark{color:var(--mid)}
+  .ref p{margin:0;font-size:13.3px;color:var(--ink-soft);line-height:1.55}
+
+  /* ---------- fixes ---------- */
+  ol.fixes{counter-reset:fx;list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+  ol.fixes li{counter-increment:fx;padding-left:34px;position:relative;color:var(--ink-soft);font-size:14.2px}
+  ol.fixes li::before{content:counter(fx);position:absolute;left:0;top:1px;
+    font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--accent);
+    background:var(--accent-soft);width:23px;height:23px;border-radius:2px;
+    display:grid;place-items:center}
+  ol.fixes b{color:var(--ink)}
+
+  footer{
+    margin-top:60px;padding-top:20px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:13px;
+  }
+  footer p{margin:0 0 8px}
+  a{color:var(--accent)}
+  @media (max-width:600px){
+    .prov div{border-right:0;border-bottom:1px solid var(--line)}
+    .prov div:last-child{border-bottom:0}
+    .support{margin-left:0;width:100%}
+    .lenses{margin-left:0}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Flap V3 Vault · 深度安全審計 · 2026-09-23</p>
+    <h1>ReferralVault 深審報告</h1>
+    <p class="subtitle">
+      對 <code class="mono">ReferralVault-main</code> 的多視角深審:5 條掃描視角、8 個舉證 agent、
+      16 個變異體,外加 Slither 與倉庫自身的 Foundry 不變量測試。所有 CONFIRMED 結論都帶一個可重跑的 Foundry 觸發器。
+    </p>
+    <div class="verdict-row">
+      <span class="verdict">審查結論 <b>ESCALATE</b></span>
+      <span class="verdict-note">5 條 high 需要人工定奪;本次審計不代替人做最終裁決。</span>
+    </div>
+
+    <dl class="prov">
+      <div><dt>Change ref</dt><dd>e0477910…f047b7<br>sha256 內容摘要(非 git checkout)</dd></div>
+      <div><dt>Toolchain</dt><dd>forge 1.7.1 · solc 0.8.26<br>evm cancun · optimizer 99999</dd></div>
+      <div><dt>Worktree</dt><dd>唯讀主樹 + 8 份隔離副本<br>probe1…probe8</dd></div>
+      <div><dt>Suite</dt><dd>98 passed / 0 failed(排除 fork)<br>完整跑:103 / 1 failed</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <h2>結論一覽</h2>
+    <p class="sec-note">17 條經過自我反駁的findings,依 quorum 支持度與嚴重度分為三級。「支持度」是獨立得出同一結論的視角數量。</p>
+    <div class="tally">
+      <div class="high"><span class="n">5</span><span class="k">High · 需升級定奪</span></div>
+      <div class="mid"><span class="n">8</span><span class="k">Mid · 已確認</span></div>
+      <div class="low"><span class="n">4</span><span class="k">Low · 註記</span></div>
+      <div><span class="n">19</span><span class="k">Quorum 群組</span></div>
+      <div><span class="n">8/16</span><span class="k">變異體存活</span></div>
+    </div>
+
+    <div class="callout">
+      <h3>先讀這段:本次審計的已知缺口</h3>
+      <ul>
+        <li><b>不變量閘沒跑。</b>marshal pack 對這個倉庫沒有任何 invariant binding(<code class="mono">invariants --repo referralvault</code> 回傳 <code class="mono">[]</code>),確定性的那一半完全沒有訊號,改用倉庫自己的 6 條 Foundry 不變量加上變異測試代替。</li>
+        <li><b>倉庫測試本身不是綠的。</b>104 條裡有 1 條失敗:主網 fork 的 <code class="mono">setUp</code> revert <code class="mono">TokenAlreadyStaged</code>,連續兩次重現。</li>
+        <li><b>一條計畫指令的 argv 與宣告不同</b>(用 <code class="mono">--no-match-contract</code> 取代 <code class="mono">--no-match-path</code>),已記錄為 deviation。</li>
+        <li><b>沒有記錄 finding-verdict。</b>high 等級的最終裁決屬於人,本次不代為記錄。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Findings</h2>
+    <p class="sec-note">17 條 findings 依 quorum 分為 escalate / confirmed,另有 2 條單一視角的 advisory。英文標題與 claim 是舉證原文(含實測數字),下方一行是中文摘要;<code class="mono">file:line</code> 即該條的定位。</p>
+
+    <div class="filters">
+      <span class="lbl">Filter</span>
+      <button class="chip" type="button" id="f-all" data-sev="all" aria-pressed="true">全部 19</button>
+      <button class="chip" type="button" id="f-high" data-sev="high" aria-pressed="false">High 5</button>
+      <button class="chip" type="button" id="f-mid" data-sev="mid" aria-pressed="false">Mid 8</button>
+      <button class="chip" type="button" id="f-low" data-sev="low" aria-pressed="false">Low 4</button>
+    </div>
+
+    <h3>升級定奪 — Escalate(5)</h3>
+    <div class="entries">
+
+      <article class="entry" data-sev="high">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <span class="key">F1</span><span class="sev high">High</span>
+            <span class="support">4 個視角獨立命中</span>
+          </div>
+          <h4>Epoch weight is assembled across transactions: one bag mints 1.5&times;&lceil;N/20&rceil; weight and the phantom accrual is banked permanently</h4>
+          <p class="gloss">週期權重是跨交易拼出來的。同一袋幣可鑄出 <b>1.5 × ⌈N/20⌉</b> 倍權重,而且 <code class="mono">_harvest</code> 在修正掃描縮回 share 之前就已把收益入帳,追不回來。</p>
+          <p class="claim">With &gt;20 bound traders the snapshot walks 20 per callback in separate transactions; a trader synced on page 1 can move the tokens to a page-2 wallet before <code>_sealEpoch</code> reads live <code>totalShares</code>. Measured <b>3.0&times; at seal, ~100% of the pot captured</b>; <code>_harvest</code> banks the accrual before the corrective walk shrinks the share, so it is not clawed back.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:240-264, 604-629, 415-429</span>
+            <span class="lenses"><span class="lens">prove-C</span><span class="lens">prove-D</span><span class="lens">econ-accounting</span><span class="lens">authz-griefing-liveness</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="high">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <span class="key">F2</span><span class="sev high">High</span>
+            <span class="support">4 個視角獨立命中</span>
+          </div>
+          <h4>trigger() callback exceeds the mandatory 2,000,000 gas cap on ordinary vault shapes</h4>
+          <p class="gloss">在「20 個持倉者各有一個 grand-referrer 且各有待生效增量」這種普通形狀下,回呼就已超過 Trigger Service 的 200 萬 gas 硬上限 —— OOG 後 cursor 零進度,<code class="mono">retryTrigger</code> 會確定性地重演同一個失敗。</p>
+          <p class="claim">20 traders each with an active grand-referrer and a pending increase: <b>2,475,580 gas</b> (prove-A) / <b>2,149,365 gas</b> with 20 cold grands, 2,039,817 without the top-up swap (prove-mutation). Verified OOG under the real cap with zero cursor progress; <code>retryTrigger</code> replays deterministically. Rule 008 section 4.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:245-249, 64</span>
+            <span class="lenses"><span class="lens">prove-A</span><span class="lens">prove-mutation</span><span class="lens">spec-conformance</span><span class="lens">authz-griefing-liveness</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="high">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <span class="key">F3</span><span class="sev high">High</span>
+            <span class="support">4 個視角獨立命中</span>
+          </div>
+          <h4>Free bind() makes epoch sealing cost &lceil;N/20&rceil; trigger fees paid from referrer revenue, and the resulting stall is silent</h4>
+          <p class="gloss">任何人都能免費 <code class="mono">bind()</code>,而 <code class="mono">_boundTraders</code> 只增不減,於是每期封盤要付 ⌈N/20⌉ 筆 Trigger 手續費、全從推薦人的收益扣。扣不動時 <code class="mono">_schedule</code> 不 revert 也不發事件,週期就這樣靜默停住,而且沒有理性的人會去救。</p>
+          <p class="claim"><code>_boundTraders</code> only ever grows; every continuation page pays a fresh fee from <code>pendingEpochQuote</code>/<code>feeReserve</code>. <b>N_breakeven = 20&times;R/fee.</b> When the fee cannot be debited <code>_schedule</code> returns with no revert and no event; cursor frozen, <code>pendingRequestId</code> 0, no rational rescuer (0.05 BNB spent to release 0.009 BNB).</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:171-182, 431-449, 457-470</span>
+            <span class="lenses"><span class="lens">prove-B</span><span class="lens">econ-accounting</span><span class="lens">spec-conformance</span><span class="lens">authz-griefing-liveness</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="high">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <span class="key">F4</span><span class="sev high">High</span>
+            <span class="support">2 個視角獨立命中</span>
+          </div>
+          <h4>isQuoteTokenSupported returns true for every token while the vault can only serve quotes with a live PancakeV2 WETH pair</h4>
+          <p class="gloss">工廠對任何報價幣都宣稱支援,但沒有 quote/WETH 池時補水永久 fail-closed、<code class="mono">requestSnapshot</code> revert、沒有任何週期封得起來,推薦人獎勵領不出來。VaultBaseV3「如實宣告」是 MUST,而 VaultPortal 在上線時就是照這個判斷的。</p>
+          <p class="claim">VaultBaseV3 <i>HOW TO IMPLEMENT</i> item 5 makes truthful declaration a MUST and the VaultPortal enforces it at launch. With no quote/WETH pair the top-up fails closed forever, <code>requestSnapshot</code> reverts, <b>no epoch ever seals and referrer rewards are unclaimable</b> unless a third party subsidises BNB every epoch.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:740-742</span>
+            <span class="lenses"><span class="lens">prove-G</span><span class="lens">spec-conformance</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="high">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <span class="key">F5</span><span class="sev high">High</span>
+            <span class="support">5 個視角獨立命中 · 最高支持度</span>
+          </div>
+          <h4>pendingAt semantics: a no-op sync wipes a nearly-matured HOLD_DELAY timer, and the timer is never re-armed for a new increase</h4>
+          <p class="gloss">同一處兩個缺陷。(a) <code class="mono">pendingAt[trader]=0</code> 寫在判斷「有沒有真的改到東西」的 guard <b>外面</b>,所以一次什麼都沒改的 sync 也會把差 1 秒到期的 24 小時計時器歸零,而競爭推薦人因此在封盤時獲利。(b) <code class="mono">pendingAt</code> 只在 <code class="mono">started==0</code> 時寫入,所以 1 wei + 1 天就先把時鐘上好膛,之後任何餘額都即時計入,HOLD_DELAY 形同虛設。</p>
+          <p class="claim">Two defects at one site. (a) <code>pendingAt[trader]=0</code> sits outside the guard, so a sync where <code>_applyWeights</code> early-returns still restarts a 23:59 timer; a competing referrer profits at seal. (b) <code>pendingAt</code> is only written when <code>started==0</code>, so <b>1 wei + 1 day</b> pre-arms the clock and any later balance is credited instantly, defeating HOLD_DELAY entirely.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:611-616, 618-624</span>
+            <span class="lenses"><span class="lens">prove-E</span><span class="lens">prove-C</span><span class="lens">prove-mutation</span><span class="lens">authz-griefing-liveness</span><span class="lens">marshal-orchestrator</span></span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <h3>已確認 — Confirmed(12)</h3>
+    <div class="entries">
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F6</span><span class="sev mid">Mid</span><span class="support">4 個視角獨立命中</span></div>
+          <h4>The fee-reserve top-up is a permissionless market order with no input-side slippage bound</h4>
+          <p class="gloss">補水是一筆無權限、系統定時的市價單,而 300bps 的價格衝擊檢查在代數上約掉了攻擊者操縱的那一側儲備;<code class="mono">amountOutMin</code> 恆真滿足,<code class="mono">deadline=block.timestamp</code> 從來不提供保護。</p>
+          <p class="claim">BSC fork against the real PancakeV2 router: attacker <b>drains 82.9% of the unsealed pot in one transaction for 737,449 gas</b>. The 300bps check reduces algebraically to <code>B/((reserveOut-B)*f)</code>, independent of the quote reserve the attacker manipulates; <code>amountOutMin</code> is tautologically satisfied; <code>deadline=block.timestamp</code> is never protective. Bounded by <code>feeReserveWatermark/maxTopupSwap</code> = 5 strikes.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:526, 533, 540-541, 547, 560-593</span>
+            <span class="lenses"><span class="lens">prove-H</span><span class="lens">spec-conformance</span><span class="lens">external-integration</span><span class="lens">authz-griefing-liveness</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F7</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>Uncaught reverts in the quote-token path wedge the trigger callback</h4>
+          <p class="gloss">報價幣路徑上有幾個呼叫不在任何 try/catch 覆蓋範圍內(包含 catch 區塊裡自己那份 <code class="mono">forceApprove</code>)。FiatToken 家族的 pause 會卡住管線,把金庫地址加進黑名單則是永久卡死。</p>
+          <p class="claim"><code>quote.forceApprove</code> (including the copy inside the catch block) and <code>quote.balanceOf</code> are outside any try/catch reachable from <code>trigger()</code>; a FiatToken-family pause wedges the pipeline and a blacklist of the vault address wedges it <b>permanently</b>. <code>quoteBefore - balanceOf</code> underflow at :543 sits in the try success body where the local catch cannot see it.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:539, 551, 555, 473, 543</span>
+            <span class="lenses"><span class="lens">prove-A</span><span class="lens">external-integration</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F8</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>Outflows decrement accountedQuote by the nominal amount instead of the measured balance delta</h4>
+          <p class="gloss">違反 VaultBaseV3 記帳規則 3。對任何「餘額不會剛好少掉 amount」的報價幣(外加手續費、rebase、管理員銷毀),baseline 會高過實際餘額,收入認列被壓制,最後一個領取者直接 revert。同一個檔案裡的兌換分支其實已經在量真實 delta —— 紀律不一致。</p>
+          <p class="claim"><code>claim()</code> and <code>claimCommission()</code> violate VaultBaseV3 accounting rule 3 for any quote whose balance does not fall by exactly <code>amount</code> (fee-charged-on-top, rebase, admin burn): baseline rises above balance, recognition is suppressed, and the <b>tail claimant reverts</b>. The swap branch at :543 already measures the real delta, so the discipline is applied inconsistently in one file.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:280-282, 165-166</span>
+            <span class="lenses"><span class="lens">prove-K</span><span class="lens">econ-accounting</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F9</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>The invariant campaign never exercises the fee-reserve, swap or fee-debit subsystem</h4>
+          <p class="gloss">整個 64×20 的 campaign 裡 Trigger 手續費一直是 0,<code class="mono">_topUpFeeReserve</code> 每次都在 <code class="mono">getFee()==0</code> 就提早返回。把整個兌換記帳刪掉,6 條不變量照樣全綠。</p>
+          <p class="claim">MockTriggerService fee stays 0 for the whole 64&times;20 campaign, so <code>_topUpFeeReserve</code> returns at the <code>getFee()==0</code> early exit. A <b>coverage poison inserted after that line survived 1280 calls</b>; the same poison one line earlier turned the suite red. Deleting the swap accounting entirely leaves all 6 invariants green.</p>
+          <div class="entry-foot">
+            <span class="loc">test/ReferralVault.invariants.t.sol:111-133</span>
+            <span class="lenses"><span class="lens">prove-mutation</span><span class="lens">test-validity</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F10</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>Three of the six invariants are one-sided, so referrer under-payment is invisible</h4>
+          <p class="gloss">守恆式寫成 <code class="mono">assertLe</code>,所以「只付推薦人 90%」可以通過整套不變量。全倉沒有任何地方對推薦人實收金額設下界。</p>
+          <p class="claim"><code>invariant_ClaimedNeverExceedsReferralInflow</code> is <code>assertLe</code>, so <b>paying referrers 90%</b> (at <code>claim()</code> or inside <code>_harvest</code>) survives the entire invariant suite. Nothing anywhere asserts a lower bound on what referrers receive.</p>
+          <div class="entry-foot">
+            <span class="loc">test/ReferralVault.invariants.t.sol:160-162</span>
+            <span class="lenses"><span class="lens">prove-mutation</span><span class="lens">test-validity</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F11</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>The mainnet-fork suite is red and non-reproducible by construction</h4>
+          <p class="gloss">唯一一套協議整合覆蓋(Rule 006,High)在跟線上主網狀態賽跑:fork 沒有釘 block,VanityHelper 的 salt 又是從 <code class="mono">block.number</code> 種出來的。</p>
+          <p class="claim"><code>setUp</code> reverts <code>TokenAlreadyStaged(0x03D6…7777)</code>, <b>reproduced on two consecutive runs</b>. <code>_forkBSCMainnet</code> calls <code>createSelectFork</code> with no pinned block and VanityHelper seeds its salt from <code>block.number</code>, so the only protocol-integration coverage races live mainnet state.</p>
+          <div class="entry-foot">
+            <span class="loc">test/ReferralVault.mainnet.t.sol:24-41 · test/FlapBSCFixture.sol:240-242</span>
+            <span class="lenses"><span class="lens">marshal-orchestrator</span><span class="lens">test-validity</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F12</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>Commission coverage is a mirror of the implementation, not an independent oracle</h4>
+          <p class="gloss">測試用 helper 重算了一遍生產公式,所以把佣金砍半、helper 一起改,98 條裡有 97 條照樣綠。真正釘住 Rule 002 的只有兩個硬寫字面值的斷言。</p>
+          <p class="claim"><code>_comm()</code>/<code>_net()</code> recompute the production formula across ~56 call sites. <b>Halving the commission in both production and helper leaves 97 of 98 tests green</b>; only two hardcoded literal assertions pin Rule 002 at all.</p>
+          <div class="entry-foot">
+            <span class="loc">test/ReferralVault.t.sol:83-91</span>
+            <span class="lenses"><span class="lens">prove-mutation</span><span class="lens">test-validity</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="low">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F13</span><span class="sev low">Low</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>The WBNB-quote top-up branch can never succeed</h4>
+          <p class="gloss">BSC 的 <code class="mono">WBNB.withdraw</code> 用 <code class="mono">transfer()</code>(2300 gas stipend,已由反組譯驗證),而金庫的 <code class="mono">receive()</code> 實測至少需要 2326 gas,所以這個分支永遠 OOG、被 catch、回 false。目前不可達:線上 Portal 的 WBNB <code class="mono">enabled=0</code>。</p>
+          <p class="claim">BSC <code>WBNB.withdraw</code> uses <code>transfer()</code> (2300 stipend, verified by disassembly: single <code>CALL</code> with <code>PUSH2 0x08fc</code>); the vault <code>receive()</code> needs a measured minimum of <b>2326 gas</b>, so the branch always OOGs, catches and returns false. Currently unreachable: the live Portal has WBNB <code>enabled=0</code>.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:504-519, 151-153</span>
+            <span class="lenses"><span class="lens">prove-F</span><span class="lens">external-integration</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="mid">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F14</span><span class="sev mid">Mid</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>The Guardian beacon upgrade is the only recovery path, is beacon-wide, and lockVaultUpgrades destroys it irreversibly</h4>
+          <p class="gloss">已做出完整往返驗證:一個佈局相容的救援實作確實能解開卡死的金庫,但升級會換掉同一 beacon 下<b>每一個</b>金庫的程式碼,Guardian 是 Flap 的地址而不是部署者的,而 <code class="mono">renounceOwnership</code> 之後連 Guardian 都被鎖在門外。Rule 009 豁免 proxy 金庫的本地緊急控制,正是因為它們倚賴這條路。</p>
+          <p class="claim">Demonstrated round trip: a layout-compatible rescue implementation clears a wedged vault, but the upgrade swaps code for <b>every vault under the same beacon</b>, the Guardian is Flap's address not the deployer's, and after <code>renounceOwnership</code> even the Guardian is locked out. Rule 009 exempts proxy vaults from local emergency controls precisely because they lean on this.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:779-787</span>
+            <span class="lenses"><span class="lens">prove-A</span><span class="lens">external-integration</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="low">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F15</span><span class="sev low">Low</span><span class="support">3 個視角獨立命中</span></div>
+          <h4>taxRateBps is cached once and never refreshed</h4>
+          <p class="gloss">佣金終生以第一次讀到的 <code class="mono">taxRate()</code> 快照計算。這點與規格參考虛擬碼一致(它也只快取一次),所以這是忠實度註記,不是規格違反。</p>
+          <p class="claim">Commission is computed against a one-time snapshot of <code>taxRate()</code> for the vault lifetime. <b>Matches the spec reference pseudocode, which also caches once</b>, so this is a fidelity note rather than a spec violation.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:401-413</span>
+            <span class="lenses"><span class="lens">spec-conformance</span><span class="lens">econ-accounting</span><span class="lens">external-integration</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="low">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F16</span><span class="sev low">Low</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>Monolingual revert reason violates Rule 004</h4>
+          <p class="gloss"><code class="mono">FreeCoinBeacon._validateBeforeLaunch</code> 回傳一條純英文字面值。已查證這是全倉<b>唯一</b>一條非雙語的使用者可見字串 —— 範圍明確、修起來便宜。</p>
+          <p class="claim"><code>FreeCoinBeacon._validateBeforeLaunch</code> returns a bare English literal; <b>verified as the only non-bilingual user-facing string in the repo</b>.</p>
+          <div class="entry-foot">
+            <span class="loc">src/FreeCoinBeacon.sol:262</span>
+            <span class="lenses"><span class="lens">spec-conformance</span><span class="lens">marshal-orchestrator</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="low">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">F17</span><span class="sev low">Low</span><span class="support">2 個視角獨立命中</span></div>
+          <h4>nextEpochAt rebases on block.timestamp so epochs are skipped rather than caught up</h4>
+          <p class="gloss">停擺 11 天只產出 2 個週期、漂移 9 天。一個 <code class="mono">EpochSealed</code> 事件可能靜默代表 30 天的收入 —— 下游任何按事件計算週期的統計都會失真。</p>
+          <p class="claim"><code>_sealEpoch</code> sets <code>nextEpochAt = block.timestamp + EPOCH_INTERVAL</code>; <b>11 days of stalls produced 2 epochs and 9 days of drift</b>. One <code>EpochSealed</code> can silently represent 30 days.</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:415-429</span>
+            <span class="lenses"><span class="lens">prove-B</span><span class="lens">econ-accounting</span></span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <h3>單一視角建議 — Advisory(2)</h3>
+    <p class="sec-note" style="margin-bottom:14px">只有一個視角提出、未經第二方獨立重現,因此不列入 17 條 findings,但保留備查。</p>
+    <div class="entries">
+
+      <article class="entry" data-sev="adv">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">ADV-1</span><span class="sev adv">Advisory</span><span class="support">1 個視角</span></div>
+          <h4>vaultUISchema omits 9 user-triggerable methods incl. fundFeeReserve / requestSnapshot</h4>
+          <p class="gloss">UI schema 只宣告了一部分使用者可觸發的方法,<code class="mono">fundFeeReserve</code>、<code class="mono">requestSnapshot</code> 等 9 個沒有出現在前端可見的介面描述裡。</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:318</span>
+            <span class="lenses"><span class="lens">spec-conformance</span></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="entry" data-sev="adv">
+        <div class="stripe"></div>
+        <div class="entry-body">
+          <div class="entry-head"><span class="key">ADV-2</span><span class="sev adv">Advisory</span><span class="support">1 個視角</span></div>
+          <h4>claimCommission has no insolvency clamp unlike claim()</h4>
+          <p class="gloss"><code class="mono">claim()</code> 會把領取額夾限在 <code class="mono">referralReserve</code> 之內,<code class="mono">claimCommission()</code> 沒有對應的夾限就直接扣 <code class="mono">accountedQuote</code>。</p>
+          <div class="entry-foot">
+            <span class="loc">src/ReferralVault.sol:165</span>
+            <span class="lenses"><span class="lens">econ-accounting</span></span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>被反駁的假說</h2>
+    <p class="sec-note">一份只列「找到什麼」的審計是不完整的。以下 9 條被提出、被追查,然後被證據殺掉。反駁同樣要舉證 —— 其中一條是我自己先前的判斷被推翻。</p>
+    <div class="refuted">
+      <div class="ref"><h4><span class="mark">✕</span>自推 150% 是漏洞</h4><p>那是文件化、且被作者單元測試(<code class="mono">test_FourCycle_…</code>)明確祝福的設計。真正該說的是:<code class="mono">share</code> 記給推薦人而非持幣人,所以自推是<b>優勢策略</b>,不懂這個技巧的推薦人每期被靜默課走 1000 bps。經濟設計註記,不是漏洞。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>沒有 storage gap ⇒ 升級不安全</h4><p><code class="mono">ReentrancyGuardUpgradeable</code> 自帶 <code class="mono">uint256[49] __gap</code>,而 <code class="mono">ReferralVaultUpgradeable</code> 是最末端合約,新變數往後追加本來就安全。葉節點不需要 gap。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>4 跳以上的推薦環是漏洞</h4><p><code class="mono">bind</code> 的環檢查擋 2 跳與 3 跳、放行 ≥4 跳,但作者的 <code class="mono">test_FourCycle_…</code> / <code class="mono">test_FiveCycle_…</code> 明確接受它;鏈上只走一跳,不會無限迴圈。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>單頁(N ≤ 20)也能重複計數</h4><p>同步迴圈與 <code class="mono">_sealEpoch</code> 在同一筆交易,中間無攻擊者可達的外部呼叫;且 <code class="mono">IERC20.balanceOf</code> 是 <code class="mono">external view</code>,solc 發 STATICCALL —— 用刻意非 view 的惡意稅幣實測,SSTORE 一個都寫不進去。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span><code class="mono">_applyWeights</code> 會下溢</h4><p><code class="mono">referrerOf</code> 一次寫定,<code class="mono">hasGrand</code> 不會 true→false 翻轉,每個持倉者的貢獻永遠記在同一個推薦人頭上。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>swap 中途重入會重複計數</h4><p><code class="mono">_topUpFeeReserve</code> 先跑 <code class="mono">_syncRevenue()</code>,兌換途中餘額已低於基準線,重入的 <code class="mono">_syncRevenue</code> 空轉。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>三處算術溢位 / 下溢</h4><p>watermark 減法被 <code class="mono">:476</code> 的提前 return 擋住;<code class="mono">received</code> 不會下溢(金庫兌換期間不外送原生幣);<code class="mono">amountIn * 10_000</code> 被 <code class="mono">:533</code> 的 <code class="mono">amountIn &le; pendingEpochQuote</code> 上界擋住 —— 最後這條是<b>潛伏</b>洞,上界一旦放寬就活化。</p></div>
+      <div class="ref"><h4><span class="mark">✕</span>典型 FOT 代幣會打破基準線</h4><p>反射型(稅從轉帳額<b>內</b>扣)實測 <code class="mono">accountedQuote == balanceOf</code> 完全吻合。原假說的機制敘述是錯的;真正會壞的是「稅外加」與 rebase 兩類,已收斂進 F8。</p></div>
+      <div class="ref caveat"><h4><span class="mark">⚠</span>稅幣黑名單會楔死走查</h4><p>機制成立但前提存疑:Flap V3 稅幣是固定 impl 的 clone,介面上沒有暫停 / 黑名單。永久版本屬低機率高衝擊;真正高機率的是同一迴圈的 gas 版本(F2)。舉證 agent 自己標註了這個限制,沒有把它算成 confirmed。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>與倉庫內既有 AI 審計報告的對照</h2>
+    <p class="sec-note">倉庫裡附了一份 <code class="mono">audit_cursor_grok_4.6.md</code>,結論是 <b>0 Critical / 0 High / 0 Medium、Rules 001–010 全 PASS、「58 passed」</b>。逐條核對後不成立。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>它的結論</th><th>本次的實測</th></tr></thead>
+        <tbody>
+          <tr><td>Rule 008 判 PASS</td><td>2M gas 上限在普通配置下被實測超過(F2),並在真實上限下驗證 OOG</td></tr>
+          <tr><td>Rule 006 判 PASS</td><td>那套 fork 測試現在是紅的,且結構上不可重現(F11)</td></tr>
+          <tr><td>Rule 003 判 PASS</td><td>無許可補水可被單筆交易抽走 82.9% 的獎池(F6)</td></tr>
+          <tr><td>Rule 004 判 PASS</td><td>有一條單語字串(F16)</td></tr>
+          <tr><td>「Unit + invariant tests: 58 passed」</td><td>58 只等於 <code class="mono">ReferralVault.t.sol</code> 一個檔;全倉 109 條測試中有 51 條不在這個數字裡</td></tr>
+          <tr><td>佣金公式出處標為 Rule 002</td><td>Rule 002 全文只有 7 行、完全沒有佣金條款,公式在 <b>Rule 001</b>(公式本身與實作一致,這點它是對的)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>建議修復優先序</h2>
+    <p class="sec-note">依「一處修改關掉幾條發現」排序,不是依嚴重度排序。</p>
+    <ol class="fixes">
+      <li><b>封盤權重必須與走查原子化。</b>走查過程中累加「每頁凍結的權重和」,<code class="mono">_sealEpoch</code> 用那個和,而不是封盤當下的 <code class="mono">totalShares</code>。一招同時關掉 F1 的兩種形態。</li>
+      <li><b><code class="mono">_syncHolding</code> 包 try/catch 並提供退場機制</b>;<code class="mono">SNAPSHOT_PAGE</code> 改成依 <code class="mono">gasleft()</code> 自適應(目前實測最壞 2.48M vs 2.00M 上限)。關掉 F2 與 F7 的一部分。</li>
+      <li><b><code class="mono">bind()</code> 加成本</b>(小額費用或要求非零稅幣餘額),走查只遍歷有權重的地址;<code class="mono">_debitTriggerFee</code> 失敗時<b>發事件</b>,讓靜默停擺變成可觀測。關掉 F3。</li>
+      <li><b><code class="mono">isQuoteTokenSupported</code> 改成誠實列舉</b>(<code class="mono">quote == address(0) || _hasViableWethPair(quote)</code>)。這一行同時收掉 F4 與 F8 的可達性。</li>
+      <li><b><code class="mono">pendingAt[trader] = 0</code> 移進真正下調的分支</b>(只在 <code class="mono">live &lt; applied</code> 時),並讓計時器對「新增量」重新武裝。關掉 F5 的兩個缺陷。</li>
+      <li><b>補水改成綁定輸入端</b>:<code class="mono">swapTokensForExactETH</code> ＋ 來自 TWAP / 預言機的 <code class="mono">amountInMax</code>。調 <code class="mono">MAX_PRICE_IMPACT_BPS</code> 沒用 —— 它在代數上看不到被操縱的那一側。關掉 F6。</li>
+      <li><b>測試面</b>:invariant handler 要設非零 trigger fee、要有 fund/topUp 動作、actor 數要能超過 <code class="mono">SNAPSHOT_PAGE</code>;補一條<b>下界</b>不變量;gas 閘要跑 <code class="mono">hasGrand</code> ＋冷儲存的最壞路徑;fork 測試釘 block。關掉 F9 / F10 / F11 / F12。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>方法與執行紀錄</h2>
+    <p class="sec-note">四個階段,外加外部掃描與變異測試。「completeness barrier」是指:在所有視角都回報之前不下任何結論。</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>階段</th><th>狀態</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">closure</td><td><span class="st pass">complete</span></td><td>以 ReferralVault / FreeCoinV3Beacon / FreeCoinBeacon 三份產品合約建立 closure bundle,其餘附檔案地圖(截斷已記錄)。</td></tr>
+          <tr><td class="mono">scout</td><td><span class="st pass">complete</span></td><td>5/5 視角全數回報,遵守 completeness barrier,共 54 條原始假設。</td></tr>
+          <tr><td class="mono">prove</td><td><span class="st pass">complete</span></td><td>8 個舉證 agent 全數回報;每條 CONFIRMED 都帶可重跑的 Foundry 觸發器,每個 agent 都跑過一輪自我反駁。</td></tr>
+          <tr><td class="mono">invariant</td><td><span class="st deg">degraded</span></td><td>marshal pack 對本倉庫沒有 invariant binding,確定性閘未執行;改用倉庫自身的 6 條 Foundry 不變量 + 變異測試代替。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>指令與掃描</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>項目</th><th>狀態</th><th>結果</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">forge build</td><td><span class="st pass">pass</span></td><td class="mono">exit 0</td></tr>
+          <tr><td class="mono">forge test(排除 fork)</td><td><span class="st deg">degraded</span></td><td>98 passed / 0 failed。<b>ARGV deviation</b>:實跑 <code>--no-match-contract "Mainnet|Robinhood"</code>,非計畫中的 <code>--no-match-path</code>。完整跑 103 passed / 1 failed。</td></tr>
+          <tr><td class="mono">forge test 不變量套件</td><td><span class="st pass">pass</span></td><td class="mono">exit 0 · 6 invariants · 64 runs × depth 20</td></tr>
+          <tr><td class="mono">slither</td><td><span class="st done">complete</span></td><td>106 findings。1 locked-ether(未使用的介面檔)、2 reentrancy-no-eth、14 incorrect-equality 判為雜訊;僅 WETH withdraw 分支升格為 F13。</td></tr>
+          <tr><td class="mono">mutation testing</td><td><span class="st done">complete</span></td><td>16 個變異體:<b>8 killed / 8 survived</b>。樹已還原並以 md5 + <code>diff -r</code> 驗證位元相同,<code>forge clean</code> 後重新確認 baseline 98 passed。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>視角清單</h3>
+    <p class="sec-note" style="margin-bottom:12px">pack 自帶的視角組是 Cowboy 專用、不適用於本倉庫,改用以倉庫自身規格(<code class="mono">.agents/skills/flap-vault-spec-checker</code>)為基礎的領域視角。5/5 全數回報,無遺漏。</p>
+    <div class="filters" style="margin-bottom:0">
+      <span class="lens">econ-accounting</span>
+      <span class="lens">authz-griefing-liveness</span>
+      <span class="lens">spec-conformance</span>
+      <span class="lens">external-integration-upgradeability</span>
+      <span class="lens">test-validity</span>
+    </div>
+  </section>
+
+  <footer>
+  <p style="margin:0 0 8px">線上版(私有 Artifact):<a href="https://claude.ai/artifact/SuviwU8wfykbKPDW5LpETj">claude.ai/artifact/SuviwU8wfykbKPDW5LpETj</a>。本檔是該報告的存檔副本,內容一致。</p>
+    <p><b>這份報告不是最終裁決。</b>5 條 high 的處置屬於人的判斷,本次審計刻意不代為記錄 finding-verdict。</p>
+    <p>證據路徑(probe4 為例):<code class="mono">scratchpad/probe4/test/MarshalProbe.t.sol</code> · <code class="mono">scratchpad/probe4_output.log</code>。重跑:<code class="mono">forge test --match-path test/MarshalProbe.t.sol -vv</code>。主樹 <code class="mono">/home/ubuntu/workspace/ReferralVault-main</code> 全程唯讀,未被修改。</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'));
+  var entries = Array.prototype.slice.call(document.querySelectorAll('.entry'));
+  function apply(sev){
+    entries.forEach(function(el){
+      el.hidden = !(sev === 'all' || el.getAttribute('data-sev') === sev);
+    });
+    // hide a group heading + list when nothing in it is visible
+    document.querySelectorAll('.entries').forEach(function(list){
+      var anyVisible = Array.prototype.some.call(list.children, function(c){ return !c.hidden; });
+      list.hidden = !anyVisible;
+      var h = list.previousElementSibling;
+      if (h && h.tagName === 'H3') h.hidden = !anyVisible;
+    });
+    chips.forEach(function(c){
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-sev') === sev));
+    });
+  }
+  chips.forEach(function(c){
+    c.addEventListener('click', function(){ apply(c.getAttribute('data-sev')); });
+  });
+})();
+</script>
+</body>
+</html>
