@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ReferralVault 深審報告</title>
+<title>ReferralVault Marshal 深審報告</title>
 <style>
   :root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
   img{max-width:100%}
@@ -267,11 +267,12 @@
 <div class="wrap">
 
   <header class="masthead">
-    <p class="eyebrow">Flap V3 Vault · 深度安全審計 · 2026-09-23</p>
-    <h1>ReferralVault 深審報告</h1>
+    <p class="eyebrow">Marshal Gate · Flap V3 Vault · 深度安全審計 · 2026-09-23</p>
+    <h1>ReferralVault Marshal 深審報告</h1>
     <p class="subtitle">
-      對 <code class="mono">ReferralVault-main</code> 的多視角深審:5 條掃描視角、8 個舉證 agent、
-      16 個變異體,外加 Slither 與倉庫自身的 Foundry 不變量測試。所有 CONFIRMED 結論都帶一個可重跑的 Foundry 觸發器。
+      <b>Marshal</b> 四階段閘(closure → scout → prove → invariant)對 <code class="mono">ReferralVault-main</code>
+      的多視角深審:5 條掃描視角、8 個舉證 agent、16 個變異體,外加 Slither 與倉庫自身的 Foundry 不變量測試。
+      所有 CONFIRMED 結論都帶一個可重跑的 Foundry 觸發器;每條發現都經過一輪自我反駁。
     </p>
     <div class="verdict-row">
       <span class="verdict">審查結論 <b>ESCALATE</b></span>
@@ -279,6 +280,7 @@
     </div>
 
     <dl class="prov">
+      <div><dt>Gate</dt><dd>Marshal · 4 階段<br>closure / scout / prove / invariant</dd></div>
       <div><dt>Change ref</dt><dd>e0477910…f047b7<br>sha256 內容摘要(非 git checkout)</dd></div>
       <div><dt>Toolchain</dt><dd>forge 1.7.1 · solc 0.8.26<br>evm cancun · optimizer 99999</dd></div>
       <div><dt>Worktree</dt><dd>唯讀主樹 + 8 份隔離副本<br>probe1…probe8</dd></div>
@@ -300,7 +302,7 @@
     <div class="callout">
       <h3>先讀這段:本次審計的已知缺口</h3>
       <ul>
-        <li><b>不變量閘沒跑。</b>marshal pack 對這個倉庫沒有任何 invariant binding(<code class="mono">invariants --repo referralvault</code> 回傳 <code class="mono">[]</code>),確定性的那一半完全沒有訊號,改用倉庫自己的 6 條 Foundry 不變量加上變異測試代替。</li>
+        <li><b>不變量閘沒跑。</b>Marshal pack 對這個倉庫沒有任何 invariant binding(<code class="mono">invariants --repo referralvault</code> 回傳 <code class="mono">[]</code>),確定性的那一半完全沒有訊號,改用倉庫自己的 6 條 Foundry 不變量加上變異測試代替。</li>
         <li><b>倉庫測試本身不是綠的。</b>104 條裡有 1 條失敗:主網 fork 的 <code class="mono">setUp</code> revert <code class="mono">TokenAlreadyStaged</code>,連續兩次重現。</li>
         <li><b>一條計畫指令的 argv 與宣告不同</b>(用 <code class="mono">--no-match-contract</code> 取代 <code class="mono">--no-match-path</code>),已記錄為 deviation。</li>
         <li><b>沒有記錄 finding-verdict。</b>high 等級的最終裁決屬於人,本次不代為記錄。</li>
@@ -662,8 +664,8 @@
   </section>
 
   <section>
-    <h2>方法與執行紀錄</h2>
-    <p class="sec-note">四個階段,外加外部掃描與變異測試。「completeness barrier」是指:在所有視角都回報之前不下任何結論。</p>
+    <h2>Marshal 閘:方法與執行紀錄</h2>
+    <p class="sec-note">Marshal 的四個階段,外加外部掃描與變異測試。「completeness barrier」是 Marshal 的硬規則:在所有視角都回報之前不下任何結論。</p>
 
     <div class="tbl-wrap">
       <table>
@@ -672,7 +674,7 @@
           <tr><td class="mono">closure</td><td><span class="st pass">complete</span></td><td>以 ReferralVault / FreeCoinV3Beacon / FreeCoinBeacon 三份產品合約建立 closure bundle,其餘附檔案地圖(截斷已記錄)。</td></tr>
           <tr><td class="mono">scout</td><td><span class="st pass">complete</span></td><td>5/5 視角全數回報,遵守 completeness barrier,共 54 條原始假設。</td></tr>
           <tr><td class="mono">prove</td><td><span class="st pass">complete</span></td><td>8 個舉證 agent 全數回報;每條 CONFIRMED 都帶可重跑的 Foundry 觸發器,每個 agent 都跑過一輪自我反駁。</td></tr>
-          <tr><td class="mono">invariant</td><td><span class="st deg">degraded</span></td><td>marshal pack 對本倉庫沒有 invariant binding,確定性閘未執行;改用倉庫自身的 6 條 Foundry 不變量 + 變異測試代替。</td></tr>
+          <tr><td class="mono">invariant</td><td><span class="st deg">degraded</span></td><td>Marshal pack 對本倉庫沒有 invariant binding,確定性閘未執行;改用倉庫自身的 6 條 Foundry 不變量 + 變異測試代替。</td></tr>
         </tbody>
       </table>
     </div>
@@ -703,8 +705,7 @@
   </section>
 
   <footer>
-  <p style="margin:0 0 8px">線上版(私有 Artifact):<a href="https://claude.ai/artifact/SuviwU8wfykbKPDW5LpETj">claude.ai/artifact/SuviwU8wfykbKPDW5LpETj</a>。本檔是該報告的存檔副本,內容一致。</p>
-    <p><b>這份報告不是最終裁決。</b>5 條 high 的處置屬於人的判斷,本次審計刻意不代為記錄 finding-verdict。</p>
+    <p><b>這份報告不是最終裁決。</b>Marshal 的規則是:5 條 high 的處置屬於人的判斷,閘本身刻意不代為記錄 finding-verdict。</p>
     <p>證據路徑(probe4 為例):<code class="mono">scratchpad/probe4/test/MarshalProbe.t.sol</code> · <code class="mono">scratchpad/probe4_output.log</code>。重跑:<code class="mono">forge test --match-path test/MarshalProbe.t.sol -vv</code>。主樹 <code class="mono">/home/ubuntu/workspace/ReferralVault-main</code> 全程唯讀,未被修改。</p>
   </footer>
 </div>
