@@ -1,0 +1,52 @@
+# Temporary probe for Avenor (Step 0) — NOT for merge; the PR is closed after one run.
+# Question: on a `pull_request`-triggered run, which commit does the GitHub Actions OIDC
+# token's `sha` claim name — the PR head commit, or the synthetic merge commit?
+# Prints only decoded, non-secret claims. The raw token is never printed.
+name: avenor-oidc-probe
+on:
+  pull_request:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decode OIDC claims and compare with the PR head
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, urllib.request
+
+          def get(url, auth):
+              req = urllib.request.Request(url, headers={
+                  "Authorization": auth, "Accept": "application/vnd.github+json"})
+              return json.load(urllib.request.urlopen(req))
+
+          tok = get(os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"] + "&audience=avenor",
+                    "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"])["value"]
+          seg = tok.split(".")[1]
+          claims = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
+          keep = ["iss", "aud", "sub", "event_name", "repository", "ref", "ref_type", "sha",
+                  "head_ref", "base_ref", "workflow_ref", "job_workflow_ref"]
+          print("OIDC claims:", json.dumps({k: claims.get(k) for k in keep}, indent=2))
+
+          head, sha = os.environ["PR_HEAD_SHA"], claims.get("sha")
+          print("GITHUB_SHA              =", os.environ["GITHUB_SHA"])
+          print("GITHUB_REF              =", os.environ["GITHUB_REF"])
+          print("PR head.sha             =", head)
+          print("PR base.sha             =", os.environ["PR_BASE_SHA"])
+          print("PR number               =", os.environ["PR_NUMBER"])
+          print("OIDC sha == PR head     :", sha == head)
+          print("OIDC sha == GITHUB_SHA  :", sha == os.environ["GITHUB_SHA"])
+
+          commit = get(f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/commits/{sha}",
+                       "Bearer " + os.environ["GH_TOKEN"])
+          parents = [p["sha"] for p in commit.get("parents", [])]
+          print("parents of OIDC sha     :", parents)
+          print("PR head is a parent     :", head in parents)
+          PY
