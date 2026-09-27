@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReferralVault 複審報告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+:root {
+  --ground: #F1F4F3;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9F8;
+  --ink: #15212A;
+  --ink-2: #3B4852;
+  --muted: #66737C;
+  --rule: #D8DEDC;
+  --rule-strong: #BFC8C5;
+  --accent: #1C5CAB;
+  --accent-soft: #E4EDF8;
+  --bar: #2a78d6;
+  --bad: #d03b3b;
+  --grid: #E3E8E6;
+  --high: #B42318;
+  --high-bg: #FBEAE8;
+  --mid: #8A5300;
+  --mid-bg: #FBF0DC;
+  --low: #45535E;
+  --low-bg: #E8EDF0;
+  --ok: #1F7040;
+  --ok-bg: #E2F2E8;
+  --code-bg: #EDF1EF;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-head: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0E1316;
+    --surface: #151C20;
+    --surface-2: #111719;
+    --ink: #E6ECEE;
+    --ink-2: #C4CED3;
+    --muted: #93A1A9;
+    --rule: #27323A;
+    --rule-strong: #384650;
+    --accent: #6DA7EC;
+    --accent-soft: #17283B;
+    --bar: #3987e5;
+    --bad: #e06666;
+    --grid: #222C33;
+    --high: #F4897E;
+    --high-bg: #3A1C19;
+    --mid: #E6B462;
+    --mid-bg: #33270F;
+    --low: #AAB7C0;
+    --low-bg: #1E282E;
+    --ok: #71C492;
+    --ok-bg: #13291C;
+    --code-bg: #1B2429;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0E1316;
+  --surface: #151C20;
+  --surface-2: #111719;
+  --ink: #E6ECEE;
+  --ink-2: #C4CED3;
+  --muted: #93A1A9;
+  --rule: #27323A;
+  --rule-strong: #384650;
+  --accent: #6DA7EC;
+  --accent-soft: #17283B;
+  --bar: #3987e5;
+  --bad: #e06666;
+  --grid: #222C33;
+  --high: #F4897E;
+  --high-bg: #3A1C19;
+  --mid: #E6B462;
+  --mid-bg: #33270F;
+  --low: #AAB7C0;
+  --low-bg: #1E282E;
+  --ok: #71C492;
+  --ok-bg: #13291C;
+  --code-bg: #1B2429;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0;
+  padding-inline: 16px;
+  padding-block: 28px 64px;
+}
+.page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--font-head); text-wrap: balance; color: var(--ink); margin: 0; }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; font-weight: 700; letter-spacing: 0.01em; }
+h2 { font-size: 24px; line-height: 1.3; font-weight: 700; }
+h3 { font-size: 18px; line-height: 1.4; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; word-break: break-word; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* header */
+.masthead { display: flex; flex-direction: column; gap: 14px; padding-block: 8px 4px; }
+.masthead .sub { color: var(--ink-2); font-size: 16px; }
+.meta-line { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+
+.verdict {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px 22px;
+  align-items: start;
+}
+.stamp {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--high);
+  border: 2px solid var(--high);
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: center;
+  line-height: 1.4;
+}
+.stamp b { display: block; font-size: 20px; letter-spacing: 0.06em; }
+.verdict-body { display: flex; flex-direction: column; gap: 10px; }
+.verdict-body p { max-width: none; }
+.answers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.answer { background: var(--surface-2); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.answer .q { font-size: 12.5px; color: var(--muted); }
+.answer .a { font-weight: 700; font-size: 16px; line-height: 1.45; }
+.answer .d { font-size: 13.5px; color: var(--ink-2); line-height: 1.65; }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.tile .label { font-size: 12.5px; color: var(--muted); }
+.tile .value { font-family: var(--font-body); font-weight: 700; font-size: 26px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.tile .note { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+nav.toc a { font-size: 13.5px; text-decoration: none; color: var(--ink-2); border: 1px solid var(--rule); background: var(--surface); padding: 4px 10px; border-radius: 999px; }
+nav.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+section.block { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 24px 24px 26px; display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 16px; }
+section.block > header { display: flex; flex-direction: column; gap: 6px; }
+.lede { color: var(--ink-2); }
+.kv { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 8px 18px; margin: 0; }
+.kv dt { color: var(--muted); font-size: 13.5px; }
+.kv dd { margin: 0; }
+ul.plain { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+ul.plain li::marker { color: var(--muted); }
+
+.figure { display: flex; flex-direction: column; gap: 8px; }
+.figure .cap { font-size: 13.5px; color: var(--ink-2); }
+.viz-wrap { overflow-x: auto; }
+svg.viz { width: 100%; max-width: 780px; min-width: 560px; height: auto; display: block; font-family: var(--font-body); }
+svg.viz text { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+svg.viz .grid { stroke: var(--grid); stroke-width: 1; }
+svg.viz .tick { fill: var(--muted); font-size: 11px; font-family: var(--font-mono); }
+svg.viz .rowlabel { fill: var(--ink-2); font-size: 12.5px; }
+svg.viz .val { fill: var(--ink); font-size: 12px; font-family: var(--font-mono); }
+svg.viz .bar { fill: var(--bar); cursor: default; }
+svg.viz .bar.bad { fill: var(--bad); }
+svg.viz .bar:focus { outline: none; stroke: var(--ink); stroke-width: 1.5; }
+svg.viz .ref { stroke: var(--ink-2); stroke-width: 1.5; }
+svg.viz .ref.limit { stroke: var(--bad); stroke-width: 2; }
+svg.viz .reflabel { fill: var(--ink-2); font-size: 11.5px; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 300px; background: var(--ink); color: var(--surface); font-size: 12.5px; line-height: 1.5; padding: 7px 10px; border-radius: 6px; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { background: var(--surface-2); color: var(--ink-2); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+td .mono { white-space: nowrap; }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; line-height: 1; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.high { color: var(--high); background: var(--high-bg); }
+.pill.mid { color: var(--mid); background: var(--mid-bg); }
+.pill.low { color: var(--low); background: var(--low-bg); }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+
+.findings { display: flex; flex-direction: column; gap: 14px; }
+.finding { border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+.finding.high { border-color: color-mix(in srgb, var(--high) 45%, var(--rule)); }
+.finding .top { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.finding .id { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+.finding h3 { flex: 1 1 100%; }
+.finding .where { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+.finding .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.finding .grid2 > div { display: flex; flex-direction: column; gap: 4px; }
+.finding .h { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.finding p { max-width: none; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; }
+
+details { border: 1px solid var(--rule); border-radius: 8px; background: var(--surface-2); }
+details > summary { cursor: pointer; padding: 10px 14px; font-weight: 500; color: var(--ink-2); list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸ "; color: var(--muted); }
+details[open] > summary::before { content: "▾ "; }
+details > .inner { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 14px; }
+.callout p { max-width: none; }
+
+footer.foot { color: var(--muted); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+
+@media (max-width: 820px) {
+  .answers { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finding .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .verdict { grid-template-columns: 1fr; }
+  .stamp { justify-self: start; }
+  .tiles { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .kv dd { margin-bottom: 8px; }
+  section.block { padding: 18px 16px 20px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <div class="eyebrow">Marshal 深審 · run 105 · 2026-09-27</div>
+  <h1>ReferralVault 複審報告</h1>
+  <p class="sub">對照作者提交 <code>5f1fbc6</code> 的修正報告，把 F1–F17 逐條放回真實環境重測，並回答兩個問題：單頁 gas 會不會擊穿 2M，3 萬規模下的總費用與耗時是否可靠。</p>
+  <div class="meta-line">
+    <span>程式碼摘要 2e095a9c…e8c9（非 git，sha256 覆蓋 src/ test/ script/）</span>
+    <span>BSC mainnet fork · 線上 Flap Trigger Service</span>
+    <span>forge 1.7.1 · solc 0.8.26</span>
+  </div>
+</header>
+
+<section class="verdict" aria-label="判決">
+  <div class="stamp">判決<b>ESCALATE</b>仍有重大問題</div>
+  <div class="verdict-body">
+    <p><strong>不建議照目前版本上線。</strong>作者標為「已修」或「部分修」的 F1、F6 在真實環境下仍然打得穿，而且比報告寫的嚴重。F5 的修法另外帶進一個新 bug。這次也新發現一個問題：用 6 位小數報價幣（XAUt）的金庫，推薦人一毛都領不到。你特別問的兩點見下方三個格子；gas 目前沒有擊穿，但安全餘量只剩約 1.3 萬 gas。</p>
+    <p class="small muted">審計狀態為 degraded：Marshal 的分級、不變量閘與棘輪只綁定 Cowboy 倉庫，對這個獨立倉庫沒有訊號。改用倉內規格（Rule 001–010）當判準，並以真實環境實測、變異測試與可重現的 PoC 替代。所有高危結論都附有可執行的觸發測試。</p>
+  </div>
+</section>
+
+<div class="answers">
+  <div class="answer">
+    <div class="q">還有沒有重大問題？</div>
+    <div class="a">有，2 條高危已確認，外加 1 條新發現的高危</div>
+    <div class="d">F6 補水夾擊一次能抽走 90% 以上的未封盤獎池；F1 同一袋幣每期被重複計入 k 次；XAUt 金庫獎勵被截斷成 0。</div>
+  </div>
+  <div class="answer">
+    <div class="q">單頁會不會擊穿 2M？</div>
+    <div class="a">目前不會，但最壞頁只剩約 1.3 萬 gas</div>
+    <div class="d">續頁保留常數 120k 本身就小於實際排程成本 128.6k，能過全靠單人津貼沒用滿。Flap 的 Trigger Service 只要貴 1.3 萬以上就會開始出現 FAILED 頁。</div>
+  </div>
+  <div class="answer">
+    <div class="q">3 萬規模費用與耗時可靠嗎？</div>
+    <div class="a">平常日可以，重日與連續重日不可靠</div>
+    <div class="d">每期 469–3,334 頁、0.094–0.667 BNB、1–7 小時。ERC20 金庫的 0.6 BNB 水位最多撐 3,001 頁，補水每期上限約 0.2 BNB。</div>
+  </div>
+</div>
+
+<div class="tiles" aria-label="關鍵數字">
+  <div class="tile"><span class="label">最壞頁排程後剩餘</span><span class="value">≈13k gas</span><span class="note">2M 的 0.65%；封盤尾巴最緊剩 2.3 萬（FXIon 首次封盤）</span></div>
+  <div class="tile"><span class="label">30k 有權集每期頁數</span><span class="value">469–3,334</span><span class="note">每頁一筆 Trigger，0.0002 BNB</span></div>
+  <div class="tile"><span class="label">30k 每期耗時（實測延遲）</span><span class="value">1.0–7.1 h</span><span class="note">每頁中位數 7.65 秒（17 個區塊）</span></div>
+  <div class="tile"><span class="label">一次補水夾擊可抽走</span><span class="value">90.6%</span><span class="note">49 SPCXB 獎池，5 筆交易，攻擊者淨賺 7.60 BNB</span></div>
+</div>
+
+<nav class="toc" aria-label="目錄">
+  <a href="#gas">焦點一：單頁 2M gas</a>
+  <a href="#scale">焦點二：3 萬規模費用與耗時</a>
+  <a href="#findings">重大問題</a>
+  <a href="#crosscheck">修正報告逐條核對</a>
+  <a href="#tests">測試有效性</a>
+  <a href="#fixes">建議修法</a>
+  <a href="#method">方法與重現</a>
+</nav>
+
+<!-- ─────────────────────────── FOCUS 1 ─────────────────────────── -->
+<section class="block" id="gas">
+  <header>
+    <div class="eyebrow">焦點一</div>
+    <h2>單頁 gas 會不會擊穿 2M 上限</h2>
+    <p class="lede">不會在現況下擊穿：所有實測頁面都以 EXECUTED 結束。但保護它的不是 <code>GAS_RESERVE_CONTINUE</code>，而是單人同步從沒用滿 200k 津貼剩下的空間。這個空間小到 Flap 自己的服務升級就可能吃掉。</p>
+  </header>
+
+  <dl class="kv">
+    <dt>怎麼量的</dt>
+    <dd>BSC fork 上經 VaultPortal 發一顆真的 Flap V3 稅幣，由線上 backend 帳號 <code>0x80c8…152e</code> 透過線上 Trigger Service 呼叫回呼（交易 gas 2.2M、回呼拿到 2M）。用 <code>forge test --isolate</code> 讓每筆交易都是冷存儲，和正式環境一致。另用一份插了 <code>GasMark</code> 事件的副本讀出斷點剩餘與尾巴成本。</dd>
+    <dt>回呼實際可用</dt>
+    <dd>2M 進到金庫本體時剩 <span class="mono">1,951,304</span>：BeaconProxy 加上 delegatecall 的 1/64 規則先吃掉約 48.7k。</dd>
+    <dt>最重的單人路徑</dt>
+    <dd>隔代首次生效，且推薦人與隔代人第一次 harvest（6 個 0→非 0 寫入）：每人 <span class="mono">178.4k</span>，頁首第一人 <span class="mono">201.6k</span>，一頁 9 人。</dd>
+    <dt>續頁尾巴（排下一頁）</dt>
+    <dd><code>_schedule</code> 原生金庫 <span class="mono">127.6k</span>、ERC20 金庫 <span class="mono">128.1k</span>，其中 <code>getFee()</code> 冷呼叫 26.1k（含 VaultPortal inspect），<code>requestTrigger</code> 83.8k。</dd>
+    <dt>封盤尾巴（補水＋封盤＋再預約）</dt>
+    <dd>依報價幣不同：FXIon 首次封盤 <span class="mono">476,626</span>（離 500k 只剩 23k），SPCXB／QQQB 約 456.9k（剩 43k），USD1 429,670，USDC／DOGE 415,920，USDT／ETH／BTCB 409,851，ASTER 408,493；之後各期少 68.4k。封盤頁最後一人要求 700k 才開跑，所以只有「尾巴＋最後一人 &gt; 700k」才會失敗：最壞的 FXIon 首次封盤 476.6k＋201.6k＝678.2k，目前還有約 21.8k 餘量。</dd>
+  </dl>
+
+  <div class="figure">
+    <h3>續頁尾巴的 gas 帳</h3>
+    <div class="viz-wrap"><svg class="viz" viewBox="0 0 640 256" role="img" aria-label="續頁尾巴的 gas 帳：常數 120k、最壞剩餘 141.6k、實際需要 128.6k、Trigger 貴 40k 時 168.6k 超出" preserveAspectRatio="xMinYMin meet">
+<line class="grid" x1="8.0" y1="20" x2="8.0" y2="226" />
+<text class="tick" x="8.0" y="242" text-anchor="start">0k</text>
+<line class="grid" x1="138.0" y1="20" x2="138.0" y2="226" />
+<text class="tick" x="138.0" y="242" text-anchor="middle">50k</text>
+<line class="grid" x1="268.0" y1="20" x2="268.0" y2="226" />
+<text class="tick" x="268.0" y="242" text-anchor="middle">100k</text>
+<line class="grid" x1="398.0" y1="20" x2="398.0" y2="226" />
+<text class="tick" x="398.0" y="242" text-anchor="middle">150k</text>
+<line class="grid" x1="528.0" y1="20" x2="528.0" y2="226" />
+<text class="tick" x="528.0" y="242" text-anchor="middle">200k</text>
+<line class="ref edge" x1="376.2" y1="2" x2="376.2" y2="226" />
+<text class="reflabel" x="380.2" y="12" text-anchor="start">最壞剩餘 141.6k</text>
+<text class="rowlabel" x="8" y="40">常數保留 GAS_RESERVE_CONTINUE</text>
+<path class="bar " d="M8.0,46.0 H316.0 Q320.0,46.0 320.0,50.0 V58.0 Q320.0,62.0 316.0,62.0 H8.0 Z" data-tip="常數保留 120,000 gas（迴圈在最後一人開跑前只檢查 120k + 200k 津貼）" tabindex="0"><title>常數保留 120,000 gas（迴圈在最後一人開跑前只檢查 120k + 200k 津貼）</title></path>
+<text class="val" x="326.0" y="58.5">120k</text>
+<text class="rowlabel" x="8" y="90">最壞相位下的實際剩餘（320k − 最重一人 178.4k）</text>
+<path class="bar " d="M8.0,96.0 H372.2 Q376.2,96.0 376.2,100.0 V108.0 Q376.2,112.0 372.2,112.0 H8.0 Z" data-tip="最後一人開跑時 gasleft 剛好 320k，跑完最重的隔代首次生效（178.4k）後剩 141.6k" tabindex="0"><title>最後一人開跑時 gasleft 剛好 320k，跑完最重的隔代首次生效（178.4k）後剩 141.6k</title></path>
+<text class="val" x="382.2" y="108.5">141.6k</text>
+<text class="rowlabel" x="8" y="140">續頁排程實際需要（_schedule 127.6k + 返回）</text>
+<path class="bar " d="M8.0,146.0 H338.4 Q342.4,146.0 342.4,150.0 V158.0 Q342.4,162.0 338.4,162.0 H8.0 Z" data-tip="getFee 26.1k + requestTrigger 83.8k + 金庫內部 ~17.7k + 返回 ~1k" tabindex="0"><title>getFee 26.1k + requestTrigger 83.8k + 金庫內部 ~17.7k + 返回 ~1k</title></path>
+<text class="val" x="348.4" y="158.5">128.6k → 剩 ~13k</text>
+<text class="rowlabel" x="8" y="190">若 Flap Trigger 升級後貴 40k（模擬）</text>
+<path class="bar bad" d="M8.0,196.0 H442.4 Q446.4,196.0 446.4,200.0 V208.0 Q446.4,212.0 442.4,212.0 H8.0 Z" data-tip="用 gas shim 模擬 requestTrigger 多 40k：12 個相位裡 2 個頁面 FAILED" tabindex="0"><title>用 gas shim 模擬 requestTrigger 多 40k：12 個相位裡 2 個頁面 FAILED</title></path>
+<text class="val" x="452.4" y="208.5">168.6k → FAILED</text>
+</svg></div>
+    <p class="cap">迴圈只在最後一人開跑<strong>之前</strong>檢查 <code>gasleft() ≥ 120k + 200k</code>。這一人自己在津貼之外的開銷（冷讀、<code>balanceOf</code>、代理轉發）也從這 120k 裡扣。所以常數保留 120k 小於實際需要的 128.6k 也能過，靠的是最重一人只用了 178.4k，沒用滿津貼。</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>驗證</th><th class="num">相位／預算數</th><th class="num">FAILED</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>最重形狀 × 13 個相位（輕量前置 0–12 人）</td><td class="num">13</td><td class="num">0</td><td>最高交易層 gas 1,928,965（含 Trigger Service 本身）</td></tr>
+        <tr><td>gas 偵察：加倉、清倉形狀 × 回呼預算 1.5M–2.178M</td><td class="num">679 + 679</td><td class="num">0</td><td>每 1k 一格；ERC20 封盤頁另掃 371 格，也是 0</td></tr>
+        <tr><td>模擬 Trigger Service 升級，<code>requestTrigger</code> 多 40k</td><td class="num">12</td><td class="num">2</td><td>相位 8、9 的第二頁 FAILED；任何人用無上限的 <code>retryTrigger</code> 才解得開</td></tr>
+        <tr><td>Portal 白名單內 10 種 ERC20 報價幣 × 首次與後續封盤</td><td class="num">30</td><td class="num">0</td><td>封盤尾巴餘量 23k–160k，FXIon 最緊；pPOLY 池太淺不換匯</td></tr>
+        <tr><td>Flap 簽名放行的自訂報價幣：已畢業到 WBNB 主池的 Flap 稅幣（會抽賣出稅）</td><td class="num">3</td><td class="num">1</td><td>補水被收稅後 <code>Pancake: K</code> revert，白燒 358,767 gas；尾巴 632,678 &gt; 500k，第 10 個重型地址那頁 FAILED（原始碼、線上 backend 的 2.18M）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>為什麼倉內的 gas 測試看不到這件事</h3>
+  <ul class="plain">
+    <li><code>MockTriggerService.requestTrigger</code> 只有一個 <code>nonce++</code>，<code>getFee()</code> 只讀一個 slot，排程比線上便宜約 90k。</li>
+    <li>測試沒開 <code>--isolate</code>，前面 setup 碰過的 slot 在 <code>trigger()</code> 時都是暖的：25 人輕頁 316k，冷存儲是 645k。修正報告寫「冷存儲」不成立。</li>
+    <li>變異：把 <code>GAS_RESERVE_CONTINUE</code> 改成 0，106 條測試全綠。刪掉封盤前的 <code>gasleft() &lt; GAS_RESERVE_SEAL</code> 保護，四種測試環境都全綠。只有「線上成本的 mock＋<code>--isolate</code>」同時成立時才殺得掉。</li>
+    <li>在 <code>{gas: 2M}</code> 呼叫之後 <code>assertLe(gasUsed, 2_000_000)</code> 永遠成立；線上服務遇到 OOG 只標 FAILED、不 revert，而 fork 測試從不檢查 <code>status == EXECUTED</code>。</li>
+  </ul>
+
+  <h3>一旦 FAILED 會怎樣</h3>
+  <p>線上服務把回呼標為 FAILED，backend 交易本身不 revert，對同一個 id 再呼叫 <code>trigger</code> 也是空操作。金庫狀態回滾，<code>pendingRequestId</code> 還是那筆失敗的 id，於是 <code>requestSnapshot()</code> 一直 revert「快照已預約」。金庫沒有自己的解鎖路徑，只能等任何人呼叫服務的 <code>retryTrigger(id)</code>。實測 retry 沒有 gas 上限，給 10M 交易時回呼拿到 9.67M。</p>
+</section>
+
+<!-- ─────────────────────────── FOCUS 2 ─────────────────────────── -->
+<section class="block" id="scale">
+  <header>
+    <div class="eyebrow">焦點二</div>
+    <h2>3 萬規模下的總費用與耗時</h2>
+    <p class="lede">「3 萬」在這裡以被掃描的有權集 <code>_activeTraders</code>（有持倉或有待生效加倉的已綁定地址）計。推薦人本身不被掃描；如果是 3 萬個推薦人、每人名下有多個持倉下線，下面的頁數、費用和耗時按下線總數等比例放大。</p>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>單人形狀（冷存儲、真實環境）</th><th class="num">每人 gas</th><th class="num">每頁人數</th><th class="num">3 萬人頁數</th></tr></thead>
+      <tbody>
+        <tr><td>持倉沒變（跳過同步）</td><td class="num">16.3k–18.1k</td><td class="num">64（上限）</td><td class="num">469</td></tr>
+        <tr><td>待生效、還沒滿 1 天</td><td class="num">29.2k</td><td class="num">53</td><td class="num">567</td></tr>
+        <tr><td>一跳首次生效</td><td class="num">100.6k</td><td class="num">16</td><td class="num">1,875</td></tr>
+        <tr><td>隔代清倉（含移出有權集）</td><td class="num">113.4k</td><td class="num">14</td><td class="num">2,143</td></tr>
+        <tr><td>隔代首次生效（推薦人新）</td><td class="num">166.2k</td><td class="num">10</td><td class="num">3,000</td></tr>
+        <tr><td>隔代首次生效（推薦人已有份額）</td><td class="num">178.4k</td><td class="num">9</td><td class="num">3,334</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">驗證：640 個持倉沒變的地址經線上服務跑出 10 頁，正好 640 ÷ 64，和上表線性外推一致。</p>
+
+  <div class="figure">
+    <h3>3 萬有權集每期頁數，對照 ERC20 費用儲備能撐多少</h3>
+    <div class="viz-wrap"><svg class="viz" viewBox="0 0 640 372" role="img" aria-label="30k 有權集每期頁數：469 到 3,334 頁；可持續補水上限 1,000 頁，滿水位 3,001 頁" preserveAspectRatio="xMinYMin meet">
+<line class="grid" x1="8.0" y1="36" x2="8.0" y2="342" />
+<text class="tick" x="8.0" y="358" text-anchor="start">0</text>
+<line class="grid" x1="142.3" y1="36" x2="142.3" y2="342" />
+<text class="tick" x="142.3" y="358" text-anchor="middle">1,000</text>
+<line class="grid" x1="276.6" y1="36" x2="276.6" y2="342" />
+<text class="tick" x="276.6" y="358" text-anchor="middle">2,000</text>
+<line class="grid" x1="410.9" y1="36" x2="410.9" y2="342" />
+<text class="tick" x="410.9" y="358" text-anchor="middle">3,000</text>
+<line class="ref edge" x1="142.3" y1="2" x2="142.3" y2="342" />
+<text class="reflabel" x="146.3" y="12" text-anchor="start">可持續補水上限 1,000 頁/期</text>
+<line class="ref limit" x1="411.0" y1="18" x2="411.0" y2="342" />
+<text class="reflabel" x="407.0" y="28" text-anchor="end">0.6 BNB 滿水位只夠 3,001 頁</text>
+<text class="rowlabel" x="8" y="56">全部持倉未變</text>
+<path class="bar " d="M8.0,62.0 H67.0 Q71.0,62.0 71.0,66.0 V74.0 Q71.0,78.0 67.0,78.0 H8.0 Z" data-tip="30k 全部未變：每頁 64 人（SNAPSHOT_PAGE 上限）" tabindex="0"><title>30k 全部未變：每頁 64 人（SNAPSHOT_PAGE 上限）</title></path>
+<text class="val" x="77.0" y="74.5">469 頁 · 0.094 BNB · 1.0 h</text>
+<text class="rowlabel" x="8" y="106">典型日：80% 未變、12% 待生效、8% 生效或清倉</text>
+<path class="bar " d="M8.0,112.0 H88.2 Q92.2,112.0 92.2,116.0 V124.0 Q92.2,128.0 88.2,128.0 H8.0 Z" data-tip="混合形狀，按實測單人成本加總" tabindex="0"><title>混合形狀，按實測單人成本加總</title></path>
+<text class="val" x="98.2" y="124.5">627 頁 · 0.125 BNB · 1.3 h</text>
+<text class="rowlabel" x="8" y="156">忙碌日：60% 未變、20% 待生效、20% 生效或清倉</text>
+<path class="bar " d="M8.0,162.0 H130.9 Q134.9,162.0 134.9,166.0 V174.0 Q134.9,178.0 130.9,178.0 H8.0 Z" data-tip="混合形狀，按實測單人成本加總" tabindex="0"><title>混合形狀，按實測單人成本加總</title></path>
+<text class="val" x="140.9" y="174.5">945 頁 · 0.189 BNB · 2.0 h</text>
+<text class="rowlabel" x="8" y="206">大清倉日：全部隔代清倉</text>
+<path class="bar " d="M8.0,212.0 H291.8 Q295.8,212.0 295.8,216.0 V224.0 Q295.8,228.0 291.8,228.0 H8.0 Z" data-tip="隔代清倉含 _removeFrozenAt：113.4k／人，14 人／頁" tabindex="0"><title>隔代清倉含 _removeFrozenAt：113.4k／人，14 人／頁</title></path>
+<text class="val" x="301.8" y="224.5">2,143 頁 · 0.429 BNB · 4.6 h</text>
+<text class="rowlabel" x="8" y="256">上線式：全部隔代首次生效（推薦人新）</text>
+<path class="bar " d="M8.0,262.0 H406.9 Q410.9,262.0 410.9,266.0 V274.0 Q410.9,278.0 406.9,278.0 H8.0 Z" data-tip="隔代首次生效、R/G 無既有份額：166.2k／人，10 人／頁" tabindex="0"><title>隔代首次生效、R/G 無既有份額：166.2k／人，10 人／頁</title></path>
+<text class="val" x="416.9" y="274.5">3,000 頁 · 0.600 BNB · 6.4 h</text>
+<text class="rowlabel" x="8" y="306">最壞：全部隔代首次生效（推薦人已有份額）</text>
+<path class="bar bad" d="M8.0,312.0 H451.7 Q455.7,312.0 455.7,316.0 V324.0 Q455.7,328.0 451.7,328.0 H8.0 Z" data-tip="178.4k／人，9 人／頁；ERC20 從滿水位出發會在第 3,001 頁停擺" tabindex="0"><title>178.4k／人，9 人／頁；ERC20 從滿水位出發會在第 3,001 頁停擺</title></path>
+<text class="val" x="461.7" y="324.5">3,334 頁 · 0.667 BNB · 7.1 h</text>
+</svg></div>
+    <p class="cap">每頁是一筆獨立的 Trigger 請求，費用 0.0002 BNB，並且要等上一頁排好才輪到下一頁。耗時用線上實測延遲換算：即時請求從送出到執行的中位數 17 個區塊（7.65 秒），p95 為 9.45 秒，p99 為 11.7 秒（1.9 小時內 893 筆樣本，BSC 出塊 0.45 秒）。</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>情境（3 萬有權集）</th><th class="num">頁數</th><th class="num">Trigger 費／期</th><th class="num">耗時（中位延遲）</th><th>ERC20 儲備（0.6 BNB 起算）</th></tr></thead>
+      <tbody>
+        <tr><td>全部持倉沒變</td><td class="num">469</td><td class="num">0.094 BNB</td><td class="num">1.0 h</td><td><span class="pill ok">撐得住</span></td></tr>
+        <tr><td>典型日（80% 未變、12% 待生效、8% 生效或清倉）</td><td class="num">627</td><td class="num">0.125 BNB</td><td class="num">1.3 h</td><td><span class="pill ok">撐得住</span></td></tr>
+        <tr><td>忙碌日（60% 未變、20% 待生效、20% 生效或清倉）</td><td class="num">945</td><td class="num">0.189 BNB</td><td class="num">2.0 h</td><td><span class="pill ok">剛好可持續</span></td></tr>
+        <tr><td>大清倉日（全部隔代清倉）</td><td class="num">2,143</td><td class="num">0.429 BNB</td><td class="num">4.6 h</td><td><span class="pill mid">當天可以，隔天再來一次會在第 1,858 頁停</span></td></tr>
+        <tr><td>上線式（全部隔代首次生效）</td><td class="num">3,000</td><td class="num">0.600 BNB</td><td class="num">6.4 h</td><td><span class="pill mid">零餘量；隔天再來會在第 1,001 頁停</span></td></tr>
+        <tr><td>最壞（隔代首次生效、推薦人已有份額）</td><td class="num">3,334</td><td class="num">0.667 BNB</td><td class="num">7.1 h</td><td><span class="pill high">第 3,001 頁停擺</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>可靠性上的缺口</h3>
+  <ul class="plain">
+    <li><strong>ERC20 金庫的儲備上限。</strong>0.6 BNB 只夠 3,000 筆續頁費。補水只在首頁與封盤頁各做一次，每次最多 0.1 BNB，所以每期最多補 0.2 BNB，可持續上限約 1,000 頁／天。一個重日把儲備用完後，隔天只要超過約 1,000 頁就會在掃描中途停擺；而且封盤頁那一次補水根本到不了。</li>
+    <li><strong>補水是全有或全無。</strong>報價池 WBNB 側低於約 3.33 BNB（0.1 ÷ 3%）時每次補水都被拒，也不會改試小額。像 pPOLY 這種池子，WBNB 側只有粉塵，儲備永遠不會回補：30k 輕日一天 0.094 BNB，0.6 BNB 撐到第 7 天就停。</li>
+    <li><strong>原生金庫有收入下限。</strong>每期 Trigger 費直接從當期推薦人收益扣，需要當日淨稅收至少「頁數 × 0.0002 BNB」，也就是 0.094–0.667 BNB。以 3% 稅全進金庫換算，日成交至少 3.2–22.7 BNB，否則每期都會停。</li>
+    <li><strong>停擺之後要人工續跑，UI 沒有入口。</strong><code>vaultUISchema</code> 沒有 <code>requestSnapshot</code>／<code>fundFeeReserve</code>。ERC20 金庫用 <code>fundFeeReserve</code> 加 <code>requestSnapshot()</code> 兩筆可以跑完。如果照註解用 <code>requestSnapshot{value: fee}</code>，一筆只續一頁，多付的 BNB 不會進 <code>feeReserve</code>，會永久卡住。原生金庫一筆 <code>requestSnapshot{value &gt; fee}</code> 可以跑完，但要先被抽 2% 佣金。</li>
+    <li><strong>週期漂移與攻擊窗口。</strong>封盤後 <code>nextEpochAt = now + 1 天</code>，實際週期變成「1 天＋掃描時間」。掃描的 1–7 小時同時是 F1 可利用的窗口。只有每頁延遲超過 26 秒（最壞形狀）或 184 秒（全部未變）時，掃描才會超過一整天。</li>
+    <li><strong>成本面。</strong>使用者一次 bind 約 17.8 萬 gas，加 0.0002 BNB；一次 <code>syncMyHolding</code> 約 16.7 萬 gas。以 0.05 gwei 計都不到 0.00001 BNB。backend 每頁實際 gas 成本約 0.0001 BNB，比 0.0002 的費用低，服務本身有利可圖。<code>SNAPSHOT_PAGE = 64</code> 讓輕頁浪費約 30% 的 gas：不設上限時約 89 人一頁，30k 輕日只要 338 頁。</li>
+    <li><strong>灰塵與女巫放大。</strong>給 3 萬個持倉者各轉 1 wei，會讓他們從「跳過」變成「每期都同步」。每天多約 98 頁（+21%），一次性成本只要 0.018–0.15 BNB。</li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────── FINDINGS ─────────────────────────── -->
+<section class="block" id="findings">
+  <header>
+    <div class="eyebrow">重大問題</div>
+    <h2>確認的發現，依嚴重度排序</h2>
+    <p class="lede">每一條都附可執行的觸發測試，而且都已對「和你的倉庫逐字相同」的原始碼重跑確認。</p>
+  </header>
+
+  <div class="findings">
+
+    <article class="finding high">
+      <div class="top"><span class="pill high">高危</span><span class="id">H1 · 對應 F6</span><h3>補水仍可被夾擊：一次抽走大部分未封盤獎池</h3></div>
+      <div class="where">src/ReferralVault.sol:257-260 topUpFeeReserve · 607-647 _fillFeeReserveFromQuote · 675-711 _quotePriceImpactTooHigh</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>兩個 300 bps 檢查和 <code>amountInMax = getAmountsIn(...)</code> 讀的都是「同一筆交易裡已被攻擊者推過」的即時儲備。攻擊者在一筆交易內先砸報價幣把 WBNB 側壓低，再呼叫無許可的 <code>topUpFeeReserve()</code>，最後買回。它們只限制了「在已被操縱的池子上」這筆交易的邊際衝擊，從來沒有限制偏離公平價格的幅度。</p></div>
+        <div><span class="h">實測（BSC fork，SPCXB/WBNB 池 15.49 WBNB）</span><p>買 0.1 BNB 公平價是 0.525 SPCXB。攻擊者最佳點金庫付 8.58–10.41 SPCXB，損失 +1,535%～+1,783%。獎池 49 SPCXB（約 9.28 BNB）、缺口 0.6 BNB 時，5 筆交易吃掉 90.6%：金庫淨損 7.91 BNB，攻擊者淨賺 7.60 BNB。<code>trigger()</code> 首頁／封盤頁的補水也能被 mempool 夾，每次 +1.47 BNB。</p></div>
+      </div>
+      <div class="stats"><span class="stat">缺口 0.6 BNB → 抽走 97.7%</span><span class="stat">0.3 → 64.9%</span><span class="stat">0.1 → 21.3%</span><span class="stat">0.02 → 4.2%</span></div>
+      <p class="small"><strong>適用範圍：</strong>報價池 WBNB 側大約低於 100 BNB 時有利可圖（估算：每次最多多付 0.1×(m²−1) BNB，對比操縱量 0.5% 的手續費）。Portal 目前允許的報價幣裡，SPCXB（15.5）、FXIon（15.0）、XAUt（22.5）、ASTER（58.4）、QQQB（79.6）都在範圍內；USDT、ETH、BTCB、DOGE、USDC、USD1 的池子夠深，不划算。<strong>資本前提：</strong>SPCXB 沒有閃電貸來源，攻擊者要先持有 40–256 顆（約 7.6–48 BNB）。但每輪都淨賺，所以只有第一次需要備貨。作者寫的「殘餘限制在 300 bps 內」不成立。</p>
+    </article>
+
+    <article class="finding high">
+      <div class="top"><span class="pill high">高危</span><span class="id">H2 · 對應 F1</span><h3>跨頁重複計權沒修好：同一袋幣在每次封盤被算 k 次</h3></div>
+      <div class="where">src/ReferralVault.sol:294-326 分頁迴圈 · 517-531 _sealEpoch（用封盤當下的 totalShares）· 713-778 _syncHolding</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>攻擊者用 k 個錢包，讓同一袋 X「走在掃描游標前面」：每個錢包被掃到時手上都正好有 X，所以每頁都判它「沒變」或讓它到期入帳。掃過的錢包被掏空後權重不會自己降下來，封盤時就累積成 k·X。下一期照樣走一遍，不需要重新 arm，所以「最多影響這一個周期」不成立。</p></div>
+        <div><span class="h">實測</span><p>k = 8：實際只持有 100 顆，推薦人權重 800，拿走 9.8 BNB 獎池中的 5.97（按持幣公平份額只有 1.60，3.7 倍）。econ 偵察另有三個變體通過：到期時點落在掃描中間，一次讓 5 個錢包入帳（5 倍）；連續 3 次封盤都是 2 倍、不重新 arm；以及在停擺期間用掃描邊界之後的新錢包放大。</p></div>
+      </div>
+      <p class="small"><strong>為什麼 F5 的修法擋不住：</strong><code>HOLD_DELAY</code> 量的是「從 arm 起算過了多久」，不是「這段時間一直持有」。arm 的那一刻拿著 X，之後把幣拿走，到期前再放回來就行。同一袋幣可以一筆交易內輪流替很多錢包 arm。<strong>3 萬規模下</strong>每期 469–3,334 頁、掃描 1–7 小時，k 的上限和可操作時間都很寬。<strong>唯一的防守</strong>是有人在封盤前逐一 <code>syncHolding</code> 被掏空的錢包（實測能完全抵銷，k=3 時權重回到 100），但沒有人有動機做，UI 也沒有入口。</p>
+    </article>
+
+    <article class="finding high">
+      <div class="top"><span class="pill high">高危</span><span class="id">H3 · 新發現</span><h3>6 位小數報價幣（XAUt）的獎勵被截斷成 0，永久卡在 referralReserve</h3></div>
+      <div class="where">src/ReferralVault.sol:528 accPerShare += amount * ACC_PRECISION / totalShares（ACC_PRECISION = 1e18）</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p><code>totalShares</code> 以 18 位小數的稅幣單位計，報價 XAUt 只有 6 位小數。每期獎池小於 <code>totalShares / 1e18</code> 個最小單位時，<code>accPerShare</code> 的增量是 0，但整筆錢仍被搬進 <code>referralReserve</code>。沒有人能領，也沒有清掃路徑。</p></div>
+        <div><span class="h">實測</span><p>持倉權重 1e26（例如 1 億顆，占 10 億總量的 10%），連續 11 期、每期 50 XAUt：<code>accPerShare</code> 一直是 0，推薦人領取 revert「沒有可領取的獎勵」，539 XAUt 卡死。150 XAUt 那期增量只有 1，可領 100，另外 47 卡死（32%）。</p></div>
+      </div>
+      <p class="small">XAUt 是 Portal 與工廠都接受的報價幣（有現成的 V2 池）。DOGE（8 位小數）同樣有截斷，但每期最多損失約 <code>totalShares/1e18</code> 個最小單位，約 1 DOGE，影響小。</p>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M1 · F5 修法引入</span><h3>到期後本人再 sync，已到期的權重會被丟掉並重新計時</h3></div>
+      <div class="where">src/ReferralVault.sol:749-756 重新計時分支排在 758 到期判斷之前 · 768-774 是死碼</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>到期後只要 <code>live &gt; pendingLive</code>（多買了一點，或被別人轉了 1 wei），本人的 <code>syncMyHolding</code> 就走重新計時分支：已到期的那一段不入帳，整筆重等一天。原本想「先入帳、再替超出的部分重新計時」的 768–774 分支永遠到不了。在那裡插一行 revert，139 條測試（含 fork）全綠。</p></div>
+        <div><span class="h">實測</span><p>照 UI 說明「買入後呼叫 syncMyHolding」、每天加倉一點、而且在當天掃描之前操作的持倉者，連續 5 天 <code>holding = 0</code>，推薦人拿 0。對照組（不再自己 sync）第一次掃描就入帳 100。任何人轉 1 wei 就能讓受害者自己下一次 sync 丟權重。</p></div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M2 · 對應 F2</span><h3>gas 保留常數低於實際成本，餘量只剩約 1.3 萬</h3></div>
+      <div class="where">src/ReferralVault.sol:75 GAS_RESERVE_CONTINUE · 77 GAS_RESERVE_SEAL · 297 檢查位置</div>
+      <p>詳見焦點一。現況合規，但安全靠的是「最重一人只用 178.4k、沒用滿 200k 津貼」這個沒寫出來的事實，而且完全依賴 Flap 可升級合約的 gas 成本。白名單報價幣裡封盤尾巴最緊的是 FXIon，首次封盤只剩 23k；如果 Flap 簽名放行會抽稅的報價幣，補水會白燒 35.9 萬 gas，封盤頁已實測 FAILED。另外兩個相關缺口：失敗一次就卡死，只能靠 <code>retryTrigger</code>；門檻是寫死的，不讀 <code>getMaxCallbackGas()</code>，回呼被餓（例如 650k）時每頁照付費卻零進度（離線重現 20 頁、0.004 BNB）。</p>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M3 · 對應 F3</span><h3>3 萬規模下 ERC20 儲備與原生收入撐不住重日</h3></div>
+      <div class="where">src/ReferralVault.sol:587-605 只在首頁與封盤頁補水 · 572-585 原生從當期收益扣費 · 328-331 續頁付不起就停</div>
+      <p>詳見焦點二。作者寫「生產水位 0.6 BNB 覆蓋約 3 萬活躍的重日」，只對部分形狀成立：最壞形狀在第 3,001 頁停，連續重日必停，淺池永遠補不回，停擺後要靠人工而且 UI 沒有入口。</p>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M4 · 對應 F2、F5、F7、F9、F10</span><h3>測試釘不住修正：關鍵保護刪掉之後仍然全綠</h3></div>
+      <div class="where">test/ReferralVault.t.sol · test/ReferralVault.invariants.t.sol · test/ReferralVault.mainnet.t.sol</div>
+      <p>34 個變異裡，關鍵保護的存活情況見「測試有效性」一節。最危險的一條：刪掉 <code>execTopUpSwap</code> 的 only-self 檢查，任何人都能拿假 router 把金庫的報價幣轉走 10 ether，而全部測試加 5 個 seed 的不變量仍然全綠。13 條「殺手測試」已放進 ReferralVault 倉庫的 <code>test/audit/ScoutKillers.t.sol</code>，每條只在對應的變異上失敗。</p>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill low">低</span><span class="id">L · 其他</span><h3>低危與資訊項</h3></div>
+      <ul class="plain">
+        <li>迴圈內的 <code>IERC20(taxToken).balanceOf(trader)</code>（L300）沒有包 try，與 F7「單人 balanceOf 失敗跳過該地址」的文字不符。Flap 稅幣的 <code>balanceOf</code> 實際不會 revert，觸發性低。</li>
+        <li>原生金庫的 bind 費打給 <code>commissionReceiver</code>：佣金方自己綁定等於免費，可以零成本造填充帳號。</li>
+        <li>原生 bind 先把 BNB 全 gas 轉給 <code>commissionReceiver</code> 再寫 <code>referrerOf</code>。如果收款方是會 revert 的合約，所有原生金庫都無法 bind（屬信任配置）。</li>
+        <li>原生 <code>requestSnapshot{value: 0}</code> 判斷能否付費前沒有先 <code>_syncRevenue</code>，只在 BNB 不經 <code>receive()</code> 進來時有影響。</li>
+        <li>Slither 0.11.6：51 條結果，逐條看過，沒有可操作的新問題（嚴格等號、自呼叫重入、未使用回傳值都屬設計如此）。</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- ─────────────────────────── CROSS-CHECK ─────────────────────────── -->
+<section class="block" id="crosscheck">
+  <header>
+    <div class="eyebrow">逐條核對</div>
+    <h2>修正報告逐條核對</h2>
+    <p class="lede">左邊是作者的結論，右邊是這次複審的實測結論。</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>項</th><th>作者結論</th><th>複審結論</th><th>依據</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">F1</td><td>部分修；殘餘最多影響一個周期</td><td><span class="pill high">未修</span> 可每期持續 k 倍</td><td>H2；F1WalkPoC、EconProbe P2/P3/P4</td></tr>
+        <tr><td class="mono">F2</td><td>已修；單測卡住 2M</td><td><span class="pill mid">部分成立</span> 現況沒擊穿；常數與測試不成立</td><td>焦點一；M2、M4</td></tr>
+        <tr><td class="mono">F3</td><td>已修；0.6 BNB 覆蓋 3 萬重日</td><td><span class="pill mid">部分成立</span> 機制正確；覆蓋只對部分形狀成立</td><td>焦點二；M3</td></tr>
+        <tr><td class="mono">F4</td><td>已修</td><td><span class="pill ok">成立</span> Portal 另有白名單，外加 Flap 簽名的自訂報價通道；工廠只檢查池子存在，不查深度與是否抽稅</td><td>實測 12 種報價幣被 Portal 接受；BUSD、CAKE、FDUSD、WBNB 與任意新 ERC20 被拒</td></tr>
+        <tr><td class="mono">F5</td><td>已修</td><td><span class="pill mid">部分成立</span> 別人代開計時器、1 wei 預熱已關；引入 M1；HOLD_DELAY 不是持續持有</td><td>M1、H2；SelfSyncPoC、P1</td></tr>
+        <tr><td class="mono">F6</td><td>已修核心；殘餘在 300 bps 內</td><td><span class="pill high">未修</span> 損失 +1,535% 以上，可抽走 90% 以上獎池</td><td>H1；AttackE6</td></tr>
+        <tr><td class="mono">F7</td><td>已修</td><td><span class="pill mid">部分成立</span> 補水隔離成立；迴圈 balanceOf 未隔離；only-self 沒有測試</td><td>L、M4</td></tr>
+        <tr><td class="mono">F8</td><td>不改（標準 ERC20）</td><td><span class="pill mid">未在鏈上強制</span> 白名單內都不收稅，但 Flap 自 2026-09-07 起會簽名放行自訂報價幣（含 Flap 稅幣）；會抽稅的報價幣讓封盤頁 FAILED</td><td>焦點一表格；QuoteFailedSealProbe</td></tr>
+        <tr><td class="mono">F9</td><td>已修</td><td><span class="pill mid">部分成立</span> 有收費、有補水，但從不翻頁、從不跑 Trigger 端同步</td><td>覆蓋率毒藥 P1–P3 存活</td></tr>
+        <tr><td class="mono">F10</td><td>已修</td><td><span class="pill mid">部分成立</span> 看得到「換掉的少給」，看不到「留在 reserve 的少給」</td><td>變異 M21 存活</td></tr>
+        <tr><td class="mono">F11</td><td>已修；fork 10 passed</td><td><span class="pill ok">成立</span> 重跑 10 passed；但從不檢查 EXECUTED</td><td>trigger 恆 revert 時 test_NoHoldings 仍綠</td></tr>
+        <tr><td class="mono">F12</td><td>部分修</td><td><span class="pill low">未複核</span></td><td>不影響判決</td></tr>
+        <tr><td class="mono">F13</td><td>已修</td><td><span class="pill ok">成立</span></td><td>工廠拒 WBNB，金庫無 unwrap 分支</td></tr>
+        <tr><td class="mono">F14–F17</td><td>不改</td><td><span class="pill low">維持</span></td><td>設計接受；F17 在 3 萬規模下的週期漂移見焦點二</td></tr>
+        <tr><td class="mono">ADV-1</td><td>暫不改</td><td><span class="pill mid">影響變大</span> 停擺續跑、F1 防守都需要 UI 沒有的入口</td><td>焦點二、H2</td></tr>
+        <tr><td class="mono">ADV-2</td><td>不改</td><td><span class="pill low">維持</span></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────── TESTS ─────────────────────────── -->
+<section class="block" id="tests">
+  <header>
+    <div class="eyebrow">測試有效性</div>
+    <h2>刪掉關鍵保護，測試還是綠的</h2>
+    <p class="lede">在非 fork 的 106 條測試上跑 34 個變異，每次都還原並用 <code>cmp</code> 確認。下面只列修正報告說「已修」、但測試釘不住的保護。我自己重跑了其中 4 個，結果相同。</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>變異</th><th>位置</th><th>對應修正</th><th>106 條結果</th></tr></thead>
+      <tbody>
+        <tr><td><code>GAS_RESERVE_CONTINUE</code> 120k → 0</td><td class="mono">:75</td><td>F2</td><td><span class="pill high">存活</span> 106/106</td></tr>
+        <tr><td>刪掉封盤前 <code>gasleft() &lt; GAS_RESERVE_SEAL</code> 改排續頁</td><td class="mono">:332-335</td><td>F2</td><td><span class="pill high">存活</span> 四種環境都活</td></tr>
+        <tr><td>刪掉 <code>execTopUpSwap</code> 的 only-self</td><td class="mono">:654</td><td>F7</td><td><span class="pill high">存活</span> 外人可轉走報價幣</td></tr>
+        <tr><td>Trigger 路徑 <code>canArm = true</code></td><td class="mono">:359</td><td>F5</td><td><span class="pill high">存活</span> 106/106</td></tr>
+        <tr><td><code>syncHoldings</code> 批次 <code>canArm = true</code></td><td class="mono">:244</td><td>F5</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td>刪掉 <code>_applyWeights</code> 裡的 <code>_harvest(referrer)</code></td><td class="mono">:855</td><td>F10</td><td><span class="pill mid">只被 2 條頁形狀斷言碰巧抓到</span></td></tr>
+        <tr><td>拿掉 <code>amountInMax &gt; pendingEpochQuote</code></td><td class="mono">:632</td><td>F6</td><td><span class="pill mid">存活</span> 可花掉已封盤的錢</td></tr>
+        <tr><td>補水改成永遠買滿 <code>maxTopupSwap</code></td><td class="mono">:594</td><td>F6/F10</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td><code>_refreshActive</code> 的掃描中保護只擋自呼叫</td><td class="mono">:803</td><td>有權集</td><td><span class="pill mid">存活</span> 下一頁 panic 0x32 卡死</td></tr>
+        <tr><td><code>_removeFrozenAt</code> 不更新被搬移者的 index</td><td class="mono">:826</td><td>有權集</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td>每頁重新凍結 <code>snapshotBound</code></td><td class="mono">:287</td><td>有權集</td><td><span class="pill mid">存活</span> 新人可讓掃描永遠結束不了</td></tr>
+        <tr><td>跳過條件拿掉 <code>pendingAt</code>／隔代兩項，或拿掉 try/catch</td><td class="mono">:304-305, 363-367</td><td>F2</td><td><span class="pill mid">存活</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">不變量套件：深度 20 時有權集最多 10 人，從不翻頁。在 <code>_tryTriggerSync</code>、<code>_removeFrozenAt</code>、續頁分支插入必爆的毒藥，3 個 seed 都存活；對照毒藥放在 <code>_sealEpoch</code> 時會被抓到。handler 用 try/catch 吞掉 <code>trigger()</code> 的 revert，所以就算 trigger 永遠失敗，9 條不變量也全綠。</p>
+</section>
+
+<!-- ─────────────────────────── FIXES ─────────────────────────── -->
+<section class="block" id="fixes">
+  <header>
+    <div class="eyebrow">建議修法</div>
+    <h2>依優先順序</h2>
+  </header>
+  <ol class="plain" style="padding-left:1.4em">
+    <li><strong>H1 補水夾擊。</strong>不要再用同一筆交易裡的即時儲備定價。可選做法：<code>amountInMax</code> 以 TWAP 或慢速預言機報價加小帶寬封頂；或把 <code>topUpFeeReserve</code> 收回，只在 <code>trigger()</code> 內帶價格帶執行；或乾脆不自動換匯，改成只靠預填與人工補充。</li>
+    <li><strong>H3 低小數報價幣。</strong>把 <code>ACC_PRECISION</code> 提高到 1e36，或按 <code>10^(36 − quoteDecimals)</code> 縮放；至少讓工廠拒絕小於 18 位小數的報價幣。已卡住的 <code>referralReserve</code> 需要遷移方案。</li>
+    <li><strong>H2 跨頁重複計權。</strong>在「稅幣必須留在錢包、稅幣沒有快照或轉帳鉤子」的前提下，這一類問題無法在合約內完全關閉，只能提高成本、讓它看得見。方向：研究能保留 Flap 持幣分紅的鎖倉包裝；如果 Flap V3 稅幣有 checkpoint 就改讀歷史餘額；封盤前對「掃過之後餘額下降」的錢包重同步給賞金，並把 <code>syncHolding(address)</code> 與批次版放進 UI；另外減少頁數（例如最低持倉門檻）來壓縮 k 與窗口。修正報告裡「最多影響一個周期」應該刪掉。</li>
+    <li><strong>M1 自我 sync 丟權重。</strong>把到期判斷移到重新計時分支前面：到期就先入帳 <code>min(live, pendingLive)</code>，超出的部分再重新計時，也就是讓 768–774 這個分支真正生效。補一條「到期後加倉再自己 sync」的測試。</li>
+    <li><strong>M2 gas 保留。</strong><code>GAS_RESERVE_CONTINUE</code> 至少提高到約 230k，或在檢查式裡明確加上「津貼以外的單人開銷」（約 60k）。<code>GAS_RESERVE_SEAL</code> 按報價幣實測再留 30% 以上，並給 <code>execTopUpSwap</code>、<code>clearQuoteApproval</code>、<code>balanceOf</code> 的 try 呼叫加 gas 上限。重頁大約會多 5% 頁數。</li>
+    <li><strong>M3 規模。</strong>儲備低於 N 頁的費用時允許續頁補水；補水失敗時改試小額；為 <code>SnapshotScheduleFailed</code> 配一個 keeper；把續跑入口放進 UI，並修正 <code>requestSnapshot</code> 在 ERC20 金庫多付 BNB 會卡住的問題；考慮放寬 <code>SNAPSHOT_PAGE</code>。</li>
+    <li><strong>M4 測試。</strong>把 <code>test/audit</code> 的 13 條殺手測試與 fork 守衛納入 CI。gas 測試改用線上成本的 mock 並開 <code>isolate</code>，直接斷言剩餘 gas 下限，不要再用 <code>assertLe(gasUsed, 2M)</code>。fork 測試對每一頁斷言 <code>getRequest(id).status == EXECUTED</code>。不變量要真的翻頁，並加上「可領總額 ≈ referralReserve」。</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────── METHOD ─────────────────────────── -->
+<section class="block" id="method">
+  <header>
+    <div class="eyebrow">方法與重現</div>
+    <h2>這次是怎麼審的</h2>
+  </header>
+  <dl class="kv">
+    <dt>範圍</dt><dd><code>src/ReferralVault.sol</code>（1,055 行，含工廠）。<code>src/flap/**</code> 與 FreeCoin 示例不在範圍內。判準是倉內的 Rule 001–010 與 <code>VaultBaseV3</code>、<code>IFlapTriggerService</code> 的規範性註解。</dd>
+    <dt>流程</dt><dd>Marshal 深審：閉包 → 4 個偵察視角（gas、3 萬規模、經濟與安全、測試有效性）共 55 條假說 → 去重 → 2 個驗證 agent（補水夾擊、報價幣 gas），再加上我自己的實測與獨立重跑。高危一律附觸發測試。</dd>
+    <dt>基線</dt><dd>非 fork 測試 106 passed；BSC fork 套件 10 passed（原生 6、SPCXB 4），FreeCoin 18 passed。</dd>
+    <dt>線上 Trigger Service</dt><dd>代理 <code>0xcf4E…a7F9</code>，實作未驗證原始碼。<code>getFee()</code> = 0.0002 BNB，<code>getMaxCallbackGas()</code> = 2M。OOG 標 FAILED、不 revert。<code>retryTrigger</code> 無許可、無 gas 上限。服務不保證被呼叫方一定拿到 2M：只給 1.2M 時回呼照樣以約 1.14M 執行。</dd>
+    <dt>降級原因</dt><dd>Marshal 的 pack 對這個倉庫沒有綁定（分級恆為 mid、不變量清單為空、棘輪是 Cowboy 的逃逸史），改用倉內規格與實測替代。倉庫不是 git checkout，change_ref 用內容摘要。沒有 Almanax。F12 未複核。</dd>
+    <dt>Marshal 紀錄</dt><dd>review run <span class="mono">105</span>（deep，degraded）。高危的最終裁決保留給你，本次沒有代為登記 finding-verdict。</dd>
+  </dl>
+
+  <details>
+    <summary>可重現命令（PoC 與守衛測試都在 ReferralVault 倉庫的 test/audit/，說明見該目錄的 README.md）</summary>
+    <div class="inner">
+      <p class="small">在 ReferralVault 倉庫根目錄執行。<strong>守衛</strong>必須一直是綠的；<strong>PoC</strong> 斷言的是有漏洞時的結果，修好之後要反轉或刪除。fork 測試讀最新區塊，gas 相關的一定要加 <code>--isolate</code>；bnbchain 的 dataseed 對大量 fork 會回 403，可以改用 <code>BSC_RPC_URL=https://bsc-rpc.publicnode.com</code>。</p>
+<pre># 單元環境（不需要網路）：13 條殺手測試 + H2、H3、M1、M3 等 PoC
+forge test --match-path 'test/audit/*' --no-match-path 'test/*mainnet*'
+
+# H1 補水夾擊（BSC fork，SPCXB 報價）
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --match-path test/audit/TopUpSandwich.mainnet.t.sol -vv
+
+# 焦點一：13 種相位的守衛 + Trigger 貴 40k 的脆弱性 PoC + 640 人 = 10 頁
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --isolate --match-path test/audit/LiveTriggerPages.mainnet.t.sol -vv
+
+# 線上 Trigger Service 的行為探針
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --isolate --match-path test/audit/TriggerService.mainnet.t.sol -vv
+
+# 會抽稅的自訂報價幣讓封盤頁 FAILED
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --isolate --match-path test/audit/CustomQuoteSeal.mainnet.t.sol -vv</pre>
+    </div>
+  </details>
+</section>
+
+<footer class="foot">
+  <span>Marshal（風險分級＋不變量閘＋對抗審查）產出，建議性質，不構成部署阻擋。</span>
+  <span>ReferralVault 是與 Cowboy 無關的獨立 Flap V3 專案；本報告不涉及 Cowboy 程式碼。</span>
+</footer>
+
+</div>
+
+<div class="tip" id="tip" hidden></div>
+<script>
+(function () {
+  var tip = document.getElementById('tip');
+  function show(el, x, y) {
+    tip.textContent = el.getAttribute('data-tip');
+    tip.hidden = false;
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = Math.min(x + 12, window.innerWidth - w - 8);
+    var top = y - h - 10 < 8 ? y + 16 : y - h - 10;
+    tip.style.left = Math.max(8, left) + 'px';
+    tip.style.top = top + 'px';
+  }
+  document.querySelectorAll('svg.viz [data-tip]').forEach(function (el) {
+    var t = el.querySelector('title');
+    if (t) t.remove();
+    el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+    el.addEventListener('mouseleave', function () { tip.hidden = true; });
+    el.addEventListener('focus', function () { var r = el.getBoundingClientRect(); show(el, r.right, r.top); });
+    el.addEventListener('blur', function () { tip.hidden = true; });
+  });
+})();
+</script>
+</body>
+</html>
