@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReferralVault 第三輪審查</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+:root {
+  --ground: #F1F4F3;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9F8;
+  --ink: #15212A;
+  --ink-2: #3B4852;
+  --muted: #66737C;
+  --rule: #D8DEDC;
+  --rule-strong: #BFC8C5;
+  --accent: #1C5CAB;
+  --accent-soft: #E4EDF8;
+  --bar: #2a78d6;
+  --bad: #d03b3b;
+  --grid: #E3E8E6;
+  --high: #B42318;
+  --high-bg: #FBEAE8;
+  --mid: #8A5300;
+  --mid-bg: #FBF0DC;
+  --low: #45535E;
+  --low-bg: #E8EDF0;
+  --ok: #1F7040;
+  --ok-bg: #E2F2E8;
+  --code-bg: #EDF1EF;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-head: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0E1316;
+    --surface: #151C20;
+    --surface-2: #111719;
+    --ink: #E6ECEE;
+    --ink-2: #C4CED3;
+    --muted: #93A1A9;
+    --rule: #27323A;
+    --rule-strong: #384650;
+    --accent: #6DA7EC;
+    --accent-soft: #17283B;
+    --bar: #3987e5;
+    --bad: #e06666;
+    --grid: #222C33;
+    --high: #F4897E;
+    --high-bg: #3A1C19;
+    --mid: #E6B462;
+    --mid-bg: #33270F;
+    --low: #AAB7C0;
+    --low-bg: #1E282E;
+    --ok: #71C492;
+    --ok-bg: #13291C;
+    --code-bg: #1B2429;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0E1316;
+  --surface: #151C20;
+  --surface-2: #111719;
+  --ink: #E6ECEE;
+  --ink-2: #C4CED3;
+  --muted: #93A1A9;
+  --rule: #27323A;
+  --rule-strong: #384650;
+  --accent: #6DA7EC;
+  --accent-soft: #17283B;
+  --bar: #3987e5;
+  --bad: #e06666;
+  --grid: #222C33;
+  --high: #F4897E;
+  --high-bg: #3A1C19;
+  --mid: #E6B462;
+  --mid-bg: #33270F;
+  --low: #AAB7C0;
+  --low-bg: #1E282E;
+  --ok: #71C492;
+  --ok-bg: #13291C;
+  --code-bg: #1B2429;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0;
+  padding-inline: 16px;
+  padding-block: 28px 64px;
+}
+.page { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--font-head); text-wrap: balance; color: var(--ink); margin: 0; }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; font-weight: 700; letter-spacing: 0.01em; }
+h2 { font-size: 24px; line-height: 1.3; font-weight: 700; }
+h3 { font-size: 18px; line-height: 1.4; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; word-break: break-word; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* header */
+.masthead { display: flex; flex-direction: column; gap: 14px; padding-block: 8px 4px; }
+.masthead .sub { color: var(--ink-2); font-size: 16px; }
+.meta-line { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+
+.verdict {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px 22px;
+  align-items: start;
+}
+.stamp {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--high);
+  border: 2px solid var(--high);
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: center;
+  line-height: 1.4;
+}
+.stamp b { display: block; font-size: 20px; letter-spacing: 0.06em; }
+.verdict-body { display: flex; flex-direction: column; gap: 10px; }
+.verdict-body p { max-width: none; }
+.answers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.answer { background: var(--surface-2); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.answer .q { font-size: 12.5px; color: var(--muted); }
+.answer .a { font-weight: 700; font-size: 16px; line-height: 1.45; }
+.answer .d { font-size: 13.5px; color: var(--ink-2); line-height: 1.65; }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.tile .label { font-size: 12.5px; color: var(--muted); }
+.tile .value { font-family: var(--font-body); font-weight: 700; font-size: 26px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.tile .note { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+nav.toc a { font-size: 13.5px; text-decoration: none; color: var(--ink-2); border: 1px solid var(--rule); background: var(--surface); padding: 4px 10px; border-radius: 999px; }
+nav.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+section.block { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 24px 24px 26px; display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 16px; }
+section.block > header { display: flex; flex-direction: column; gap: 6px; }
+.lede { color: var(--ink-2); }
+.kv { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 8px 18px; margin: 0; }
+.kv dt { color: var(--muted); font-size: 13.5px; }
+.kv dd { margin: 0; }
+ul.plain, ol.plain { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+ul.plain li::marker, ol.plain li::marker { color: var(--muted); }
+
+.figure { display: flex; flex-direction: column; gap: 8px; }
+.figure .cap { font-size: 13.5px; color: var(--ink-2); }
+.viz-wrap { overflow-x: auto; }
+svg.viz { width: 100%; max-width: 780px; min-width: 560px; height: auto; display: block; font-family: var(--font-body); }
+svg.viz text { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+svg.viz .grid { stroke: var(--grid); stroke-width: 1; }
+svg.viz .tick { fill: var(--muted); font-size: 11px; font-family: var(--font-mono); }
+svg.viz .rowlabel { fill: var(--ink-2); font-size: 12.5px; }
+svg.viz .val { fill: var(--ink); font-size: 12px; font-family: var(--font-mono); }
+svg.viz .bar { fill: var(--bar); cursor: default; }
+svg.viz .bar.bad { fill: var(--bad); }
+svg.viz .bar:focus { outline: none; stroke: var(--ink); stroke-width: 1.5; }
+svg.viz .ref { stroke: var(--ink-2); stroke-width: 1.5; }
+svg.viz .ref.limit { stroke: var(--bad); stroke-width: 2; }
+svg.viz .reflabel { fill: var(--ink-2); font-size: 11.5px; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 300px; background: var(--ink); color: var(--surface); font-size: 12.5px; line-height: 1.5; padding: 7px 10px; border-radius: 6px; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { background: var(--surface-2); color: var(--ink-2); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+td .mono { white-space: nowrap; }
+table.wrap th { white-space: normal; vertical-align: bottom; line-height: 1.45; }
+code.nw { white-space: nowrap; }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; line-height: 1; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.high { color: var(--high); background: var(--high-bg); }
+.pill.mid { color: var(--mid); background: var(--mid-bg); }
+.pill.low { color: var(--low); background: var(--low-bg); }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+
+.findings { display: flex; flex-direction: column; gap: 14px; }
+.finding { border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+.finding.high { border-color: color-mix(in srgb, var(--high) 45%, var(--rule)); }
+.finding .top { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.finding .id { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+.finding h3 { flex: 1 1 100%; }
+.finding .where { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+.finding .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.finding .grid2 > div { display: flex; flex-direction: column; gap: 4px; }
+.finding .h { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.finding p { max-width: none; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; }
+
+details { border: 1px solid var(--rule); border-radius: 8px; background: var(--surface-2); }
+details > summary { cursor: pointer; padding: 10px 14px; font-weight: 500; color: var(--ink-2); list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸ "; color: var(--muted); }
+details[open] > summary::before { content: "▾ "; }
+details > .inner { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 14px; }
+.callout p { max-width: none; }
+
+footer.foot { color: var(--muted); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+
+@media (max-width: 820px) {
+  .answers { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finding .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .verdict { grid-template-columns: 1fr; }
+  .stamp { justify-self: start; }
+  .tiles { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .kv dd { margin-bottom: 8px; }
+  section.block { padding: 18px 16px 20px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <div class="eyebrow">Marshal 深度審查 · 2026-09-28</div>
+  <h1>ReferralVault 第三輪審查</h1>
+  <p class="sub">新版把 Trigger 分頁、費用儲備與補水換匯整套拿掉，改成「稅一進金庫就按當下權重入帳，領取時在同一筆交易裡同步全部直推」。本輪把上一輪（2026-09-27）的 H1–H3、M1–M4 放到新程式碼上重驗，核對作者自審報告 <code>audit_grok_4.7.md</code> 的結論，並重新回答兩個問題：單筆交易的 gas 會不會擊穿上限，3 萬規模下的總費用與耗時是否可靠。</p>
+  <div class="meta-line">
+    <span>審查版本：2026-09-28 收到的程式碼（沒有 git 紀錄，以 src/ReferralVault.sol 的 sha256 3cfdcd36…d276f6 識別，742 行）</span>
+    <span>BSC mainnet fork · 真實 Flap V3 稅幣</span>
+    <span>forge 1.7.1 · solc 0.8.26</span>
+  </div>
+</header>
+
+<section class="verdict" aria-label="判決">
+  <div class="stamp">判決<b>ESCALATE</b>仍有重大問題</div>
+  <div class="verdict-body">
+    <p><strong>不建議照目前版本上線。</strong>新版確實關掉了上一輪兩條高危：補水夾擊隨換匯路徑一起刪除，6 位小數報價幣也被擋下；Trigger 相關的 gas 與費用問題也隨架構消失。但新的領取方式撞上了 BSC 自 2026-08-25 起強制的單筆交易上限 16,777,216 gas：名下有效直推超過 856 人時，推薦人就領不出來（直推狀態有變動時，上限低到 211–697 人）。只持 1 wei 的假下線永遠移不出清單，所以任何人花約 0.2 BNB 灌假下線，就能把一個推薦人鎖死，合約內沒有解法，只能靠 Guardian 升級實作；已有約 700 名直推的推薦人，只要給每名直推轉 1 wei 稅幣就夠。上一輪的 H2（同一袋幣被算多次）與 M1（到期後本人 sync 丟權重）所在的程式碼，除了一個函式改名，與上一版完全相同，兩者仍然成立。作者自審把前者列為中危；在真實稅幣上實測，一袋幣輪流經過 10 個錢包，就能拿走 86% 的推薦分潤。</p>
+    <p class="small muted">審查方式：以專案自己的規格（Rule 001–010）為判準，在 BSC 主網 fork 上用真實 Flap V3 稅幣實測，並用變異測試檢查測試是否真的守得住保護。本專案沒有預先定義的自動不變量規則，這部分由上述方法替代。所有高危結論都附有可執行的觸發測試，關鍵數字都經過至少兩組獨立測量。</p>
+  </div>
+</section>
+
+<div class="answers">
+  <div class="answer">
+    <div class="q">還有沒有重大問題？</div>
+    <div class="a">有：2 條高危、4 條中危</div>
+    <div class="d">領取可能永久卡死（新發現）；同一袋幣仍可被算 K 次（上一輪 H2 未修）。中危：到期後本人 sync 丟權重（上一輪 M1 未修）、999 個名額可被灌滿、到期的加倉不會自己生效、測試釘不住保護。</div>
+  </div>
+  <div class="answer">
+    <div class="q">單筆 gas 會不會擊穿上限？</div>
+    <div class="a">Trigger 的 2M 單頁問題已不存在，但領取會擊穿 BSC 單筆上限</div>
+    <div class="d">每名有效直推約 19,151 gas（冷存儲、真實稅幣）。999 人需要約 1,950 萬 gas，超過 16,777,216。直推全部未變時最多 856 人；直推剛收到 1 wei、剛到期或剛賣光時只剩 211–697 人。作者拿約 7,000 萬的區塊上限來比，基準用錯了。</div>
+  </div>
+  <div class="answer">
+    <div class="q">3 萬規模費用與耗時可靠嗎？</div>
+    <div class="a">費用與耗時本身可靠，但有兩處缺口</div>
+    <div class="d">沒有全域排程或全域費用，持幣者的每一步單筆約 0.00001 BNB，稅款入帳與推薦人數量無關；最大的一筆是每位下線一次 0.0002 BNB 的綁定費。缺口：大推薦人領不出來；權重要準確，得有人每天替別人同步，沒有人付錢、UI 也沒有入口。</div>
+  </div>
+</div>
+
+<div class="tiles" aria-label="關鍵數字">
+  <div class="tile"><span class="label">BSC 單筆交易上限</span><span class="value">16,777,216</span><span class="note">EIP-7825，2026-08-25 起節點直接拒收超過的交易</span></div>
+  <div class="tile"><span class="label">還領得出來的有效直推上限</span><span class="value">856 人</span><span class="note">直推全部未變時；狀態有變動時 211–697 人；合約允許 999 人</span></div>
+  <div class="tile"><span class="label">把一個推薦人鎖死的成本</span><span class="value">≈0.2 BNB</span><span class="note">約 860 個只持 1 wei 的假下線，每個約 0.00023 BNB；已有約 700 名直推的，只要各轉 1 wei</span></div>
+  <div class="tile"><span class="label">一袋幣走 10 個錢包拿到的分潤</span><span class="value">86.0%</span><span class="note">真實稅幣實測；按實際持幣只該拿 38.1%</span></div>
+</div>
+
+<nav class="toc" aria-label="目錄">
+  <a href="#gas">焦點一：單筆 gas 上限</a>
+  <a href="#scale">焦點二：3 萬規模費用與耗時</a>
+  <a href="#findings">重大問題</a>
+  <a href="#crosscheck">逐條核對</a>
+  <a href="#tests">測試有效性</a>
+  <a href="#fixes">建議修法</a>
+  <a href="#method">方法與重現</a>
+</nav>
+
+<!-- ─────────────────────────── FOCUS 1 ─────────────────────────── -->
+<section class="block" id="gas">
+  <header>
+    <div class="eyebrow">焦點一</div>
+    <h2>單筆交易的 gas 會不會擊穿上限</h2>
+    <p class="lede">Trigger 已經整個移除，上一輪「單頁回呼 2M」的問題不再存在，回呼、續頁、封盤的 gas 帳都不用再算。取而代之的是領取：它要在同一筆交易裡同步推薦人名下所有有效直推（持倉大於 0，或有待生效加倉的直推），gas 隨人數線性增加。而 BSC 現在對每一筆交易都有硬上限。</p>
+  </header>
+
+  <dl class="kv">
+    <dt>BSC 的單筆上限</dt>
+    <dd>BSC 在 2026-08-25 的 Pasteur 硬分叉（節點 v1.7.7）啟用 EIP-7825：每筆交易的 gas limit 不得超過 <span class="mono">16,777,216</span>。實測用一個沒有餘額的臨時地址簽交易：gas 16,777,217 時，BNB Chain 官方節點回「transaction gas limit too high (cap: 16777216, tx: 16777217)」，publicnode 回「transaction gas cannot exceed 16777216」；同一筆改成 16,777,216 時，只因餘額不足被拒。最近 3,000 個區塊約 32 萬筆使用者交易，gas limit 最大正好 16,777,216，沒有一筆超過。約 7,000 萬的區塊上限是另一回事，它限制的是整個區塊，不是單筆交易。</dd>
+    <dt>怎麼量的</dt>
+    <dd>BSC fork 上經 VaultPortal 發一顆真的 Flap V3 稅幣，讓一個推薦人名下有 n 名直推。每人持幣、已 arm、已到期並同步過，也就是領取時「全部未變」、最便宜的情況。用 <code>forge test --isolate</code> 讓每筆交易都是冷存儲，再對領取交易的 gas limit 做二分搜尋，找出能成功的最小值。</dd>
+    <dt>結果</dt>
+    <dd>400 人 <span class="mono">8,017,335</span>；700 人 <span class="mono">13,762,098</span>；999 人 <span class="mono">19,488,574</span>。三點落在同一條直線上（誤差小於 500 gas）：每名直推 19,151 gas，外加約 35.7 萬的固定部分，再加上每筆交易本身的 21,064 gas。16,777,216 最多容納 856 名有效直推；另一組真實稅幣測量直接驗證了 856 名能領、857 名不能。999 人時用 16,777,216 領取直接 revert。</dd>
+    <dt>直推有變動時</dt>
+    <dd>每名直推更貴，上限更低；下表是真實稅幣、冷存儲下，每種狀態「n 人能領、n＋1 人不能」直接驗證的結果。實際名下的直推是混合狀態，上限介於其間。「收到 1 wei、沒有 arm」只有持幣者本人能解除，「已 arm、還沒到期」只能等到期，推薦人事先同步都沒用；其餘狀態任何人都能先用 <code>syncHoldings</code> 每 50 人一筆同步掉，但 UI 沒有這個入口，領取失敗時的錯誤訊息也不會這樣提示。</dd>
+  </dl>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>直推的狀態（自上次同步以來）</th><th class="num">每人 gas</th><th class="num">上限（無隔代／有隔代）</th><th>能不能先同步掉</th></tr></thead>
+      <tbody>
+        <tr><td>全部未變</td><td class="num">19.1k</td><td class="num">856／847</td><td>—</td></tr>
+        <tr><td>收到 1 wei 稅幣、沒有 arm</td><td class="num">23.5k</td><td class="num">697／691</td><td><span class="pill high">不能</span> 只有持幣者本人 arm、再等一天</td></tr>
+        <tr><td>已 arm、還沒到期</td><td class="num">23.6k–23.8k</td><td class="num">688–694／682</td><td><span class="pill high">不能</span> 只能等到期</td></tr>
+        <tr><td>一半剛賣掉</td><td class="num">29.7k–36.0k</td><td class="num">550／453</td><td><span class="pill mid">可以</span> 任何人用 <code>syncHoldings</code></td></tr>
+        <tr><td>全部剛賣光</td><td class="num">37.7k–43.9k</td><td class="num">433／371</td><td><span class="pill mid">可以</span></td></tr>
+        <tr><td>到期加倉在這次領取裡入帳</td><td class="num">36.0k–42.3k</td><td class="num">454／385</td><td><span class="pill mid">可以</span></td></tr>
+        <tr><td>到期後第一次入帳</td><td class="num">53.4k–77.0k</td><td class="num">306／211</td><td><span class="pill mid">可以</span></td></tr>
+        <tr><td>推薦人後來才綁定上級（每名直推要搬 33%）</td><td class="num">48.9k</td><td class="num">334</td><td><span class="pill mid">可以</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <h3>一次領取需要的 gas（直推全部未變，最便宜的情況）</h3>
+    <div class="viz-wrap"><svg class="viz" viewBox="0 0 640 256" role="img" aria-label="一次領取所需 gas：400 名 8.02M、700 名 13.76M、856 名 16.75M、999 名 19.49M；BSC 單筆上限 16,777,216" preserveAspectRatio="xMinYMin meet">
+<line class="grid" x1="8.0" y1="20" x2="8.0" y2="226" />
+<text class="tick" x="8.0" y="242" text-anchor="start">0M</text>
+<line class="grid" x1="105.9" y1="20" x2="105.9" y2="226" />
+<text class="tick" x="105.9" y="242" text-anchor="middle">5M</text>
+<line class="grid" x1="203.8" y1="20" x2="203.8" y2="226" />
+<text class="tick" x="203.8" y="242" text-anchor="middle">10M</text>
+<line class="grid" x1="301.8" y1="20" x2="301.8" y2="226" />
+<text class="tick" x="301.8" y="242" text-anchor="middle">15M</text>
+<line class="grid" x1="399.7" y1="20" x2="399.7" y2="226" />
+<text class="tick" x="399.7" y="242" text-anchor="middle">20M</text>
+<line class="ref limit" x1="336.6" y1="2" x2="336.6" y2="226" />
+<text class="reflabel" x="332.6" y="12" text-anchor="end">BSC 單筆上限 16,777,216</text>
+<text class="rowlabel" x="8" y="40">400 名有效直推（實測）</text>
+<path class="bar " d="M8.0,46.0 H161.0 Q165.0,46.0 165.0,50.0 V58.0 Q165.0,62.0 161.0,62.0 H8.0 Z" data-tip="真實 Flap V3 稅幣、冷存儲：能成功的最小 gas limit 8,017,335" tabindex="0"><title>真實 Flap V3 稅幣、冷存儲：能成功的最小 gas limit 8,017,335</title></path>
+<text class="val" x="171.0" y="58.5">8.02M</text>
+<text class="rowlabel" x="8" y="90">700 名（實測）</text>
+<path class="bar " d="M8.0,96.0 H273.5 Q277.5,96.0 277.5,100.0 V108.0 Q277.5,112.0 273.5,112.0 H8.0 Z" data-tip="能成功的最小 gas limit 13,762,098" tabindex="0"><title>能成功的最小 gas limit 13,762,098</title></path>
+<text class="val" x="283.5" y="108.5">13.76M</text>
+<text class="rowlabel" x="8" y="140">856 名（最大可領人數）</text>
+<path class="bar " d="M8.0,146.0 H332.0 Q336.0,146.0 336.0,150.0 V158.0 Q336.0,162.0 332.0,162.0 H8.0 Z" data-tip="356,932 + 19,151 × 856 ≈ 16,750,000，加上交易本身 21,064 gas 仍在上限內；857 名就超過" tabindex="0"><title>356,932 + 19,151 × 856 ≈ 16,750,000，加上交易本身 21,064 gas 仍在上限內；857 名就超過</title></path>
+<text class="val" x="342.0" y="158.5">16.75M · 剛好塞得進</text>
+<text class="rowlabel" x="8" y="190">999 名（實測，合約允許的上限）</text>
+<path class="bar bad" d="M8.0,196.0 H385.7 Q389.7,196.0 389.7,200.0 V208.0 Q389.7,212.0 385.7,212.0 H8.0 Z" data-tip="能成功的最小 gas limit 19,488,574；用 16,777,216 領取直接 revert" tabindex="0"><title>能成功的最小 gas limit 19,488,574；用 16,777,216 領取直接 revert</title></path>
+<text class="val" x="395.7" y="208.5">19.49M · 超過上限</text>
+</svg></div>
+    <p class="cap">400、700、999 人為真實稅幣、冷存儲的實測值；856 人由三點直線推算，並由另一組真實稅幣測量直接驗證（856 人能領、857 人不能）。第三組獨立測量（模擬稅幣、冷存儲）得到 851 人塞得進、871 人塞不進，999 人需要 19,349,452 gas，與這條線相差不到 1%。固定部分的 35.7 萬裡，有 33 萬是迴圈每次開跑前要求保留的 gas。</p>
+  </div>
+
+  <h3>為什麼作者的數字看起來沒問題</h3>
+  <ul class="plain">
+    <li>作者量到 1,000 人持倉不變約 1,880 萬、全部減倉 2,969 萬 gas，和本次冷存儲的實測一致。問題在於拿來比較的是約 7,000 萬的「區塊」上限；卡住領取的是「單筆交易」上限 16,777,216，兩個數字都超過它。</li>
+    <li>倉內的 gas 基準測試（<code>ReferralVault.gas.t.sol</code>）預設跳過；手動打開、不加 <code class="nw">--isolate</code> 跑時，setup 碰過的存儲在領取時都是暖的：999 人持倉不變只量到 467 萬 gas，冷存儲是 1,871 萬（4.0 倍）；全部賣光 1,223 萬對 2,960 萬。它也沒有對 gas 做任何斷言，所以量到多少都不會失敗。</li>
+    <li>單元測試裡綁滿 999 人的那一條（<code>test_Bind_CapsDirectsAt999</code>）只綁定、不持倉，有效直推是 0；預設會跑的測試裡，領取從來沒有在大人數下跑過。</li>
+  </ul>
+
+  <h3>領不出來會怎樣</h3>
+  <p>領取整筆 revert，錯誤訊息要使用者「給錢包充更多 BNB 後重試」，但任何金額都沒用：節點在廣播階段就拒收 gas limit 超過 16,777,216 的交易。合約沒有其他領取路徑，也沒有分批領取。有效直推只有在持倉歸零、而且沒有待生效加倉時，才會在同步時移出清單，推薦人自己無法移除。已累積和之後累積的獎勵都卡在金庫裡，只能靠 Guardian 升級實作解開；如果之後呼叫了 <code>lockVaultUpgrades</code>，就永遠救不回來。</p>
+
+  <h3>任何人都能把一個推薦人推過上限</h3>
+  <p>綁定不需要推薦人同意。攻擊者部署一批假下線錢包，綁到受害推薦人，各轉 1 wei 稅幣並呼叫 <code>syncMyHolding</code>，它們就成了永遠移不出去的有效直推：1 wei 讓持倉永遠大於 0。真實稅幣上，每個假下線約 52.9 萬 gas 加 0.0002 BNB 綁定費，合計約 0.00023 BNB。把一個沒有有效直推的推薦人推過 856 人約 0.19 BNB；已有 h 名有效直推的推薦人只需要 857 − h 個（例如 h = 600 時約 0.06 BNB），前提是它的終身名額還剩得夠。綁定費付給 <code>commissionReceiver</code>，佣金方自己來做等於免費。單元環境（冷存儲）重現：998 個假下線加 1 名真實直推，受害者領取最少需要 19,349,452 gas。</p>
+  <p>已有約 700 名以上有效直推的推薦人，攻擊者連綁定都不用：給每名直推轉 1 wei 稅幣，直推就進入「收到增量、但沒有 arm」的狀態，每人成本升到約 23.5k，上限降到 697 人。第三方同步不會替別人 arm，所以這個狀態只有持幣者本人能解除（arm 之後再等一天），推薦人事先同步也沒用；攻擊者可以每天重做，成本只有轉帳的 gas。單元環境（冷存儲）重現：740 名被轉過 1 wei 的直推，受害者先全部同步過，領取仍最少需要 17,573,220 gas；660 名時是 15,714,031，還塞得進。</p>
+
+  <h3>這段同步其實保護不了領取金額</h3>
+  <p>領取前先同步直推，看起來是為了讓已賣出的直推不再替推薦人分錢。但 <code>_setShare</code> 會先按舊份額把獎勵結算給推薦人，然後才降低份額。實測：直推賣光之後才進來的 9.8 單位淨稅，推薦人領取時照樣按賣出前的權重拿到一半（4.9）；只有在稅進來之前就有人同步那個直推，推薦人才拿 0。所以這段 O(n) 的同步不影響這一次能領多少，只讓領取成本隨人數增長，最後撞上單筆上限。</p>
+</section>
+
+<!-- ─────────────────────────── FOCUS 2 ─────────────────────────── -->
+<section class="block" id="scale">
+  <header>
+    <div class="eyebrow">焦點二</div>
+    <h2>3 萬規模下的總費用與耗時</h2>
+    <p class="lede">Trigger 拿掉之後，系統不再有全域排程，也不再有全域費用：每一步都是當事人自己送的一筆交易。稅款入帳發生在 Flap dispatch 那一筆裡，成本與推薦人數量無關（3 個或 100 個有權重的推薦人都是約 23 萬 gas）。以下以「3 萬個推薦人」為邊界，按每人名下 1、10、33 名直推（3 萬、30 萬、約 99 萬持幣者）分別計算。單步 gas 都是 BSC fork 上真實 Flap V3 稅幣、冷存儲的實測值；3 萬規模的情境由這些實測值推算，按當日 0.05 gwei 換算。</p>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>操作</th><th>誰付</th><th class="num">gas</th><th class="num">BNB</th></tr></thead>
+      <tbody>
+        <tr><td>綁定 <code>bind</code></td><td>持幣者；另付 0.0002 BNB 綁定費給佣金方</td><td class="num">159k–218k</td><td class="num">0.000008–0.000011 ＋ 0.0002</td></tr>
+        <tr><td>加倉後 arm（<code>syncMyHolding</code>）</td><td>持幣者本人，別人不能代做</td><td class="num">160k–177k</td><td class="num">0.000008–0.000009</td></tr>
+        <tr><td>到期後本人再點一次入帳</td><td>持幣者</td><td class="num">110k–230k</td><td class="num">0.0000055–0.000011</td></tr>
+        <tr><td>第三方同步：持倉沒變／到期入帳／全部賣光</td><td>任何人</td><td class="num">73k／143k–182k／105k–196k</td><td class="num">0.0000036–0.0000098</td></tr>
+        <tr><td>批次同步 <code>syncHoldings</code>（50 人）</td><td>任何人</td><td class="num">0.91M–7.73M</td><td class="num">0.00005–0.00039</td></tr>
+        <tr><td>稅款 dispatch（含金庫入帳）</td><td>Flap 或任何人</td><td class="num">229k–239k</td><td class="num">0.000012</td></tr>
+        <tr><td>領取 <code>claim</code></td><td>推薦人</td><td class="num">88,310 ＋ 19,041 × 有效直推數</td><td class="num">1 人 0.0000054；20 人 0.0000235</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">領取欄是扣退款後的實際用量；決定能否成交的峰值見焦點一。<code>receive()</code> 最重一次 193,475 gas（第一次有權重的入帳），穩態 3.9–9.6 萬，遠低於 Rule 005 的 1,000,000。</p>
+
+  <div class="table-wrap">
+    <table class="wrap">
+      <thead><tr><th>每位推薦人的直推數</th><th class="num">一次性綁定費</th><th class="num">持幣者自付 gas／天<br>平常／重日</th><th class="num">3 萬人各領一次</th><th class="num">沒人付錢的同步／天<br>平常／重日</th><th class="num">佔 BSC 一天 gas<br>（重日）</th></tr></thead>
+      <tbody>
+        <tr><td>1 名（3 萬持幣者）</td><td class="num">6 BNB</td><td class="num">0.013／0.080 BNB</td><td class="num">0.16 BNB</td><td class="num">0.020／0.077 BNB</td><td class="num">0.05%</td></tr>
+        <tr><td>10 名（30 萬持幣者）</td><td class="num">60 BNB</td><td class="num">0.12／0.73 BNB</td><td class="num">0.42 BNB</td><td class="num">0.090／0.40 BNB</td><td class="num">0.23%</td></tr>
+        <tr><td>33 名（約 99 萬持幣者）</td><td class="num">198 BNB</td><td class="num">0.40／2.38 BNB</td><td class="num">1.08 BNB</td><td class="num">0.27／1.23 BNB</td><td class="num">0.70%</td></tr>
+        <tr><td>999 名（約 3,000 萬持幣者）</td><td class="num">5,994 BNB</td><td class="num">12.0／71.8 BNB</td><td class="num"><span class="pill high">無法成交</span></td><td class="num">8.0／36.7 BNB</td><td class="num">20.4%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">平常日：5% 持幣者買入、5% 賣出；重日：30% 買入、10% 賣出。每位推薦人一次領取約 0.000005（1 名直推）到 0.000036 BNB（33 名）。「沒人付錢的同步」是替沒有自己再點一次的持幣者入帳，以及在賣出後把權重降下來的同步，每筆 50 個地址。每位推薦人 999 名直推時，每一筆領取都需要約 1,950 萬 gas 以上，任何 gas 價格都無法成交。</p>
+
+  <div class="figure">
+    <h3>保持權重準確、但沒有人付錢的每日同步成本</h3>
+    <div class="viz-wrap"><svg class="viz" viewBox="0 0 640 348" role="img" aria-label="保持權重準確、但沒有人付錢的每日同步成本：0.020 到 1.23 BNB" preserveAspectRatio="xMinYMin meet">
+<line class="grid" x1="8.0" y1="12" x2="8.0" y2="318" />
+<text class="tick" x="8.0" y="334" text-anchor="start">0 BNB</text>
+<line class="grid" x1="154.9" y1="12" x2="154.9" y2="318" />
+<text class="tick" x="154.9" y="334" text-anchor="middle">0.5 BNB</text>
+<line class="grid" x1="301.8" y1="12" x2="301.8" y2="318" />
+<text class="tick" x="301.8" y="334" text-anchor="middle">1 BNB</text>
+<line class="grid" x1="448.6" y1="12" x2="448.6" y2="318" />
+<text class="tick" x="448.6" y="334" text-anchor="middle">1.5 BNB</text>
+<text class="rowlabel" x="8" y="32">3 萬推薦人 × 1 名直推（3 萬持幣者）· 平常日</text>
+<path class="bar " d="M8.0,38.0 H9.7 Q13.7,38.0 13.7,42.0 V50.0 Q13.7,54.0 9.7,54.0 H8.0 Z" data-tip="減倉與到期都要有人同步；每筆 syncHoldings 50 個地址" tabindex="0"><title>減倉與到期都要有人同步；每筆 syncHoldings 50 個地址</title></path>
+<text class="val" x="19.7" y="50.5">0.020 BNB · 60 筆</text>
+<text class="rowlabel" x="8" y="82">× 1 名直推 · 買入重日</text>
+<path class="bar " d="M8.0,88.0 H26.6 Q30.6,88.0 30.6,92.0 V100.0 Q30.6,104.0 26.6,104.0 H8.0 Z" data-tip="30% 買入、10% 賣出" tabindex="0"><title>30% 買入、10% 賣出</title></path>
+<text class="val" x="36.6" y="100.5">0.077 BNB · 240 筆</text>
+<text class="rowlabel" x="8" y="132">× 10 名直推（30 萬持幣者）· 平常日</text>
+<path class="bar " d="M8.0,138.0 H30.4 Q34.4,138.0 34.4,142.0 V150.0 Q34.4,154.0 30.4,154.0 H8.0 Z" data-tip="5% 買入、5% 賣出" tabindex="0"><title>5% 買入、5% 賣出</title></path>
+<text class="val" x="40.4" y="150.5">0.090 BNB · 600 筆</text>
+<text class="rowlabel" x="8" y="182">× 10 名直推 · 買入重日</text>
+<path class="bar " d="M8.0,188.0 H121.5 Q125.5,188.0 125.5,192.0 V200.0 Q125.5,204.0 121.5,204.0 H8.0 Z" data-tip="30% 買入、10% 賣出" tabindex="0"><title>30% 買入、10% 賣出</title></path>
+<text class="val" x="131.5" y="200.5">0.40 BNB · 2,400 筆</text>
+<text class="rowlabel" x="8" y="232">× 33 名直推（約 99 萬持幣者）· 平常日</text>
+<path class="bar " d="M8.0,238.0 H83.2 Q87.2,238.0 87.2,242.0 V250.0 Q87.2,254.0 83.2,254.0 H8.0 Z" data-tip="5% 買入、5% 賣出" tabindex="0"><title>5% 買入、5% 賣出</title></path>
+<text class="val" x="93.2" y="250.5">0.27 BNB · 1,980 筆</text>
+<text class="rowlabel" x="8" y="282">× 33 名直推 · 買入重日</text>
+<path class="bar " d="M8.0,288.0 H364.2 Q368.2,288.0 368.2,292.0 V300.0 Q368.2,304.0 364.2,304.0 H8.0 Z" data-tip="30% 買入、10% 賣出；以 10% 區塊空間計約 26 分鐘" tabindex="0"><title>30% 買入、10% 賣出；以 10% 區塊空間計約 26 分鐘</title></path>
+<text class="val" x="374.2" y="300.5">1.23 BNB · 7,920 筆</text>
+</svg></div>
+    <p class="cap">單看金額不大，但合約沒有給這份工作任何獎勵，推薦人也沒有動機去降低自己名下直推的權重；UI 裡沒有 <code>syncHolding</code>／<code>syncHoldings</code> 的入口。沒有人做時，賣出的權重一直留著（H2），到期的加倉一直不生效（M3）。</p>
+  </div>
+
+  <h3>從發生到生效要多久</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>事件</th><th>多久生效</th></tr></thead>
+      <tbody>
+        <tr><td>稅進金庫 → 推薦人可領</td><td>即時：在 dispatch 那一筆交易裡，就按當下權重入帳。</td></tr>
+        <tr><td>買入 → 計入權重</td><td>arm 之後至少 24 小時，而且之後還要有人再同步一次；沒有人同步就一直不生效。照 UI「每次加倉後點 syncMyHolding」操作、每天都加倉的人，已到期的部分每次都被自己的點擊丟掉，永遠不生效（M1）。</td></tr>
+        <tr><td>賣出 → 權重下降</td><td>直到有人同步那個地址為止，可能永遠不會（H2）。</td></tr>
+        <tr><td>啟動期沒有權重時的稅 → 分出去</td><td>第一筆權重生效後，用 24 小時線性釋放給當時有權重的人（M3）。</td></tr>
+        <tr><td>讓 3 萬 × 33 名直推的權重保持準確</td><td>以 10% 區塊空間計：平常日約 6 分鐘，重日約 26 分鐘，啟動隔天約 75 分鐘。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>可靠性上的缺口</h3>
+  <ul class="plain">
+    <li><strong>大推薦人領不出來。</strong>見焦點一：有效直推超過 856 人（直推剛收到 1 wei、剛到期或剛賣光時只剩 211–697 人）就沒有任何交易能成交；「每人 999 名直推」這一整欄不可行。</li>
+    <li><strong>誠實的權重要靠沒人付錢的同步。</strong>賣出後權重要等有人同步才降，推薦人自己不會去做，因為那會降低自己的權重。實測：直推賣光後的一次 2 BNB 買入，其推薦分潤的一半（0.0265 BNB）仍付給持倉已是 0 的推薦人。3 萬 × 33 名直推一天要 0.27–1.23 BNB 的同步費，合約沒有獎勵，UI 也沒有入口。</li>
+    <li><strong>新推薦人無法用領取啟動權重。</strong>直推到期後如果沒有人同步，推薦人的權重一直是 0。這時推薦人點領取，會先替直推入帳，再因「沒有可領取的獎勵」整筆 revert，入帳也一起回滾。實測 10 天後權重仍是 0，同期已同步的推薦人領到 0.185 BNB。</li>
+    <li><strong>綁定費才是「總費用」的主體。</strong>每位下線一次 0.0002 BNB，付給佣金方。3 萬推薦人 × 33 名直推約 198 BNB（一次性）；同一規模下，重日一天的鏈上 gas 合計約 4.7 BNB。</li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────── FINDINGS ─────────────────────────── -->
+<section class="block" id="findings">
+  <header>
+    <div class="eyebrow">重大問題</div>
+    <h2>確認的發現，依嚴重度排序</h2>
+    <p class="lede">每一條都附可執行的觸發測試，並已在與本次審查版本（sha256 3cfdcd36…d276f6）逐字相同的原始碼上重跑確認；測試檔在 <code>test/audit/</code>。</p>
+  </header>
+
+  <div class="findings">
+
+    <article class="finding high">
+      <div class="top"><span class="pill high">高危</span><span class="id">H1 · 新發現</span><h3>領取會擊穿 BSC 單筆 gas 上限：有效直推超過 856 人就領不出來，花約 0.2 BNB 就能鎖死一個推薦人</h3></div>
+      <div class="where">src/ReferralVault.sol:222-236 claim · 340-352 _syncDirects · 56 MAX_BOUND_REFEREES = 999 · 600-620 _touchActive</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p><code>claim</code> 必須在一筆交易裡同步 <code>_activeReferees</code> 的每一個人，沒有分批，也沒有其他領取路徑。每名有效直推約 19.2k gas（冷存儲、最便宜的狀態），而 BSC 自 2026-08-25 起每筆交易最多 16,777,216 gas。合約允許每位推薦人 999 名直推，但有效直推超過 856 名時，領取就無法成交；直推狀態有變動時，211–697 名就會卡住。只持 1 wei 的直推永遠留在清單裡。</p></div>
+        <div><span class="h">實測</span><p>真實 Flap V3 稅幣：400／700／999 人需要 8.02M／13.76M／19.49M gas，999 人時用 16,777,216 領取 revert。另一組真實稅幣測量直接驗證 856 名能領、857 名不能。單元環境（冷存儲）：998 個 1 wei 假下線加 1 名真實直推，最少 19,349,452 gas。攻擊成本：每個假下線約 0.00023 BNB，推過上限約 0.19 BNB；已有 h 名有效直推的推薦人只需 857 − h 個；已有約 700 名的，只要給每名直推轉 1 wei。</p></div>
+        <div><span class="h">影響</span><p>受害推薦人已累積與之後累積的獎勵全部領不出來，只能靠 Guardian 升級實作解開；呼叫 <code>lockVaultUpgrades</code> 之後就永遠卡死。沒有攻擊者時，自然成長到 856 名以上有效直推的大推薦人也會卡住，而他們正是最該被獎勵的人。錯誤訊息要使用者充 BNB，但沒有用。</p></div>
+        <div><span class="h">與作者結論的差異</span><p>作者自審寫「沒有會鎖死某一推薦人獎勵的高優先級問題」，並以約 7,000 萬的區塊上限評估 999 人的領取；卡住領取的是單筆上限。領取裡這段同步也保護不了領取金額（見焦點一最後一段），拿掉它，領取就固定在約 9 萬 gas。</p></div>
+      </div>
+      <div class="stats"><span class="stat">單筆上限 16,777,216</span><span class="stat">每名直推 19,151 gas</span><span class="stat">上限 856 人（變動時 211–697）</span><span class="stat">鎖死成本 ≈0.2 BNB</span></div>
+    </article>
+
+    <article class="finding high">
+      <div class="top"><span class="pill high">高危</span><span class="id">H2 · 對應上一輪 H2（作者 M-01）</span><h3>同一袋幣仍可被算 K 次，還能和稅款 dispatch 綁在同一筆交易</h3></div>
+      <div class="where">src/ReferralVault.sol:503-568 _syncHolding（除一個函式改名外與上一版相同）· 530、540 arm · 548-553 · 555 到期入帳 · 510 減倉只在同步時生效</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p><code>HOLD_DELAY</code> 量的是「從 arm 起算過了多久」，不是「這段時間一直持有」。錢包只要在 arm 那一刻和到期入帳那一刻持有 X，中間只留 1 wei，任何人的同步都取消不了它的 arm。入帳之後把幣轉走，權重不會自己降下來，要等有人同步那個錢包。攻擊者用同一袋幣依序經過 K 個已綁定錢包，每個錢包都拿到 X 的權重，合計 K·X。</p></div>
+        <div><span class="h">實測</span><p>單元環境：K = 10，實際只持有 100 顆（加 10 wei），推薦人權重卻是 1,000 顆（10 倍），拿走 83.3% 的分潤，按持幣只該拿 33.3%；整袋幣賣掉之後，下一批稅仍拿 83.3%。BSC fork、真實 Flap V3 稅幣：錢包之間轉帳不收稅（曲線期與畢業後都是）。整個攻擊只要一筆 arm 交易，加一筆「入帳＋dispatch」交易（10 個錢包時，兩筆分別約 192 萬、146 萬 gas）；攻擊者拿走 86.0% 的推薦分潤，按持幣只該拿 38.1%。</p></div>
+        <div><span class="h">規模</span><p>攻擊者份額 f = K·X ÷ (K·X + H)。持有 1% 供給、誠實合格持倉 20% 時，K = 20 拿一半，K = 80 拿 80%，K = 180 拿 90%（仍在單一推薦人的 999 名額內）。K = 80 的成本：一次性約 0.0175 BNB，之後每個循環約 0.00135 BNB。隔代地址拿 33%，它的領取只同步自己的直推、碰不到那些錢包，所以可以每天領、權重一直不降（實測連續 5 天）。</p></div>
+        <div><span class="h">防守與其限制</span><p>任何人都能用 <code>syncHoldings</code> 把這些錢包的權重降下來（每個約 3.6 萬 gas），但沒有獎勵，UI 也沒有入口。而攻擊者把入帳和 dispatch 放在同一筆交易裡，那一批稅在任何人來得及同步之前，就已經按膨脹的權重入帳。作者自審把它列為中危（M-01），沒有考慮 K 倍放大與 dispatch 綁定。</p></div>
+      </div>
+      <div class="stats"><span class="stat">K = 10：86.0% 對 38.1%</span><span class="stat">轉帳不收稅</span><span class="stat">2 筆交易</span><span class="stat">K = 80：一次性 0.0175 BNB</span></div>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M1 · 對應上一輪 M1</span><h3>到期後本人再 sync，已到期的權重仍會被丟掉</h3></div>
+      <div class="where">src/ReferralVault.sol:539-546 重新計時分支排在 548 到期判斷之前 · 558-564 是死碼</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>到期後只要 <code>live &gt; pendingLive</code>（又買了一點，或被別人轉了 1 wei），本人的 <code>syncMyHolding</code> 就走重新計時分支：已到期的那一段不入帳，整筆重等一天。本想「先入帳、再替超出的部分重新計時」的 558–564 永遠到不了：在那裡插一行 revert，倉庫全部測試加 5,000 輪模糊測試仍然全綠。這段程式碼除一個函式改名外與上一版相同。</p></div>
+        <div><span class="h">實測</span><p>arm 100 顆、到期後又買 1 顆並照 UI 點 <code>syncMyHolding</code>：權重 0，101 顆整筆重新計時；同樣狀態下如果先有陌生人同步，就會入帳 100 顆。每天加倉並照 UI 操作的持幣者，連續 7 天、持有 70 顆，權重一直是 0；每 23 小時買一次的，115 小時後仍是 0。陌生人轉 1 wei，就能讓持幣者自己的下一次點擊變成重新計時。</p></div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M2 · 新發現</span><h3>999 個終身名額可被零持倉假下線灌滿，推薦連結永久失效</h3></div>
+      <div class="where">src/ReferralVault.sol:185-188 綁定上限 · 192 _referees 只增不減</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>上限數的是推薦人一輩子被綁定的次數，不是目前的有效直推；名額永遠不會釋放，綁定也不需要推薦人同意。</p></div>
+        <div><span class="h">實測</span><p>999 個不持任何稅幣的地址綁到受害者（綁定費 0.1998 BNB，另加 gas）：受害者的有效直推是 0，但之後任何真實用戶綁定都 revert「該推薦人的直推已滿 999 人」。佣金方自己做等於免費。這和 H1 用的是同一種假下線：持 1 wei 並 arm 的假下線同時佔名額、又推高領取成本。</p></div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M3 · 對應作者 I-01</span><h3>到期的加倉不會自己生效，1 wei 的第一筆權重拿走啟動積壓的一半</h3></div>
+      <div class="where">src/ReferralVault.sol:253-258 holdingActivatesAt · 548-567 到期入帳要等同步 · 596-597、451-456 第一筆權重開啟滴灌 · 230 沒有收益時整筆 revert</div>
+      <div class="grid2">
+        <div><span class="h">發生什麼</span><p>到期不等於生效，要再有人同步一次才入帳，<code>holdingActivatesAt</code> 卻顯示一個已經過去的時間。沒有任何權重時的稅全部進 <code>backlog</code>，第一筆權重生效後用 24 小時釋放給當時有權重的人。會準時替自己入帳的機器人，永遠比只照 UI 操作的持幣者先拿到權重。新推薦人的領取也無法代為入帳：沒有可領金額時整筆 revert，入帳一起回滾。</p></div>
+        <div><span class="h">實測</span><p>只持 1 wei、比持有 100 萬顆的持幣者早 12 小時 arm，拿走啟動積壓 98 單位中的 49（50%）。到期但沒人同步的直推，兩天後推薦人仍是 0；fork 上 10 天後權重仍是 0，同期已同步的推薦人領到 0.185 BNB。作者自審把第一筆權重吃掉積壓列為資訊。</p></div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill mid">中</span><span class="id">M4 · 對應上一輪 M4</span><h3>測試釘不住新設計的保護：77 個變異有 40 個存活</h3></div>
+      <div class="where">test/ReferralVault.t.sol · test/ReferralVault.invariants.t.sol · test/ReferralVault.gas.t.sol · test/ReferralVault.mainnet.t.sol</div>
+      <p>詳見「測試有效性」。最危險的幾條：到期入帳不再以 arm 時的數量封頂（arm 1 顆、到期前一刻買任意數量就全額入帳）；陌生人能替持幣者重設計時器；移除直推時被搬移者的索引沒修正（下一次移除 Panic 0x32，推薦人領取卡死）；滴灌超過 24 小時沒人碰時會超額釋放（儲備大於餘額）；佣金可重複領，或付給呼叫者；任何人都能呼叫 <code>lockVaultUpgrades</code>。倉庫全部 49 條非 fork 測試與 10 條 fork 測試在這些變異下都仍然全綠。28 條殺手測試已放進 <code>test/audit/KillerTests.t.sol</code>，殺掉其中 36 個；剩下 4 個屬於無法觸發或等價的變異。</p>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill ok">已查證</span><span class="id">OK</span><h3>查證後沒有問題的部分</h3></div>
+      <ul class="plain">
+        <li>上一輪 H1（補水夾擊）已修：換匯路徑整個刪除。狀態差異記錄測試確認，入帳、領取、佣金與 <code>sync</code> 只碰金庫、報價幣、稅幣與收款方。</li>
+        <li>上一輪 H3（6 位小數報價幣）已修：工廠與 <code>initialize</code> 都拒絕非 18 位小數；全部 10 億顆供給都綁定時（1e27 權重），0.000001 單位的收入仍會入帳。</li>
+        <li>Rule 005 <code>receive()</code>：真實環境最重 193,475 gas（第一次有權重的入帳，含滴灌），穩態 3.9–9.6 萬，遠低於 1,000,000；沒有迴圈，兩個外部讀取都有 try 包住。</li>
+        <li>工廠佣金公式與 Rule 001 的建議一致（50、100、101、300、500、1,000 bps 逐一驗證；程式碼註解與作者自審寫成 Rule 002）。</li>
+        <li>重入：每一次出帳前都先改狀態；付款時透過 <code>sync</code> 或 <code>receive()</code> 重入只會多記一筆捐款，其他入口有 <code>nonReentrant</code> 擋下。</li>
+        <li>記帳恆等式 <code>referralReserve + backlog + 滴灌未釋放 + 佣金 == accountedQuote</code>，在倉內不變量與本次所有 PoC 中都成立。</li>
+        <li>升級只有 Guardian 能做，沒有非特權路徑；新版儲存佈局與舊版不相容，作者已註明不要把舊 Beacon 指到新實作。</li>
+        <li>上一輪 M2（Trigger gas 保留）、M3（3 萬規模 Trigger 費用）隨架構移除，不再適用。</li>
+        <li>Slither 0.11.6：51 條結果，逐條看過，沒有可操作的新問題（嚴格等號與時間戳屬設計如此；bind 先把綁定費轉給固定的佣金地址，重入只能呼叫無害的 <code>sync</code>）。</li>
+      </ul>
+    </article>
+
+    <article class="finding">
+      <div class="top"><span class="pill low">低</span><span class="id">L · 其他</span><h3>低危與資訊項</h3></div>
+      <ul class="plain">
+        <li>可以綁到永遠不會領取的地址（例如 <code>0xdEaD</code>）。配合 H2 的一袋多算，K = 10 時 <code>0xdEaD</code> 累積 90.9% 的分潤、永遠留在 <code>referralReserve</code>：攻擊者自己不賺，但誠實推薦人少拿。</li>
+        <li>到期後，陌生人在持幣者餘額暫時變少時同步（例如幣暫時放進流動性池或交易所），入帳會被鎖在當時的低點，其餘要重新 arm 再等一天。</li>
+        <li>晚綁定的隔代，要等別人同步孫代才拿到 33%；它自己的領取只同步直推。</li>
+        <li>可領總額可以比 <code>referralReserve</code> 多幾 wei（每次入帳最多 1 wei），最後一個領的人少領；經濟上可以忽略。</li>
+        <li>工廠接受任何 18 位小數 ERC20。會收轉帳手續費或會 rebase 的報價幣，會讓 <code>accountedQuote</code> 高於實際餘額，之後的小額收入看不見，最後一筆領取 revert。能否發生取決於 Flap 的報價幣白名單。</li>
+        <li>ERC20 報價的金庫也收 BNB，但沒有任何路徑把 BNB 轉出，誤轉進來的 BNB 永久卡住。</li>
+        <li>綁定費付給 <code>commissionReceiver</code>，所以佣金方自己做 H1、M2 的攻擊不花綁定費。</li>
+        <li><code>vaultUISchema</code> 沒有 <code>sync</code>、<code>syncHolding</code>、<code>syncHoldings</code>、<code>claimCommission</code>（作者 L-01）；前三者正是 H2 與 M3 唯一的防守入口。</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- ─────────────────────────── CROSS-CHECK ─────────────────────────── -->
+<section class="block" id="crosscheck">
+  <header>
+    <div class="eyebrow">逐條核對</div>
+    <h2>作者自審結論與上一輪發現逐條核對</h2>
+    <p class="lede">左邊是作者在 <code>audit_grok_4.7.md</code> 的結論，右邊是這次審查的實測結論。</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>作者結論</th><th>本次結論</th><th>依據</th></tr></thead>
+      <tbody>
+        <tr><td>規格 001–010 無失敗項</td><td><span class="pill mid">部分成立</span> 規格條文逐條成立；規格沒涵蓋的兩條高危存在</td><td>H1、H2；OK 各項</td></tr>
+        <tr><td>沒有會鎖死某一推薦人獎勵的高優先級問題</td><td><span class="pill high">不成立</span> 有效直推超過 856 人（狀態有變動時 211–697 人）就無法領取，約 0.2 BNB 可人為製造</td><td>H1</td></tr>
+        <tr><td>1,000 人全部減倉 29,693,241 gas、持倉不變約 1,880 萬，低於約 7,000 萬的區塊上限</td><td><span class="pill high">數字對，上限比錯</span> 單筆交易上限是 16,777,216，兩個數字都超過</td><td>焦點一</td></tr>
+        <tr><td>一筆領取約 0.00094–0.0015 BNB</td><td><span class="pill mid">只在上限內成立</span> 超過 856 名有效直推時，任何 gas 價格都無法成交</td><td>焦點一</td></tr>
+        <tr><td>M-01：減倉後的權重要等同步才消失（中危）</td><td><span class="pill high">低估</span> 同一袋幣可放大 K 倍，還能和 dispatch 綁在同一筆；真實稅幣 86% 對 38%</td><td>H2</td></tr>
+        <tr><td>L-01：<code>vaultUISchema</code> 未列出全部寫函式（低危）</td><td><span class="pill ok">成立</span> 而且是 H2、M3 唯一的防守入口</td><td>H2、M3、L</td></tr>
+        <tr><td>I-01：第一筆合格權重吃掉積壓的釋放（資訊）</td><td><span class="pill mid">成立且更嚴重</span> 1 wei 拿走一半；到期不等於生效</td><td>M3</td></tr>
+        <tr><td>I-02：大戶用第二個地址當推薦人</td><td><span class="pill low">維持</span> 設計如此</td><td></td></tr>
+        <tr><td><code>receive()</code> 首次 127,377、穩態 39,953 gas</td><td><span class="pill ok">成立</span> 真實環境最重 193,475，仍遠低於 1M</td><td>OK</td></tr>
+        <tr><td>單元與不變式 28 項、fork 10 項均通過</td><td><span class="pill mid">重跑成立，但守不住</span> ReferralVault 非 fork 33 項、fork 10 項全綠；77 個變異有 40 個存活</td><td>M4、測試有效性</td></tr>
+        <tr><td>已刪除 Trigger、補水換幣、週期申報、分批掃描</td><td><span class="pill ok">成立</span> 上一輪 H1、M2、M3 隨之消失</td><td>OK</td></tr>
+        <tr><td>舊 Beacon 不要升級到這份合約</td><td><span class="pill ok">成立</span> 儲存佈局不相容</td><td>OK</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>上一輪發現在新版的狀態</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>上一輪</th><th>內容</th><th>新版</th><th>依據</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">H1</td><td>補水夾擊</td><td><span class="pill ok">已修</span> 換匯路徑刪除</td><td><code>test/audit/Guards.t.sol</code> 狀態差異守衛</td></tr>
+        <tr><td class="mono">H2</td><td>同一袋幣被算 k 次</td><td><span class="pill high">仍成立</span> <code>_syncHolding</code> 除改名外與上一版相同</td><td>H2；<code>WalkingBag.t.sol</code>、<code>WalkingBag.mainnet.t.sol</code></td></tr>
+        <tr><td class="mono">H3</td><td>6 位小數報價幣獎勵被截斷</td><td><span class="pill ok">已修</span> 只接受 18 位小數</td><td><code>Guards.t.sol</code> 守衛</td></tr>
+        <tr><td class="mono">M1</td><td>到期後本人 sync 丟權重</td><td><span class="pill mid">仍成立</span> 除改名外與上一版相同</td><td>M1；<code>SelfSyncRearm.t.sol</code></td></tr>
+        <tr><td class="mono">M2</td><td>Trigger gas 保留不足</td><td><span class="pill low">不適用</span> 單筆 gas 問題轉移到領取</td><td>H1</td></tr>
+        <tr><td class="mono">M3</td><td>3 萬規模 Trigger 費用與耗時</td><td><span class="pill low">不適用</span> 重新評估見焦點二</td><td>焦點二</td></tr>
+        <tr><td class="mono">M4</td><td>測試釘不住修正</td><td><span class="pill mid">仍成立</span> 40／77 個變異存活</td><td>M4；<code>KillerTests.t.sol</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────── TESTS ─────────────────────────── -->
+<section class="block" id="tests">
+  <header>
+    <div class="eyebrow">測試有效性</div>
+    <h2>刪掉關鍵保護，測試還是綠的</h2>
+    <p class="lede">在倉庫全部非 fork 測試（49 條）與 BSC fork 套件（10 條）上跑 77 個變異，每次都還原原始檔並用 <code>cmp</code> 確認。倉庫測試殺掉 37 個，40 個存活；fork 套件沒有多殺任何一個。下表只列會拿掉使用者依賴的保護、卻沒有任何測試失敗的變異；其中 6 個另行獨立重做，結果相同。</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>變異</th><th>位置</th><th>失去什麼</th><th>倉庫測試</th></tr></thead>
+      <tbody>
+        <tr><td>到期入帳不再以 arm 時的數量封頂（<code>credit = live</code>）</td><td class="mono">:555</td><td>arm 1 顆、到期前一刻買任意數量，就全額入帳</td><td><span class="pill high">存活</span> 49/49</td></tr>
+        <tr><td>重新計時分支不檢查 <code>canArm</code></td><td class="mono">:539</td><td>陌生人轉 1 wei 再同步，就能無限重設別人的計時器</td><td><span class="pill high">存活</span></td></tr>
+        <tr><td><code>syncHoldings</code> 讓陌生人也能 arm</td><td class="mono">:216</td><td>同上</td><td><span class="pill high">存活</span></td></tr>
+        <tr><td>減倉或持平時不清掉 arm</td><td class="mono">:512, :519</td><td>賣掉再買回，照舊計時器到期（一袋多算更容易）</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td>移除直推時不修正被搬移者的索引</td><td class="mono">:615</td><td>下一次移除 Panic 0x32，推薦人領取卡死</td><td><span class="pill high">存活</span></td></tr>
+        <tr><td>領取時跳過被搬進第 i 格的直推</td><td class="mono">:347</td><td>只同步一半已賣光的直推</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td>滴灌超過 24 小時沒人碰時不封頂</td><td class="mono">:435</td><td>超額釋放，儲備大於實際餘額</td><td><span class="pill high">存活</span></td></tr>
+        <tr><td>權重歸 0 時丟掉未釋放的滴灌</td><td class="mono">:460</td><td>那筆稅永遠卡住</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td><code>claimCommission</code> 不扣基線／不歸零／付給呼叫者</td><td class="mono">:169-171</td><td>下一筆收入看不見／佣金可重複領／任何人都能領走佣金</td><td><span class="pill high">存活</span> 倉庫沒有任何測試呼叫 <code>claimCommission</code></td></tr>
+        <tr><td>稅率 ≤ 1% 分支的 6% 改成 5%</td><td class="mono">:384</td><td>Rule 001 佣金建議的一半沒人驗</td><td><span class="pill mid">存活</span></td></tr>
+        <tr><td><code>lockVaultUpgrades</code> 不檢查 Guardian</td><td class="mono">:723</td><td>任何人都能永久取消所有金庫的升級，也就是 H1 唯一的救援路徑</td><td><span class="pill high">存活</span></td></tr>
+        <tr><td>領取不再以 <code>referralReserve</code> 封頂</td><td class="mono">:229</td><td>捨入讓可領略大於儲備時，領取 Panic 0x11</td><td><span class="pill mid">存活</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">不變量套件：68 個地址均勻隨機、深度 20，每位推薦人最多只測到 2 名直推。10 次全新的跑法裡，成功領取只出現 1 次，減倉 1 次；重新計時、到期封頂、滴灌暫停、清單搬移、999 上限都是 0 次。六條不變量共用同一個種子，實際上是同一次 64 輪的跑法檢查六遍。gas 基準預設跳過、只量暖存儲、沒有斷言（見焦點一）。28 條殺手測試在原始碼上全綠，殺掉 36 個存活變異；剩下 4 個屬於無法觸發或等價（包括 M1 那段死碼）。</p>
+</section>
+
+<!-- ─────────────────────────── FIXES ─────────────────────────── -->
+<section class="block" id="fixes">
+  <header>
+    <div class="eyebrow">建議修法</div>
+    <h2>依優先順序</h2>
+  </header>
+  <ol class="plain" style="padding-left:1.4em">
+    <li><strong>H1 讓領取與直推數脫鉤。</strong>最直接的做法：把 <code>_syncDirects</code> 從 <code>claim</code> 拿掉，領取只結算自己。實測這段同步本來就不影響這一次能領多少；拿掉之後，領取固定在約 9 萬 gas。權重衛生改由無許可的 <code>syncHoldings</code> 負責。如果仍要保留同步，就改成有上限的分批（例如每筆最多 N 人、循環游標），而且不要讓付款等全部同步完成。補一條 fork＋<code class="nw">--isolate</code> 測試：在合約允許的最大有效直推數下，<code>claim{gas: 16_777_216}</code> 必須成功。錯誤訊息也要說出真正原因。</li>
+    <li><strong>M2 名額。</strong>名額只計有效直推，或允許推薦人移除零持倉的下線；也可以讓綁定需要推薦人簽名同意，從根本擋住灌假下線，同時削弱 H1 的攻擊。</li>
+    <li><strong>H2 同一袋多算。</strong>在「稅幣留在錢包、沒有快照或轉帳鉤子」的前提下，這類問題無法在合約內完全關閉，只能提高成本、讓它看得見：官方 keeper 監看稅幣的 Transfer 事件，每個區塊替轉出方同步；把 <code>syncHolding(address)</code> 與 <code>syncHoldings</code> 放進 UI；研究能保留 Flap 持幣分紅的鎖倉包裝（唯一根治）；設最低持倉門檻來壓低 K。作者自審裡 M-01 的中危評級應調高。</li>
+    <li><strong>M1 自我 sync 丟權重。</strong>把到期判斷移到重新計時分支前面：到期就先入帳 <code>min(live, pendingLive)</code>，超出的部分再重新計時，讓 558–564 真正生效。但光調順序不夠：比一天一次更勤的買家，每次點擊仍會把還沒到期的整筆重新計時。要讓新加的部分自己計時、原本在計時的部分保留原計時，需要把 arm 拆成兩段。補「到期後加倉再自己 sync」與「每天加倉」兩條測試。</li>
+    <li><strong>M3 到期不等於生效。</strong>UI 與 <code>holdingActivatesAt</code> 的說明要講清楚「到期後要再同步一次」；keeper 在到期時同步；領取在沒有收益時不要整筆 revert，讓推薦人能替直推入帳。啟動期的 <code>backlog</code> 可以拉長滴灌，或按一段時間的持倉加權，降低第一筆權重的優勢。</li>
+    <li><strong>M4 測試。</strong>把 <code>test/audit</code> 的殺手測試與 PoC 納入 CI；gas 測試開 <code class="nw">--isolate</code>，直接斷言不超過 16,777,216；不變量 handler 要能在同一位推薦人下累積大量直推，真的觸發重新計時與滴灌暫停，並補上「可領總額 ≈ referralReserve」與 <code>claimCommission</code>；六條不變量改用不同種子。</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────── METHOD ─────────────────────────── -->
+<section class="block" id="method">
+  <header>
+    <div class="eyebrow">方法與重現</div>
+    <h2>這次是怎麼審的</h2>
+  </header>
+  <dl class="kv">
+    <dt>範圍</dt><dd><code>src/ReferralVault.sol</code>（742 行，含工廠）。<code>src/flap/**</code> 與 FreeCoin 示例不在範圍內。判準是倉內的 Rule 001–010 與 <code>VaultBaseV3</code> 的規範性註解。</dd>
+    <dt>流程</dt><dd>Marshal 深度審查：從單筆 gas 上限、3 萬規模、經濟與安全（含上一輪發現重驗）、測試有效性四個角度提出 40 多條失效假說，逐條以真實環境實測、PoC 或變異測試證實或排除。關鍵結果都另行獨立重跑：領取 gas 有三組獨立測量（真實稅幣 999 人 19,488,574 與 19,508,782，後者另對每種直推狀態直接驗證 n／n＋1；模擬稅幣 999 人 19,349,452），經濟面 PoC 在乾淨副本重跑 22＋3 條全過，6 個關鍵變異獨立重做結果相同。</dd>
+    <dt>基線</dt><dd>非 fork 測試 49 passed（ReferralVault 單元 23、表面 4、不變量 6，其餘為 FreeCoin 示例），gas 基準 1 條預設跳過；BSC fork 套件 10 passed（原生 6、SPCXB 4）。</dd>
+    <dt>BSC 單筆上限</dt><dd>BNB Chain v1.7.6／v1.7.7 發行說明：Pasteur 硬分叉，主網 2026-08-25 02:30 UTC 生效，「Per-transaction gas limit is now enforced by EIP-7825」。用沒有餘額的臨時地址簽交易探測：gas 16,777,216 只因餘額不足被拒；16,777,217 與 20,000,000 被兩個節點以超過上限拒收。最近 3,000 個區塊約 32 萬筆使用者交易，最大 gas limit 正好 16,777,216。</dd>
+    <dt>審查限制</dt><dd>本專案沒有預先定義的自動不變量規則，改以專案自己的規格、實測與變異測試替代。fork 結果取決於 2026-09-28 的鏈上狀態，日後重跑數字可能略有差異。各種直推狀態的上限是在單一狀態下量的；真實的直推是混合狀態，上限介於其間。SPCXB 的 <code>balanceOf</code> 語義只做了介面比對；Flap 報價幣白名單的內容沒有查。</dd>
+  </dl>
+
+  <details>
+    <summary>可重現命令（PoC 與守衛測試都在 ReferralVault 倉庫的 test/audit/，說明見該目錄的 README.md）</summary>
+    <div class="inner">
+      <p class="small">在 ReferralVault 倉庫根目錄執行。<strong>守衛</strong>必須一直是綠的；<strong>PoC</strong> 斷言的是有漏洞時的結果，修好之後要反轉或刪除。gas 相關的測試一定要加 <code class="nw">--isolate</code>。forge 不會執行 BSC 的單筆上限，所以測試用二分搜尋找出能成功的最小 gas limit，再與 16,777,216 比較。</p>
+<pre># 單元環境（不需要網路）：PoC、守衛與 28 條殺手測試
+forge test --match-path 'test/audit/*' --no-match-path 'test/audit/*mainnet*'
+
+# H1 鎖死：冷存儲才有意義
+ISOLATE=1 SYBILS=998 forge test --isolate --match-path test/audit/SybilLock.t.sol -vv
+
+# H2 一袋多算（真實 Flap V3 稅幣）與焦點二的單步成本
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --isolate --match-path test/audit/WalkingBag.mainnet.t.sol -vv
+BSC_RPC_URL=https://bsc-rpc.publicnode.com forge test --isolate --match-path test/audit/ScaleGas.mainnet.t.sol -vv
+
+# 焦點一：400／700／999 名直推的領取（999 個新地址，要用能讀歷史狀態的 RPC 並釘住區塊；
+# publicnode 只保留約 100 個區塊的狀態）
+U=https://api.zan.top/bsc-mainnet
+B=$(( $(cast block-number --rpc-url $U) - 5 ))
+BSC_FORK_BLOCK=$B BSC_RPC_URL=$U forge test --rpc-url $U --fork-block-number $B \
+  --fork-retries 30 --fork-retry-backoff 1500 --isolate --disable-block-gas-limit \
+  --gas-limit 9000000000000 --match-path test/audit/ClaimTxCap.mainnet.t.sol -vv</pre>
+    </div>
+  </details>
+</section>
+
+<footer class="foot">
+  <span>Marshal（風險分級＋不變量閘＋對抗審查）產出，建議性質，不構成部署阻擋。</span>
+</footer>
+
+</div>
+
+<div class="tip" id="tip" hidden></div>
+<script>
+(function () {
+  var tip = document.getElementById('tip');
+  function show(el, x, y) {
+    tip.textContent = el.getAttribute('data-tip');
+    tip.hidden = false;
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = Math.min(x + 12, window.innerWidth - w - 8);
+    var top = y - h - 10 < 8 ? y + 16 : y - h - 10;
+    tip.style.left = Math.max(8, left) + 'px';
+    tip.style.top = top + 'px';
+  }
+  document.querySelectorAll('svg.viz [data-tip]').forEach(function (el) {
+    var t = el.querySelector('title');
+    if (t) t.remove();
+    el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+    el.addEventListener('mouseleave', function () { tip.hidden = true; });
+    el.addEventListener('focus', function () { var r = el.getBoundingClientRect(); show(el, r.right, r.top); });
+    el.addEventListener('blur', function () { tip.hidden = true; });
+  });
+})();
+</script>
+</body>
+</html>
