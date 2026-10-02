@@ -12,7 +12,7 @@ status: authoritative
 
 # Cowboy Node — 主链节点架构
 
-**位置**: `/home/ubuntu/workspace/node/`（独立 Rust workspace）
+**位置**: `/home/ubuntu/workspace/core/`（`cowboyinc/core` monorepo 根目录；2026-09-26 前为独立 `node` 仓）
 
 **共识**: Simplex BFT（`Application` trait: propose/verify/report 三阶段）
 

@@ -17,7 +17,8 @@
    - `refs/economics/`、`refs/devex/`、`refs/common/` — 专题文档
    - `refs/analysis/` — 跨主题分析、修正案、会议纪要
    - `refs/plans/` — 工程实施计划 / 评估 / 路径图（随机 slug 命名；见 `wiki/entities/plans-inventory.md`）
-   - 代码（真正权威）位于 workspace `node/`、`runner/`、`cbfs/`（CIP-9 存储层，前称 `steamtrain/`）、`cbss/` 等 workspace
+   - 代码（真正权威）位于 monorepo `core/`（`cowboyinc/core`）：节点 crate 在根目录，另有 `protocol/`、`cbfs/`（CIP-9 存储层，前称 `steamtrain/`）、`cbss/`、`cbqs/`、`runnerd/`（runner daemon）、`gateway/`、`cowchat-server/`
+   - **路径对照**：2026-09-26 前的条目引用的是独立仓路径，历史记录保持原样，读时按此换算：`node/X` → core 根目录 `X`；runner 仓 `runner/crates/X` → `runnerd/crates/X`；`cbfs/`、`cbss/`、`cbqs/`、`gateway/` 不变；cowboy-protocol 仓 → `protocol/`。**新条目一律写 core 路径**
 
 2. **Wiki**（`refs/wiki/`）— LLM 全权维护
    - `index.md`、`log.md` — 索引与时序
