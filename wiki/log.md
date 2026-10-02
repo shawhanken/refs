@@ -672,3 +672,13 @@ README 停在 2026-05-11、`wiki/index.md` 停在 2026-05-26，两者都把已�
 以及 `refs/cips/` 各档正文（只加横幅不改写 —— 改写会制造「已维护」的假象，沿用 2026-08-16 决策）。
 
 ---
+
+## [2026-10-01] lint | 代码已并入 core monorepo：更新现行路径指针
+
+2026-09-26 起 node、cowboy-protocol、cbfs、cbss、cbqs、runner、gateway、cowchat-server 都并入 `cowboyinc/core`（节点 crate 在根目录，runner daemon 在 `runnerd/`；对照见 core `docs/migration/imports.json`）。
+
+**更新**:
+- `wiki/entities/node.md` — 位置改为 core monorepo 根目录
+- `wiki/AGENTS.md` — 代码权威位置改为 `core/`，并加新旧路径对照；历史条目的旧路径保持原样，按对照换算
+
+**同步**（wiki 外）：`README.md`、`node/README.md`、`dev_support/CLAUDE.md` 的现行路径。

@@ -224,16 +224,15 @@ wc -l *.md
 ## 🔗 相关资源
 
 ### 代码仓库
-- **主仓库**: `/home/ubuntu/workspace/node/`
-- **分支**: `devnet_pvm_integration`
+- **主仓库**: `/home/ubuntu/workspace/core/`（`cowboyinc/core` monorepo；节点 crate 在根目录。2026-09-26 前是独立的 `node` 仓）
+- **分支**: `devnet`
 - **关键文件**:
-  - `chain/src/execution.rs`
-  - `chain/src/pvm_host.rs`
-  - `chain/src/pvm_executor.rs`
+  - `execution/src/execution/engine.rs`
+  - `execution/src/pvm_host.rs`
+  - `execution/src/pvm_executor.rs`
 
-### PVM 子模块
-- **路径**: `/home/ubuntu/workspace/node/pvm/`
-- **版本**: `v0.2.0-1-gc889583`
+### PVM
+- **路径**: `/home/ubuntu/workspace/core/pvm/`（独立的 Cargo workspace，不在根 workspace 内）
 
 ### 配置文件
 - **测试脚本**: `test2.sh`

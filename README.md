@@ -11,7 +11,9 @@
 >    且完全缺 CIP-27 / 30 / 33 / 34 / 36 / 40 / 41 / 42。每个档头都有 STALE SNAPSHOT 横幅标注具体差距。
 >    保留它们只为历史追溯 —— **不要据此实作**。
 > 2. **代码永远是最终权威。** 文档（含 `wiki/`、`whitepaper/`、任何 CIP）与代码冲突时以代码为准。
->    系统 actor 地址以 `node/runner/src/system_actors.rs` 的 `well_known_low_byte_assignments` pin 测试为准。
+>    代码在 monorepo `cowboyinc/core`：2026-09-26 起 node、cowboy-protocol、cbfs、cbss、cbqs、runner、gateway、cowchat-server
+>    都已并入（节点 crate 在根目录，runner daemon 在 `runnerd/`）。旧文档里的 `node/…` 路径对应 core 根目录。
+>    系统 actor 地址以 core `runner/src/system_actors.rs` 的 `well_known_low_byte_assignments` pin 测试为准。
 
 ---
 
